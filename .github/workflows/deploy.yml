@@ -1,0 +1,324 @@
+name: deploy
+
+# Deploy only what a change actually affects.
+#
+# A `changes` job computes path filters once, and every downstream job gates on its
+# output. Editing a registry YAML resyncs the registry and reapplies Tasks without
+# rebuilding a container; editing Python rebuilds the image; editing a dbt model
+# rebuilds models and leaves the ingestion side alone.
+#
+# Auth is keyless: GitHub OIDC -> a Snowflake TYPE=SERVICE user with a matching
+# WORKLOAD_IDENTITY. No credential is stored anywhere. The only repo secret is the
+# account identifier. See dlt-pipelines/sql/prod/03b_service_user_oidc.sql, which
+# also covers the network policy override without which none of this can connect.
+#
+# NOT ON EVERY PUSH: main and manual dispatch only, gated on the `deploy` GitHub
+# environment so required reviewers can sit in front of a production change. The
+# environment name is part of the OIDC subject claim; renaming it here breaks
+# authentication until 03b is updated to match.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO: run anything under dlt-pipelines/sql/. Those
+# files create roles, compute pools, databases and grants, several as SYSADMIN,
+# USERADMIN or ACCOUNTADMIN. They stay a reviewed `make setup-*` run by a human.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # required to mint the OIDC token
+  contents: read
+
+# Two deploys applying Task DDL at once would race, and the loser's CREATE OR ALTER
+# would leave Tasks in a state neither run intended. Queue instead of cancelling:
+# a half-applied deploy is worse than a slow one.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }} # DLT_DEPLOYER
+  SNOWFLAKE_ROLE: ${{ vars.SNOWFLAKE_ROLE }} # DLT_LOADER_ROLE
+  SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }} # DLT_WH
+  SNOWFLAKE_DATABASE: DLT_DB
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.decide.outputs.image }}
+      registry: ${{ steps.decide.outputs.registry }}
+      tasks: ${{ steps.decide.outputs.tasks }}
+      dev_specs: ${{ steps.decide.outputs.dev_specs }}
+      dbt: ${{ steps.decide.outputs.dbt }}
+      agents: ${{ steps.decide.outputs.agents }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        # A manual dispatch has no base commit to diff against, so the filter is
+        # skipped entirely and `decide` below turns everything on. That makes the
+        # Run workflow button mean "deploy all of it", which is what you want when
+        # you are recovering from a partial failure.
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            image:
+              - 'dlt-pipelines/pipelines/**'
+              - 'dlt-pipelines/pyproject.toml'
+              - 'dlt-pipelines/uv.lock'
+              - 'dlt-pipelines/deploy/spcs/Dockerfile'
+            registry:
+              - 'dlt-pipelines/pipelines/batch/registries/**'
+            tasks:
+              - 'dlt-pipelines/pipelines/batch/registries/**'
+              - 'dlt-pipelines/deploy/spcs/dlt_job.tmpl.yaml'
+              - 'dlt-pipelines/deploy/tasks/generate_tasks.py'
+            dev_specs:
+              - 'dlt-pipelines/deploy/spcs/dlt_dev_job*.tmpl.yaml'
+            dbt:
+              - 'dbt-pipelines/**'
+            agents:
+              - 'dbt-pipelines/agents/**'
+
+      - name: Decide what to deploy
+        id: decide
+        env:
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          F: ${{ toJSON(steps.filter.outputs) }}
+        run: |
+          for k in image registry tasks dev_specs dbt agents; do
+            if [ "$DISPATCH" = "true" ]; then
+              v=true
+            else
+              v=$(echo "$F" | python3 -c \
+                "import json,sys;print(json.load(sys.stdin).get('$k','false'))")
+            fi
+            echo "$k=$v" >> "$GITHUB_OUTPUT"
+            echo "$k=$v"
+          done
+
+  # ---------------------------------------------------------------------------
+  # Container image
+  # ---------------------------------------------------------------------------
+  # Built on a native linux/amd64 runner because SPCS compute pools are x86_64.
+  # This is the right place for it: an Apple Silicon laptop has to emulate amd64
+  # through QEMU, which turns a two-minute build into a long one.
+  image:
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    environment: deploy
+    defaults:
+      run:
+        working-directory: dlt-pipelines
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+
+      - name: Log in to the Snowflake image registry
+        run: snow spcs image-registry login
+
+      - name: Build and push (linux/amd64)
+        run: |
+          host="$(snow spcs image-registry url)"
+          # Docker references must be lowercase; Snowflake maps this back to
+          # DLT_DB.DEPLOY.IMAGES.
+          target="$host/dlt_db/deploy/images/dlt-pipeline:latest"
+          echo "Building and pushing $target"
+          docker build --platform linux/amd64 -f deploy/spcs/Dockerfile -t "$target" .
+          docker push "$target"
+
+  # ---------------------------------------------------------------------------
+  # Registry resync
+  # ---------------------------------------------------------------------------
+  # --emit-sql / generate_tasks need only pyyaml (no dlt, no Snowflake connector),
+  # which is why models.py is kept import-free. The deploy runner stays lean.
+  registry:
+    needs: changes
+    if: needs.changes.outputs.registry == 'true'
+    runs-on: ubuntu-latest
+    environment: deploy
+    defaults:
+      run:
+        working-directory: dlt-pipelines
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - name: Verify connection
+        run: snow connection test -x
+      - name: Sync registries/*.yml into OPS.PIPELINE_REGISTRY
+        run: |
+          python -m pipelines.batch.registry_sync --emit-sql --prune > registry_sync.sql
+          echo "----- registry_sync.sql -----" && cat registry_sync.sql
+          snow sql -f registry_sync.sql -x
+
+  # ---------------------------------------------------------------------------
+  # Tasks
+  # ---------------------------------------------------------------------------
+  tasks:
+    needs: [changes, image, registry]
+    # `always()` is load-bearing. `image` and `registry` are skipped far more often
+    # than they run, and a bare `needs:` propagates a skip, which would silently
+    # stop Tasks from ever being reapplied. The guard is "did not FAIL", not "ran".
+    if: |
+      always()
+      && needs.changes.outputs.tasks == 'true'
+      && needs.image.result != 'failure'
+      && needs.registry.result != 'failure'
+    runs-on: ubuntu-latest
+    environment: deploy
+    defaults:
+      run:
+        working-directory: dlt-pipelines
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - name: Generate and apply per-pipeline Tasks
+        run: |
+          python -m deploy.tasks.generate_tasks > tasks.sql
+          echo "----- tasks.sql -----" && cat tasks.sql
+          snow sql -f tasks.sql -x
+
+      # THIS STEP IS NOT OPTIONAL AND MUST NOT BE REORDERED.
+      #
+      # CREATE OR ALTER TASK resets a Task to SUSPENDED. Without this, every deploy
+      # that touches a registry file would silently stop the entire schedule: the
+      # DDL succeeds, nothing errors, and the next cron fire never happens. That
+      # failure has already happened once by hand.
+      #
+      # Resuming a Task that is already started is a no-op, so this is safe to
+      # re-run and safe on a first deploy.
+      - name: Resume scheduled Tasks
+        run: |
+          python -m deploy.tasks.generate_tasks --resume > resume.sql
+          echo "----- resume.sql -----" && cat resume.sql
+          snow sql -f resume.sql -x
+
+      - name: Show resulting Task state
+        run: snow sql -q "SHOW TASKS IN SCHEMA DLT_DB.OPS;" -x
+
+  # ---------------------------------------------------------------------------
+  # Dev job spec templates
+  # ---------------------------------------------------------------------------
+  # Only the DEV templates are staged. Production Tasks carry their spec inline,
+  # rendered by generate_tasks.py, because Snowflake's server-side template
+  # renderer fails inside a Task: it resolves a dependency through
+  # snowflake.snowpark.pypi_shared_repository, which the Task's role cannot reach.
+  dev-specs:
+    needs: changes
+    if: needs.changes.outputs.dev_specs == 'true'
+    runs-on: ubuntu-latest
+    environment: deploy
+    defaults:
+      run:
+        working-directory: dlt-pipelines
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+      - name: Upload dev spec templates
+        run: |
+          for f in deploy/spcs/dlt_dev_job*.tmpl.yaml; do
+            snow sql -x -q "PUT file://$PWD/$f @DLT_DB.DEPLOY.SPECS \
+              AUTO_COMPRESS=FALSE OVERWRITE=TRUE;"
+          done
+
+  # ---------------------------------------------------------------------------
+  # dbt
+  # ---------------------------------------------------------------------------
+  # PREREQUISITE NOT YET SATISFIED, see the repo README/CLAUDE.md "Known gaps".
+  # dbt-pipelines/env.yml sets DBT_ROLE: SYSADMIN for prod, but DLT_DEPLOYER only
+  # holds DLT_LOADER_ROLE. Until either a dedicated dbt role exists and env.yml
+  # names it, or that role is granted to the deployer, this job authenticates fine
+  # and then fails on privileges. Decide the role model before enabling it.
+  #
+  # `--env` must come BEFORE the project name. Tokens after it are passed through
+  # to dbt Core, which has no --env and will reject them.
+  dbt:
+    needs: changes
+    if: needs.changes.outputs.dbt == 'true'
+    runs-on: ubuntu-latest
+    environment: deploy
+    defaults:
+      run:
+        working-directory: dbt-pipelines
+    env:
+      DBT_PROJECT: ${{ vars.DBT_PROJECT_FQN }} # e.g. NFL_PROD_DB.ANALYTICS.cortex_lifecycle
+      DBT_PROJECT_NAME: ${{ vars.DBT_PROJECT_NAME }} # e.g. cortex_lifecycle
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+      - name: Deploy the dbt project object
+        run: |
+          snow dbt deploy "$DBT_PROJECT_NAME" --source . --default-env prod \
+            --external-access-integration dbt_ext_access --force -x
+      - name: Build models
+        run: snow dbt execute --env prod "$DBT_PROJECT" build -x
+
+  # ---------------------------------------------------------------------------
+  # Cortex Agents
+  # ---------------------------------------------------------------------------
+  # Separate from `dbt` because an agent is a MACRO, not a model: `dbt build` does
+  # not deploy it, and redeploying an agent on every model change is pure churn.
+  # It needs the models to exist first, hence `needs: dbt`.
+  #
+  # `alter: true` updates in place rather than dropping and recreating, so a live
+  # agent does not disappear mid-deploy.
+  agents:
+    needs: [changes, dbt]
+    if: |
+      always()
+      && needs.changes.outputs.agents == 'true'
+      && needs.dbt.result != 'failure'
+    runs-on: ubuntu-latest
+    environment: deploy
+    defaults:
+      run:
+        working-directory: dbt-pipelines
+    env:
+      DBT_PROJECT: ${{ vars.DBT_PROJECT_FQN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+      - name: Redeploy the analyst agent
+        run: |
+          snow dbt execute --env prod "$DBT_PROJECT" \
+            run-operation deploy_nfl_analyst --args '{alter: true}' -x

@@ -1,0 +1,66 @@
+name: ci
+
+# Validation only. NOTHING HERE TOUCHES SNOWFLAKE, and that is the whole design:
+# because it needs no credentials and no network access to the account, it can run
+# on every push and on pull requests from forks. Anything that does touch Snowflake
+# lives in deploy.yml, which is restricted to main and workflow_dispatch.
+#
+# Keep it that way. The moment a step here needs `snow`, it belongs in deploy.yml.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dlt:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # This repo is a monorepo; the dlt project is not at the root. Without this
+        # every step would run against the repository root and find no pyproject.
+        working-directory: dlt-pipelines
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      # models.py is deliberately import-free (no dlt, no Snowflake connector) so the
+      # Task generator can run in CI. This check is what keeps that true: an accidental
+      # top-level `import dlt` in models.py would pass tests and break deploy.yml.
+      - name: Import check
+        run: |
+          python -c "import pipelines.batch.run, pipelines.batch.models, \
+            pipelines.common.observability, pipelines.common.snowflake_session"
+
+      - name: Registry parses
+        run: python -m pipelines.batch.run --list
+
+      - name: Tests
+        run: pytest -q
+
+      # Render the Task DDL and the resume statements. generate_tasks raises on any
+      # unsubstituted placeholder, so this fails here rather than producing a Task
+      # whose container spec is malformed -- which is only discoverable at 09:00 UTC
+      # when the schedule fires. The two must agree on how many Tasks exist.
+      - name: Task DDL renders
+        run: |
+          python -m deploy.tasks.generate_tasks > /tmp/tasks.sql
+          python -m deploy.tasks.generate_tasks --resume > /tmp/resume.sql
+          tasks=$(grep -c "^CREATE OR ALTER TASK" /tmp/tasks.sql || true)
+          resumes=$(grep -c "^ALTER TASK" /tmp/resume.sql || true)
+          echo "tasks=$tasks resumes=$resumes"
+          test "$tasks" -gt 0
+          test "$tasks" = "$resumes"
