@@ -56,6 +56,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 # Make the repo root importable so `pipelines` resolves when run as a module or script.
@@ -255,7 +256,14 @@ def resume_sql(spec: PipelineSpec) -> str:
     return f"ALTER TASK {TASKS_SCHEMA}.dlt_task_{spec.name} RESUME;\n"
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Sequence[str] = ()) -> int:
+    # argv DEFAULTS TO EMPTY, NOT None, AND THAT IS DELIBERATE.
+    # argparse reads sys.argv when handed None, so a library caller doing a bare
+    # main() would silently inherit whatever flags its own process was started
+    # with. Under pytest that is `-q`, and the generator dies on an unrecognised
+    # argument in a test that never mentioned arguments. Defaulting to () makes
+    # main() mean "run with defaults" everywhere, and __main__ passes the real
+    # argv explicitly.
     parser = argparse.ArgumentParser(
         prog="generate_tasks",
         description="Emit Snowflake Task DDL from pipelines/batch/registries/.",
@@ -282,4 +290,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

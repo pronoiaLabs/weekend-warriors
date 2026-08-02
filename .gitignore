@@ -44,6 +44,15 @@ dist/
 .snowflake/
 .claude/settings.local.json
 logs.txt
+
+# Reference material kept locally, not redistributed. Holds the BallDontLie
+# OpenAPI specs, which are the provider's to publish rather than ours, plus
+# working notes. Nothing in the build reads from here.
+#
+# LEADING SLASH IS LOAD-BEARING: it anchors this to the repository root. A bare
+# `.docs/` matches at any depth and would also swallow dlt-pipelines/.docs/,
+# which is vendored dlt reference that its README documents and links to.
+/.docs/
 FIX-PLAN.md
 FIX-PLAN.html
 SPCS-PLAN.md

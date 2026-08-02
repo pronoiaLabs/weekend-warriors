@@ -49,6 +49,19 @@ jobs:
         run: python -m pipelines.batch.run --list
 
       - name: Tests
+        # A dummy credential, NOT a real one, and nothing here calls the API.
+        #
+        # Some tests build the dlt source object to inspect how dlt resolved a
+        # resource's write disposition. Constructing a rest_api source requires the
+        # auth config to RESOLVE even though no request is ever sent, and dlt reads
+        # it from .dlt/secrets.toml, which is gitignored and therefore absent on a
+        # runner. Without this the tests fail on ConfigFieldMissingException, which
+        # reads like a broken pipeline and is actually a missing file.
+        #
+        # Scoped to this step rather than the job so that a step which genuinely
+        # should fail without a credential still does.
+        env:
+          SOURCES__NFL__API_KEY: ci-dummy-not-a-real-key
         run: pytest -q
 
       # Render the Task DDL and the resume statements. generate_tasks raises on any

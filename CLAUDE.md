@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-An NFL analytics stack on Snowflake, assembled from two upstream templates and adapted. Data source is the [BallDontLie](https://api.balldontlie.io) NFL API; OpenAPI specs for NFL and NCAAF live in [.docs/openapi-meta/](.docs/openapi-meta/) and `BALL_DONT_LIE_API_KEY` is in `.env`.
+An NFL analytics stack on Snowflake, assembled from two upstream templates and adapted. Data source is the [BallDontLie](https://api.balldontlie.io) NFL API, documented at [docs.balldontlie.io](https://docs.balldontlie.io); `BALL_DONT_LIE_API_KEY` is in `.env`.
+
+Note `/.docs/` at the repo root is gitignored: it holds the provider's OpenAPI specs and local working notes, which are not ours to redistribute. `dlt-pipelines/.docs/` is a different directory and **is** tracked, holding vendored dlt reference material that `dlt-pipelines/README.md` links to.
 
 The shape is: dlt loads `NFL_PROD_DB.RAW` from SPCS on a Snowflake Task schedule, dbt builds `PREP` / `CORE` / `ANALYTICS` on top of it via `EXECUTE DBT PROJECT`, and a Cortex Agent sits on the semantic views. Nothing runs outside the Snowflake account.
 
@@ -129,4 +131,3 @@ What makes it work is that **network policies override rather than stack**. A po
 - **Nothing chains dbt behind the ingestion Tasks.** `dbt build` runs on a code push, not when new rows land in `RAW`. A Task graph with dbt as a child of the last dlt Task is the natural shape and is not built.
 - **`stats?seasons[]=<year>` is incomplete.** A 2023 replay returned 47 of 49 games; both missing games have data when fetched by `game_id`. Fetching per game the way `plays` does would close it. The dbt reconciliation tests exist to keep this visible.
 - **No alerting on Task failure.** Visible only in `TASK_HISTORY` and `_DLT_RUNS`.
-- `.docs/README.md` and the `cortex-agents` / `data-modeling` HTML files are 0 bytes.

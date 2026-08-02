@@ -78,8 +78,10 @@ Two directories, one for each half:
 |---|---|
 | [dlt-pipelines/](dlt-pipelines/) | Gets the data in. Registry-driven [dlt](https://dlthub.com), deployed to SPCS. |
 | [dbt-pipelines/](dbt-pipelines/) | Makes it useful. dbt models, semantic views, Cortex Agents. |
-| [.docs/](.docs/) | BallDontLie OpenAPI specs for NFL and NCAAF. |
 | [.github/workflows/](.github/workflows/) | CI, and a deploy that only ships what changed. |
+
+The BallDontLie API is documented at [docs.balldontlie.io](https://docs.balldontlie.io). Its OpenAPI
+specs are not vendored here; they belong to the provider.
 
 **Where to read next**, depending on what you came for:
 
