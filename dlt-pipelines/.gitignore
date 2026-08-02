@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# dlt
+# secrets.toml contains credentials — never commit it.
+# config.toml and secrets.toml.example ARE safe to commit.
+.dlt/secrets.toml
+~/.dlt/
+# Local DuckDB. `make run-local` writes duck-db/local.duckdb; the bare *.duckdb rule
+# stays because older runs left files in the repo root.
+duck-db/
+*.duckdb
+
+
+# Make / emitted SQL artifacts
+build/
+
+# OS
+.DS_Store
+
+# Local Snowflake CLI / Cortex state (connections, conversation history)
+.snowflake/
+
+# Local agent onboarding notes (not part of the published template)
+TG-AGENT.md
+
+# Local backlog notes (not part of the published template)
+BACK-LOG.md

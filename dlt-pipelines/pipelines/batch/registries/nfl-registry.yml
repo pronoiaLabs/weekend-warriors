@@ -1,0 +1,628 @@
+# NFL pipelines, loaded from the BallDontLie NFL API.
+#
+# Every file in this directory is merged into one registry, so pipeline names must be
+# unique across ALL of them, not just within this file. `defaults:` below applies only
+# to this file's pipelines, which is what keeps a per-source file self-contained.
+#
+# SECRETS ARE NEVER STORED HERE. A `secret:<path>` value points at a key in
+# .dlt/secrets.toml (or a Snowflake SECRET bound to an env var); see the client block.
+
+# ---------------------------------------------------------------------------
+# Anchors only.
+#
+# load_registry reads `defaults` and `pipelines` from the top level and ignores
+# anything else, so this key never reaches a PipelineSpec. pyyaml expands the alias at
+# parse time, which means the registry table and the task generator both receive a
+# fully expanded copy; nothing downstream has to understand anchors.
+#
+# The client block is shared because every NFL pipeline hits the same host with the
+# same credential. Copying it per pipeline invites drift, and drift in an auth block
+# fails silently rather than loudly.
+#
+# On auth: BallDontLie wants the raw key in an `Authorization` header with no scheme
+# prefix. dlt's `auth: {token: ...}` shorthand would send "Authorization: Bearer <key>",
+# so use the explicit api_key form.
+#
+# On the paginator: `single_page` is the client-wide default because `teams` returns a
+# bare `data` array with no `meta` object at all. Paginated endpoints override it, which
+# keeps the unusual case local to the resource that is unusual.
+# ---------------------------------------------------------------------------
+anchors:
+  nfl_client: &nfl_client
+    base_url: "https://api.balldontlie.io/nfl/v1/"
+    auth:
+      # resolved from .dlt/secrets.toml -> [sources.nfl] api_key = "..."
+      # env var equivalent: SOURCES__NFL__API_KEY
+      type: api_key
+      name: Authorization
+      location: header
+      api_key: "secret:sources.nfl.api_key"
+    paginator: single_page
+
+# NOTE: `write_disposition` is deliberately NOT set here. Setting it in defaults would
+# apply it to every pipeline, and dlt applies a pipeline-level disposition to EVERY
+# resource in a source, overwriting anything a resource declares for itself. Leaving it
+# unset means each resource keeps its own, which is what makes mixed pipelines possible
+# (for example a `replace` reference table alongside a merged fact table). Set it on an
+# individual pipeline only when you genuinely want to override the whole source.
+# `database` is a STEM, not a full name. It resolves to NFL_DEV_DB or NFL_PROD_DB
+# depending on which environment runs, so one entry describes both and the registry
+# never has to know where it is running. See models.resolve_database.
+#
+# The sport lives in the database name, so `dataset_name` is a plain RAW: naming it
+# RAW_NFL as well would give NFL_PROD_DB.RAW_NFL. Note dlt also creates RAW_STAGING
+# alongside it for merges, which is why no dbt layer should be called STAGING.
+# `secret`, `env_var` and `external_access` exist for SCHEDULED runs. A Snowflake Task
+# passes no arguments, so anything a container needs at 09:00 UTC has to be recorded
+# here. In dev these same values are what `make run-spcs` now reads instead of making
+# you type SECRET= and ENVVAR= on every command.
+defaults:
+  destination: snowflake
+  database: NFL               # -> NFL_DEV_DB / NFL_PROD_DB
+  dataset_name: RAW           # target Snowflake schema inside that database
+  group: nfl                  # selects the whole sport: make run-local GROUP=nfl
+  load_warehouse: DLT_WH      # Gen2 multi-cluster warehouse (see sql/05_load_warehouse.sql)
+  compute_pool: DLT_POOL      # SPCS compute pool (see sql/04_compute_pool.sql)
+  secret: DLT_DB.OPS.NFL_API_KEY      # Snowflake SECRET holding the API key
+  env_var: SOURCES__NFL__API_KEY      # matches `secret:sources.nfl.api_key` above
+  external_access: NFL_API_EAI        # egress to api.balldontlie.io
+
+pipelines:
+  # --- Reference data: teams + players -------------------------------------
+  # Slow-changing entities that everything else joins against. These two share a
+  # pipeline because they share a cadence and are both small; that is the only reason
+  # to bundle resources. A pipeline is the unit of scheduling, of failure, of
+  # reporting, and of runtime, so anything with a different cadence or a different
+  # order of magnitude belongs in its own entry.
+  - name: nfl_reference
+    source: rest_api
+    # daily. Rosters churn all season on waivers and practice-squad moves,
+    # and hardest at the 53-man cut (Sun 30 Aug 2026, 18:00 ET).
+    schedule: "0 8 * * *"
+    config:
+      client: *nfl_client
+      resource_defaults:
+        endpoint:
+          data_selector: data  # rows live under `data`; without this the envelope loads as one row
+      resources:
+        # 32 rows in one request. A full snapshot beats any incremental scheme,
+        # and `replace` needs no key.
+        - name: teams
+          write_disposition: replace
+          endpoint:
+            path: teams
+
+        # Every player in the league, paginated. `merge` on the integer `id`, so
+        # re-running updates a player in place (team change, weight, experience)
+        # instead of appending a second row.
+        #
+        # Pagination: the response carries `meta.next_cursor`, which is fed back as
+        # the `cursor` query param. That is dlt's `cursor` paginator, NOT `json_link`
+        # (there is no next-page URL) and NOT `offset`.
+        #
+        # per_page is set to the spec maximum of 100; the default is 25, which would
+        # quadruple the number of requests for identical data.
+        #
+        # `team` arrives as a nested object and dlt flattens it to team__id,
+        # team__name and so on. That is wanted here: it keeps players one flat table
+        # rather than spawning a child table for a single embedded record.
+        - name: players
+          primary_key: id
+          write_disposition: merge
+          endpoint:
+            path: players
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+
+  # --- Schedule and results ------------------------------------------------
+  # Separate from the reference data because it changes daily during the season while
+  # teams and players change on the order of weeks, and one cron line cannot serve both.
+  #
+  # THREE RESOURCES, ONE TABLE. `season_type` is a server-side filter that DEFAULTS TO
+  # 2 (regular season). A single resource would therefore load a games table with no
+  # playoff games in it and report a completely green run, which is the exact failure
+  # this project exists to remove. Each type is requested explicitly and `table_name`
+  # lands all three in `games`, deduplicated by the merge key.
+  #
+  # No `seasons[]` filter, so this pulls every season the API holds. `merge` on `id`
+  # means a re-run updates scores in place rather than duplicating games, which is what
+  # makes a daily in-season refresh cheap.
+  #
+  # To load one season, or one type, use the CLI rather than editing this file:
+  #   make run-local NAME=nfl_games RESOURCE=games_post PARAM="seasons[]=2023"
+  # Note the literal brackets. `seasons=2023` is a param the API IGNORES rather than
+  # rejects, so the filter looks like it worked and every season comes back.
+  - name: nfl_games
+    source: rest_api
+    # daily. Flex scheduling moves kickoffs with 12 to 28 days notice, so the
+    # schedule is never settled; scores also want to be same-day. 09:00 UTC is
+    # after Monday Night Football ends (~03:45 UTC Tue in EDT, 04:45 in EST).
+    schedule: "0 9 * * *"
+    config:
+      client: *nfl_client
+      # `params` deep merges between resource_defaults and a resource, while every
+      # other endpoint key shallow merges. That is why each resource below adds only
+      # its season_type and still inherits the paginator and per_page.
+      #
+      # `path` IS THE EXCEPTION and must be repeated on every resource. dlt fills a
+      # missing path with the RESOURCE NAME before the merge with resource_defaults
+      # runs, so the resource always has one by then and always wins. A path set here
+      # would be silently unreachable, and these three would request /games_pre,
+      # /games_regular and /games_post. Verified in dlt 1.29
+      # (sources/rest_api/config_setup.py, _make_endpoint_resource).
+      resource_defaults:
+        primary_key: id
+        write_disposition: merge
+        table_name: games
+        endpoint:
+          data_selector: data
+          paginator:
+            type: cursor
+            cursor_path: meta.next_cursor
+            cursor_param: cursor
+          params:
+            per_page: 100
+            # Resolved at run time by run.py (models.current_season). A Task passes
+            # no arguments, so without this a nightly run pulls EVERY season the API
+            # holds. A backfill still wins: --param merges into params after this.
+            seasons[]: "{current_season}"
+      #
+      # `constants` stamps a value onto every row the resource yields. It is needed
+      # here because the API accepts `season_type` as a filter but does NOT return it
+      # on a game, and `postseason` only distinguishes type 3. Without the stamp,
+      # preseason and regular-season rows would be indistinguishable once merged into
+      # one table. The value is deliberately written twice: once as a request filter,
+      # once as a column. They are different things and deriving one from the other
+      # would break for any parameter that is not also a row label.
+      resources:
+        - name: games_pre
+          constants:
+            season_type: 1
+          endpoint:
+            path: games
+            params:
+              season_type: 1
+        - name: games_regular
+          constants:
+            season_type: 2
+          endpoint:
+            path: games
+            params:
+              season_type: 2
+        - name: games_post
+          constants:
+            season_type: 3
+          endpoint:
+            path: games
+            params:
+              season_type: 3
+
+  # --- Box scores: player grain and team grain -----------------------------
+  # Two tables, one pipeline. `stats` is one row per player per game (from /stats) and
+  # `team_stats` is one row per team per game (from /team_stats). They share a pipeline
+  # because they share a cadence: both are facts produced by a game finishing. That is
+  # the same reason teams and players share nfl_reference, and the reason neither of
+  # them belongs with nfl_games, which refreshes daily on a schedule that has not
+  # changed.
+  #
+  # Because the pipeline now carries TWO GRAINS, `primary_key` and `table_name` are no
+  # longer common to every resource and so are declared per resource rather than in
+  # resource_defaults. Only what is genuinely shared stays in the defaults block.
+  #
+  # Its own pipeline rather than resources on nfl_games because it runs after each game
+  # rather than daily, it is two orders of magnitude larger (roughly 13,600 rows a
+  # regular season against 272), and a failure here must not be able to take the
+  # schedule table down with it.
+  #
+  # IDENTITY. /stats returns no `id`. A row is identified by which player, in which
+  # game, so the key is the composite of the two. dlt flattens the nested `player` and
+  # `game` objects to player__id and game__id, and a composite primary_key over those
+  # flattened names is what makes a re-run correct a stat line in place. Verified
+  # against a live load rather than assumed.
+  #
+  # NOT scd2. scd2 tracks history by row hash and needs no key, which sounds like a fit
+  # for a table with no id. It is not: a stat line that changes was WRONG, not versioned.
+  # You want the correction, not both rows.
+  #
+  # WIDTH. Each row nests the full player, team and game objects, and `game` nests both
+  # its teams, so this flattens to about 115 columns of which roughly half are copies of
+  # data already in PLAYERS, TEAMS and GAMES. That is deliberate: the raw layer stays a
+  # faithful mirror, joins in the modelling layer decide what is actually used, and a
+  # column never loaded is a column you cannot get back without a backfill.
+  #
+  # SEASON TYPE. Same trap as games, same fix. /stats defaults to season_type 2, so a
+  # single resource would silently drop every playoff performance. See the games entry
+  # above for the full explanation of `constants`.
+  #
+  # No `seasons[]` filter, so a bare run pulls every season. One season at a time:
+  #   make run-snowflake NAME=nfl_stats RESOURCE=stats_regular PARAM="seasons[]=2025"
+  - name: nfl_stats
+    source: rest_api
+    # daily. Box scores follow the Thu / Sun / Mon games.
+    schedule: "0 10 * * *"
+    config:
+      client: *nfl_client
+      resource_defaults:
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator:
+            type: cursor
+            cursor_path: meta.next_cursor
+            cursor_param: cursor
+          params:
+            per_page: 100
+            # Same as nfl_games: the scheduled run needs a season and cannot be
+            # given one on a command line.
+            seasons[]: "{current_season}"
+      resources:
+        # --- player grain -> `stats` ---------------------------------------
+        - name: stats_pre
+          primary_key: [player__id, game__id]
+          table_name: stats
+          constants:
+            season_type: 1
+          endpoint:
+            path: stats
+            params:
+              season_type: 1
+        - name: stats_regular
+          primary_key: [player__id, game__id]
+          table_name: stats
+          constants:
+            season_type: 2
+          endpoint:
+            path: stats
+            params:
+              season_type: 2
+        - name: stats_post
+          primary_key: [player__id, game__id]
+          table_name: stats
+          constants:
+            season_type: 3
+          endpoint:
+            path: stats
+            params:
+              season_type: 3
+
+        # --- team grain -> `team_stats` ------------------------------------
+        # One row per team per game, so both teams in a game produce a row and the key
+        # is team plus game. 23 fields of team-level totals (first downs, third-down
+        # efficiency, time of possession) that cannot be derived by summing the player
+        # box score, which is why this is loaded rather than modelled.
+        #
+        # Season filter, same as every other endpoint:
+        #   make run-snowflake NAME=nfl_stats RESOURCE=team_stats_regular PARAM="seasons[]=2025"
+        #
+        # DO NOT TRUST THE OPENAPI SPEC ON THIS ONE. It documents this endpoint's
+        # parameter as `seasons` with no brackets, which the API rejects outright:
+        #   {"param":"seasons","error":"seasons must be an array (use seasons[]=value)"}
+        # Verified against the live API; the brackets are required here as everywhere.
+        - name: team_stats_pre
+          primary_key: [team__id, game__id]
+          table_name: team_stats
+          constants:
+            season_type: 1
+          endpoint:
+            path: team_stats
+            params:
+              season_type: 1
+        - name: team_stats_regular
+          primary_key: [team__id, game__id]
+          table_name: team_stats
+          constants:
+            season_type: 2
+          endpoint:
+            path: team_stats
+            params:
+              season_type: 2
+        - name: team_stats_post
+          primary_key: [team__id, game__id]
+          table_name: team_stats
+          constants:
+            season_type: 3
+          endpoint:
+            path: team_stats
+            params:
+              season_type: 3
+
+  # --- Play by play --------------------------------------------------------
+  # Roughly 169 plays a game, so about 55,000 rows and 670 requests for one season.
+  # Larger than every other NFL table combined, which is most of why it is its own
+  # pipeline.
+  #
+  # TWO-STEP FETCH. /plays has no season filter and REQUIRES a game_id, so there is no
+  # way to ask for "the 2025 plays". Each `games_*_ref` resource lists the games, and
+  # dlt then issues one /plays request per game id. The reference resources are
+  # `selected: false`: they drive the fan-out and are never loaded, because GAMES is
+  # already maintained by the nfl_games pipeline.
+  #
+  # SYNTAX. A QUERY parameter references its parent with a format placeholder string,
+  # `"{resources.<parent>.<field>}"`. The `{type: resolve, resource: ..., field: ...}`
+  # dict form that dlt documents applies to PATH parameters only, and using it here
+  # fails the whole source with "defines resolve params that are not bound in path".
+  #
+  # SEASON_TYPE MUST MATCH THE GAME, and a mismatch is silent. Verified against the
+  # live API with a postseason game id:
+  #     no season_type  -> HTTP 200, 0 rows
+  #     season_type=2   -> HTTP 200, 0 rows
+  #     season_type=3   -> 100 rows
+  # A single fan-out over all games with the default would therefore return nothing at
+  # all for the 62 preseason and postseason games and report a completely green load.
+  # Hence three pairs, each pinned to one type on BOTH the parent and the child.
+  #
+  # FILTERING A RUN. The season belongs on the PARENT, so it needs the qualified form.
+  # Put it on the child and nothing happens, because by then the request is about one
+  # already-chosen game:
+  #   make run-snowflake NAME=nfl_plays RESOURCE=plays_post \
+  #     PARAM="games_post_ref:seasons[]=2025"
+  # Without it the parent lists every game the API holds and the fan-out is enormous.
+  #
+  # IDENTITY is easy here for once: /plays returns a top-level `id` (a string), unique
+  # per play, so no composite key is needed.
+  - name: nfl_plays
+    source: rest_api
+    # weekly, Tuesday. The expensive one: a request per game, ~334 of them.
+    # A game's plays are final once it ends, so re-fetching daily buys nothing.
+    schedule: "0 11 * * 2"
+    config:
+      client: *nfl_client
+      resource_defaults:
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator:
+            type: cursor
+            cursor_path: meta.next_cursor
+            cursor_param: cursor
+          params:
+            per_page: 100
+      resources:
+        # Parents. Not loaded; they exist only to produce game ids for the fan-out.
+        #
+        # The season filter belongs HERE and only here. These parents decide which
+        # games the fan-out visits, so filtering them filters everything downstream.
+        # Repeating seasons[] on the plays resources would be redundant at best, and
+        # the API ignores unknown params rather than rejecting them, so a redundant
+        # filter there could look effective while doing nothing.
+        - name: games_pre_ref
+          selected: false
+          endpoint:
+            path: games
+            params:
+              season_type: 1
+              seasons[]: "{current_season}"
+        - name: games_regular_ref
+          selected: false
+          endpoint:
+            path: games
+            params:
+              season_type: 2
+              seasons[]: "{current_season}"
+        - name: games_post_ref
+          selected: false
+          endpoint:
+            path: games
+            params:
+              season_type: 3
+              seasons[]: "{current_season}"
+
+        # Children. One request per game id yielded by the matching parent.
+        - name: plays_pre
+          primary_key: id
+          table_name: plays
+          constants:
+            season_type: 1
+          endpoint:
+            path: plays
+            params:
+              season_type: 1
+              game_id: "{resources.games_pre_ref.id}"
+        - name: plays_regular
+          primary_key: id
+          table_name: plays
+          constants:
+            season_type: 2
+          endpoint:
+            path: plays
+            params:
+              season_type: 2
+              game_id: "{resources.games_regular_ref.id}"
+        - name: plays_post
+          primary_key: id
+          table_name: plays
+          constants:
+            season_type: 3
+          endpoint:
+            path: plays
+            params:
+              season_type: 3
+              game_id: "{resources.games_post_ref.id}"
+
+  # --- Standings -----------------------------------------------------------
+  # 32 rows a season: one per team, with the derived numbers a season table cannot
+  # cheaply give you. Wins and losses are recomputable from GAMES; `playoff_seed` is
+  # not, because seeding runs on tiebreaker rules that are unpleasant to reimplement.
+  #
+  # A SNAPSHOT, NOT A FACT, which is why this is the first pipeline here using scd2.
+  # Standings change every week of the season, and the earlier state is a real thing to
+  # know rather than a stale version of the current one. scd2 keeps every version with
+  # `_dlt_valid_from` / `_dlt_valid_to`; the current rows are the ones whose valid_to is
+  # NULL. Every query against this table needs that filter, unlike the fact tables.
+  #
+  # MERGE_KEY IS SET, AND MUST BE. With scd2 and no merge_key, dlt treats each load as a
+  # FULL extract and retires every row absent from it. `season` is a required parameter
+  # here, so a run only ever sees one year, and loading 2025 would find all of 2024
+  # missing and retire the lot. Naming `season` switches dlt to partition mode: only the
+  # seasons actually present in the extract can be retired. Contrast nfl_injuries below,
+  # which deliberately leaves it unset for the opposite reason.
+  #
+  # No paginator override: /standings returns all 32 rows with no `meta` object at all,
+  # so the client-wide `single_page` default is already correct.
+  #
+  # `season` is REQUIRED by the API, so this pipeline cannot run bare:
+  #   make run-snowflake NAME=nfl_standings RESOURCE=standings PARAM="season=2025"
+  - name: nfl_standings
+    source: rest_api
+    # weekly, Tuesday. Only meaningful once a full week has been played.
+    schedule: "0 12 * * 2"
+    config:
+      client: *nfl_client
+      resources:
+        - name: standings
+          merge_key: season
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          endpoint:
+            path: standings
+            data_selector: data
+            params:
+              # REQUIRED. /standings returns HTTP 400 without a season, so before this
+              # existed the pipeline could not be scheduled at all: a Task passes no
+              # arguments. Note the SINGULAR `season`, not the bracketed array form
+              # that games and stats take.
+              season: "{current_season}"
+
+  # --- Player injuries -----------------------------------------------------
+  # Who is hurt right now. Four fields (player, status, comment, date) and a few hundred
+  # rows in season; 21 in August.
+  #
+  # THE PUREST SNAPSHOT IN THIS REGISTRY. There is no season parameter and no date
+  # filter, so the endpoint only ever answers "today". A plain merge would overwrite
+  # yesterday's answer and lose the thing that makes injury data worth having: that a
+  # player was questionable on Thursday and out on Sunday is two facts, not a
+  # correction of one.
+  #
+  # MERGE_KEY IS DELIBERATELY UNSET, the opposite of nfl_standings. Every run extracts
+  # the COMPLETE current list, so full-extract semantics are correct: a player who
+  # recovers drops off the list, and dlt retires their row by stamping `_dlt_valid_to`.
+  # That timestamp IS the recovery, recorded without the API ever reporting one. Naming
+  # a merge_key here would switch dlt to incremental mode and those rows would stay
+  # open forever, so the table would claim everyone who was ever hurt still is.
+  #
+  # Current rows are `WHERE _dlt_valid_to IS NULL`.
+  #
+  # Runs bare; there is nothing to filter:
+  #   make run-snowflake NAME=nfl_injuries
+  - name: nfl_injuries
+    source: rest_api
+    # daily, late. Injury reports are filed Wed/Thu/Fri by 16:00 ET; 22:00 UTC
+    # is 18:00 EDT and 17:00 EST, so it lands after the deadline year-round.
+    # This one matters most: the table is scd2, so a state that is never
+    # captured while true is gone permanently and cannot be backfilled.
+    schedule: "0 22 * * *"
+    config:
+      client: *nfl_client
+      resources:
+        - name: player_injuries
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          endpoint:
+            path: player_injuries
+            data_selector: data
+            # Cursor paginator rather than the client default: the response carries a
+            # `meta` object, and an in-season list can exceed one page.
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+
+  # --- Advanced statistics -------------------------------------------------
+  # Next-Gen-style tracking metrics: air yards, time to throw, separation, yards over
+  # expected. Three distinct endpoints feeding three tables, roughly 2,000 rows for a
+  # whole season.
+  #
+  # THIS PIPELINE CANNOT RUN BARE. Every one of these endpoints REQUIRES `season`
+  # (singular, unlike the `seasons[]` array everything else takes), and omitting it is a
+  # 400:
+  #     {"errors":[{"param":"season","error":"Invalid value"}]}
+  # No season is pinned here on purpose. Nothing else in this registry pins one, and a
+  # hardcoded year silently becomes wrong every January, whereas a missing parameter
+  # fails loudly and says exactly what it wants:
+  #   make run-snowflake NAME=nfl_advanced_stats RESOURCE=adv_passing_regular PARAM="season=2025"
+  #
+  # That is also why this is its own pipeline rather than more resources on nfl_stats,
+  # despite sharing a cadence and being far smaller. nfl_stats runs bare; these cannot.
+  # Bundling them would break `make run-snowflake NAME=nfl_stats` for want of a season.
+  #
+  # TWO GRAINS IN ONE TABLE, which is the thing to know before querying it. A response
+  # mixes season totals (`week: 0`) with per-week rows (`week: 1..18`). Nothing is
+  # duplicated, because `week` is part of the key, but SUM() across the table DOUBLE
+  # COUNTS every player. Aggregates need `WHERE week > 0`. Both grains are kept because
+  # the season totals are not always the sum of the weeks and cannot be recomputed.
+  #
+  # NO `constants` NEEDED HERE, unlike games and stats. `postseason` is a boolean ON THE
+  # ROW, and preseason does not exist for these endpoints (season_type=1 returns zero
+  # rows for all three), so the two remaining types are fully self-identifying. The
+  # split into _regular and _post resources is still required because `season_type`
+  # defaults to 2 server-side, so postseason rows only arrive when asked for.
+  - name: nfl_advanced_stats
+    source: rest_api
+    # weekly, Tuesday. Same reasoning as standings.
+    schedule: "0 13 * * 2"
+    config:
+      client: *nfl_client
+      resource_defaults:
+        # Identity: one row per player, per season, per week, per season type. There is
+        # no top-level id, and `week` must be in the key or the season total would
+        # collide with week 1.
+        primary_key: [player__id, season, week, postseason]
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator:
+            type: cursor
+            cursor_path: meta.next_cursor
+            cursor_param: cursor
+          params:
+            per_page: 100
+            # REQUIRED, same as /standings: every advanced_stats endpoint returns
+            # HTTP 400 without a season. Singular, not the array form.
+            season: "{current_season}"
+      resources:
+        - name: adv_passing_regular
+          table_name: advanced_passing
+          endpoint:
+            path: advanced_stats/passing
+            params:
+              season_type: 2
+        - name: adv_passing_post
+          table_name: advanced_passing
+          endpoint:
+            path: advanced_stats/passing
+            params:
+              season_type: 3
+
+        - name: adv_rushing_regular
+          table_name: advanced_rushing
+          endpoint:
+            path: advanced_stats/rushing
+            params:
+              season_type: 2
+        - name: adv_rushing_post
+          table_name: advanced_rushing
+          endpoint:
+            path: advanced_stats/rushing
+            params:
+              season_type: 3
+
+        - name: adv_receiving_regular
+          table_name: advanced_receiving
+          endpoint:
+            path: advanced_stats/receiving
+            params:
+              season_type: 2
+        - name: adv_receiving_post
+          table_name: advanced_receiving
+          endpoint:
+            path: advanced_stats/receiving
+            params:
+              season_type: 3

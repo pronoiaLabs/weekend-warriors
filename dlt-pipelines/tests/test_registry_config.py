@@ -1,0 +1,680 @@
+"""Unit tests for the config-as-data layer: spec_from_row + registry_sync SQL.
+
+Pure Python. No Snowflake, no dlt, no network. Only pyyaml is required (pulled
+in transitively via pipelines.batch.models).
+"""
+from __future__ import annotations
+
+import json
+import sys
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+_ROOT = Path(__file__).parent.parent.resolve()
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+# models imports yaml at module load; skip cleanly if pyyaml is absent.
+pytest.importorskip("yaml")
+
+from pipelines.batch.models import (  # noqa: E402
+    ENVIRONMENTS,
+    PipelineSpec,
+    RegistryError,
+    current_season,
+    load_registry,
+    resolve_database,
+    spec_from_row,
+)
+
+
+# ---------------------------------------------------------------------------
+# resolve_database: registry stem + environment -> full database name
+# ---------------------------------------------------------------------------
+
+
+def _spec(**overrides) -> PipelineSpec:
+    kwargs = {"name": "p", "source": "rest_api", "config": {"a": 1}}
+    kwargs.update(overrides)
+    return PipelineSpec(**kwargs)
+
+
+def test_resolve_database_composes_stem_and_environment():
+    spec = _spec(database="NFL")
+    assert resolve_database(spec, "DEV") == "NFL_DEV_DB"
+    assert resolve_database(spec, "PROD") == "NFL_PROD_DB"
+
+
+def test_resolve_database_default_stem_keeps_the_shared_databases():
+    # A pipeline that names no sport must land where everything landed before the
+    # per-sport split, so `sample` and anything new stay working untouched.
+    assert resolve_database(_spec(), "DEV") == "DLT_DEV_DB"
+    assert resolve_database(_spec(), "PROD") == "DLT_PROD_DB"
+
+
+@pytest.mark.parametrize("env", ["dev", "Prod", " prod "])
+def test_resolve_database_accepts_case_and_padding(env):
+    assert resolve_database(_spec(database="NFL"), env).startswith("NFL_")
+
+
+@pytest.mark.parametrize("env", ["staging", "", "DEVELOPMENT", None])
+def test_resolve_database_rejects_unknown_environment(env):
+    # An unknown environment would compose a plausible name for a database that does
+    # not exist, and the failure would surface far from the typo.
+    with pytest.raises(RegistryError) as exc:
+        resolve_database(_spec(database="NFL"), env)
+    assert "environment" in str(exc.value)
+
+
+@pytest.mark.parametrize("stem", ["", "NFL-DB", "NFL DB", "NFL;DROP", "1NFL", None])
+def test_database_stem_must_be_a_bare_identifier(stem):
+    # The stem is interpolated into Task DDL and into the job spec USING clause,
+    # neither of which is parameterised.
+    with pytest.raises(RegistryError) as exc:
+        _spec(database=stem).validate()
+    assert "`database`" in str(exc.value)
+
+
+def test_every_environment_is_resolvable():
+    for env in ENVIRONMENTS:
+        assert resolve_database(_spec(database="NFL"), env).endswith("_DB")
+
+
+# ---------------------------------------------------------------------------
+# The real registry, not a fixture: these are the names data actually lands in
+# ---------------------------------------------------------------------------
+
+
+def test_real_registry_sends_every_nfl_pipeline_to_the_nfl_databases():
+    registry = load_registry()
+    nfl = [s for s in registry.pipelines if s.name.startswith("nfl_")]
+    assert nfl, "expected the NFL pipelines to be present"
+
+    for spec in nfl:
+        assert resolve_database(spec, "DEV") == "NFL_DEV_DB"
+        assert resolve_database(spec, "PROD") == "NFL_PROD_DB"
+        # The sport lives in the database name now, so repeating it in the schema
+        # would give NFL_PROD_DB.RAW_NFL.
+        assert spec.dataset_name == "RAW", (
+            f"{spec.name}: dataset_name should be RAW, got {spec.dataset_name}"
+        )
+
+
+def test_real_registry_leaves_sample_in_the_shared_databases():
+    # sample is the credential-free smoke test. It must not depend on any sport's
+    # database existing, or a broken sport would take the smoke test down with it.
+    sample = load_registry().get("sample")
+    assert resolve_database(sample, "DEV") == "DLT_DEV_DB"
+
+
+# ---------------------------------------------------------------------------
+# current_season: which NFL season is "now"
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "day, expected",
+    [
+        (date(2026, 7, 31), 2025),   # offseason: last COMPLETED season
+        (date(2026, 8, 1), 2026),    # rollover, preseason opens this month
+        (date(2026, 8, 6), 2026),    # Hall of Fame Game
+        (date(2026, 9, 9), 2026),    # regular season opener
+        (date(2026, 12, 25), 2026),  # Christmas games
+        (date(2027, 1, 10), 2026),   # Week 18 is still the 2026 season
+        (date(2027, 2, 14), 2026),   # Super Bowl LXI, likewise
+        (date(2027, 7, 31), 2026),   # whole offseason stays on 2026
+        (date(2027, 8, 1), 2027),    # next rollover
+    ],
+)
+def test_current_season_rolls_over_on_1_august(day, expected) -> None:
+    assert current_season(day) == expected
+
+
+def test_current_season_does_not_roll_over_at_the_super_bowl() -> None:
+    # The tempting alternative. It would make every February-to-July load ask for a
+    # season that has not been played, and the API answers that with an empty list
+    # rather than an error, so the run would look fine and load nothing.
+    assert current_season(date(2027, 3, 1)) == 2026
+
+
+# ---------------------------------------------------------------------------
+# Scheduled pipelines must carry what a Task cannot pass
+# ---------------------------------------------------------------------------
+
+
+def test_scheduled_pipeline_without_bindings_is_rejected() -> None:
+    with pytest.raises(RegistryError) as exc:
+        _spec(schedule="0 9 * * *").validate()
+    msg = str(exc.value)
+    assert "secret" in msg and "env_var" in msg and "external_access" in msg
+
+
+def test_unscheduled_pipeline_needs_no_bindings() -> None:
+    # `sample` is exactly this: no schedule, no secret, no egress.
+    _spec().validate()
+
+
+def test_real_registry_every_scheduled_pipeline_can_actually_run() -> None:
+    """The check that stops a 09:00 UTC surprise.
+
+    A Task passes no arguments. A scheduled pipeline missing its secret dies on
+    dlt.secrets inside a container; one missing its EAI has no network at all. Both
+    fail where nobody is watching, hours after the mistake was made.
+    """
+    scheduled = [s for s in load_registry().pipelines if s.schedule]
+    assert scheduled, "expected the NFL pipelines to be scheduled"
+
+    for spec in scheduled:
+        assert spec.secret, f"{spec.name}: scheduled but no secret"
+        assert spec.env_var, f"{spec.name}: scheduled but no env_var"
+        assert spec.external_access, f"{spec.name}: scheduled but no external_access"
+        # 5-field cron; Snowflake wraps it as USING CRON <expr> UTC.
+        assert len(spec.schedule.split()) == 5, f"{spec.name}: {spec.schedule!r}"
+
+
+def test_sample_is_never_scheduled() -> None:
+    # It is the credential-free smoke test. A Task would give it a cost and a failure
+    # mode for no benefit.
+    assert load_registry().get("sample").schedule is None
+
+
+# ---------------------------------------------------------------------------
+# The season token: what a scheduled run substitutes before dlt sees the config
+# ---------------------------------------------------------------------------
+
+
+def test_every_season_scoped_resource_carries_the_token() -> None:
+    """Without a season, a scheduled run is wrong in one of two ways.
+
+    /standings and /advanced_stats return HTTP 400 outright. /games and /stats are
+    worse: they silently return EVERY season the API holds and report a clean run.
+    A Task passes no arguments, so the only place the year can come from is here.
+    """
+    registry = load_registry()
+
+    def season_params(cfg) -> list:
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key in ("season", "seasons[]"):
+                        found.append(value)
+                    walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(cfg)
+        return found
+
+    expected = {
+        "nfl_games": 1,          # once, in resource_defaults
+        "nfl_stats": 1,          # once, in resource_defaults
+        "nfl_standings": 1,      # the resource itself
+        "nfl_advanced_stats": 1, # once, in resource_defaults
+        "nfl_plays": 3,          # the three parents that drive the fan-out
+    }
+    for name, count in expected.items():
+        values = season_params(registry.get(name).config)
+        assert values == ["{current_season}"] * count, (
+            f"{name}: expected {count} season token(s), got {values}"
+        )
+
+
+def test_pipelines_with_no_season_have_no_token() -> None:
+    # teams, players and injuries are current state, not seasonal. A season filter on
+    # them would not narrow anything; it would just be a param the API ignores.
+    for name in ("nfl_reference", "nfl_injuries"):
+        assert "{current_season}" not in json.dumps(load_registry().get(name).config)
+
+
+# ---------------------------------------------------------------------------
+# spec_from_row: table row -> validated PipelineSpec
+# ---------------------------------------------------------------------------
+
+
+def _base_row(**overrides) -> dict:
+    row = {
+        "name": "nfl_stats",
+        "source": "rest_api",
+        "schedule": "0 * * * *",
+        "secret": "DLT_DB.OPS.NFL_API_KEY",
+        "env_var": "SOURCES__NFL__API_KEY",
+        "external_access": "NFL_API_EAI",
+        "dataset_name": "RAW",
+        "write_disposition": "merge",
+        "pipeline_group": "batch_hourly",
+        "config": {"credentials": "secret:x", "schema": "public"},
+        "enabled": True,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_spec_from_row_config_as_dict() -> None:
+    spec = spec_from_row(_base_row())
+    assert spec.name == "nfl_stats"
+    assert spec.source == "rest_api"
+    assert spec.config["schema"] == "public"
+    # pipeline_group column maps onto the `group` field.
+    assert spec.group == "batch_hourly"
+
+
+def test_spec_from_row_config_as_json_string() -> None:
+    row = _base_row(config=json.dumps({"credentials": "secret:x", "schema": "s"}))
+    spec = spec_from_row(row)
+    assert spec.config == {"credentials": "secret:x", "schema": "s"}
+
+
+def test_spec_from_row_empty_config_string_becomes_error() -> None:
+    # An empty VARIANT string parses to {} which fails validate() (config required).
+    row = _base_row(config="")
+    with pytest.raises(RegistryError, match="non-empty mapping"):
+        spec_from_row(row)
+
+
+def test_spec_from_row_missing_columns_fall_back_to_defaults() -> None:
+    # Table has no destination/load_warehouse/compute_pool columns; defaults apply.
+    row = {
+        "name": "minimal",
+        "source": "rest_api",
+        "config": {"client": {"base_url": "https://api.example.com"}},
+    }
+    spec = spec_from_row(row)
+    assert spec.destination == "snowflake"
+    assert spec.load_warehouse == "DLT_WH"
+    assert spec.compute_pool == "DLT_POOL"
+    assert spec.dataset_name == "RAW"
+    # No write_disposition column means no pipeline-level override.
+    assert spec.write_disposition is None
+    assert spec.schedule is None
+    assert spec.group is None
+
+
+def test_spec_from_row_reads_target_database_under_its_column_name() -> None:
+    # DATABASE is a SQL keyword, so the column is target_database and spec_from_row
+    # renames it, exactly as it already does for pipeline_group -> group.
+    spec = spec_from_row(_base_row(target_database="NFL"))
+    assert spec.database == "NFL"
+    assert resolve_database(spec, "PROD") == "NFL_PROD_DB"
+
+
+def test_spec_from_row_missing_target_database_falls_back_to_shared() -> None:
+    # A table that predates the column returns nothing for it. Falling back to DLT
+    # reproduces the pre-split behaviour rather than failing the load outright.
+    assert spec_from_row(_base_row()).database == "DLT"
+    assert spec_from_row(_base_row(target_database=None)).database == "DLT"
+
+
+def test_spec_from_row_null_column_uses_default() -> None:
+    # A NULL dataset_name falls back to the default, but a NULL write_disposition
+    # must stay None: it means "no override", which is not the same as "unset".
+    row = _base_row(dataset_name=None, write_disposition=None)
+    spec = spec_from_row(row)
+    assert spec.dataset_name == "RAW"
+    assert spec.write_disposition is None
+
+
+# ---------------------------------------------------------------------------
+# write_disposition: VARIANT round trip and validation
+# ---------------------------------------------------------------------------
+
+
+def test_write_disposition_variant_arrives_as_json_string() -> None:
+    # A VARIANT column comes back from the connector as JSON text, so a plain
+    # string arrives with its quotes still attached.
+    spec = spec_from_row(_base_row(write_disposition='"replace"'))
+    assert spec.write_disposition == "replace"
+
+
+def test_write_disposition_dict_form_accepted() -> None:
+    row = _base_row(write_disposition=json.dumps({"disposition": "merge", "strategy": "scd2"}))
+    spec = spec_from_row(row)
+    assert spec.write_disposition == {"disposition": "merge", "strategy": "scd2"}
+
+
+def test_write_disposition_dict_form_as_native_dict() -> None:
+    # Already-parsed VARIANTs pass through untouched.
+    spec = spec_from_row(_base_row(write_disposition={"disposition": "append"}))
+    assert spec.write_disposition == {"disposition": "append"}
+
+
+def test_write_disposition_bad_string_rejected() -> None:
+    with pytest.raises(RegistryError, match="write_disposition must be"):
+        spec_from_row(_base_row(write_disposition='"upsert"'))
+
+
+def test_write_disposition_dict_without_disposition_rejected() -> None:
+    with pytest.raises(RegistryError, match="needs a `disposition`"):
+        spec_from_row(_base_row(write_disposition=json.dumps({"strategy": "scd2"})))
+
+
+def test_write_disposition_wrong_type_rejected() -> None:
+    with pytest.raises(RegistryError, match="must be a string, a mapping, or absent"):
+        spec_from_row(_base_row(write_disposition=42))
+
+
+def test_spec_from_row_invalid_source_rejected() -> None:
+    with pytest.raises(RegistryError, match="not supported"):
+        spec_from_row(_base_row(source="mongodb"))
+
+
+# ---------------------------------------------------------------------------
+# --param: parsing and merging into a resource's endpoint
+#
+# Pure functions on plain dicts, so these need no dlt and no network. They import
+# from run.py, which does import dlt, hence the module-level skip below.
+# ---------------------------------------------------------------------------
+
+pytest.importorskip("dlt")
+
+from pipelines.batch.run import _apply_params, _parse_params  # noqa: E402
+
+
+def test_parse_params_single_pair() -> None:
+    # None is the "no resource named" key; the CLI binds it to the selected resource.
+    assert _parse_params(["season_type=3"]) == {None: {"season_type": "3"}}
+
+
+def test_parse_params_repeated_key_accumulates() -> None:
+    # An array parameter is one filter with several values. A plain dict would keep
+    # only the last and silently narrow the backfill.
+    assert _parse_params(["seasons[]=2023", "seasons[]=2022"]) == {
+        None: {"seasons[]": ["2023", "2022"]}
+    }
+
+
+def test_parse_params_splits_on_first_equals_only() -> None:
+    assert _parse_params(["filter=a=b"]) == {None: {"filter": "a=b"}}
+
+
+def test_parse_params_qualified_form_names_its_target() -> None:
+    # The parent-child case: the filter belongs on the resource that lists the games,
+    # not on the one fetching plays for a game already chosen.
+    assert _parse_params(["games_post_ref:seasons[]=2025"]) == {
+        "games_post_ref": {"seasons[]": "2025"}
+    }
+
+
+def test_parse_params_mixes_qualified_and_plain() -> None:
+    assert _parse_params(["games_ref:seasons[]=2025", "per_page=50"]) == {
+        "games_ref": {"seasons[]": "2025"},
+        None: {"per_page": "50"},
+    }
+
+
+def test_parse_params_colon_in_value_is_not_a_qualifier() -> None:
+    # The resource split happens on the key side only, so a value may contain colons.
+    assert _parse_params(["url=https://x.test/a"]) == {None: {"url": "https://x.test/a"}}
+
+
+def test_parse_params_rejects_missing_equals() -> None:
+    with pytest.raises(ValueError, match="must be KEY=VALUE"):
+        _parse_params(["seasons"])
+
+
+def test_parse_params_rejects_empty_key() -> None:
+    with pytest.raises(ValueError, match="must be KEY=VALUE"):
+        _parse_params(["=2023"])
+
+
+def test_parse_params_rejects_empty_resource_or_param() -> None:
+    with pytest.raises(ValueError, match="empty resource or parameter"):
+        _parse_params([":seasons[]=2025"])
+    with pytest.raises(ValueError, match="empty resource or parameter"):
+        _parse_params(["games_ref:=2025"])
+
+
+def _games_config() -> dict:
+    return {
+        "client": {"base_url": "https://api.example.com/"},
+        "resource_defaults": {"endpoint": {"params": {"per_page": 100}}},
+        "resources": [
+            {"name": "games_post", "endpoint": {"path": "games", "params": {"season_type": 3}}},
+            {"name": "games_pre", "endpoint": {"path": "games", "params": {"season_type": 1}}},
+        ],
+    }
+
+
+def test_apply_params_merges_into_the_named_resource_only() -> None:
+    config = _games_config()
+    out = _apply_params(config, {"games_post": {"seasons[]": "2023"}})
+
+    post = out["resources"][0]["endpoint"]["params"]
+    pre = out["resources"][1]["endpoint"]["params"]
+    # Added to the target, and the registry's own params on that endpoint survive.
+    assert post == {"season_type": 3, "seasons[]": "2023"}
+    # The sibling resource is untouched.
+    assert pre == {"season_type": 1}
+
+
+def test_apply_params_handles_several_targets_at_once() -> None:
+    # The parent-child shape: filter the parent, adjust the child, in one run.
+    out = _apply_params(
+        _games_config(),
+        {"games_post": {"seasons[]": "2025"}, "games_pre": {"per_page": "10"}},
+    )
+    assert out["resources"][0]["endpoint"]["params"]["seasons[]"] == "2025"
+    assert out["resources"][1]["endpoint"]["params"]["per_page"] == "10"
+
+
+def test_apply_params_overrides_an_existing_value() -> None:
+    out = _apply_params(_games_config(), {"games_post": {"season_type": "1"}})
+    assert out["resources"][0]["endpoint"]["params"]["season_type"] == "1"
+
+
+def test_apply_params_does_not_mutate_the_original() -> None:
+    # Registry files share nested structures through YAML anchors, so two pipelines can
+    # hold the same dict object. Mutating in place would change the other one.
+    config = _games_config()
+    _apply_params(config, {"games_post": {"seasons[]": "2023"}})
+    assert config["resources"][0]["endpoint"]["params"] == {"season_type": 3}
+
+
+def test_apply_params_promotes_a_bare_string_endpoint() -> None:
+    config = {"resources": [{"name": "teams", "endpoint": "teams"}]}
+    out = _apply_params(config, {"teams": {"per_page": "100"}})
+    assert out["resources"][0]["endpoint"] == {"path": "teams", "params": {"per_page": "100"}}
+
+
+def test_apply_params_unknown_resource_rejected() -> None:
+    # A typo in a qualified name must not pass silently, or the run proceeds unfiltered.
+    with pytest.raises(ValueError, match="does not declare"):
+        _apply_params(_games_config(), {"games_nope": {"season_type": "2"}})
+
+
+# ---------------------------------------------------------------------------
+# constants: stamping a value the API filters on but does not return
+# ---------------------------------------------------------------------------
+
+from pipelines.batch.run import _apply_constants, _constant_stamper  # noqa: E402
+
+
+def test_constant_stamper_adds_fields_without_touching_the_row() -> None:
+    row = {"id": 1}
+    stamped = _constant_stamper({"season_type": 1})(row)
+    assert stamped == {"id": 1, "season_type": 1}
+    assert row == {"id": 1}, "the source row must not be mutated"
+
+
+def test_constants_bind_per_resource_not_to_the_last_one() -> None:
+    """The bug this whole helper exists to prevent.
+
+    Written as inline lambdas in a loop, all three mappers would close over the same
+    variable and stamp season_type 3. Nothing raises; the data is just wrong.
+    """
+    cfg = {
+        "resources": [
+            {"name": f"games_{n}", "constants": {"season_type": n}, "endpoint": {"path": "games"}}
+            for n in (1, 2, 3)
+        ]
+    }
+    _apply_constants(cfg)
+
+    stamped = [entry["processing_steps"][0]["map"]({}) for entry in cfg["resources"]]
+    assert [row["season_type"] for row in stamped] == [1, 2, 3]
+
+
+def test_apply_constants_removes_the_key_dlt_would_reject() -> None:
+    # dlt validates a resource against a TypedDict and rejects unknown fields, so the
+    # key must be gone by the time the config is handed over.
+    cfg = {"resources": [{"name": "games_pre", "constants": {"season_type": 1}}]}
+    _apply_constants(cfg)
+    assert "constants" not in cfg["resources"][0]
+
+
+def test_apply_constants_preserves_existing_processing_steps() -> None:
+    def existing(row):
+        return row
+
+    cfg = {
+        "resources": [
+            {
+                "name": "games_pre",
+                "constants": {"season_type": 1},
+                "processing_steps": [{"map": existing}],
+            }
+        ]
+    }
+    _apply_constants(cfg)
+
+    steps = cfg["resources"][0]["processing_steps"]
+    assert len(steps) == 2 and steps[0]["map"] is existing
+
+
+def test_apply_constants_is_a_no_op_without_the_key() -> None:
+    cfg = {"resources": [{"name": "teams", "endpoint": {"path": "teams"}}]}
+    _apply_constants(cfg)
+    assert "processing_steps" not in cfg["resources"][0]
+
+
+# ---------------------------------------------------------------------------
+# registry_sync: MERGE / prune SQL builders
+# ---------------------------------------------------------------------------
+
+
+def test_merge_sql_and_row_params_align() -> None:
+    from pipelines.batch.models import PipelineSpec  # noqa: PLC0415
+    from pipelines.batch.registry_sync import MERGE_SQL, _row_params  # noqa: PLC0415
+
+    spec = PipelineSpec(
+        name="nfl_stats",
+        source="rest_api",
+        config={"credentials": "secret:x"},
+        schedule="0 * * * *",
+        secret="DLT_DB.OPS.NFL_API_KEY",
+        env_var="SOURCES__NFL__API_KEY",
+        external_access="NFL_API_EAI",
+        group="batch_hourly",
+    )
+    params = _row_params(spec)
+
+    # One %s per bind value, in the documented order. Update the count AND the
+    # indices below when a column is added: this assertion exists to make that a
+    # deliberate edit rather than a silently misaligned MERGE, where every value
+    # after the new column would land in the wrong field.
+    assert MERGE_SQL.count("%s") == len(params) == 8
+    assert params[0] == "nfl_stats"
+    assert params[3] == "DLT"                   # target_database (stem, not full name)
+    assert params[4] == "RAW"                   # dataset_name
+    assert params[6] == "batch_hourly"          # pipeline_group
+    assert json.loads(params[7]) == {"credentials": "secret:x"}  # config JSON
+    # config bind is wrapped in PARSE_JSON so VARIANT typing is correct.
+    assert "PARSE_JSON(%s)" in MERGE_SQL
+    assert "MERGE INTO DLT_DB.OPS.PIPELINE_REGISTRY" in MERGE_SQL
+    # enabled is only set on INSERT, never on UPDATE (preserves manual disables).
+    assert "enabled" not in MERGE_SQL.split("WHEN MATCHED")[1].split("WHEN NOT MATCHED")[0]
+
+
+def test_prune_sql_placeholder_count() -> None:
+    from pipelines.batch.registry_sync import _prune_sql  # noqa: PLC0415
+
+    sql, params = _prune_sql(["a", "b", "c"])
+    assert sql.count("%s") == 3
+    assert params == ("a", "b", "c")
+    assert "DELETE FROM DLT_DB.OPS.PIPELINE_REGISTRY" in sql
+    assert "NOT IN" in sql
+
+
+def test_emit_sql_is_self_contained() -> None:
+    from pipelines.batch.models import PipelineSpec  # noqa: PLC0415
+    from pipelines.batch.registry_sync import emit_sql  # noqa: PLC0415
+
+    specs = [
+        PipelineSpec(
+            name="nfl_stats",
+            source="rest_api",
+            config={"credentials": "secret:x"},
+            schedule="0 * * * *",
+            secret="DLT_DB.OPS.NFL_API_KEY",
+            env_var="SOURCES__NFL__API_KEY",
+            external_access="NFL_API_EAI",
+            group="batch_hourly",
+        ),
+        PipelineSpec(
+            name="gh_issues",
+            source="rest_api",
+            config={"client": {"base_url": "https://api.example.com"}},
+        ),
+    ]
+    out = emit_sql(specs, prune=True)
+
+    # No bind placeholders leak into the emitted script.
+    assert "%s" not in out
+    # Both pipelines produce a MERGE with inlined literals + dollar-quoted config.
+    assert out.count("MERGE INTO DLT_DB.OPS.PIPELINE_REGISTRY") == 2
+    assert "'nfl_stats' AS name" in out
+    assert "PARSE_JSON($$" in out
+    # Missing group renders as NULL, not the string 'None'.
+    assert "NULL AS pipeline_group" in out
+    assert "'None'" not in out
+    # Statements are terminated; prune DELETE is included and scoped to YAML names.
+    assert out.count(";") == 3  # 2 MERGE + 1 DELETE
+    assert "DELETE FROM DLT_DB.OPS.PIPELINE_REGISTRY WHERE name NOT IN (" in out
+    assert "'nfl_stats'" in out and "'gh_issues'" in out
+
+
+
+# ---------------------------------------------------------------------------
+# Token substitution itself (run.py, so dlt is required)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_tokens_replaces_only_exact_matches() -> None:
+    pytest.importorskip("dlt")
+    from pipelines.batch.run import _resolve_tokens  # noqa: PLC0415
+
+    cfg = {
+        "resource_defaults": {"endpoint": {"params": {"seasons[]": "{current_season}"}}},
+        "resources": [
+            {"endpoint": {"params": {"season": "{current_season}", "season_type": 2}}},
+            # A placeholder dlt owns, not us. Substituting inside it would break the
+            # parent-child fan-out, which is why matching is exact rather than partial.
+            {"endpoint": {"params": {"game_id": "{resources.games_pre_ref.id}"}}},
+        ],
+        "note": "text mentioning {current_season} in prose",
+    }
+    out = _resolve_tokens(cfg, {"{current_season}": 2026})
+
+    assert out["resource_defaults"]["endpoint"]["params"]["seasons[]"] == 2026
+    assert out["resources"][0]["endpoint"]["params"]["season"] == 2026
+    assert out["resources"][0]["endpoint"]["params"]["season_type"] == 2
+    assert out["resources"][1]["endpoint"]["params"]["game_id"] == (
+        "{resources.games_pre_ref.id}"
+    )
+    assert out["note"] == "text mentioning {current_season} in prose"
+
+
+def test_resolve_tokens_does_not_mutate_the_registry() -> None:
+    # The spec config is shared: nfl_games and nfl_stats both alias the same client
+    # block, and a second pipeline in the same process must not see a resolved year.
+    pytest.importorskip("dlt")
+    from pipelines.batch.run import _resolve_tokens  # noqa: PLC0415
+
+    spec = load_registry().get("nfl_standings")
+    before = json.dumps(spec.config, sort_keys=True)
+    _resolve_tokens(spec.config, {"{current_season}": 2026})
+    assert json.dumps(spec.config, sort_keys=True) == before
