@@ -1,0 +1,95 @@
+# SPCS job spec template for an ad-hoc dlt DEV run.
+#
+# This is the "develop in Snowflake" spec: it loads into the DEV database using a
+# per-developer dataset schema, and injects the source credential from a
+# Snowflake SECRET object (no local .dlt/secrets.toml required).
+#
+# Uploaded to @DLT_DB.DEPLOY.SPECS (see sql/base/03_registry.sql) and launched
+# ad-hoc (see Makefile `run-spcs`):
+#
+#   EXECUTE JOB SERVICE
+#     IN COMPUTE POOL DLT_DEV_POOL
+#     NAME = dlt_dev_<pipeline>
+#     FROM @DLT_DB.DEPLOY.SPECS
+#       SPECIFICATION_TEMPLATE_FILE = 'dlt_dev_job.tmpl.yaml'
+#       [ EXTERNAL_ACCESS_INTEGRATIONS = (<eai>) ]   -- only for external sources
+#       USING (
+#         args     => '["<pipeline>","--resource","<res>","--param","<key>=<value>"]',
+#         database => 'NFL_DEV_DB',
+#         dataset  => 'DEV_<user>',
+#         secret   => 'DLT_DB.OPS.<SECRET_NAME>',
+#         env_var  => 'SOURCES__<PIPELINE>__CREDENTIALS'   -- or ..._TOKEN
+#       );
+#
+# Template variables are substituted from the USING clause before the YAML is parsed,
+# so one template drives any pipeline + secret + dataset.
+#
+# THE RENDERER IS JINJA2, AND IT DOES NOT KNOW WHAT A COMMENT IS.
+#     It runs over the raw file, so every Jinja delimiter in this header is live. Two
+#     consequences, both of which have already bitten:
+#
+#       1. A placeholder named in a comment becomes a REQUIRED variable, and the
+#          render fails if USING does not supply it.
+#       2. Anything that is not a valid Jinja expression is a syntax error, even as
+#          documentation. This very line used to read "Template variables (double
+#          brace, dot dot dot, close brace)" spelled literally, and Jinja tried to
+#          evaluate the ellipsis and failed with `unexpected '.'`.
+#
+#     So describe placeholders in prose or backticks here, never in braces. Only the
+#     spec body below should contain them.
+#
+# WHY `args` IS ONE JSON ARRAY RATHER THAN SEVERAL VARIABLES
+#     The container entrypoint is `python -m pipelines.batch.run`, so everything after
+#     the pipeline name is an ordinary CLI flag: --resource to narrow the run,
+#     --param to override a query parameter for a backfill. Passing them means passing
+#     a whole argv, not a single value.
+#
+#     USING has no optional variables and no defaults: every placeholder in this file
+#     must be supplied on every call. Separate `resource` and `param` placeholders
+#     would therefore have to be passed even when unused, and an empty scalar in a
+#     YAML list renders as a null item that reaches argparse as an empty argument.
+#     One variable that is always present sidesteps that entirely.
+#
+#     JSON is the encoding because Snowflake requires a USING value to be alphanumeric
+#     or valid JSON, and a JSON array is simultaneously valid YAML flow-sequence
+#     syntax, so it parses correctly in the `args:` position. It also survives the two
+#     characters that break naive quoting: the brackets in `seasons[]=2023`, which a
+#     shell would glob, and the `=`, which nothing splits on inside a quoted string.
+#
+#     Build it with `make run-spcs NAME=... RESOURCE=... PARAM=...` rather than by
+#     hand; that target assembles the array with json.dumps.
+#
+# Destination auth uses the ambient SPCS OAuth token. The destination database is the
+# `database` variable and the schema is the per-developer `dataset`. The source secret
+# is bound from a Snowflake SECRET (GENERIC_STRING) into the dlt env var named by the
+# `env_var` variable, which pipelines/run.py resolves via dlt.secrets.
+#
+# WHY THE DATABASE IS A VARIABLE RATHER THAN A LITERAL
+#     It used to read DLT_DEV_DB. With one database per sport (NFL_DEV_DB, NBA_DEV_DB)
+#     a literal can only ever be right for one of them, so keeping it would mean a
+#     near-duplicate copy of this file per sport, each uploaded separately.
+#
+#     Do not type the value at the call site either. `make run-spcs` resolves it from
+#     the pipeline's own registry entry, so a pipeline cannot be pointed at another
+#     sport's database by a stale shell export. The warehouse below stays a literal
+#     because compute is shared across sports; only storage is partitioned.
+spec:
+  containers:
+    - name: dlt
+      image: /DLT_DB/DEPLOY/IMAGES/dlt-pipeline:latest
+      args: {{ args }}
+      env:
+        DESTINATION__SNOWFLAKE__CREDENTIALS__AUTHENTICATOR: oauth
+        DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE: {{ database }}
+        DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE: DLT_DEV_WH
+        # registry_store reads the control-plane registry with these connector
+        # vars; the dev role can only use DLT_DEV_WH (not DLT_WH).
+        SNOWFLAKE_WAREHOUSE: DLT_DEV_WH
+        SNOWFLAKE_DATABASE: DLT_DB
+        DLT_REGISTRY_SOURCE: auto
+        DLT_DATASET: {{ dataset }}
+        LOG_LEVEL: INFO
+      secrets:
+        - snowflakeSecret: {{ secret }}
+          secretKeyRef: secret_string
+          envVarName: {{ env_var }}

@@ -1,0 +1,161 @@
+version: 2
+
+models:
+
+  - name: dim_team
+    description: "The 32 NFL teams. Grain: team. SCD1."
+    columns:
+      - name: team_key
+        description: "Surrogate key. Grain of this dimension."
+        tests: [unique, not_null]
+      - name: team_id
+        tests: [unique, not_null]
+      - name: team_abbreviation
+        tests: [unique, not_null]
+      - name: conference
+        tests:
+          - not_null
+          - accepted_values: {values: ['AFC', 'NFC']}
+      - name: division
+        description: "Uppercase in the source. 8 divisions of 4 teams each."
+        tests:
+          - accepted_values: {values: ['EAST', 'NORTH', 'SOUTH', 'WEST']}
+
+  - name: dim_player
+    description: >
+      Player biographical attributes. Grain: player. SCD1.
+      Deliberately carries NO team column -- the source holds only the current
+      team, so historical affiliation comes from the facts' team_key instead.
+    columns:
+      - name: player_key
+        tests: [unique, not_null]
+      - name: player_id
+        tests: [unique, not_null]
+      - name: full_name
+        tests: [not_null]
+      - name: position_name
+        description: >
+          Clean position label derived from position_abbreviation, NOT the raw
+          source text. The source label had case-variant duplicates
+          ('Place kicker' vs 'Place Kicker') and abbreviation leakage. This is
+          the column to expose in semantic views.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Quarterback', 'Running Back', 'Fullback', 'Wide Receiver',
+                       'Tight End', 'Center', 'Guard', 'Offensive Guard',
+                       'Offensive Tackle', 'Offensive Lineman', 'Defensive End',
+                       'Defensive Tackle', 'Defensive Lineman', 'Nose Tackle',
+                       'Linebacker', 'Weakside Linebacker', 'Cornerback',
+                       'Left Cornerback', 'Safety', 'Defensive Back',
+                       'Place Kicker', 'Punter', 'Long Snapper', 'Kick Returner',
+                       'Unknown']
+      - name: position_source
+        description: "Raw source label. Retained for audit only -- do NOT expose in a semantic view or filter on it."
+      - name: position_abbreviation
+        description: "Clean and complete, 25 values. Authoritative input for position_name."
+        tests: [not_null]
+      - name: position_group
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - 'Offense - Skill'
+                - 'Offense - Line'
+                - 'Defense - Line'
+                - 'Defense - Linebacker'
+                - 'Defense - Secondary'
+                - 'Special Teams'
+                - 'Unknown'
+      - name: has_known_position
+        tests: [not_null]
+
+  - name: dim_game
+    description: >
+      Descriptive context per game. Grain: game. 1,002 rows.
+      Scores are measures and live on fact_team_game, not here.
+    columns:
+      - name: game_key
+        tests: [unique, not_null]
+      - name: game_id
+        tests: [unique, not_null]
+      - name: game_date
+        tests: [not_null]
+      - name: season_week_key
+        description: "Conforms to dim_season_week."
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key}
+      - name: home_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: away_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+
+  - name: dim_season_week
+    description: >
+      The NFL calendar. Grain: season x week x season_type. 78 rows.
+      season_type is part of the key because week 1 exists in both the preseason
+      and the regular season -- a postseason boolean would collapse 78 weeks
+      into 66 and merge the two.
+    columns:
+      - name: season_week_key
+        tests: [unique, not_null]
+      - name: season
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: season_type
+        tests:
+          - not_null
+          - accepted_values: {values: [1, 2, 3], quote: false}
+      - name: season_week_sequence
+        tests: [unique, not_null]
+      - name: games_in_week
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, week, season_type]
+
+  - name: dim_date
+    description: >
+      Conformed calendar, generated as a dense spine from the games date range.
+      Grain: date. nfl_season differs from calendar_year -- Jan/Feb dates belong
+      to the previous year's season.
+    columns:
+      - name: date_key
+        tests: [unique, not_null]
+      - name: full_date
+        tests: [unique, not_null]
+      - name: nfl_season
+        tests: [not_null]
+      - name: day_of_week
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 6}
+
+  - name: dim_play_type
+    description: >
+      Play classification derived from the distinct type values on plays.
+      Grain: play type. 39 rows.
+    columns:
+      - name: play_type_key
+        tests: [unique, not_null]
+      - name: play_type_slug
+        tests: [unique, not_null]
+      - name: play_category
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Passing', 'Rushing', 'Punt', 'Kicking', 'Kickoff',
+                       'Penalty', 'Administrative', 'Turnover', 'Other']
+      - name: is_live_ball_play
+        tests: [not_null]

@@ -1,0 +1,61 @@
+# SPCS job spec template for a single dlt pipeline run.
+#
+# Uploaded to @DLT_DB.DEPLOY.SPECS (see sql/base/03_registry.sql) and
+# referenced by the generated Tasks:
+#
+#   EXECUTE JOB SERVICE
+#     IN COMPUTE POOL DLT_POOL
+#     NAME = dlt_job_<pipeline>
+#     FROM @DLT_DB.DEPLOY.SPECS
+#       SPECIFICATION_TEMPLATE_FILE = 'dlt_job.tmpl.yaml'
+#       [ EXTERNAL_ACCESS_INTEGRATIONS = (<eai>) ]   -- required for external sources
+#       USING (
+#         pipeline => '<pipeline>',
+#         database => 'NFL_PROD_DB',
+#         secret   => 'DLT_DB.OPS.NFL_API_KEY',
+#         env_var  => 'SOURCES__NFL__API_KEY'
+#       );
+#
+# Placeholders are substituted from the USING clause, so one template + one image
+# drives every pipeline. Adding a pipeline needs no rebuild and no new spec file:
+# INSERT a row (registry_sync) and generate its Task.
+#
+# The container reads its full spec from DLT_DB.OPS.PIPELINE_REGISTRY at runtime
+# (DLT_REGISTRY_SOURCE=auto -> table, because the OAuth session token is mounted
+# in SPCS). Snowflake auth uses that ambient token; no secrets are baked in.
+#
+# THE RENDERER IS JINJA2 AND DOES NOT KNOW WHAT A COMMENT IS.
+#     Every delimiter in this header is live. A placeholder named in braces here
+#     becomes a REQUIRED variable, and anything that is not a valid expression is a
+#     syntax error even as documentation. Describe variables in prose or backticks.
+#
+# WHY THIS TAKES NO `args` VARIABLE, UNLIKE THE DEV TEMPLATES
+#     A scheduled Task has no command line to forward. It does not need one: the
+#     registry declares its season as a `{current_season}` token that run.py resolves
+#     at run time, so a bare `run <pipeline>` already loads the right season. Adding
+#     an argv here would just move that decision somewhere nobody looks.
+#
+# WHY THE SECRET IS BOUND HERE AND NOT BAKED IN
+#     Every NFL pipeline resolves `secret:sources.nfl.api_key`. Without the block
+#     below the container starts, reaches dlt.secrets, and dies with a KeyError at
+#     09:00 UTC. The values come from the registry (`secret` / `env_var` fields) via
+#     generate_tasks.py, so the binding lives beside the pipeline it belongs to.
+spec:
+  containers:
+    - name: dlt
+      image: /DLT_DB/DEPLOY/IMAGES/dlt-pipeline:latest
+      args:
+        - {{ pipeline }}
+      env:
+        DESTINATION__SNOWFLAKE__CREDENTIALS__AUTHENTICATOR: oauth
+        DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE: {{ database }}
+        DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE: DLT_WH
+        # registry_store reads the control-plane registry with these connector vars.
+        SNOWFLAKE_WAREHOUSE: DLT_WH
+        SNOWFLAKE_DATABASE: DLT_DB
+        DLT_REGISTRY_SOURCE: auto
+        LOG_LEVEL: INFO
+      secrets:
+        - snowflakeSecret: {{ secret }}
+          secretKeyRef: secret_string
+          envVarName: {{ env_var }}

@@ -1,0 +1,80 @@
+name: cortex_agent_lifecycle
+version: '1.0.0'
+config-version: 2
+
+profile: cortex_agent_lifecycle
+
+model-paths: ["models"]
+macro-paths: ["macros", "agents"]   # agents/ holds per-agent deploy wrapper macros
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  cortex_agent_lifecycle:
+
+    # -------------------------------------------------------------------------
+    # nfl -- one league. Config is nested per sport so a second league can be
+    # added as a sibling key without touching these settings.
+    #
+    # NOTE: the path nesting must match the folder nesting. These keys are
+    # directory names, so models/nfl/prep/ requires nfl: > prep:. Flattening
+    # them silently drops the materialization and +schema configs -- the models
+    # still build, just as views in the default target schema.
+    # -------------------------------------------------------------------------
+    nfl:
+      +tags: ['nfl']
+
+      # PREP -- thin views over NFL_PROD_DB.RAW. Rename, cast, strip the dlt
+      # bookkeeping columns and the flattened parent payload, hash surrogate keys.
+      # Views (not tables) because these are pass-through and the cost belongs in
+      # CORE, which materializes.
+      prep:
+        +materialized: view
+        +schema: PREP
+
+      # CORE -- conformed dimensions and facts at declared grain.
+      core:
+        +schema: CORE
+        dimensions:
+          +materialized: table
+        facts:
+          +materialized: table
+
+      # ANALYTICS -- semantic views and evaluation datasets, consumed by agents.
+      #
+      # sv_example and eval_dataset are the upstream template's skeletons. They
+      # reference the placeholder source that models/sources.yml replaced, so
+      # they are disabled rather than deleted -- both carry substantial
+      # authoring guidance in their comments that is worth keeping until the
+      # real NFL semantic views are written on top of CORE.
+      semantic_views:
+        +materialized: semantic_view
+        +schema: ANALYTICS
+        sv_example:
+          +enabled: false
+        # Disabled: the Next Gen source tracks each player in only ONE discipline.
+        # Verified against the BallDontLie API directly -- advanced_stats/rushing
+        # returns zero rows for quarterbacks (Lamar Jackson, Jalen Hurts) while
+        # returning data for running backs. Same shape for the other endpoints:
+        # 96 QBs in passing, 132 RBs in rushing, 307 WR/TE in receiving, with
+        # zero player overlap between any two.
+        #
+        # The consequence is that the obvious questions ("how good a runner is
+        # Lamar Jackson versus expectation?") have no answer, so the view
+        # promises more than the data supports. Actual rushing production is
+        # still fully available in sv_nfl_player_offense from the box score.
+        #
+        # The underlying facts are left in place and still build -- only this
+        # semantic view is off. Re-enable if the provider broadens coverage.
+        sv_nfl_player_advanced:
+          +enabled: false
+      evaluations:
+        +materialized: table
+        +schema: ANALYTICS
+        eval_dataset:
+          +enabled: false

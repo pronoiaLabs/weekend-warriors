@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cortex Agent Lifecycle with dbt</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.css" />
+<style>
+:root {
+  --sf-blue: #29B5E8;
+  --sf-blue-deep: #11567F;
+  --sf-blue-darker: #0A3D5A;
+  --sf-cyan: #71D3DC;
+  --sf-blue-pale: #E8F6FC;
+  --bg: #FFFFFF;
+  --bg-alt: #F7F9FB;
+  --bg-code: #F5F7FA;
+  --text: #1E1E1E;
+  --text-muted: #5A6872;
+  --border: #E5EAF0;
+  --border-strong: #CFD7E0;
+  --success: #2E7D32;
+  --warning: #E65100;
+  --error: #C62828;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow-sm: 0 1px 2px rgba(17, 86, 127, 0.06);
+  --shadow-md: 0 4px 12px rgba(17, 86, 127, 0.08);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.site-header {
+  background: linear-gradient(135deg, var(--sf-blue-deep) 0%, var(--sf-blue-darker) 100%);
+  color: white;
+  padding: 1.5rem 0;
+  border-bottom: 3px solid var(--sf-blue);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.brand-mark { font-size: 1.5rem; color: var(--sf-blue); }
+.brand-text .divider { color: var(--sf-cyan); margin: 0 0.5rem; font-weight: 300; }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 2rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.meta-label {
+  color: var(--sf-cyan);
+  font-weight: 600;
+  margin-right: 0.5rem;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.tab-nav {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-nav .container {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 1rem 1.5rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tab-btn:hover { color: var(--sf-blue-deep); background: var(--bg-alt); }
+.tab-btn.is-active { color: var(--sf-blue-deep); border-bottom-color: var(--sf-blue); font-weight: 600; }
+
+.tab-panel {
+  display: none;
+  padding: 2.5rem 0 4rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.tab-panel.is-active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+h1 { font-size: 2.25rem; font-weight: 700; color: var(--sf-blue-deep); margin: 0 0 0.5rem; letter-spacing: -0.02em; }
+h2 { font-size: 1.5rem; font-weight: 600; color: var(--sf-blue-deep); margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+h3 { font-size: 1.15rem; font-weight: 600; color: var(--text); margin: 1.75rem 0 0.75rem; }
+h4 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.5rem; color: var(--text); }
+
+.lead { font-size: 1.125rem; color: var(--text-muted); margin: 0 0 2rem; max-width: 65ch; }
+p { margin: 0.75rem 0; }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--bg-code);
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  color: var(--sf-blue-darker);
+  border: 1px solid var(--border);
+}
+
+pre[class*="language-"] {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 0.875rem;
+  margin: 1rem 0;
+}
+
+.muted { color: var(--text-muted); }
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.metric-tile {
+  background: linear-gradient(135deg, var(--sf-blue-pale) 0%, #FFFFFF 100%);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--sf-blue);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-value { font-size: 1.5rem; font-weight: 700; color: var(--sf-blue-deep); line-height: 1.2; margin-bottom: 0.25rem; }
+.metric-label { font-size: 0.875rem; color: var(--text-muted); }
+.metric-sublabel { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.925rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.data-table th {
+  background: var(--sf-blue-deep);
+  color: white;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.data-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:nth-child(even) td { background: var(--bg-alt); }
+.data-table.compact { font-size: 0.875rem; }
+.data-table.compact td, .data-table.compact th { padding: 0.5rem 0.75rem; }
+
+.badge {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 0.5rem;
+}
+.badge-ok { background: var(--sf-blue-pale); color: var(--sf-blue-deep); }
+.badge-low { background: #E8F5E9; color: var(--success); }
+.badge-med { background: #FFF3E0; color: var(--warning); }
+.badge-high { background: #FFEBEE; color: var(--error); }
+
+.callout {
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  border-left: 4px solid var(--sf-blue);
+  background: var(--sf-blue-pale);
+}
+
+.callout h4 { margin-top: 0; color: var(--sf-blue-deep); }
+.callout.callout-info { border-left-color: var(--sf-blue); background: var(--sf-blue-pale); }
+.callout.callout-warn { border-left-color: #F59E0B; background: #FFFBEB; }
+.callout.callout-key { border-left-color: var(--success); background: #F1F8F4; }
+.callout ol, .callout ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+.callout li { margin-bottom: 0.5rem; }
+
+.step {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0.75rem 0;
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.step[open] { border-color: var(--sf-blue); box-shadow: var(--shadow-md); }
+
+.step summary {
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--sf-blue-deep);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-alt);
+  user-select: none;
+}
+
+.step summary::-webkit-details-marker { display: none; }
+.step summary::after { content: "+"; margin-left: auto; font-size: 1.5rem; color: var(--sf-blue); font-weight: 300; transition: transform 0.2s ease; }
+.step[open] summary::after { content: "\2212"; }
+.step summary:hover { background: var(--sf-blue-pale); }
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--sf-blue);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.step-content { padding: 1rem 1.25rem; }
+.step-content p:first-child { margin-top: 0; }
+.step-content pre[class*="language-"] { margin: 0.75rem 0; }
+
+.mermaid-wrap {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-wrap .mermaid { min-width: 400px; width: 100%; }
+
+.site-footer {
+  background: var(--sf-blue-darker);
+  color: rgba(255, 255, 255, 0.75);
+  padding: 1.25rem 0;
+  margin-top: 4rem;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.site-footer strong { color: var(--sf-cyan); }
+
+a { color: var(--sf-blue-deep); }
+.repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--sf-blue-deep);
+  background: var(--sf-blue-pale);
+  border: 1px solid var(--sf-blue);
+  border-radius: 12px;
+  padding: 0.25em 0.75em;
+  margin-bottom: 0.85rem;
+  transition: all 0.15s ease;
+}
+.repo-link:hover { background: var(--sf-blue); color: #fff; }
+.repo-link::before { content: "\2197"; font-weight: 700; }
+.data-table a { color: var(--sf-blue-deep); font-weight: 600; text-decoration: none; }
+.data-table a:hover { text-decoration: underline; }
+
+@media (max-width: 900px) {
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  h1 { font-size: 1.75rem; }
+}
+
+@media (max-width: 600px) {
+  .metric-grid { grid-template-columns: 1fr; }
+  .tab-btn { padding: 0.75rem 1rem; font-size: 0.875rem; }
+  .container { padding: 0 1rem; }
+  .data-table { font-size: 0.8rem; }
+  .data-table td, .data-table th { padding: 0.5rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- HEADER                                                        -->
+<!-- ============================================================ -->
+<header class="site-header">
+  <div class="container">
+    <div class="brand">
+      <span class="brand-mark">&#10052;</span>
+      <span class="brand-text">Snowflake <span class="divider">|</span> Cortex Agents</span>
+    </div>
+    <div class="meta">
+      <div class="meta-row"><span class="meta-label">System</span> Cortex Agent Development Lifecycle</div>
+      <div class="meta-row"><span class="meta-label">Template</span> cortex-agents-dbt-project-template</div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<!-- NAV                                                           -->
+<!-- ============================================================ -->
+<nav class="tab-nav" aria-label="Sections">
+  <div class="container" id="tab-buttons"><!-- populated by script --></div>
+</nav>
+
+<main class="container">
+
+<!-- ============================================================ -->
+<!-- TAB: overview                                                 -->
+<!-- ============================================================ -->
+<section class="tab-panel is-active" data-tab="overview">
+
+  <h1>Cortex Agent Lifecycle with dbt</h1>
+  <p class="lead">A dbt project template that manages the full Cortex Agent development lifecycle as code — semantic views, agent configurations, evaluations, and scheduling — all running natively inside Snowflake.</p>
+
+  <p><a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template" target="_blank" rel="noopener">View the full repository on GitHub</a></p>
+
+  <div class="callout callout-key">
+    <h4>Starting point</h4>
+    <p>This flow begins <strong>after</strong> business questions and the data models that can answer them have already been identified. The template operationalizes that work into a repeatable, version-controlled pipeline.</p>
+  </div>
+
+  <h2>At a Glance</h2>
+  <div class="metric-grid">
+    <div class="metric-tile">
+      <div class="metric-value">6</div>
+      <div class="metric-label">Steps in the lifecycle</div>
+      <div class="metric-sublabel">Sources → Staging → Semantic View → Agent → Eval → Schedule</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-value">4</div>
+      <div class="metric-label">dbt macros</div>
+      <div class="metric-sublabel">create_agent, alter_agent, create_eval_stage, run_evaluation</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-value">1</div>
+      <div class="metric-label">Package dependency</div>
+      <div class="metric-sublabel">dbt_semantic_view — no extra SQL API wiring needed</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-value">Native</div>
+      <div class="metric-label">Runs inside Snowflake</div>
+      <div class="metric-sublabel">Workspaces, dbt Projects on Snowflake, Tasks</div>
+    </div>
+  </div>
+
+  <h2>Architecture</h2>
+  <div class="mermaid-wrap">
+    <pre class="mermaid">
+flowchart LR
+    src["Source Tables"] --> stg["Staging Models"]
+    stg --> sv["Semantic View"]
+    sv --> agent["Cortex Agent"]
+    agent --> eval{"Evaluate"}
+    eval -->|"pass" | task["Snowflake Task"]
+    eval -->|"fail"| sv
+    task --> users["Teams / SI / MCP"]
+    </pre>
+  </div>
+
+  <h2>6-Step Workflow</h2>
+  <table class="data-table compact">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Step</th>
+        <th>What you do</th>
+        <th>Key file</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1</strong></td>
+        <td>Define Sources</td>
+        <td>Register source tables — set database, schema, and table names</td>
+        <td><a href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/models/sources.yml" target="_blank" rel="noopener"><code>models/sources.yml</code></a></td>
+      </tr>
+      <tr>
+        <td><strong>2</strong></td>
+        <td>Build Staging</td>
+        <td>Clean and type-cast raw source data into reliable staging models</td>
+        <td><a href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/tree/main/models/staging" target="_blank" rel="noopener"><code>models/staging/*.sql</code></a></td>
+      </tr>
+      <tr>
+        <td><strong>3</strong></td>
+        <td>Create Semantic View</td>
+        <td>Define tables, dimensions, metrics, and verified queries for Cortex Analyst</td>
+        <td><a href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/models/semantic_views/sv_example.sql" target="_blank" rel="noopener"><code>models/semantic_views/sv_example.sql</code></a></td>
+      </tr>
+      <tr>
+        <td><strong>4</strong></td>
+        <td>Deploy Agent</td>
+        <td>Write agent YAML spec, run macro to create the Cortex Agent object</td>
+        <td><a href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/agents/example_agent.yml" target="_blank" rel="noopener"><code>agents/example_agent.yml</code></a></td>
+      </tr>
+      <tr>
+        <td><strong>5</strong></td>
+        <td>Run Evaluations</td>
+        <td>Score accuracy with ground-truth Q&amp;A pairs before shipping</td>
+        <td><a href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/seeds/eval_ground_truth.csv" target="_blank" rel="noopener"><code>seeds/eval_ground_truth.csv</code></a></td>
+      </tr>
+      <tr>
+        <td><strong>6</strong></td>
+        <td>Schedule</td>
+        <td>Chain dbt build + evaluation as daily Snowflake Tasks</td>
+        <td><a href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template" target="_blank" rel="noopener"><code>EXECUTE DBT PROJECT</code></a></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Prerequisites</h2>
+  <table class="data-table compact">
+    <thead>
+      <tr>
+        <th>Requirement</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Snowflake account</td>
+        <td>Any edition with Cortex Agents enabled</td>
+      </tr>
+      <tr>
+        <td>Role</td>
+        <td>Must have <code>CREATE SEMANTIC VIEW</code>, <code>CREATE AGENT</code>, <code>CREATE TASK</code> on the target schema</td>
+      </tr>
+      <tr>
+        <td>Warehouse</td>
+        <td>Any size — XS is fine for development</td>
+      </tr>
+      <tr>
+        <td>External Access Integration</td>
+        <td>Required once (ACCOUNTADMIN) for <code>dbt deps</code> to download packages from hub.getdbt.com</td>
+      </tr>
+      <tr>
+        <td>Git repository</td>
+        <td>Fork the template repo to your own GitHub account, or upload the folder directly to a Workspace</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <h4>Quick start — Snowflake Workspace (recommended)</h4>
+    <ol>
+      <li>Fork the repo to your GitHub account</li>
+      <li>In Snowsight, go to <strong>Projects &gt; Workspaces</strong> and create a Workspace from your forked repo URL</li>
+      <li>Update <code>profiles.yml</code> with your database, schema, warehouse, and role</li>
+      <li>Run <strong>Deps</strong> from the command bar (enter your External Access Integration name)</li>
+      <li>Run <strong>Build</strong> to materialize all models</li>
+      <li>Click <strong>Connect &gt; Deploy dbt Project</strong> to register the dbt PROJECT object in Snowflake</li>
+    </ol>
+  </div>
+
+</section>
+
+<!-- ============================================================ -->
+<!-- TAB: data-foundation                                          -->
+<!-- ============================================================ -->
+<section class="tab-panel" data-tab="data-foundation">
+
+  <h1>Data Foundation</h1>
+  <p class="lead">Steps 1 and 2 establish the reliable source and staging layer that the semantic view will be built on. Every downstream object — the semantic view, the agent, the evaluations — inherits the quality of this foundation.</p>
+
+  <h2>Step 1 &amp; 2 Walkthrough</h2>
+
+  <details class="step" open>
+    <summary><span class="step-num">1</span> Define Sources — <code>models/sources.yml</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/models/sources.yml" target="_blank" rel="noopener">View sources.yml on GitHub</a>
+      <p>Edit <code>models/sources.yml</code> to register your raw tables. dbt uses this file to resolve <code>{{ source() }}</code> calls throughout the project with fully-qualified names.</p>
+      <p><strong>What to change:</strong> Replace <code>raw_database</code>, <code>raw_schema</code>, and the table names with your actual source values.</p>
+<pre><code class="language-yaml">version: 2
+
+sources:
+  - name: raw                          # logical name used in {{ source('raw', ...) }}
+    database: raw_database             # TODO: your source database
+    schema: raw_schema                 # TODO: your source schema
+    tables:
+      - name: orders                   # TODO: add your tables
+        description: Raw order records
+      - name: products
+        description: Product catalog</code></pre>
+      <div class="callout callout-info">
+        <h4>Why sources matter</h4>
+        <p>Declaring sources enables dbt lineage — Snowflake can trace data from your Cortex Agent's semantic view all the way back to the raw tables it depends on. It also lets <code>dbt source freshness</code> alert you when upstream data stops updating.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">2</span> Build Staging Models — <code>models/staging/*.sql</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/tree/main/models/staging" target="_blank" rel="noopener">View the staging directory on GitHub</a>
+      <p>Create one <code>.sql</code> file per source table in <code>models/staging/</code>. Staging models do three things: enforce data types, clean nulls/whitespace, and rename columns to consistent business names. The semantic view references <code>{{ ref('stg_orders') }}</code> — never the raw source directly.</p>
+      <p><strong>Naming convention:</strong> <code>stg_{source_name}_{table_name}.sql</code></p>
+<pre><code class="language-sql">-- models/staging/stg_orders.sql
+
+SELECT
+    order_id::VARCHAR          AS order_id,
+    customer_id::VARCHAR       AS customer_id,
+    order_date::DATE           AS order_date,
+    TRIM(status)               AS status,
+    order_total::FLOAT         AS order_total,
+    COALESCE(region, 'Unknown') AS region
+FROM {{ source('raw', 'orders') }}
+WHERE order_id IS NOT NULL</code></pre>
+
+<pre><code class="language-bash"># Build only staging models
+dbt build --select staging.*
+
+# Build a single staging model
+dbt build --select stg_orders</code></pre>
+
+      <div class="callout callout-key">
+        <h4>Keep staging models thin</h4>
+        <p>Staging models should do no aggregation or business logic — just type casts, null handling, and renaming. Business logic lives in the semantic view's METRICS and DIMENSIONS blocks, where Cortex Analyst can reason about it.</p>
+      </div>
+    </div>
+  </details>
+
+</section>
+
+<!-- ============================================================ -->
+<!-- TAB: semantic-view                                            -->
+<!-- ============================================================ -->
+<section class="tab-panel" data-tab="semantic-view">
+
+  <h1>Semantic View</h1>
+  <p class="lead">Step 3 translates your staging models into a business-readable semantic layer. The semantic view is what Cortex Analyst reads to convert natural language questions into SQL — every fact, dimension, metric, and verified query you define directly improves answer accuracy.</p>
+
+  <div class="callout callout-info">
+    <h4>How <code>materialized='semantic_view'</code> works</h4>
+    <p>The <code>dbt_semantic_view</code> package intercepts this materialization type and passes your SQL body verbatim to Snowflake's <code>CREATE OR REPLACE SEMANTIC VIEW</code> statement. You get full SQL API coverage for every Snowflake feature release without waiting for a package upgrade.</p>
+  </div>
+
+  <h2>Step 3 Walkthrough</h2>
+
+  <details class="step" open>
+    <summary><span class="step-num">1</span> dbt config block — top of every semantic view</summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/models/semantic_views/sv_example.sql" target="_blank" rel="noopener">View sv_example.sql on GitHub</a>
+      <p>Every file in <code>models/semantic_views/</code> must start with this config. The name you give the model becomes the semantic view's object name in Snowflake.</p>
+<pre><code class="language-sql">{{ config(materialized='semantic_view') }}</code></pre>
+      <p>File path: <code>models/semantic_views/sv_orders.sql</code> → creates <code>{database}.{schema}.SV_ORDERS</code></p>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">2</span> TABLES block — register logical tables with primary keys</summary>
+    <div class="step-content">
+      <p>The TABLES block maps logical table aliases to your dbt models. Use <code>{{ ref() }}</code> for staging models and <code>{{ source() }}</code> for raw tables. Primary keys are required — they tell Cortex Analyst how to deduplicate rows in aggregations.</p>
+<pre><code class="language-sql">TABLES (
+  orders AS {{ ref('stg_orders') }}
+    PRIMARY KEY (order_id)
+    COMMENT = 'Customer orders with fulfillment status and revenue',
+
+  products AS {{ ref('stg_products') }}
+    PRIMARY KEY (product_id)
+    COMMENT = 'Product catalog with categories and pricing'
+)</code></pre>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">3</span> RELATIONSHIPS block — define foreign key joins</summary>
+    <div class="step-content">
+      <p>Relationships tell Cortex Analyst how to join tables when a question spans multiple entities. Without this, the model can only answer single-table questions.</p>
+<pre><code class="language-sql">RELATIONSHIPS (
+  orders_to_products AS
+    orders (product_id) REFERENCES products
+)</code></pre>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">4</span> FACTS block — row-level expressions</summary>
+    <div class="step-content">
+      <p>A fact is a value evaluated at the individual row level — not aggregated. Metrics are built on top of facts: the fact <code>order_value</code> holds the per-row amount, and a metric like <code>SUM(order_value)</code> aggregates it. The FACTS clause must appear <strong>before</strong> DIMENSIONS and METRICS in the statement.</p>
+<pre><code class="language-sql">FACTS (
+  orders.order_value AS order_total
+    COMMENT = 'Per-order revenue amount, before aggregation',
+
+  orders.is_fulfilled AS IFF(status = 'Fulfilled', 1, 0)
+    COMMENT = 'Row-level 1/0 flag used to compute fulfillment rate'
+)</code></pre>
+      <div class="callout callout-info">
+        <h4>Facts vs. metrics</h4>
+        <p>Think of a fact as the raw per-row number and a metric as the aggregation over it. Defining the row-level value once as a fact lets multiple metrics (sum, average, ratio) reuse it consistently. Facts can also be marked <code>PRIVATE</code> when they exist only to feed a metric and shouldn't be queryable on their own.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">5</span> DIMENSIONS block — filterable and groupable attributes</summary>
+    <div class="step-content">
+      <p>Dimensions are columns users will filter by or group on ("by region", "for Q1", "where status is Fulfilled"). SYNONYMS expand the vocabulary Cortex Analyst recognizes for each dimension — add the natural language terms your users actually say.</p>
+<pre><code class="language-sql">DIMENSIONS (
+  orders.order_date AS order_date
+    COMMENT = 'Date the order was placed'
+    WITH SYNONYMS = ('purchase date', 'transaction date', 'order day'),
+
+  orders.status AS order_status
+    COMMENT = 'Fulfillment status of the order'
+    WITH SYNONYMS = ('fulfillment status', 'order state'),
+
+  orders.region AS region
+    COMMENT = 'Geographic region of the order'
+    WITH SYNONYMS = ('territory', 'area', 'geography'),
+
+  products.product_name AS product_name
+    COMMENT = 'Display name of the product'
+    WITH SYNONYMS = ('item name', 'product', 'sku name')
+)</code></pre>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">6</span> METRICS block — aggregate measures</summary>
+    <div class="step-content">
+      <p>Metrics are the numbers users ask about ("total revenue", "order count", "average order value"). They aggregate over the facts and columns defined above — note how <code>total_revenue</code> sums the <code>order_value</code> fact. Define them here rather than in staging so Cortex Analyst understands them semantically, not just syntactically.</p>
+<pre><code class="language-sql">METRICS (
+  orders.total_revenue AS SUM(order_value)
+    COMMENT = 'Total revenue from orders'
+    WITH SYNONYMS = ('revenue', 'sales', 'total sales', 'gross revenue'),
+
+  orders.order_count AS COUNT(order_id)
+    COMMENT = 'Number of orders placed'
+    WITH SYNONYMS = ('number of orders', 'orders', 'order volume'),
+
+  orders.fulfillment_rate AS AVG(is_fulfilled)
+    COMMENT = 'Share of orders that reached Fulfilled status'
+    WITH SYNONYMS = ('fulfillment percentage', 'fulfilled rate')
+)</code></pre>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">7</span> AI_SQL_GENERATION block — business rules for generated SQL</summary>
+    <div class="step-content">
+      <p>This block injects business-specific guidance into every SQL statement Cortex Analyst generates. Use it to encode conventions that aren't expressible in the schema — default date handling, rounding rules, or required filters — so answers stay consistent without the user having to specify them.</p>
+<pre><code class="language-sql">AI_SQL_GENERATION
+  'Default to the most recent complete month if no date range is specified.
+   Always round currency values to 2 decimal places.
+   Exclude cancelled orders (status = ''Cancelled'') from all revenue metrics
+   unless the user explicitly asks to include them.'</code></pre>
+      <div class="callout callout-info">
+        <h4>When to use it</h4>
+        <p>Reach for AI_SQL_GENERATION whenever you find yourself correcting the same class of SQL mistake repeatedly — it's the place to codify "house rules" that apply across many questions rather than a single verified query.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">8</span> AI_QUESTION_CATEGORIZATION block — out-of-scope guardrails</summary>
+    <div class="step-content">
+      <p>This block defines guardrails that classify and reject questions outside the semantic view's domain. Instead of hallucinating an answer for a question the model can't support, the agent declines cleanly — critical for trust when the view is shipped to business users.</p>
+<pre><code class="language-sql">AI_QUESTION_CATEGORIZATION
+  'Reject questions about employee data, HR topics, or individual
+   customer PII. Reject questions that require data not present in
+   this semantic view (for example, marketing spend or web traffic).
+   For rejected questions, briefly explain what this model can answer
+   instead.'</code></pre>
+      <div class="callout callout-key">
+        <h4>Guardrails build trust</h4>
+        <p>A model that confidently answers questions it has no data for erodes user trust faster than one that politely declines. Defining the out-of-scope boundary explicitly is one of the highest-impact steps before go-live.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">9</span> AI_VERIFIED_QUERIES block — ground-truth SQL pairs</summary>
+    <div class="step-content">
+      <p>Verified queries are the single highest-leverage addition to a semantic view. Each pair tells Cortex Analyst exactly what SQL to generate for a known question — improving accuracy for similar questions through retrieval-augmented generation. Add the questions you know users will ask most.</p>
+<pre><code class="language-sql">AI_VERIFIED_QUERIES (
+  top_products AS (
+    QUESTION 'What are the top selling products this quarter?'
+    VERIFIED_AT 1747267200
+    ONBOARDING_QUESTION TRUE
+    SQL 'SELECT product_name, total_revenue
+         FROM SEMANTIC_VIEW(sv_orders
+           DIMENSIONS products.product_name
+           METRICS orders.total_revenue)
+         ORDER BY total_revenue DESC
+         LIMIT 10'
+  ),
+
+  revenue_by_region AS (
+    QUESTION 'What is total revenue by region?'
+    VERIFIED_AT 1747267200
+    ONBOARDING_QUESTION TRUE
+    SQL 'SELECT region, total_revenue
+         FROM SEMANTIC_VIEW(sv_orders
+           DIMENSIONS orders.region
+           METRICS orders.total_revenue)
+         ORDER BY total_revenue DESC'
+  )
+)</code></pre>
+      <div class="callout callout-key">
+        <h4>How many verified queries to add?</h4>
+        <p>Start with 5–10 covering the most common question patterns for your domain. Each one acts as a retrieval anchor — questions semantically similar to a verified query will reuse its SQL pattern, dramatically improving accuracy beyond the exact match.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">10</span> Build and deploy the semantic view</summary>
+    <div class="step-content">
+<pre><code class="language-bash"># Build a single semantic view
+dbt build --select sv_orders
+
+# Build all semantic views
+dbt build --select semantic_views.*
+
+# Verify the object was created in Snowflake
+SHOW SEMANTIC VIEWS LIKE 'SV_ORDERS';</code></pre>
+      <p>After building, the fully-qualified semantic view name (e.g., <code>DEV_DB.CORTEX_AGENTS.SV_ORDERS</code>) is what you'll reference in your agent YAML spec under <code>tool_resources.Analyst.semantic_view</code>.</p>
+    </div>
+  </details>
+
+</section>
+
+<!-- ============================================================ -->
+<!-- TAB: agent-config                                             -->
+<!-- ============================================================ -->
+<section class="tab-panel" data-tab="agent-config">
+
+  <h1>Agent Configuration</h1>
+  <p class="lead">Step 4 takes the semantic view you built and wires it into a Cortex Agent. The agent spec is a YAML file — the <code>create_agent</code> macro reads it and issues <code>CREATE OR REPLACE AGENT</code> on your behalf. Updates are zero-downtime via <code>alter_agent</code>.</p>
+
+  <h2>Step 4 Walkthrough</h2>
+
+  <details class="step" open>
+    <summary><span class="step-num">1</span> Write the agent spec — <code>agents/example_agent.yml</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/agents/example_agent.yml" target="_blank" rel="noopener">View example_agent.yml on GitHub</a>
+      <p>Create one YAML file per agent in the <code>agents/</code> directory. The filename (without <code>.yml</code>) is the agent's object name in Snowflake.</p>
+<pre><code class="language-yaml">models:
+  orchestration: auto        # Snowflake picks the best orchestration model
+
+orchestration:
+  budget:
+    seconds: 30              # Hard cap on time per request
+    tokens: 16000            # Hard cap on orchestration tokens per request
+
+instructions:
+  response: >
+    You are a data analyst assistant for [your use case].
+    Provide clear, data-driven answers. Always cite specific
+    numbers and dates. Round currency to 2 decimal places.
+  orchestration: >
+    For quantitative questions about orders, revenue, and
+    fulfillment, use the Analyst tool. For questions about
+    business definitions or policies, use the Search tool.
+    Never guess numeric values — always use a tool.
+  sample_questions:
+    - question: "What were total sales last month?"
+    - question: "Which products had the highest revenue in Q1?"
+    - question: "How many orders are pending fulfillment today?"
+
+tools:
+  - tool_spec:
+      type: "cortex_analyst_text_to_sql"
+      name: "Analyst"
+      description: >
+        Queries structured order, inventory, and product data
+        to answer questions about revenue, demand, and
+        fulfillment metrics. Do NOT use for definitions or
+        policy questions.
+
+tool_resources:
+  Analyst:
+    semantic_view: "DEV_DB.CORTEX_AGENTS.SV_ORDERS"</code></pre>
+
+      <div class="callout callout-key">
+        <h4>Tool descriptions drive routing accuracy</h4>
+        <p>The orchestration model reads tool descriptions to decide which tool to call. Be explicit about what each tool does <em>and</em> what it does <em>not</em> do. Vague descriptions are the primary cause of misrouted queries.</p>
+      </div>
+
+      <div class="callout callout-info">
+        <h4>Adding Cortex Search (optional)</h4>
+        <p>To add unstructured document search alongside the Analyst tool, add a second tool spec:</p>
+<pre><code class="language-yaml">  - tool_spec:
+      type: "cortex_search"
+      name: "Search"
+      description: >
+        Searches business documentation for definitions,
+        policies, and terminology. Do NOT use for numeric
+        queries or data that requires aggregation.
+
+tool_resources:
+  Search:
+    name: "DEV_DB.CORTEX_AGENTS.MY_SEARCH_SERVICE"
+    max_results: "5"</code></pre>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">2</span> Create the agent — <code>macros/create_agent.sql</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/macros/create_agent.sql" target="_blank" rel="noopener">View create_agent.sql on GitHub</a>
+      <p>The <code>create_agent</code> macro reads your YAML spec from disk using <code>load_file_contents()</code> and issues <code>CREATE OR REPLACE AGENT ... FROM SPECIFICATION $$...$$</code>. The agent name and fully-qualified location are derived from <code>target.database</code> and <code>target.schema</code> in your <code>profiles.yml</code>.</p>
+<pre><code class="language-sql">{% macro create_agent(agent_name, spec_file=none) %}
+  {%- set db = target.database -%}
+  {%- set schema = target.schema -%}
+  {%- if spec_file is none -%}
+    {%- set spec_file = 'agents/' ~ agent_name ~ '.yml' -%}
+  {%- endif -%}
+  {%- set spec_content = load_file_contents(spec_file) -%}
+
+  {% set sql %}
+    CREATE OR REPLACE AGENT {{ db }}.{{ schema }}.{{ agent_name }}
+      COMMENT = 'Managed by dbt - do not edit manually'
+      FROM SPECIFICATION $${{ spec_content }}$$
+  {% endset %}
+
+  {% do run_query(sql) %}
+{% endmacro %}</code></pre>
+
+<pre><code class="language-bash"># Create or replace the agent
+dbt run-operation create_agent --args '{agent_name: example_agent}'
+
+# Verify the agent was created
+SHOW AGENTS LIKE 'EXAMPLE_AGENT';</code></pre>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">3</span> Update a live agent — zero-downtime with <code>alter_agent</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/macros/alter_agent.sql" target="_blank" rel="noopener">View alter_agent.sql on GitHub</a>
+      <p>After the initial creation, use <code>alter_agent</code> instead of <code>create_agent</code> to update the live agent's specification without interrupting active sessions. This issues <code>ALTER AGENT MODIFY LIVE VERSION</code>, which applies changes atomically.</p>
+<pre><code class="language-bash"># Update the live agent in-place
+dbt run-operation alter_agent --args '{agent_name: example_agent}'</code></pre>
+      <div class="callout callout-warn">
+        <h4>When to use create_agent vs alter_agent</h4>
+        <p>Use <code>create_agent</code> the first time or when you need a full reset. Use <code>alter_agent</code> for incremental updates to instructions, tool descriptions, or budget settings on an already-deployed agent — it avoids downtime and preserves version history.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">4</span> Test the agent interactively</summary>
+    <div class="step-content">
+      <p>Once deployed, test the agent directly in Snowsight before running formal evaluations. This lets you quickly spot routing issues or bad SQL generation before committing ground-truth pairs.</p>
+<pre><code class="language-sql">-- Call the agent via SQL
+SELECT SNOWFLAKE.CORTEX.COMPLETE(
+  'AGENT',
+  ARRAY_CONSTRUCT(
+    OBJECT_CONSTRUCT('role', 'user', 'content', 'What were total sales last month?')
+  ),
+  OBJECT_CONSTRUCT('agent_name', 'DEV_DB.CORTEX_AGENTS.EXAMPLE_AGENT')
+) AS response;</code></pre>
+      <div class="callout callout-info">
+        <h4>Snowflake Intelligence shortcut</h4>
+        <p>In Snowsight, navigate to <strong>AI &amp; ML &gt; Intelligence</strong> to chat with your agent through the built-in UI — no SQL needed. This is also the quickest way to demo the agent to a stakeholder before it's surfaced in Teams or a custom app.</p>
+      </div>
+    </div>
+  </details>
+
+</section>
+
+<!-- ============================================================ -->
+<!-- TAB: eval-schedule                                            -->
+<!-- ============================================================ -->
+<section class="tab-panel" data-tab="eval-schedule">
+
+  <h1>Evaluate &amp; Schedule</h1>
+  <p class="lead">Steps 5 and 6 close the loop: evaluate accuracy against real questions before shipping to users, then automate the entire pipeline on a Snowflake Task schedule so models and agents stay current as data changes.</p>
+
+  <h2>Step 5 — Run Evaluations</h2>
+
+  <div class="callout callout-key">
+    <h4>Accuracy gate before go-live</h4>
+    <p>Target <strong>&ge;95% answer_correctness</strong> before surfacing the agent to end users. The evaluation framework scores responses against your ground-truth pairs using Cortex LLM-as-judge — no external tooling required.</p>
+  </div>
+
+  <details class="step" open>
+    <summary><span class="step-num">1</span> Build the ground-truth dataset — <code>seeds/eval_ground_truth.csv</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/seeds/eval_ground_truth.csv" target="_blank" rel="noopener">View eval_ground_truth.csv on GitHub</a>
+      <p>Add rows to <code>seeds/eval_ground_truth.csv</code>. Each row is a question the agent should be able to answer plus the correct response. The evaluation framework compares the agent's live output against these expected answers.</p>
+
+      <table class="data-table compact">
+        <thead>
+          <tr>
+            <th>Column</th>
+            <th>Purpose</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>input_query</code></td>
+            <td>The natural language question</td>
+            <td><em>What were total sales for January 2026?</em></td>
+          </tr>
+          <tr>
+            <td><code>ground_truth_json</code></td>
+            <td>JSON with <code>ground_truth_output</code> key containing the expected answer</td>
+            <td><em>{"ground_truth_output": "Total sales for January 2026 were $1.2M..."}</em></td>
+          </tr>
+        </tbody>
+      </table>
+
+<pre><code class="language-bash"># Load seeds and rebuild the eval dataset table
+dbt seed
+dbt run --select eval_dataset</code></pre>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">2</span> Configure the evaluation — <code>evaluations/example_eval_config.yml</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/evaluations/example_eval_config.yml" target="_blank" rel="noopener">View example_eval_config.yml on GitHub</a>
+      <p>The eval config YAML controls which agent to evaluate, which dataset to use, and which metrics to score. It gets uploaded to a Snowflake stage before running.</p>
+<pre><code class="language-yaml"># dataset block: ONLY include on the first run.
+# Remove it after the first successful run to avoid
+# "dataset already exists" errors.
+dataset:
+  dataset_type: "CORTEX AGENT"
+  table_name: "DEV_DB.CORTEX_AGENTS.EVAL_DATASET"
+  dataset_name: "AGENT_EVAL_DATASET"
+  column_mapping:
+    query_text: "INPUT_QUERY"
+    ground_truth: "GROUND_TRUTH"
+
+evaluation:
+  agent_params:
+    agent_name: "EXAMPLE_AGENT"
+    agent_type: "CORTEX AGENT"
+  run_params:
+    label: "v1 baseline"
+    description: "Baseline evaluation before shipping to users"
+  source_metadata:
+    type: "dataset"
+    dataset_name: "AGENT_EVAL_DATASET"
+
+metrics:
+  - "answer_correctness"     # Primary gate metric — target >= 95%
+  - "logical_consistency"    # Secondary — checks internal coherence</code></pre>
+
+      <div class="callout callout-warn">
+        <h4>Remove the <code>dataset:</code> block after the first run</h4>
+        <p>The dataset only needs to be registered once. Leave the block in and subsequent runs will fail with a "dataset already exists" error. Delete or comment out the entire <code>dataset:</code> section after the first successful evaluation.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open>
+    <summary><span class="step-num">3</span> Run the evaluation — <code>macros/run_evaluation.sql</code></summary>
+    <div class="step-content">
+      <a class="repo-link" href="https://github.com/innovation-igloo/cortex-agents-dbt-project-template/blob/main/macros/run_evaluation.sql" target="_blank" rel="noopener">View run_evaluation.sql on GitHub</a>
+      <p>The <code>run_evaluation</code> macro creates the staging infrastructure (file format + stage), uploads your eval config YAML, and calls <code>EXECUTE_AI_EVALUATION('START', ...)</code>. Evaluation results appear in Snowsight under <strong>AI &amp; ML &gt; Evaluations</strong>.</p>
+<pre><code class="language-bash"># Run evaluation for the agent
+dbt run-operation run_evaluation \
+  --args '{agent_name: example_agent, run_name: v1, config_file: example_eval_config.yml}'</code></pre>
+
+<pre><code class="language-sql">-- The macro issues this call internally:
+CALL EXECUTE_AI_EVALUATION(
+  'START',
+  OBJECT_CONSTRUCT('run_name', 'v1'),
+  '@DEV_DB.CORTEX_AGENTS.EVAL_CONFIG_STAGE/example_eval_config.yml'
+);</code></pre>
+      <p>Results are available in Snowsight under <strong>AI &amp; ML &gt; Evaluations</strong>. Review per-question scores and drill into failures before proceeding to scheduling.</p>
+    </div>
+  </details>
+
+  <h2>Step 6 — Schedule with Snowflake Tasks</h2>
+
+  <details class="step" open>
+    <summary><span class="step-num">4</span> Create daily build and evaluation Tasks</summary>
+    <div class="step-content">
+      <p>Chain two Tasks: the first rebuilds all dbt models nightly, the second runs the evaluation immediately after. Both use <code>EXECUTE DBT PROJECT</code> to invoke the deployed dbt PROJECT object — no external orchestrator needed.</p>
+<pre><code class="language-sql">-- Task 1: nightly dbt build (prod target)
+CREATE OR REPLACE TASK daily_cortex_build
+  WAREHOUSE = ANALYTICS_WH
+  SCHEDULE = 'USING CRON 0 6 * * * America/New_York'
+AS
+  EXECUTE DBT PROJECT DEV_DB.CORTEX_AGENTS.CORTEX_LIFECYCLE
+    ARGS = 'build --target prod';
+
+-- Task 2: evaluation runs immediately after the build
+CREATE OR REPLACE TASK daily_agent_evaluation
+  WAREHOUSE = ANALYTICS_WH
+  AFTER daily_cortex_build
+AS
+  EXECUTE DBT PROJECT DEV_DB.CORTEX_AGENTS.CORTEX_LIFECYCLE
+    ARGS = 'run-operation run_evaluation
+            --args "{agent_name: example_agent,
+                    run_name: daily,
+                    config_file: example_eval_config.yml}"';
+
+-- Activate both tasks
+ALTER TASK daily_agent_evaluation RESUME;
+ALTER TASK daily_cortex_build RESUME;</code></pre>
+
+      <div class="callout callout-info">
+        <h4>Task dependency order</h4>
+        <p>Always <code>RESUME</code> child tasks before parent tasks. Snowflake requires dependent tasks to be active before the root task can be enabled. Resume <code>daily_agent_evaluation</code> first, then <code>daily_cortex_build</code>.</p>
+      </div>
+    </div>
+  </details>
+
+    </div>
+  </details>
+
+</section>
+
+<!-- ============================================================ -->
+<!-- TAB: shipping                                                 -->
+<!-- ============================================================ -->
+<section class="tab-panel" data-tab="shipping">
+
+  <h1>Shipping Surfaces</h1>
+  <p class="lead">Once the agent is scheduled and consistently passing evaluations, it can be surfaced to end users through any of these channels — without changes to the agent itself.</p>
+
+  <h2>Where Users Reach the Agent</h2>
+
+  <table class="data-table compact">
+    <thead>
+      <tr>
+        <th>Surface</th>
+        <th>Best for</th>
+        <th>How to connect</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Snowflake Intelligence</strong></td>
+        <td>Snowsight-native chat UI — analysts and power users</td>
+        <td>Create an Intelligence conversation, add your agent as a source</td>
+      </tr>
+      <tr>
+        <td><strong>Microsoft Teams</strong></td>
+        <td>Business users who live in Teams — broadest reach</td>
+        <td>Install the Snowflake Teams app, configure the agent endpoint</td>
+      </tr>
+      <tr>
+        <td><strong>Custom app via MCP</strong></td>
+        <td>Embedded in a portal, Streamlit app, or internal tool</td>
+        <td>Call the Cortex Agents REST API; MCP server available for local dev</td>
+      </tr>
+      <tr>
+        <td><strong>Cortex Agent REST API</strong></td>
+        <td>Programmatic access from any language, backend service, or batch job</td>
+        <td>POST to the <code>agents/&lt;name&gt;:run</code> endpoint with a PAT or OAuth token</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Calling the Cortex Agent REST API</h2>
+  <p>Every Cortex Agent object is automatically callable over REST — it is the lowest-level surface, and the same endpoint that Snowflake Intelligence, Teams, and MCP all sit on top of. Any language or service that can make an authenticated HTTPS request can drive the agent directly, which makes it the right choice for embedding the agent in backend services, scheduled jobs, or a custom front end.</p>
+<pre><code class="language-bash">curl -X POST \
+  "https://&lt;account&gt;.snowflakecomputing.com/api/v2/databases/DEV_DB/schemas/CORTEX_AGENTS/agents/EXAMPLE_AGENT:run" \
+  -H "Authorization: Bearer $SNOWFLAKE_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      { "role": "user",
+        "content": [ { "type": "text", "text": "What were total sales last month?" } ] }
+    ]
+  }'</code></pre>
+
+  <div class="callout callout-info">
+    <h4>Authentication and streaming</h4>
+    <p>Authenticate with a Programmatic Access Token (PAT) or OAuth bearer token scoped to a role that has <code>USAGE</code> on the agent. The endpoint streams its response as server-sent events (SSE), so your client can render the agent's reasoning, tool calls, and final answer incrementally rather than waiting for the full payload.</p>
+  </div>
+
+  <div class="callout callout-key">
+    <h4>The agent object is the integration point</h4>
+    <p>All of these surfaces call the same underlying Cortex Agent object — changes to instructions, tools, or the semantic view propagate everywhere automatically on the next <code>alter_agent</code> run. No surface-specific configuration is needed when you update the agent.</p>
+  </div>
+
+</section>
+
+</main>
+
+<!-- ============================================================ -->
+<!-- FOOTER                                                        -->
+<!-- ============================================================ -->
+<footer class="site-footer">
+  <div class="container">
+    <p>June 2026 &middot; <strong>Cortex Agent Development Lifecycle</strong> &middot; Snowflake</p>
+  </div>
+</footer>
+
+<!-- CDN dependencies -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/copy-to-clipboard/prism-copy-to-clipboard.min.js"></script>
+
+<!-- Inlined config.js + script.js -->
+<script>
+(function () {
+  'use strict';
+
+  // config.js
+  window.DOC_CONFIG = {
+    tabs: [
+      { id: 'overview',        label: '1. Overview' },
+      { id: 'data-foundation', label: '2. Data Foundation' },
+      { id: 'semantic-view',   label: '3. Semantic View' },
+      { id: 'agent-config',    label: '4. Agent Config' },
+      { id: 'eval-schedule',   label: '5. Eval & Schedule' },
+      { id: 'shipping',        label: '6. Shipping Surfaces' }
+    ]
+  };
+
+  // script.js
+  var config = (window.DOC_CONFIG && Array.isArray(window.DOC_CONFIG.tabs))
+    ? window.DOC_CONFIG
+    : { tabs: [] };
+
+  var TAB_ORDER = config.tabs.map(function (t) { return t.id; });
+
+  var tabContainer = document.getElementById('tab-buttons');
+  if (tabContainer) {
+    tabContainer.innerHTML = '';
+    config.tabs.forEach(function (t, i) {
+      var btn = document.createElement('button');
+      btn.className = 'tab-btn' + (i === 0 ? ' is-active' : '');
+      btn.dataset.tab = t.id;
+      btn.textContent = t.label;
+      tabContainer.appendChild(btn);
+    });
+  }
+
+  var tabButtons = document.querySelectorAll('.tab-btn');
+  var tabPanels  = document.querySelectorAll('.tab-panel');
+
+  function activateTab(tabId) {
+    if (!tabId || TAB_ORDER.indexOf(tabId) === -1) return;
+
+    tabButtons.forEach(function (btn) {
+      btn.classList.toggle('is-active', btn.dataset.tab === tabId);
+    });
+    tabPanels.forEach(function (panel) {
+      panel.classList.toggle('is-active', panel.dataset.tab === tabId);
+    });
+
+    if (history.replaceState) {
+      history.replaceState(null, '', '#' + tabId);
+    }
+
+    var activePanel = document.querySelector('.tab-panel.is-active');
+    if (activePanel && window.mermaid) {
+      var unrendered = activePanel.querySelectorAll('.mermaid:not([data-processed])');
+      if (unrendered.length > 0) {
+        mermaid.run({ nodes: unrendered });
+      }
+    }
+
+    var tabNav = document.querySelector('.tab-nav');
+    if (tabNav) {
+      window.scrollTo({ top: tabNav.offsetTop, behavior: 'smooth' });
+    }
+  }
+
+  tabButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activateTab(btn.dataset.tab);
+    });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (['input', 'select', 'textarea'].indexOf(tag) !== -1) return;
+    if (e.target.isContentEditable) return;
+
+    var currentBtn = document.querySelector('.tab-btn.is-active');
+    if (!currentBtn) return;
+    var currentIdx = TAB_ORDER.indexOf(currentBtn.dataset.tab);
+    if (currentIdx === -1) return;
+
+    if (e.key === 'ArrowRight' && currentIdx < TAB_ORDER.length - 1) {
+      activateTab(TAB_ORDER[currentIdx + 1]);
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft' && currentIdx > 0) {
+      activateTab(TAB_ORDER[currentIdx - 1]);
+      e.preventDefault();
+    }
+  });
+
+  var initialHash = window.location.hash.replace('#', '');
+  if (initialHash && TAB_ORDER.indexOf(initialHash) !== -1) {
+    activateTab(initialHash);
+  }
+
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#E8F6FC',
+        primaryBorderColor: '#29B5E8',
+        primaryTextColor: '#11567F',
+        lineColor: '#11567F',
+        secondaryColor: '#F7F9FB',
+        tertiaryColor: '#FFFFFF',
+        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+        fontSize: '14px'
+      }
+    });
+    var visibleMermaids = document.querySelectorAll('.tab-panel.is-active .mermaid');
+    if (visibleMermaids.length > 0) {
+      mermaid.run({ nodes: visibleMermaids });
+    }
+  }
+
+})();
+</script>
+
+</body>
+</html>

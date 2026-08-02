@@ -1,0 +1,192 @@
+version: 2
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # Reference
+  # ---------------------------------------------------------------------------
+  - name: stg_nfl__teams
+    description: "The 32 NFL teams, cleaned. Grain: team."
+    columns:
+      - name: team_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: team_id
+        tests: [unique, not_null]
+      - name: team_abbreviation
+        tests: [unique, not_null]
+      - name: conference
+        tests:
+          - accepted_values: {values: ['AFC', 'NFC']}
+
+  - name: stg_nfl__players
+    description: >
+      Player roster with height/weight/experience parsed to numbers.
+      Grain: player. Team is CURRENT ONLY and is not promoted to dim_player.
+    columns:
+      - name: player_key
+        tests: [unique, not_null]
+      - name: player_id
+        tests: [unique, not_null]
+      - name: full_name
+        tests: [not_null]
+      - name: position
+        description: "'Unknown' for 8,379 of 13,503 players -- an explicit dimension member, never NULL."
+        tests: [not_null]
+      - name: height_inches
+        description: "Parsed from \"6' 2\\\"\". NULL for the 9,715 players with no height on file."
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 60
+              max_value: 84
+              severity: warn
+      - name: weight_lbs
+        description: "Parsed from \"176 lbs\"."
+        tests:
+          # Upper bound is 475, not 400: Desmond Watson (DT) is legitimately
+          # 449 lbs. The original 400 threshold flagged him as an outlier when
+          # the data was correct.
+          - dbt_utils.accepted_range:
+              min_value: 140
+              max_value: 475
+              severity: warn
+      - name: current_team_key
+        tests: [not_null]
+
+  - name: stg_nfl__games
+    description: "One row per game, 2023-2025. Grain: game."
+    columns:
+      - name: game_key
+        tests: [unique, not_null]
+      - name: game_id
+        tests: [unique, not_null]
+      - name: game_date
+        tests: [not_null]
+      - name: season
+        tests:
+          - not_null
+          - accepted_values: {values: [2023, 2024, 2025], quote: false}
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Preseason', 'Regular Season', 'Postseason']}
+      - name: home_team_key
+        tests: [not_null]
+      - name: away_team_key
+        tests: [not_null]
+      - name: home_team_score
+        tests: [not_null]
+      - name: away_team_score
+        tests: [not_null]
+
+  # ---------------------------------------------------------------------------
+  # Fact staging
+  # ---------------------------------------------------------------------------
+  - name: stg_nfl__team_stats
+    description: "Team box score. Grain: team x game. 2,000 rows (2 games missing)."
+    columns:
+      - name: team_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+
+  - name: stg_nfl__player_stats
+    description: >
+      Player box score with dlt variant columns coalesced.
+      Grain: player x game. 67,191 rows.
+    columns:
+      - name: player_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        description: "Team the player appeared for in THIS game. The only accurate historical affiliation."
+        tests: [not_null]
+
+  - name: stg_nfl__plays
+    description: "Play-by-play with the flattened game/team payload stripped. Grain: play. 179,402 rows."
+    columns:
+      - name: play_key
+        tests: [unique, not_null]
+      - name: play_id
+        tests: [unique, not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: team_key
+        description: "NULLABLE by design -- 126 neutral-event plays have no possessing team."
+      - name: period
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 6, severity: warn}
+      - name: clock_seconds_remaining
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 900, severity: warn}
+      - name: home_win_probability
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+
+  - name: stg_nfl__standings
+    description: "Current version of final standings. Grain: team x season. 96 rows."
+    columns:
+      - name: team_season_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: win_pct
+        description: "NFL formula: (W + 0.5T) / (W + L + T). NULL if no games played."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_key, season]
+
+  - name: stg_nfl__player_injuries
+    description: "Injury report, SCD2 history preserved. Grain: player x report date x version."
+    columns:
+      - name: player_injury_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+
+  # ---------------------------------------------------------------------------
+  # Next Gen Stats -- player x season-week grain, no game_id
+  # ---------------------------------------------------------------------------
+  - name: stg_nfl__advanced_passing
+    description: "Next Gen passing. Grain: player x season x week x postseason. No game_id."
+    columns:
+      - name: player_week_passing_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: completion_percentage
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
+
+  - name: stg_nfl__advanced_rushing
+    description: "Next Gen rushing. Grain: player x season x week x postseason. No game_id."
+    columns:
+      - name: player_week_rushing_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+
+  - name: stg_nfl__advanced_receiving
+    description: "Next Gen receiving. Grain: player x season x week x postseason. No game_id."
+    columns:
+      - name: player_week_receiving_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: catch_percentage
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}

@@ -1,0 +1,6 @@
+input_query,ground_truth_json
+"What were total sales for January 2026?","{""ground_truth_output"": ""Total sales for January 2026 were $1.2M across all product categories.""}"
+"Which products had the highest revenue between January and March 2026?","{""ground_truth_output"": ""The top 3 products by revenue between January and March 2026 were Product A ($450K), Product B ($320K), and Product C ($280K).""}"
+"How many orders were placed on February 14, 2026?","{""ground_truth_output"": ""There were 1,247 orders placed on February 14, 2026.""}"
+"What is the average order value for Q1 2026?","{""ground_truth_output"": ""The average order value for Q1 2026 (January through March) was $85.50.""}"
+"Which region had the most orders in March 2026?","{""ground_truth_output"": ""The West region had the most orders in March 2026 with 4,512 orders, followed by East (3,890) and Central (2,340).""}"

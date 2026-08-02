@@ -1,0 +1,296 @@
+# Running the NFL pipelines in production
+
+Scheduled Snowflake Tasks loading `NFL_PROD_DB.RAW`. The third runbook, after
+[MAKE-COMMANDS.md](MAKE-COMMANDS.md) (laptop) and [MAKE-COMMANDS-SPCS.md](MAKE-COMMANDS-SPCS.md)
+(container, by hand).
+
+The difference that matters: **nobody is watching.** A Task fires at 09:00 UTC and reports itself
+only in `TASK_HISTORY` and `_DLT_RUNS`. Everything below exists because a failure here is silent by
+default.
+
+---
+
+## What a Task can and cannot do
+
+A Task passes **no arguments**. There is no `--resource`, no `--param`, no season on a command line.
+That single constraint explains most of the design:
+
+| Need | How a manual run does it | How a Task does it |
+|---|---|---|
+| Which season | `PARAM="season=2026"` | `{current_season}` token in the registry, resolved at run time |
+| The API key | `SECRET=` on the command line | `secret` field in the registry, bound by the job spec |
+| Network egress | `EAI=` on the command line | `external_access` field, emitted into the Task DDL |
+| Which database | resolved from the registry | resolved from the registry, always `_PROD_DB` |
+
+So a scheduled pipeline must carry `schedule`, `secret`, `env_var` and `external_access` in its
+registry entry. `make test` fails if one is missing, because the alternative is finding out at
+09:00 UTC.
+
+### The season token
+
+```yaml
+- name: standings
+  endpoint:
+    params:
+      season: "{current_season}"
+```
+
+`run.py` substitutes the real year before dlt sees the config. The rule is `year if month >= 8 else
+year - 1`, so it rolls over on 1 August when preseason opens, and January stays on the season that is
+still being played.
+
+**A backfill still wins.** `--param season=2023` merges after the token resolves, so nothing about
+scheduling changes how you load history.
+
+**Why not a literal year.** It works until the August nobody remembers it. Then every nightly load
+reports success while re-fetching a season that ended months ago.
+
+---
+
+## The schedules, and the calendar behind them
+
+| Pipeline | Cron (UTC) | Cadence | Why |
+|---|---|---|---|
+| `nfl_reference` | `0 8 * * *` | daily | rosters churn on waivers all season |
+| `nfl_games` | `0 9 * * *` | daily | flex scheduling moves kickoffs; scores same-day |
+| `nfl_stats` | `0 10 * * *` | daily | box scores follow the games |
+| `nfl_plays` | `0 11 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
+| `nfl_standings` | `0 12 * * 2` | Tuesday | only meaningful after a full week |
+| `nfl_advanced_stats` | `0 13 * * 2` | Tuesday | same |
+| `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently |
+
+Cron is five fields, **Sunday is 0**, so Tuesday is `2`. Hours are staggered because `DLT_POOL` maxes
+at three nodes.
+
+**Why 09:00 UTC.** A normal week ends with Monday Night Football at 20:15 ET, final around 23:45 ET.
+That is 03:45 UTC Tuesday under EDT and 04:45 under EST. 09:00 UTC clears both, and the margin is
+deliberate: a fixed UTC cron drifts an hour against ET when the clocks change on 1 November.
+
+**Why `nfl_injuries` is late and daily.** Injury reports are filed Wed/Thu/Fri by 16:00 ET. 22:00 UTC
+is 18:00 EDT and 17:00 EST, after the deadline year-round. This is the one table where cadence is not
+a convenience: it is scd2, so a state never captured while true cannot be recovered by any backfill.
+
+### 2026 season dates
+
+| Date | Day | Event |
+|---|---|---|
+| 6 Aug 2026 | Thu | Hall of Fame Game, preseason opens |
+| 13 to 29 Aug | | Preseason weeks 1 to 3 |
+| **30 Aug, 18:00 ET** | Sun | 90 to 53 roster cut, the year's biggest `players` churn |
+| 31 Aug, 13:00 ET | Mon | waivers clear, practice squads form |
+| **9 Sep 2026** | Wed | regular season opener (a Wednesday, unusually) |
+| 10 Sep | Thu | Melbourne game, 20:35 ET |
+| 10 Nov, 16:00 ET | Tue | trade deadline |
+| 10 Jan 2027 | Sun | Week 18 ends |
+| 16 Jan to 14 Feb 2027 | | postseason through Super Bowl LXI |
+
+Games run Thu 20:15, Sun 09:30 (international) / 13:00 / 16:25 / 20:20, Mon 20:15 ET, with Saturday
+games from Week 16.
+
+**Two things not to hardcode anywhere.** Games per week varies from 13 to 16 because byes run Weeks 5
+to 14. And flex scheduling moves kickoffs with 12 to 28 days notice, which is why `nfl_games` re-reads
+daily instead of assuming the schedule has settled.
+
+---
+
+## First deployment
+
+```bash
+make setup-prod CONFIRM=1
+```
+
+Creates `DLT_POOL`, `DLT_WH` and the `DLT_LOADER` service user. `NFL_PROD_DB` already exists from
+`make setup-source SOURCE=nfl CONFIRM=1`.
+
+**Seed the data.** Cloning from dev is instant, costs no storage and makes no API calls, and it
+carries dlt's `_dlt_*` state so the first Task continues rather than rebuilding:
+
+**Neither role can do this alone, and that is the isolation working.** `DLT_LOADER_ROLE` has no
+grant at all on `NFL_DEV_DB`, so it cannot read the source. `DLT_DEV_ROLE` has none on `NFL_PROD_DB`,
+so it cannot write the target. Only `SYSADMIN`, which both roles are granted to, spans them.
+
+But a schema created by `SYSADMIN` is **owned** by `SYSADMIN`, and the Task's role could then read it
+and not write to it. So the ownership transfer is not optional:
+
+```sql
+USE ROLE SYSADMIN;
+
+DROP SCHEMA IF EXISTS NFL_PROD_DB.RAW;                 -- CLONE cannot target an existing schema
+CREATE SCHEMA NFL_PROD_DB.RAW CLONE NFL_DEV_DB.DEV_JSMITH;
+
+DROP TABLE IF EXISTS NFL_PROD_DB.RAW.CUSTOMERS;        -- sample fixtures ride along
+DROP TABLE IF EXISTS NFL_PROD_DB.RAW.ORDERS;
+
+-- Without these the first Task fails on a permission error that reads nothing like
+-- an ownership problem.
+GRANT OWNERSHIP ON SCHEMA NFL_PROD_DB.RAW
+    TO ROLE DLT_LOADER_ROLE COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON ALL TABLES IN SCHEMA NFL_PROD_DB.RAW
+    TO ROLE DLT_LOADER_ROLE COPY CURRENT GRANTS;
+```
+
+Verify before moving on:
+
+```sql
+SHOW SCHEMAS LIKE 'RAW' IN DATABASE NFL_PROD_DB;   -- owner must read DLT_LOADER_ROLE
+SELECT COUNT(*) FROM NFL_PROD_DB.RAW.GAMES;        -- 1002 for three seasons
+```
+
+```bash
+make sync-apply          # schedules + bindings into DLT_DB.OPS.PIPELINE_REGISTRY
+make tasks-sql           # review build/tasks.sql
+make tasks-apply         # Tasks created SUSPENDED, applied as DLT_LOADER_ROLE
+```
+
+**Read `build/tasks.sql` before applying it.** Seven `CREATE OR ALTER TASK` statements, each
+carrying its full container spec inline. `make deploy` does sync and apply in one step once you
+trust it.
+
+**The spec is inlined rather than staged.** `SPECIFICATION_TEMPLATE_FILE` looked tidier, but every
+Task failed two seconds after firing with `Unable to render service spec from given template:
+Object 'snowflake.snowpark.pypi_shared_repository' does not exist or not authorized`. Snowflake's
+server-side renderer resolves a dependency we do not control, and granting
+`SNOWFLAKE.PYPI_REPOSITORY_USER` did not help because it was already granted to `PUBLIC`. Rendering
+locally removes the whole class of problem, and the emitted SQL now states exactly what will run.
+
+The cost: changing the image or container env means re-running `make tasks-apply` rather than
+re-uploading one file. There is no prod spec upload at all now; `@DLT_DB.DEPLOY.SPECS` serves the
+dev templates only.
+
+---
+
+## Starting and stopping
+
+Tasks are created **suspended**. Generating a schedule and starting one are different decisions.
+
+```bash
+snow sql -c weekend-warriors --role DLT_LOADER_ROLE -q "
+ALTER TASK DLT_DB.OPS.dlt_task_nfl_reference RESUME;"
+```
+
+```sql
+ALTER TASK DLT_DB.OPS.dlt_task_nfl_reference SUSPEND;
+
+SHOW TASKS IN SCHEMA DLT_DB.OPS;    -- `state` is started | suspended
+                                    -- `owner` must read DLT_LOADER_ROLE
+```
+
+**Check the `owner` column the first time.** A Task runs with its owner's privileges,
+so one created by `SYSADMIN` works while granting every scheduled load far more than it
+needs. `make tasks-apply` uses `$(SNOW_LOADER)` to get this right; a Task applied by
+hand without `--role` will not be.
+
+**Resume one at a time, cheapest first**, confirming each before the next: `nfl_reference` (32 rows
+plus a merge), then `nfl_standings`, then the daily ones, then `nfl_plays` last because it is the only
+expensive one.
+
+Run one by hand without waiting for its cron:
+
+```sql
+EXECUTE TASK DLT_DB.OPS.dlt_task_nfl_reference;
+```
+
+That works on a suspended Task, which makes it the right way to test before resuming anything.
+
+---
+
+## Watching it
+
+Three layers, and they fail differently.
+
+```sql
+-- 1. Did the Task fire, and did the SQL succeed?
+SELECT name, state, scheduled_time, completed_time, error_code, error_message
+FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(
+    SCHEDULED_TIME_RANGE_START => DATEADD(day, -2, CURRENT_TIMESTAMP())))
+ORDER BY scheduled_time DESC;
+
+-- 2. Did the pipeline inside it load anything?
+SELECT pipeline, status, row_counts::string AS counts, error, finished_at
+FROM NFL_PROD_DB.OPS._DLT_RUNS
+WHERE finished_at > DATEADD(day, -2, CURRENT_TIMESTAMP())
+ORDER BY finished_at DESC;
+
+-- 3. Why did the container fail? Job services are auto-named, so find it first.
+SHOW SERVICES IN SCHEMA DLT_DB.DEPLOY;
+--   the `comment` column carries the pipeline name; take the newest matching `name`
+SELECT SYSTEM$GET_SERVICE_LOGS('DLT_DB.DEPLOY.JOB_<uuid>', 0, 'dlt');
+```
+
+**Job services have generated names on purpose.** A completed job is kept for 30 days
+so its logs stay readable, and there is no `OR REPLACE`, so a fixed name would succeed
+once and collide on every run after. Letting Snowflake name each run keeps a month of
+per-run history instead of destroying the previous night's logs. `COMMENT` carries the
+pipeline name so `SHOW SERVICES` is still readable.
+
+**A green Task is not a successful load.** `TASK_HISTORY` reports whether `EXECUTE JOB SERVICE`
+returned, and a job that runs and loads zero rows returns fine. `_DLT_RUNS` is the one that knows what
+was written. Check layer 2, not layer 1.
+
+**A missing `_DLT_RUNS` row is worse than a failed one.** It means the container died before the
+observability write, so look at layer 3.
+
+### Failure table
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Task never fires | still suspended | `ALTER TASK ... RESUME` |
+| `Object 'DLT_DB.DEPLOY.DLT_JOB_...' already exists` | a fixed job-service NAME | omit `NAME`; a completed job lingers 30 days |
+| `Insufficient privileges to operate on schema 'OPS'` | auto-named services are created in the Task's own schema | `GRANT CREATE SERVICE ON SCHEMA DLT_DB.OPS TO ROLE DLT_LOADER_ROLE` |
+| `syntax error ... unexpected 'EXTERNAL_ACCESS_INTEGRATIONS'` | clause after `FROM` | it belongs before `FROM` |
+| `SECRET ... does not exist or not authorized` | missing `READ` on the secret | `GRANT READ ON SECRET ... TO ROLE DLT_LOADER_ROLE` |
+| `KeyError` from `dlt.secrets` | `env_var` does not match the registry `secret:` path | fix the registry, re-sync |
+| connection timeout to the API | EAI missing from the Task | check `external_access` is set, re-generate |
+| cannot create schema `RAW_STAGING` | no `CREATE SCHEMA` grant | `sql/sources/<name>/01_databases.sql` grants it |
+| runs fine, loads a stale season | token did not resolve | check the log line `resolved runtime tokens` |
+| `no enabled pipeline named ...` | registry table out of date | `make sync-apply` |
+
+---
+
+## Checking a season rollover
+
+The one scheduled behaviour that changes without anyone editing anything. On 1 August the token
+starts resolving to the new year.
+
+```bash
+python -m pipelines.batch.models --current-season
+```
+
+After the first scheduled run past a rollover:
+
+```sql
+SELECT season, COUNT(*) FROM NFL_PROD_DB.RAW.STANDINGS GROUP BY season ORDER BY season;
+```
+
+The new season should appear. If it does not, the token did not resolve, and the container log says
+so directly: look for `resolved runtime tokens`.
+
+For `nfl_games` and `nfl_stats` the failure mode is the opposite and quieter. Those endpoints ignore
+an unrecognised filter rather than rejecting it, so a broken token means **every** season comes back
+and the run looks unusually productive:
+
+```sql
+SELECT COUNT(DISTINCT season) FROM NFL_PROD_DB.RAW.GAMES;
+```
+
+---
+
+## Backfilling in production
+
+Scheduled Tasks only ever load the current season, so history has to be loaded some other way.
+
+**There is no `make` target for this yet, deliberately.** `make run-spcs` is hardwired to the dev
+environment: it resolves the database with `--env DEV`, submits as `DLT_DEV_ROLE`, and uses
+`DLT_DEV_POOL`. None of those can touch `NFL_PROD_DB`, and widening them would give the dev path a
+route into production, which is the boundary this layout exists to create.
+
+Two workable options, neither built:
+
+- **Backfill in dev, then clone forward.** Load the season into `NFL_DEV_DB.DEV_<user>` with the
+  normal SPCS commands, then clone as above. Cheap and uses the path that is already proven, but it
+  replaces the whole prod schema rather than adding to it, so it only suits a quiet moment.
+- **A prod backfill target.** `run-spcs` gains an `ENV=` switch that also selects the role and pool.
+  Small, but it is a new way into production and deserves its own review rather than being added in
+  passing.
+
+Whichever gets built, the merge keys mean a backfill and a scheduled run cannot corrupt each other.

@@ -1,0 +1,25 @@
+# Snowflake Workspace Profile
+# =============================================================================
+# One profile for every environment. Snowflake resolves env.yml at
+# EXECUTE DBT PROJECT time and injects DBT_DATABASE / DBT_SCHEMA /
+# DBT_WAREHOUSE / DBT_ROLE; this file reads them with env_var().
+#
+# account and user are left empty -- dbt runs under the current Snowflake
+# session context. env.yml injects DBT_DATABASE / DBT_SCHEMA / DBT_WAREHOUSE /
+# DBT_ROLE at EXECUTE DBT PROJECT time. These env_var() calls have no defaults,
+# so a run will fail fast if a variable is missing (e.g. running outside
+# Snowflake without env.yml resolution) rather than silently using a fallback.
+# =============================================================================
+
+cortex_agent_lifecycle:
+  target: default
+  outputs:
+    default:
+      type: snowflake
+      account: ''
+      user: ''
+      role: "{{ env_var('DBT_ROLE') }}"
+      database: "{{ env_var('DBT_DATABASE') }}"
+      schema: "{{ env_var('DBT_SCHEMA') }}"
+      warehouse: "{{ env_var('DBT_WAREHOUSE') }}"
+      threads: 4

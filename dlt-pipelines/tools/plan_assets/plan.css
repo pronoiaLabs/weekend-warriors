@@ -1,0 +1,244 @@
+/* FIX-PLAN stylesheet. Inlined into FIX-PLAN.html by tools/build_plan.py.
+   Theme states: no [data-theme] follows the OS; [data-theme="light"|"dark"] pins it. */
+
+:root{
+  --bg:#fbfbfa; --panel:#ffffff; --ink:#1b1f23; --muted:#5d6871; --faint:#8b949e;
+  --rule:#e3e6e8; --rule-soft:#eef0f2; --accent:#0f6fc5; --accent-soft:#e8f1fb;
+  --code-bg:#f5f6f7; --code-ink:#1f2933; --code-rule:#e3e6e8;
+  --add-bg:#e4f5e9; --add-ink:#14622f; --del-bg:#fdeaea; --del-ink:#8a1c1c;
+  --ok:#1a7f45; --ok-bg:#e4f3ea; --open:#a8630a; --open-bg:#fbf0dd;
+  --mark:#ffe9a8; --mark-ink:#4a3608;
+  --rail:260px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme]){
+    --bg:#0f1214; --panel:#15191c; --ink:#dde3e8; --muted:#9aa5ae; --faint:#6f7a83;
+    --rule:#252b30; --rule-soft:#1d2226; --accent:#5aa9f0; --accent-soft:#16283a;
+    --code-bg:#0c0f11; --code-ink:#cdd6dd; --code-rule:#242a2f;
+    --add-bg:#10301c; --add-ink:#7fd39a; --del-bg:#331516; --del-ink:#f0a0a0;
+    --ok:#5fce90; --ok-bg:#12301f; --open:#e5b25a; --open-bg:#332815;
+    --mark:#5a4a12; --mark-ink:#ffe9a8;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1214; --panel:#15191c; --ink:#dde3e8; --muted:#9aa5ae; --faint:#6f7a83;
+  --rule:#252b30; --rule-soft:#1d2226; --accent:#5aa9f0; --accent-soft:#16283a;
+  --code-bg:#0c0f11; --code-ink:#cdd6dd; --code-rule:#242a2f;
+  --add-bg:#10301c; --add-ink:#7fd39a; --del-bg:#331516; --del-ink:#f0a0a0;
+  --ok:#5fce90; --ok-bg:#12301f; --open:#e5b25a; --open-bg:#332815;
+  --mark:#5a4a12; --mark-ink:#ffe9a8;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+.skip{position:absolute;left:-999px}
+.skip:focus{left:.5rem;top:.5rem;z-index:200;background:var(--panel);padding:.5rem .8rem;border-radius:6px}
+
+/* ------------------------------------------------------------------ the rail */
+
+.rail{
+  position:fixed;inset:0 auto 0 0;width:var(--rail);z-index:40;
+  display:flex;flex-direction:column;
+  background:var(--panel);border-right:1px solid var(--rule);
+}
+.brand{padding:1.1rem 1.1rem .5rem;display:flex;flex-direction:column;gap:.15rem}
+.brandname{font-size:.82rem;font-weight:650;letter-spacing:.02em;text-transform:uppercase}
+.brandmeta{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{height:4px;margin:.15rem 1.1rem .7rem;background:var(--rule-soft);border-radius:999px;overflow:hidden}
+.barfill{height:100%;width:0;background:var(--ok);border-radius:999px;transition:width .18s ease-out}
+
+.tools{display:flex;gap:.4rem;padding:0 1.1rem .55rem}
+#search{
+  flex:1 1 auto;min-width:0;font:inherit;font-size:.78rem;padding:.34rem .55rem;
+  border:1px solid var(--rule);border-radius:6px;background:var(--bg);color:var(--ink);
+}
+#search:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.iconbtn{
+  flex:0 0 auto;width:28px;height:28px;border:1px solid var(--rule);border-radius:6px;
+  background:var(--bg);color:var(--muted);cursor:pointer;font-size:.85rem;line-height:1;
+}
+.iconbtn:hover{color:var(--ink);border-color:var(--accent)}
+.hint{padding:0 1.1rem;font-size:.7rem;color:var(--faint);min-height:0}
+.hint:not(:empty){padding-bottom:.4rem}
+
+.side{flex:1 1 auto;overflow-y:auto;padding:.2rem .55rem 1rem;scrollbar-width:thin}
+.navgroup{margin-bottom:.5rem}
+.grouphead{
+  display:flex;align-items:baseline;justify-content:space-between;gap:.4rem;
+  padding:.7rem .55rem .3rem;
+}
+.groupname{font-size:.66rem;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.groupcount{font-size:.66rem;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.navrow.hide{display:none}
+.navitem{
+  display:flex;align-items:center;gap:.45rem;width:100%;text-align:left;
+  background:none;border:0;cursor:pointer;color:var(--muted);font:inherit;font-size:.79rem;
+  padding:.32rem .55rem;border-radius:6px;line-height:1.3;
+}
+.navitem:hover{background:var(--rule-soft);color:var(--ink)}
+.navitem.active{background:var(--accent-soft);color:var(--accent);font-weight:550}
+.navcode{
+  flex:0 0 auto;min-width:2.1rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.68rem;color:var(--faint);letter-spacing:.02em;
+}
+.navitem.active .navcode{color:var(--accent)}
+.navlabel{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.navlabel code{background:none;padding:0;font-size:.92em}
+.dot{flex:0 0 6px;width:6px;height:6px;border-radius:50%;background:var(--open)}
+.dot.done{background:var(--ok)}
+.dot.none{background:transparent;border:1px solid var(--rule)}
+
+/* Subsections show only for the open section: one nav level, not two. */
+.subitems{display:none;margin:.1rem 0 .35rem 2.55rem;border-left:1px solid var(--rule);padding-left:.6rem}
+.navrow.open .subitems{display:block}
+.subitem{
+  display:block;font-size:.73rem;color:var(--muted);text-decoration:none;
+  padding:.16rem .3rem;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.subitem:hover{color:var(--ink);background:var(--rule-soft)}
+.subitem.here{color:var(--accent);background:var(--accent-soft)}
+
+.railfoot{padding:.5rem 1.1rem .9rem;border-top:1px solid var(--rule)}
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-size:.7rem;color:var(--faint);cursor:pointer}
+.linkbtn:hover{color:var(--accent);text-decoration:underline}
+
+/* --------------------------------------------------------------- the content */
+
+main{margin-left:var(--rail);padding:0 clamp(1rem,4vw,3rem) 6rem;max-width:calc(var(--rail) + 62rem)}
+.section{display:none}
+.section.active{display:block}
+
+.sechead{padding:2.4rem 0 1rem;border-bottom:1px solid var(--rule);margin-bottom:1.6rem}
+.eyebrow{font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);min-height:1rem}
+.sechead h1{margin:.1rem 0 .3rem;font-size:1.6rem;line-height:1.25;font-weight:640;letter-spacing:-.012em}
+.hcode{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.72em;color:var(--accent);background:var(--accent-soft);
+  padding:.1em .45em;border-radius:5px;vertical-align:.12em;margin-right:.2em;
+}
+.counts{font-size:.76rem;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Prose keeps a readable measure; code and tables are free to be wide. */
+.body>p,.body>ul,.body>ol,.body>blockquote,.body>h3{max-width:78ch}
+.body h3.sub{
+  margin:2.4rem 0 .7rem;font-size:1.02rem;font-weight:640;letter-spacing:-.005em;
+  padding-top:.3rem;scroll-margin-top:1.2rem;
+}
+.body h3.sub::before{
+  content:"";display:block;width:26px;height:2px;background:var(--accent);
+  opacity:.55;margin-bottom:.55rem;
+}
+.body>h3.sub:first-child{margin-top:0}
+.body p{margin:0 0 1rem}
+.body strong{font-weight:650}
+blockquote{
+  margin:0 0 1.2rem;padding:.6rem 1rem;border-left:3px solid var(--accent);
+  background:var(--accent-soft);border-radius:0 6px 6px 0;color:var(--ink);
+}
+blockquote p:last-child{margin-bottom:0}
+hr{border:0;border-top:1px solid var(--rule);margin:2rem 0}
+
+code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em;
+  background:var(--code-bg);border:1px solid var(--rule-soft);border-radius:4px;padding:.08em .3em;
+}
+
+/* ----------------------------------------------------------------- checklist */
+
+ul,ol{margin:0 0 1.1rem;padding-left:1.3rem}
+li{margin:.2rem 0}
+ul:has(>li.task){list-style:none;padding-left:0;max-width:78ch}
+li.task{
+  display:flex;gap:.6rem;align-items:flex-start;margin:0;
+  padding:.42rem .55rem;border-radius:6px;
+}
+li.task:hover{background:var(--rule-soft)}
+li.task+li.task{border-top:1px solid var(--rule-soft)}
+.tbox{
+  flex:0 0 auto;margin:.36rem 0 0;width:15px;height:15px;cursor:pointer;
+  accent-color:var(--ok);
+}
+.tbody{flex:1 1 auto;cursor:pointer;min-width:0}
+.tbox:checked+.tbody{color:var(--muted);text-decoration-color:var(--faint)}
+.tbox:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* --------------------------------------------------------------------- code */
+
+.code{
+  position:relative;margin:0 0 1.2rem;background:var(--code-bg);
+  border:1px solid var(--code-rule);border-radius:8px;
+}
+.codelang{
+  position:absolute;top:0;right:4.4rem;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+  padding:.35rem .4rem;pointer-events:none;
+}
+.copy{
+  position:absolute;top:.3rem;right:.35rem;z-index:2;
+  font:inherit;font-size:.66rem;letter-spacing:.02em;
+  background:var(--panel);color:var(--muted);border:1px solid var(--rule);
+  border-radius:5px;padding:.14rem .45rem;cursor:pointer;opacity:0;transition:opacity .12s;
+}
+.code:hover .copy,.copy:focus-visible{opacity:1}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+.copy.ok{color:var(--ok);border-color:var(--ok);opacity:1}
+.code pre{
+  margin:0;padding:.85rem 1rem;overflow-x:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.795rem;line-height:1.62;color:var(--code-ink);
+}
+.code pre code{background:none;border:0;padding:0;font-size:inherit}
+.code.diff pre{padding:.85rem 0}
+.l{display:block;padding:0 1rem}
+/* Pseudo-element, so blank diff lines have height without polluting a copy. */
+.l:empty::before{content:"\200b"}
+.l.add{background:var(--add-bg);color:var(--add-ink)}
+.l.del{background:var(--del-bg);color:var(--del-ink)}
+.l.meta{color:var(--faint)}
+
+/* ------------------------------------------------------------------- tables */
+
+.tablewrap{overflow-x:auto;margin:0 0 1.3rem;border:1px solid var(--rule);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{text-align:left;padding:.5rem .8rem;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+th{
+  font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  background:var(--rule-soft);font-weight:650;white-space:nowrap;
+}
+tr:last-child td{border-bottom:0}
+
+mark{background:var(--mark);color:var(--mark-ink);border-radius:2px;padding:0 .1em}
+
+/* ------------------------------------------------------------------ responsive */
+
+@media (max-width:900px){
+  :root{--rail:0px}
+  .rail{position:static;width:auto;inset:auto;border-right:0;border-bottom:1px solid var(--rule)}
+  .side{max-height:42vh}
+  main{margin-left:0;max-width:none}
+  .sechead{padding-top:1.4rem}
+}
+
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{transition:none !important}
+}
+
+/* Print reveals the whole document, which doubles as a full-text fallback. */
+@media print{
+  .rail,.copy,.codelang{display:none !important}
+  main{margin:0;max-width:none;padding:0}
+  .section{display:block !important;break-before:page}
+  .section:first-of-type{break-before:auto}
+  .subitems{display:none}
+  body{font-size:11pt;background:#fff;color:#000}
+  .code,.tablewrap{break-inside:avoid}
+}

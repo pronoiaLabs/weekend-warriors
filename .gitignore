@@ -1,0 +1,58 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+**/.dlt/secrets.toml
+*.p8
+*.pem
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# dlt
+duck-db/
+*.duckdb
+*.duckdb.wal
+.dlt/pipelines/
+build/
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# Node (docs sites)
+node_modules/
+dist/
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
+
+# Agent session state and working artifacts.
+# .snowflake/ is where Cortex Code writes its plans; they are scratch for one
+# session, not a record of the project. The two PLAN files are closed-out session
+# logs kept on disk deliberately -- the runbooks (MAKE-COMMANDS-*.md) are what an
+# adopter actually needs and those ARE committed.
+.snowflake/
+.claude/settings.local.json
+logs.txt
+
+# Reference material kept locally, not redistributed. Holds the BallDontLie
+# OpenAPI specs, which are the provider's to publish rather than ours, plus
+# working notes. Nothing in the build reads from here.
+#
+# LEADING SLASH IS LOAD-BEARING: it anchors this to the repository root. A bare
+# `.docs/` matches at any depth and would also swallow dlt-pipelines/.docs/,
+# which is vendored dlt reference that its README documents and links to.
+/.docs/
+FIX-PLAN.md
+FIX-PLAN.html
+SPCS-PLAN.md

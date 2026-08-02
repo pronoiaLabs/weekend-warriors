@@ -1,0 +1,53 @@
+# Non-secret dlt configuration.
+# Secrets (credentials, tokens) go in secrets.toml (see secrets.toml.example).
+# Pipeline-level settings (destination, dataset_name, write_disposition, warehouses)
+# are driven by the registries/ files, so there is no need to duplicate them here.
+
+[runtime]
+log_level = "INFO"            # override at runtime with LOG_LEVEL env var
+# dlt sends ANONYMOUS usage telemetry to dltHub by default (outbound HTTPS on every
+# pipeline.run and CLI command: hashed names, elapsed, success). Disabled here so
+# nothing leaves your environment, which matters for egress-restricted SPCS and
+# compliance. Set to true (or delete) to re-enable; CLI equivalent: `dlt --disable-telemetry`.
+# This is unrelated to observability (the Snowflake event table / OPS._DLT_RUNS stay put).
+dlthub_telemetry = false
+
+# ---------------------------------------------------------------------------
+# Snowflake destination: query tagging.
+# dlt query tagging is OFF by default; setting query_tag turns it on. Every
+# Snowflake session dlt opens is then tagged with the operation, source,
+# resource, table, load_id, and pipeline_name (queryable in QUERY_HISTORY /
+# ACCOUNT_USAGE). The {placeholders} are filled by dlt per operation.
+# NOTE: dlt fills this with str.format(), so the literal JSON braces are doubled
+# ({{ }}) to escape them; only the {placeholders} use single braces.
+# ---------------------------------------------------------------------------
+[destination.snowflake]
+query_tag = '{{"operation":"{operation}", "source":"{source}", "resource":"{resource}", "table":"{table}", "load_id":"{load_id}", "pipeline_name":"{pipeline_name}"}}'
+
+# Dataset name normalization: OFF.
+#
+# Left on, dlt lowercases the dataset name to match its naming convention, then the
+# Snowflake destination's casefold_identifier (str.upper) uppercases it straight back,
+# then it is emitted quoted as "DEV_JSMITH". The round trip cancels out, but dlt
+# logs a WARNING about it on every schema and staging-schema touch: 36 of 161 lines in
+# a 32-row load, which buries the warnings that do matter.
+#
+# Turning it off skips the lowercasing. casefold_identifier still runs and still
+# uppercases, so the schema created is identical. Verified with
+# `SHOW SCHEMAS IN DATABASE DLT_DEV_DB` before and after.
+#
+# THIS IS SAFE BECAUSE THIS DESTINATION UPPERCASES. A destination whose
+# casefold_identifier is str.lower or a no-op would genuinely change where data lands.
+# Check `dlt.destinations.<name>().capabilities().casefold_identifier` before copying
+# this setting anywhere else.
+enable_dataset_name_normalization = false
+
+# ---------------------------------------------------------------------------
+# REST client retries. dlt already retries 5xx and 429 with exponential backoff
+# and honours Retry-After; these only tune it. Also settable as RUNTIME__* env
+# vars in an SPCS job spec, which avoids an image rebuild since this file is
+# baked into the image.
+# ---------------------------------------------------------------------------
+# request_max_attempts    = 10
+# request_backoff_factor  = 1.5
+# request_max_retry_delay = 30

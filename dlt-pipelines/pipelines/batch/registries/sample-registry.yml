@@ -1,0 +1,40 @@
+# Infrastructure, not a data source.
+#
+# `sample` is the canonical "does my setup work?" pipeline. It has no external source,
+# no credentials and no local files, so it runs identically on a laptop, in CI, and
+# inside an SPCS container. That makes it the right thing to reach for when a real
+# pipeline fails and you need to know whether the problem is the pipeline or the
+# environment.
+#
+# It lives in its own file because it belongs to no sport. Putting it in an NFL
+# registry would make that file lie about what it holds, and every source added later
+# would make it lie harder.
+#
+#   make run-local     NAME=sample   # local DuckDB, nothing else required
+#   make run-snowflake NAME=sample   # laptop -> Snowflake (into DLT_DEV_DB.DEV_<user>)
+#   make run-spcs      NAME=sample   # in-Snowflake SPCS job (no SECRET needed)
+#
+# Do not delete it because the name sounds disposable. It is also the only end-to-end
+# test that exercises run_pipeline() without network access, and it pairs with
+# deploy/spcs/dlt_dev_job_nosecret.tmpl.yaml.
+
+# `database: DLT` is stated rather than left to the default, because this is the one
+# pipeline that belongs to no sport. It resolves to the shared DLT_DEV_DB /
+# DLT_PROD_DB, which is exactly where a credential-free smoke test should land: a
+# broken sport database should not stop you proving the container path works.
+defaults:
+  destination: snowflake
+  database: DLT               # -> DLT_DEV_DB / DLT_PROD_DB
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+
+pipelines:
+  # No `schedule` on purpose, so the task generator never turns this into a production
+  # Task. `group` is omitted for the same reason: it is not part of any sport's run.
+  - name: sample
+    source: sample
+    dataset_name: RAW_SAMPLE
+    write_disposition: merge
+    config:
+      n_customers: 5             # rows emitted by the generator (see pipelines/batch/sample_source.py)
+      n_orders: 5

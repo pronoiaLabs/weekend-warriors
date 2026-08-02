@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dlt-snowflake-template"
+version = "0.1.0"
+requires-python = ">=3.11"
+# REST-API-only. dlt does not require sqlalchemy, connectorx, or pyarrow, and the
+# Snowflake destination defaults to jsonl (duckdb to insert_values), so Arrow is
+# not on the load path. pyarrow becomes required again only if you set
+# loader_file_format="parquet", use filesystem staging, or call
+# pipeline.dataset().arrow()/df().
+dependencies = [
+    "dlt[snowflake]>=1.0",
+    "snowflake-connector-python>=3.7",   # imported directly by pipelines/common/snowflake_session.py
+    "pyyaml>=6",                         # imported directly by pipelines/batch/models.py
+]
+
+[project.optional-dependencies]
+# jinja2 is not used at run time. It is here so tests/test_spec_templates.py can parse
+# the SPCS job specs with the same engine Snowflake renders them with, which is the
+# only way to catch a bad placeholder without spending a container run.
+dev = ["duckdb", "dlt[duckdb]", "jinja2", "pytest>=8", "ruff>=0.15,<0.16"]
+# `make plan` only. Both already arrive transitively via dlt, but the doc build
+# must not depend on that staying true.
+docs = ["markdown-it-py>=3", "pygments>=2"]
+
+[tool.setuptools.packages.find]
+# Auto-discover pipelines + every subpackage (batch, common).
+include = ["pipelines*"]
+
+[tool.ruff]
+line-length = 100

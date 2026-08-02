@@ -1,0 +1,224 @@
+version: 2
+
+sources:
+  - name: nfl_raw
+    description: >
+      Raw NFL data landed by dlt from the BallDontLie API. Owned by the dlt
+      pipeline -- dbt reads this schema and must never write to it.
+
+      Deliberately NOT environment-driven: every developer reads the same
+      production raw tables, so dev models are built on real data.
+
+      Grain note: dlt flattens parent records into every child row, so most
+      tables carry a full GAME__* / TEAM__* / PLAYER__* payload alongside their
+      own columns. The prep layer strips that back down to foreign keys.
+    database: NFL_PROD_DB
+    schema: RAW
+
+    # dlt writes an epoch-seconds float as _dlt_load_id on every row. Decoding
+    # it gives a real load timestamp for freshness without needing OPS._DLT_LOADS.
+    loaded_at_field: "TO_TIMESTAMP_TZ(_dlt_load_id::FLOAT::NUMBER)"
+    freshness:
+      warn_after: {count: 2, period: day}
+      error_after: {count: 7, period: day}
+
+    tables:
+
+      # ---------------------------------------------------------------------
+      # Reference / dimension sources
+      # ---------------------------------------------------------------------
+      - name: teams
+        description: "The 32 NFL teams. Static reference data."
+        columns:
+          - name: id
+            description: "BallDontLie team ID. Natural key."
+            tests: [unique, not_null]
+          - name: conference
+            tests:
+              - accepted_values: {values: ['AFC', 'NFC']}
+          - name: abbreviation
+            tests: [unique, not_null]
+
+      - name: players
+        description: >
+          Player roster. Holds each player's CURRENT team only -- there is no
+          team history in this source. Historical per-game team affiliation
+          comes from stats.team__id instead, which is accurate as-loaded.
+          Height, weight and experience arrive as TEXT and are cast in prep.
+        columns:
+          - name: id
+            description: "BallDontLie player ID. Natural key."
+            tests: [unique, not_null]
+          - name: team__id
+            description: "Current team. Verified non-null for all 13,503 rows."
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'teams')", field: id}
+
+      - name: games
+        description: >
+          One row per game, 2023-2025 seasons. Home and away scores sit side by
+          side; the core layer unpivots this to team x game grain.
+          All rows are Final or Final/OT -- no in-progress games to filter.
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: season
+            tests: [not_null]
+          - name: season_type
+            description: "1 = preseason, 2 = regular season, 3 = postseason."
+            tests:
+              - accepted_values: {values: [1, 2, 3], quote: false}
+          - name: status
+            tests:
+              - accepted_values: {values: ['Final', 'Final/OT']}
+          - name: home_team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'teams')", field: id}
+          - name: visitor_team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'teams')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Fact sources
+      # ---------------------------------------------------------------------
+      - name: team_stats
+        description: >
+          Team box score, one row per team per game. 2,000 rows against an
+          expected 2,004 -- two games have no team_stats row, so the
+          fact_team_game box score is null for those four team-game rows.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [game__id, team__id]
+        columns:
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'games')", field: id}
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'teams')", field: id}
+
+      - name: stats
+        description: >
+          Player box score, one row per player per game, 116 columns spanning
+          six phases of play (passing, rushing, receiving, defense, kicking,
+          returns). Mostly NULL for any given player -- a punter's row has
+          nothing in the passing columns. The core layer splits this by phase.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [game__id, player__id]
+        columns:
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'games')", field: id}
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'players')", field: id}
+          - name: team__id
+            description: "Team the player appeared for in THIS game. The only historical team affiliation available."
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'teams')", field: id}
+
+      - name: plays
+        description: >
+          Play-by-play, one row per play. 18 games have no plays at all.
+          126 plays have a null team (kickoffs and other neutral events), so
+          team is intentionally nullable here.
+          text / short_text hold natural-language play descriptions.
+        columns:
+          - name: id
+            description: "Play ID. TEXT, not numeric."
+            tests: [unique, not_null]
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'games')", field: id}
+          - name: team__id
+            description: "Nullable by design -- 126 neutral-event plays have no team."
+            tests:
+              - relationships: {to: "source('nfl_raw', 'teams')", field: id}
+
+      - name: standings
+        description: >
+          Final regular-season standings, one row per team per season.
+          Loaded by dlt as SCD2 (_dlt_valid_from / _dlt_valid_to); prep takes
+          the current version only.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season, _dlt_valid_from]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'teams')", field: id}
+          - name: season
+            tests: [not_null]
+
+      - name: player_injuries
+        description: >
+          Injury report. Only 21 rows today -- sparse, but grows with ongoing
+          loads. dlt SCD2 like standings.
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'players')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Next Gen Stats -- player x season x week grain, NO game_id.
+      # These conform to dim_player and dim_season_week but NOT to dim_game.
+      # ---------------------------------------------------------------------
+      - name: advanced_passing
+        description: >
+          Next Gen Stats passing, one row per player per season-week per
+          postseason flag. No game_id in this source, so it cannot be joined
+          to a specific game.
+
+          WARNING: week = 0 rows are SEASON TOTALS, not a week. They do not
+          reconcile with the sum of the weekly rows (50,025 attempts vs 47,392),
+          so they are independent authoritative data. Never aggregate across
+          week 0 and weeks 1+ together.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season, week, postseason]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'players')", field: id}
+          - name: week
+            description: "0 = season total, 1-18 = regular season week, 1-5 when postseason."
+            tests: [not_null]
+
+      - name: advanced_rushing
+        description: "Next Gen Stats rushing. Same grain as advanced_passing."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season, week, postseason]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'players')", field: id}
+          - name: week
+            tests: [not_null]
+
+      - name: advanced_receiving
+        description: "Next Gen Stats receiving. Same grain as advanced_passing."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season, week, postseason]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'players')", field: id}
+          - name: week
+            tests: [not_null]
