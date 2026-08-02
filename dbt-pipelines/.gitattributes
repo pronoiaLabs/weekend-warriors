@@ -1,0 +1,3 @@
+# Exclude presentation collateral from GitHub's language stats (Linguist).
+# These are self-contained HTML decks/doc-sites, not source code.
+presentations/** linguist-documentation

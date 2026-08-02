@@ -1,0 +1,53 @@
+# Cortex Agent Evaluation Configuration
+# Upload this file to the EVAL_CONFIG_STAGE before running.
+# See: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-evaluations
+
+# --- Dataset Definition ---
+# Creates a dataset object from your evaluation table.
+# IMPORTANT: Remove this entire 'dataset' block after the first successful run
+# to avoid "dataset already exists" errors on subsequent runs.
+dataset:
+  dataset_type: "CORTEX AGENT"
+  table_name: "DEV_DB.CORTEX_AGENTS.EVAL_DATASET"     # TODO: Update to match your target
+  dataset_name: "AGENT_EVAL_DATASET"
+  column_mapping:
+    query_text: "INPUT_QUERY"
+    ground_truth: "GROUND_TRUTH"
+
+# --- Agent Configuration ---
+evaluation:
+  agent_params:
+    agent_name: "EXAMPLE_AGENT"                        # TODO: Replace with your agent name
+    agent_type: "CORTEX AGENT"
+  run_params:
+    label: "Initial evaluation"
+    description: "Baseline evaluation before shipping to users"
+  source_metadata:
+    type: "dataset"
+    dataset_name: "AGENT_EVAL_DATASET"
+
+# --- Metrics ---
+metrics:
+  # System metrics
+  - "answer_correctness"
+  - "logical_consistency"
+
+  # Custom metric example (uncomment to use):
+  # - name: "relevance"
+  #   score_ranges:
+  #     min_score: [1, 3]
+  #     median_score: [4, 6]
+  #     max_score: [7, 10]
+  #   prompt: |
+  #     Evaluate the relevance of the agent's response to the user's query.
+  #     Rate from 1-10 where:
+  #       1 = Completely irrelevant
+  #       5 = Partially relevant
+  #       10 = Highly relevant and on-topic
+  #
+  #     Compare the {{output}} with the {{ground_truth}}.
+  #
+  #     Consider:
+  #     - Does the response address the user's question?
+  #     - Is the information provided accurate and complete?
+  #     - Are there tangential or off-topic elements?

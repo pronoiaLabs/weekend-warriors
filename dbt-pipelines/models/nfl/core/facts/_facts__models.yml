@@ -1,0 +1,359 @@
+version: 2
+
+models:
+
+  - name: fact_team_game
+    description: >
+      One row per team per game. Grain: team x game. 2,004 rows.
+      GAMES unpivoted to team level (UNION ALL, cannot fan out) with the
+      TEAM_STATS box score left-joined on. Four rows have has_box_score = false
+      because two games have no team_stats row.
+      Covers all season types -- filter on season_type, do not assume regular season.
+    columns:
+      - name: team_game_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: opponent_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key}
+      - name: points_scored
+        tests: [not_null]
+      - name: points_allowed
+        tests: [not_null]
+      - name: is_home
+        tests: [not_null]
+      - name: has_box_score
+        tests: [not_null]
+      - name: third_down_conversions
+        description: "NULL where has_box_score is false."
+      - name: possession_time_seconds
+        description: "NULL where has_box_score is false. Roughly 1800s per team per game."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 5400, severity: warn}
+
+    tests:
+      # the declared grain
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+
+  # ---------------------------------------------------------------------------
+  # Player-game phase facts.
+  #
+  # These three share a key space on purpose: 4,604 player-games have activity in
+  # more than one phase and appear in more than one fact. Measure sets are
+  # disjoint, so nothing is double-counted -- but row counts do NOT sum to 67,191
+  # and the facts must never be UNIONed.
+  # ---------------------------------------------------------------------------
+  - name: fact_player_game_offense
+    description: >
+      Passing, rushing and receiving. Grain: player x game. ~21,700 rows.
+      Filtered to rows with offensive volume, not by position -- position is
+      'Unknown' for 801 players who appear in box scores.
+    columns:
+      - name: player_game_key
+        description: "Unique WITHIN this fact. Also appears in the other phase facts for multi-phase players."
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: team_key
+        description: "Team the player appeared for in THIS game."
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: scrimmage_yards
+        description: "rushing + receiving yards, NULLs coalesced to 0."
+        tests: [not_null]
+      - name: touches
+        tests: [not_null]
+
+  - name: fact_player_game_defense
+    description: >
+      Tackles, pressure and coverage. Grain: player x game. ~42,300 rows.
+      defensive_sacks is FLOAT -- half-sacks are real.
+    columns:
+      - name: player_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: assisted_tackles
+        description: "total_tackles - solo_tackles. NULL when either is missing or total < solo."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: takeaways
+        tests: [not_null]
+
+  - name: fact_player_game_special
+    description: >
+      Kicking, punting and returns. Grain: player x game. ~7,700 rows.
+      Three sub-disciplines sharing one fact; use has_kicking / has_punting /
+      has_returns to isolate them.
+    columns:
+      - name: player_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: field_goal_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
+      - name: total_returns
+        tests: [not_null]
+
+  # ---------------------------------------------------------------------------
+  # Play-by-play
+  # ---------------------------------------------------------------------------
+  - name: fact_play
+    description: >
+      Play-by-play. Grain: play. 179,402 rows. Incremental (merge on play_key),
+      clustered on season, week.
+      Does NOT cover all games -- 18 games have no plays. Never use as a game spine.
+    columns:
+      - name: play_key
+        tests: [unique, not_null]
+      - name: play_id
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_key
+        description: "NULLABLE -- 126 neutral-event plays have no possessing team."
+        tests:
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: play_type_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_play_type')", field: play_type_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: home_win_probability
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: dlt_load_id_numeric
+        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
+        tests: [not_null]
+
+  # ---------------------------------------------------------------------------
+  # Next Gen Stats -- weekly grain. NO game_key: the source has no game_id.
+  # ---------------------------------------------------------------------------
+  - name: fact_player_week_advanced_passing
+    description: >
+      Next Gen passing, weekly. Grain: player x season x week x postseason.
+      Excludes the week 0 season totals (see fact_player_season_advanced_passing).
+      Cannot be joined to dim_game.
+    columns:
+      - name: player_week_passing_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: week
+        description: "Always >= 1 here; week 0 is filtered out as a season total."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 18}
+
+  - name: fact_player_week_advanced_rushing
+    description: "Next Gen rushing, weekly. Same grain and caveats as the passing weekly fact."
+    columns:
+      - name: player_week_rushing_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: week
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 18}
+
+  - name: fact_player_week_advanced_receiving
+    description: "Next Gen receiving, weekly. Same grain and caveats as the passing weekly fact."
+    columns:
+      - name: player_week_receiving_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: week
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 18}
+
+  # ---------------------------------------------------------------------------
+  # Next Gen Stats -- season totals (source week 0). NOT a rollup of the weekly
+  # facts; the two do not reconcile, and the source totals are authoritative.
+  # ---------------------------------------------------------------------------
+  - name: fact_player_season_advanced_passing
+    description: >
+      Next Gen passing season totals from the source's week 0 rows.
+      Grain: player x season x postseason. Independent of the weekly fact.
+    columns:
+      - name: player_week_passing_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: season
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, season, is_postseason]
+
+  - name: fact_player_season_advanced_rushing
+    description: "Next Gen rushing season totals. Grain: player x season x postseason."
+    columns:
+      - name: player_week_rushing_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, season, is_postseason]
+
+  - name: fact_player_season_advanced_receiving
+    description: "Next Gen receiving season totals. Grain: player x season x postseason."
+    columns:
+      - name: player_week_receiving_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, season, is_postseason]
+
+  # ---------------------------------------------------------------------------
+  # Season and injury facts
+  # ---------------------------------------------------------------------------
+  - name: fact_team_season
+    description: >
+      Final standings. Grain: team x season. 96 rows.
+      A snapshot fact -- measures are end-of-season states, so playoff_seed is
+      not additive even though wins is.
+    columns:
+      - name: team_season_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: season
+        tests: [not_null]
+      - name: win_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: games_played
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 18}
+      - name: conference_rank
+        description: >
+          Conference standing rank 1-16, populated for EVERY team. This is the
+          column the source mislabels as playoff_seed.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 16}
+      - name: playoff_seed
+        description: "The real seed: conference_rank where <= 7, else NULL. 7 teams per conference qualify."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 7}
+      - name: made_playoffs
+        description: "Derived as conference_rank <= 7, NOT from NULLability of the source's playoff_seed."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_id, season]
+
+  - name: fact_player_injury
+    description: >
+      Injury report with SCD2 history. Grain: player x report date x version.
+      Only 21 rows today. Filter is_current for the live report.
+    columns:
+      - name: player_injury_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: team_key
+        tests:
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: reported_date
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]

@@ -1,0 +1,40 @@
+# =============================================================================
+# packages.yml
+# =============================================================================
+# IMPORTANT -- how dbt deps actually works on dbt Projects on Snowflake.
+#
+# These packages install at DEPLOY time, not at execute time. Snowflake runs
+# `dbt deps` before `dbt compile` when the project object is created or updated
+# WITH an external access integration attached:
+#
+#   snow dbt deploy <name> --source . --external-access-integration DBT_EXT_ACCESS
+#
+# Do NOT try to install them with `snow dbt execute <project> deps`. A dbt
+# project object is an immutable versioned snapshot, so that command cannot
+# write to dbt_packages. Per Snowflake docs it "doesn't modify any files; it
+# mainly checks that your external access is configured correctly" -- and its
+# egress check fails in this account with a misleading
+# `Errno 16 Device or resource busy` against hub.getdbt.com. That error is a
+# red herring: the deploy path works fine. Verified by compiling a probe that
+# calls dbt_utils.star() against a live relation.
+#
+# Egress is provided by:
+#   INTEGRATIONS.PUBLIC.DBT_HUB_EGRESS  network rule (EGRESS / HOST_PORT)
+#   DBT_EXT_ACCESS                      external access integration
+# Creating an EAI needs ACCOUNTADMIN; SYSADMIN lacks CREATE EXTERNAL ACCESS
+# INTEGRATION. USAGE is granted to SYSADMIN.
+#
+# The alternative, if you ever need to run with no egress at all: run `dbt deps`
+# locally or in CI and deploy the resulting dbt_packages/ folder alongside the
+# project, or use `snow dbt deploy --install-local-deps`.
+# =============================================================================
+
+packages:
+  # Supplies the `semantic_view` materialization used by models/nfl/semantic_views.
+  - package: Snowflake-Labs/dbt_semantic_view
+    version: 1.0.4
+
+  # generate_surrogate_key for all dim/fact keys, plus the
+  # unique_combination_of_columns and accepted_range generic tests.
+  - package: dbt-labs/dbt_utils
+    version: 1.3.0

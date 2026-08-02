@@ -1,0 +1,6 @@
+version: 2
+
+models:
+  # sv_example is disabled in dbt_project.yml until the real NFL semantic views land
+  - name: sv_example
+    description: "TODO: Describe your semantic view: what business domain does it cover?"
