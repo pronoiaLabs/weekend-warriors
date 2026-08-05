@@ -68,6 +68,13 @@ _DISPOSITIONS: tuple[str, ...] = ("append", "replace", "merge")
 # Resolved relative to this file so the loader works from any working directory.
 REGISTRY_PATH: Path = Path(__file__).with_name("registries")
 
+# The month an NFL season starts owning the calendar. Preseason opens in early August,
+# so from 1 August the current season is that year's. It is the DEFAULT rather than the
+# rule: every sport declares its own via `season_rollover_month`. Defined up here rather
+# than beside current_season() because PipelineSpec uses it as a field default, and
+# dataclass defaults are evaluated when the class is created.
+DEFAULT_SEASON_ROLLOVER_MONTH: int = 8
+
 
 class RegistryError(ValueError):
     """Raised when a registry entry is missing required fields or is malformed."""
@@ -109,6 +116,12 @@ class PipelineSpec:
     compute_pool: str = "DLT_POOL"
     group: str | None = None
 
+    # The month this sport's season starts owning the calendar, feeding the
+    # `{current_season}` token. See current_season() for why it is per-source: the NFL
+    # opens in August and the WNBA in May, and the two only agree in August, so a shared
+    # constant looks correct on the day you write it and is wrong the following spring.
+    season_rollover_month: int = DEFAULT_SEASON_ROLLOVER_MONTH
+
     # Scheduled-run bindings. Unused by a local or dev run, which take them from the
     # command line, but a Snowflake Task has no command line: whatever a container
     # needs at 09:00 UTC has to be recorded here or the Task cannot supply it.
@@ -144,6 +157,23 @@ class PipelineSpec:
         self._validate_database()
         self._validate_schedule_bindings()
         self._validate_write_disposition()
+        self._validate_season_rollover()
+
+    def _validate_season_rollover(self) -> None:
+        """A rollover month outside 1-12 silently produces a wrong season, not an error.
+
+        `current_season` compares `day.month >= rollover_month`. A 0 makes every date
+        resolve to the current calendar year and a 13 makes every date resolve to the
+        previous one. Both are plausible-looking years that the API accepts, so the load
+        succeeds and quietly holds the wrong season. Fail on the registry instead.
+        """
+        month = self.season_rollover_month
+        if not isinstance(month, int) or isinstance(month, bool) or not 1 <= month <= 12:
+            raise RegistryError(
+                f"pipeline '{self.name}': season_rollover_month must be an integer "
+                f"month 1-12, got {month!r}. It is the month this sport's season "
+                "starts: 8 for the NFL, 5 for the WNBA."
+            )
 
     def _validate_schedule_bindings(self) -> None:
         """A scheduled pipeline must carry everything a Task cannot supply.
@@ -308,6 +338,11 @@ def spec_from_row(row: dict[str, Any]) -> PipelineSpec:
         load_warehouse=pick("load_warehouse", "load_warehouse"),
         compute_pool=pick("compute_pool", "compute_pool"),
         group=row.get("pipeline_group"),
+        # int() because Snowflake returns NUMBER as Decimal, and a Decimal compares
+        # fine against day.month but would fail the isinstance check in validate().
+        season_rollover_month=int(
+            pick("season_rollover_month", "season_rollover_month")
+        ),
         secret=row.get("secret"),
         env_var=row.get("env_var"),
         external_access=row.get("external_access"),
@@ -425,30 +460,45 @@ def resolve_database(spec: PipelineSpec, env: str) -> str:
     return f"{spec.database}_{key}_DB"
 
 
-# The month an NFL season starts owning the calendar. Preseason opens in early August,
-# so from 1 August the current season is that year's.
-_SEASON_ROLLOVER_MONTH = 8
+def current_season(
+    rollover_month: int = DEFAULT_SEASON_ROLLOVER_MONTH,
+    *,
+    today: date | None = None,
+) -> int:
+    """Return the season year in progress on *today* (defaults to now, UTC).
 
+    A season is named for the year it starts in, and it may run into the next calendar
+    year. So the rule is not "this calendar year": for the NFL, January 2027 is still
+    the 2026 season, and so is the whole 2027 offseason until preseason opens again.
 
-def current_season(today: date | None = None) -> int:
-    """Return the NFL season year in progress on *today* (defaults to now, UTC).
+        NFL, rollover 8:    31 Jul 2026 -> 2025      1 Aug 2026 -> 2026
+                            10 Jan 2027 -> 2026      1 Aug 2027 -> 2027
 
-    A season is named for the year it kicks off in, and it runs into February. So the
-    rule is not "this calendar year": January 2027 is still the 2026 season, and so is
-    the whole 2027 offseason until preseason opens again.
+    Rolling over when the season STARTS, rather than when the previous one ended, means
+    the offseason keeps pointing at the last COMPLETED season, which is the one that
+    still has data. A rollover at the championship would make every scheduled load ask
+    for a season nobody has played, and these APIs answer that with an empty list rather
+    than an error, so it would look like a working pipeline loading nothing.
 
-        31 Jul 2026 -> 2025      1 Aug 2026 -> 2026
-        10 Jan 2027 -> 2026      1 Aug 2027 -> 2027
+    WHY THIS IS A PARAMETER AND NOT A CONSTANT.
+    A hardcoded 8 is right for the NFL and wrong for every sport that does not open in
+    August. The WNBA plays May to September within one calendar year, so under the NFL
+    rule the whole of May, June and July would resolve to LAST season while the current
+    one is being played:
 
-    Rolling over on 1 August rather than at the Super Bowl means the offseason keeps
-    pointing at the last COMPLETED season, which is the one that still has data. A
-    rollover in February would make every scheduled load ask for a season that has not
-    been played, and the API answers that with an empty list rather than an error.
+        WNBA, rollover 5:   30 Apr 2027 -> 2026      1 May 2027 -> 2027
 
-    *today* is injectable so tests do not depend on the clock.
+    Both agree in August, which is exactly why a shared constant would have shipped
+    looking correct and broken the following spring. The value lives in each registry's
+    `defaults:` block, so a new league is one line of YAML rather than another function
+    and another token.
+
+    *today* is injectable so tests do not depend on the clock, and is KEYWORD-ONLY.
+    Both parameters would otherwise be positional, and `current_season(some_date)` would
+    silently bind a date to `rollover_month` instead of failing.
     """
     day = today or datetime.now(timezone.utc).date()
-    return day.year if day.month >= _SEASON_ROLLOVER_MONTH else day.year - 1
+    return day.year if day.month >= rollover_month else day.year - 1
 
 
 def _main(argv: list[str] | None = None) -> int:
@@ -491,8 +541,11 @@ def _main(argv: list[str] | None = None) -> int:
     )
     what.add_argument(
         "--current-season",
-        action="store_true",
-        help="print the NFL season year in progress today",
+        metavar="PIPELINE",
+        nargs="?",
+        const="",
+        help="print the season year in progress today. Pass a pipeline name to use "
+        "that sport's rollover month; with no name you get the default (NFL, August).",
     )
     parser.add_argument(
         "--env",
@@ -501,8 +554,14 @@ def _main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.current_season:
-        print(current_season())
+    # `is not None` rather than truthiness: `--current-season` with no pipeline name
+    # yields "", which is falsy but means "use the default rollover", not "not asked".
+    if args.current_season is not None:
+        if args.current_season:
+            spec = load_registry().get(args.current_season)
+            print(current_season(spec.season_rollover_month))
+        else:
+            print(current_season())
         return 0
 
     if args.database:

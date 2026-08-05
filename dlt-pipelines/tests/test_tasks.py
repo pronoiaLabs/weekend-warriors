@@ -36,7 +36,7 @@ if str(_ROOT) not in sys.path:
 pytest.importorskip("yaml")
 
 from deploy.tasks.generate_tasks import task_sql  # noqa: E402
-from pipelines.batch.models import load_registry  # noqa: E402
+from pipelines.batch.models import load_registry, resolve_database  # noqa: E402
 
 
 def _scheduled():
@@ -85,7 +85,11 @@ def test_every_scheduled_task_is_runnable(spec) -> None:
     # Production, always, and never a dev database. A Task IS the production
     # schedule, so a generator able to emit a dev target would put a scheduled write
     # into somebody's sandbox one typo away.
-    assert "NFL_PROD_DB" in sql
+    #
+    # Derived from the spec rather than hardcoded: this is parametrized over EVERY
+    # scheduled pipeline, and the registry now spans more than one sport. A literal
+    # "NFL_PROD_DB" here asserted that every league loads into the NFL's database.
+    assert resolve_database(spec, "PROD") in sql
     assert "_DEV_DB" not in sql
 
     assert f"SCHEDULE = 'USING CRON {spec.schedule} UTC'" in sql
@@ -106,7 +110,7 @@ def test_inlined_spec_is_valid_yaml_with_the_right_bindings(spec) -> None:
 
     assert container["args"] == [spec.name]
     assert container["env"]["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] == (
-        "NFL_PROD_DB"
+        resolve_database(spec, "PROD")
     )
     # The control plane is one database for the account and must not follow the
     # per-source destination.
@@ -155,4 +159,26 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
     from deploy.tasks.generate_tasks import main  # noqa: PLC0415
 
     assert main() == 0  # prints to stdout; exercised for import and runtime errors
-    assert len(_scheduled()) == 7, "expected all seven NFL pipelines to be scheduled"
+
+    # Counted per source rather than as one total. A single number has to be edited
+    # every time any league gains or loses a pipeline, which makes it a chore that gets
+    # updated without being read, and it cannot tell "WNBA arrived" from "an NFL
+    # pipeline silently lost its schedule".
+    scheduled = {s.name for s in _scheduled()}
+    by_source: dict[str, set[str]] = {}
+    for name in scheduled:
+        by_source.setdefault(name.split("_", 1)[0], set()).add(name)
+
+    assert by_source["nfl"] == {
+        "nfl_reference", "nfl_games", "nfl_stats", "nfl_plays",
+        "nfl_standings", "nfl_advanced_stats", "nfl_injuries",
+    }
+    assert by_source["wnba"] == {
+        "wnba_reference", "wnba_games", "wnba_stats", "wnba_plays",
+        "wnba_standings", "wnba_season_stats", "wnba_advanced_game",
+        "wnba_advanced_season", "wnba_shot_locations", "wnba_injuries",
+    }
+
+    # `sample` is the guard on the whole mechanism: it exists precisely to be the
+    # pipeline that is runnable by hand and never becomes a Task.
+    assert "sample" not in scheduled
