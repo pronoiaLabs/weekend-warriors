@@ -85,3 +85,46 @@ subagent, after the stall. Later phases keep implementation subagents but
 anything likely to prompt runs in the main loop.
 
 **Open:** none.
+
+---
+
+## Phase 2: full API
+
+**Ran:** wrote app/schedule.py (cron expansion, 15-minute missed grace,
+1-hour slot match window, cron-to-prose), app/derive.py (anomaly classes,
+severity ranking missing > missed > failure > disagree, computed ERROR_TEXT
+provenance), app/assemble.py (pure payload assembly for overview / incidents /
+pipeline detail / run detail, shared by live and fixture modes), datasource
+fetchers, and 9 endpoints. Verified every endpoint against the live account,
+recorded logs/metrics fixtures for the reference run, wrote 20 more tests.
+
+**Result:** 28 tests passed, ruff clean. Live spot checks all reconciled:
+summary read 8 slots today / 5 succeeded / 2 failed / 2 record-missing /
+2 missed / 2 upcoming, which matches the known Aug 8 timeline including the
+manual nfl_stats reruns. Metrics endpoint returns 179 samples, 16 metric
+names, 4 groups (storage absent, as measured in WORKFLOW-1), cpu strip 1
+point / mem strip 2, node CPU_X64_S. prev_row_counts on nfl_reference
+returned the prior day's {players: 13521, teams: 32} via skip-nulls lookup.
+
+**Surprises:**
+- The overview immediately surfaced a real finding: WNBA's 14:00 and 15:00
+  cron slots MISSED today. The WNBA view holds only the two manual 16:00 runs,
+  so the crons never fired. First check on return: SHOW TASKS IN SCHEMA
+  DLT_DB.OPS and look at the wnba_* tasks' state.
+- Missed-slot counts are inflated for young pipelines: incidents over 7 days
+  reads missed=33 because every WNBA slot before the pipelines existed counts
+  as missed. Honest from the registry's standpoint, noisy in practice. Options
+  when you are back: bound expansion at each pipeline's first run (hides a
+  never-ran pipeline, bad), at registry UPDATED_AT (zeroed by any resync), or
+  add a created_at column to the registry (right fix, small migration).
+- A stale uvicorn on :8123 survived an earlier kill and served old routes;
+  the overview 404 looked like a routing bug. kill -9 on the port cleared it.
+
+**Changed from plan:** built in the main loop, same reasoning as Phase 1.
+Anomaly-count semantics implemented as planned: cards gate on the LATEST run
+(or a missed slot today), badges count the 14-day window. A resolved anomaly
+(nfl_stats: latest run succeeded) therefore renders no card even with
+record-missing history; its history stays visible in incidents and on the
+pipeline page.
+
+**Open:** the missed-slot inflation decision above.

@@ -1,0 +1,1434 @@
+[
+ {
+  "event_ts": "2026-08-08T16:48:16.883Z",
+  "metric_name": "container.memory.usage",
+  "metric_value": 109416448.0,
+  "metric_unit": "byte",
+  "metric_group": "system",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:46.877Z",
+  "metric_name": "container.cpu.usage",
+  "metric_value": 0.12687785107021404,
+  "metric_unit": "cpu",
+  "metric_group": "system",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:46.877Z",
+  "metric_name": "container.memory.usage",
+  "metric_value": 139857920.0,
+  "metric_unit": "byte",
+  "metric_group": "system",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:09.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:15.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 6267.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:15.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 48.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:15.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 57036.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:15.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:15.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 37.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:39.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:45.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:45.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:45.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:45.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:45.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:09.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:15.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:15.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:15.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:15.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:15.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:39.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:45.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:45.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:45.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:45.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:50:45.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:09.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:15.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:15.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:15.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:15.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:15.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:39.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:45.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:45.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:45.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:45.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:51:45.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:09.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:15.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:15.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:15.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:15.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:15.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:39.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:45.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:45.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:45.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:45.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:52:45.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:09.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:15.434Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:15.434Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:15.434Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:15.434Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:15.434Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:39.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:45.433Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:45.433Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:45.433Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:45.433Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:53:45.433Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:09.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:15.429Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:15.429Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:15.429Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:15.429Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:15.429Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.state.pending",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.state.running",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.restarts",
+  "metric_value": 0.0,
+  "metric_unit": "restart",
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.state.finished",
+  "metric_value": 1.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.state.started",
+  "metric_value": 0.0,
+  "metric_unit": null,
+  "metric_group": "status",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.cpu.limit",
+  "metric_value": 3.0,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.memory.limit",
+  "metric_value": 13958643712.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.cpu.requested",
+  "metric_value": 0.5,
+  "metric_unit": "cpu",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:39.153Z",
+  "metric_name": "container.memory.requested",
+  "metric_value": 536870912.0,
+  "metric_unit": "byte",
+  "metric_group": "system_limits",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:45.434Z",
+  "metric_name": "network.egress.denied.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:45.434Z",
+  "metric_name": "network.egress.transmitted.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:45.434Z",
+  "metric_name": "network.egress.received.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:45.434Z",
+  "metric_name": "network.egress.received.packets",
+  "metric_value": 0.0,
+  "metric_unit": "packet",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ },
+ {
+  "event_ts": "2026-08-08T16:54:45.434Z",
+  "metric_name": "network.egress.transmitted.bytes",
+  "metric_value": 0.0,
+  "metric_unit": "byte",
+  "metric_group": "network",
+  "node_instance_family": "CPU_X64_S"
+ }
+]
