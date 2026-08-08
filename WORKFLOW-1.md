@@ -308,3 +308,95 @@ storage        NOTHING, again
   confirmation is free: `nfl_injuries` at 22:00 UTC.
 - Cost has not yet been measured over a full day. Estimate was ~400 metric rows/day, about a
   20% increase on event volume. Check `METERING_HISTORY` once a day of real cron fires exists.
+
+---
+
+## Modelling layer: five views and a retention task
+
+Built `sql/ops/02` through `05` plus a per-sport view for each league. **The dynamic table in the
+design became a plain view**, and four separate bugs were found by checking output against
+something already known to be true. None of them raised an error.
+
+**Ran**
+
+```bash
+make setup-ops CONFIRM=1                  # x2, one fix in between
+make setup-source SOURCE=nfl  CONFIRM=1   # x2, one fix in between
+make setup-source SOURCE=wnba CONFIRM=1   # x2
+```
+
+**Result**
+
+```
+DLT_DB.OPS.V_LOG_LINES        one row per log line, four formats parsed
+DLT_DB.OPS.V_METRICS          one row per metric sample, group derived
+DLT_DB.OPS.V_TASK_RUNS        one row per run: 44 rows, 44 distinct query ids
+DLT_DB.OPS.DLT_EVENTS_RETENTION   task, state=started, Sun 04:30 UTC
+NFL_PROD_DB.OPS.V_PIPELINE_RUNS   42 rows / 42 runs, 5 dlt_record_missing
+WNBA_PROD_DB.OPS.V_PIPELINE_RUNS   2 rows /  2 runs
+```
+
+The one run with full telemetry reads exactly as designed: 92s task, 63s container span, 29s
+startup overhead, 416 log lines, 179 metric samples, 0.127 cores from **one** sample, 133 MB.
+
+`ROWS_LOADED` correctly excludes `_dlt_pipeline_state`: `nfl_stats` reads 85, not 86.
+
+**Surprises**
+
+Four bugs, all silent, all caught by comparing output to a known answer rather than by an error:
+
+1. **`CREATE VIEW` was never granted.** `01_event_table.sql` granted `CREATE DYNAMIC TABLE`,
+   left over from the earlier design. The failure reads
+   `Insufficient privileges to operate on schema 'OPS'`, which names the schema rather than the
+   missing privilege and looks like a role problem.
+
+2. **`QUALIFY` after `UNION ALL` binds to the last branch only.** Written as
+   `SELECT ... UNION ALL SELECT ... QUALIFY`, the deduplicate silently did not happen and every
+   run appeared twice, once per history source. No error; the row count just doubled. Fixed by
+   wrapping the union in its own CTE.
+
+3. **`TIMESTAMP_NTZ` compared against `TIMESTAMP_LTZ`.** The event table's `TIMESTAMP` is NTZ
+   holding UTC; `TASK_HISTORY.QUERY_START_TIME` is LTZ. Compared directly, the NTZ value is read
+   in session time and the boundary lands seven hours in the future, so `TELEMETRY_AVAILABLE`
+   was FALSE for every row including ones sitting on 416 log lines.
+
+4. **Two different history boundaries, and I used the wrong one.** `DLT_RECORD_MISSING` was
+   guarded on `TELEMETRY_AVAILABLE`, the event table's boundary of 2026-08-08. `_DLT_RUNS` has
+   been collecting since 2026-08-01. Every genuinely missing record predated the event table, so
+   the column came back false for all 42 rows. A column that is always false does not look
+   broken.
+
+Also worth recording, from building `V_METRICS`:
+
+- **`RESULT_LIMIT` on `INFORMATION_SCHEMA.TASK_HISTORY` defaults to 100.** Seventeen Tasks over
+  seven days exceeds that, and the truncation is silent. Set to 10000, the maximum.
+- **A view CAN wrap an `INFORMATION_SCHEMA` table function.** Open question in the design;
+  answered by building one. This is what makes the zero-lag half of `V_TASK_RUNS` possible.
+- **Metric rows carry `snow.compute_pool.name` and `snow.compute_pool.node.instance_family`**,
+  which log rows do not. That is the only place the pool and node size are recorded, and it is
+  what separates prod from dev runs sharing one event table.
+- **The metrics that matter are the sparsest.** Across every run collected so far:
+  `container.cpu.limit` 37 samples, `container.cpu.usage` **2**. Constants are sampled every
+  scrape; the varying ones are not.
+
+**Changed from plan**
+
+- **The dynamic table became a view.** Measured first: ~74k rows at steady state, full parse over
+  14.8k rows in well under a second. A dynamic table mirrors its source so it buys no retention
+  once `05` trims at 30 days, it costs ~0.4 credits/day whether or not anyone looks, and its
+  `TARGET_LAG` is backwards for a view you read right after a failure.
+- **Added `V_METRICS`**, which the plan did not have. The plan surfaced metrics only as a
+  per-run rollup, which throws away the individual samples and contradicts the decision to
+  collect all five groups and filter downstream.
+- File numbering shifted: retention is now `05`, not `04`.
+
+**Open**
+
+- The `_DLT_RUNS` join is still a time window, because `_DLT_RUNS` carries no run identifier.
+  Verified 1:1 with no fan-out on all live rows, but two concurrent runs of one pipeline would
+  be ambiguous. One line in `observability.py` stamping `SNOWFLAKE_SERVICE_NAME` turns it into
+  an equality join.
+- `V_LOG_LINES` reports duplicates rather than deduplicating them, because `run.py` emits every
+  `dlt_pipeline` message twice. Filtering is left to the consumer via `LOG_FORMAT`.
+- Cost of the views under real dashboard load is unmeasured. The estimate rests on a single
+  timing over 14.8k rows.

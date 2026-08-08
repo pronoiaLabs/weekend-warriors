@@ -9,11 +9,23 @@
 --
 -- WHY A DEDICATED TABLE AND NOT SNOWFLAKE.TELEMETRY.EVENTS
 --   The shared table already receives these logs and would need no setup at all.
---   It cannot be used: it lives in the SNOWFLAKE shared database, change tracking
---   cannot be set on an object there, and change tracking is the prerequisite for
---   an incrementally refreshing dynamic table. Reading the shared table forecloses
---   the entire modelling layer, so the choice is made here rather than discovered
---   in ops/02.
+--   Three reasons not to build on it, and only the first two survive the move from
+--   a dynamic table to views:
+--
+--     Retention. Event tables are never auto-purged, and ops/04 has to DELETE from
+--     this one on a schedule. DELETE on SNOWFLAKE.TELEMETRY.EVENTS is permitted but
+--     it is a shared object owned by the account, and trimming it on our cadence
+--     imposes our retention policy on anything else that ever logs there.
+--
+--     Ownership and grants. DLT_LOADER_ROLE owns this table and can be granted
+--     exactly SELECT and DELETE. Access to the shared table is an account-level
+--     concern that cannot be scoped to this project's roles.
+--
+--     Change tracking, which was the original and now weakest reason: it cannot be
+--     set on an object in the SNOWFLAKE database, and a dynamic table needs it. The
+--     modelling layer is views, so this no longer decides anything. Recorded because
+--     it was the argument that carried the decision, and it should not be quoted
+--     back later as if it still does.
 --
 -- THE BINDING MUST BE AT ACCOUNT LEVEL. A DATABASE-LEVEL BINDING DOES NOTHING HERE.
 --   This is the opposite of what the general event-table documentation implies, and
@@ -99,14 +111,23 @@ GRANT OPERATE ON WAREHOUSE DLT_OPS_WH TO ROLE DLT_LOADER_ROLE;
 -- ---------------------------------------------------------------------------
 -- 2. The event table
 --
--- DATA_RETENTION_TIME_IN_DAYS = 1 IS LOAD BEARING AND IS NOT ABOUT RETENTION.
---   Incremental refresh requires change tracking with NON-ZERO Time Travel
---   retention on every base object. At 0 the dynamic table in ops/02 either falls
---   back to a full refresh or refuses to create, and the error names change
---   tracking rather than retention, so it reads like a grant problem for an hour.
+-- DATA_RETENTION_TIME_IN_DAYS = 1 PURGES NOTHING. It is Time Travel only.
+--   Event tables are never auto-purged by Snowflake. Row retention is a scheduled
+--   DELETE and lives in ops/04_retention.sql. One day is simply the default and is
+--   enough to undo a mistaken DELETE.
 --
---   This parameter purges NOTHING. Event tables are never auto-purged by Snowflake;
---   row retention is a scheduled DELETE and lives in ops/04_retention.sql.
+--   AN EARLIER VERSION OF THIS FILE CLAIMED THIS SETTING WAS LOAD BEARING, because
+--   incremental refresh of a dynamic table requires change tracking with non-zero
+--   Time Travel. That reasoning died with the dynamic table: ops/02 is a plain view.
+--   The claim is recorded here rather than quietly deleted, because a false rationale
+--   left in a file is worse than no rationale, and this one would have justified
+--   never touching a parameter that is in fact free to change.
+--
+-- CHANGE_TRACKING IS NOW OPTIONALITY, NOT A REQUIREMENT.
+--   Nothing downstream reads the change stream today. It is left on because it costs
+--   little and is the one prerequisite that cannot be added retroactively to history
+--   already collected: turning it on later starts the stream from that moment. If the
+--   modelling layer ever outgrows views, this is what makes the switch cheap.
 -- ---------------------------------------------------------------------------
 CREATE EVENT TABLE IF NOT EXISTS DLT_DB.OPS.DLT_EVENTS
     DATA_RETENTION_TIME_IN_DAYS = 1
@@ -129,9 +150,15 @@ GRANT SELECT ON TABLE DLT_DB.OPS.DLT_EVENTS TO ROLE DLT_LOADER_ROLE;
 GRANT DELETE ON TABLE DLT_DB.OPS.DLT_EVENTS TO ROLE DLT_LOADER_ROLE;
 GRANT SELECT ON TABLE DLT_DB.OPS.DLT_EVENTS TO ROLE DLT_DEV_ROLE;
 
--- The dynamic table in ops/02 is created and owned by DLT_LOADER_ROLE, matching
+-- The views in ops/02 and ops/03 are created and owned by DLT_LOADER_ROLE, matching
 -- every other production object, so the privilege belongs on the schema now.
-GRANT CREATE DYNAMIC TABLE ON SCHEMA DLT_DB.OPS TO ROLE DLT_LOADER_ROLE;
+--
+-- CREATE VIEW, not CREATE DYNAMIC TABLE. An earlier draft granted the latter because
+-- ops/02 was going to be a dynamic table; the modelling layer is views. Granting the
+-- wrong one fails at apply time with `Insufficient privileges to operate on schema
+-- 'OPS'`, which names the schema rather than the missing privilege and reads like a
+-- role problem. If the layer is ever materialised, add the dynamic table grant then.
+GRANT CREATE VIEW ON SCHEMA DLT_DB.OPS TO ROLE DLT_LOADER_ROLE;
 
 -- ---------------------------------------------------------------------------
 -- 4. Bind the event table
