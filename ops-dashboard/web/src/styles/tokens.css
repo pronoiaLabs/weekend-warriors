@@ -1,0 +1,93 @@
+/* Design tokens lifted from the approved option-4-hybrid wireframe:
+   light theme, grayscale plus a single red accent. */
+
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #fbfbfa;
+  --surface-3: #f8f8f8;
+
+  --ink: #18181b;
+  --ink-2: #3f3f46;
+  --ink-3: #52525b;
+  --ink-4: #71717a;
+  --ink-5: #a1a1aa;
+
+  --line: #e4e4e7;
+  --line-soft: #f4f4f5;
+  --line-strong: #d4d4d8;
+
+  --red: #dc2626;
+  --red-ink: #b91c1c;
+  --red-line: #fecaca;
+  --red-edge: #fca5a5;
+  --red-lite: #f87171;
+  --red-wash: #fef2f2;
+
+  --fill-ok: #d4d4d8;
+  --hatch: repeating-linear-gradient(45deg, #dc2626 0 3px, #ffffff 3px 6px);
+
+  --font: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --r-sm: 4px;
+  --r: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+}
+
+/* ---- status vocabulary ----
+   One treatment per state, reused by timeline blocks, legend swatches and
+   anywhere else a state is drawn. Applied as `.st st-<state>`; the state class
+   comes later in the file so its border shorthand wins at equal specificity.
+   A disagreement is deliberately absent: it is a finding, never drawn red. */
+
+.st {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: 3px;
+}
+
+.st-succeeded {
+  background: var(--fill-ok);
+  border: 1px solid var(--ink-5);
+  color: var(--ink);
+}
+
+.st-failure {
+  background: var(--red);
+  border: 1px solid var(--red-ink);
+  color: #ffffff;
+}
+
+.st-missing {
+  background: var(--hatch);
+  border: 1px solid var(--red-ink);
+  color: var(--red-ink);
+}
+
+.st-missed {
+  background: var(--surface);
+  border: 2px dashed var(--red);
+  color: var(--red-ink);
+}
+
+.st-upcoming {
+  background: var(--surface);
+  border: 1px dotted var(--ink-5);
+  color: var(--ink-5);
+}
+
+.st-notsched {
+  background: var(--line-soft);
+  border: 1px solid var(--line);
+  color: var(--ink-5);
+}
+
+/* The API lowercases any TASK_STATE it does not classify; render it neutrally
+   rather than guessing at a severity. */
+.st-unknown {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-3);
+}

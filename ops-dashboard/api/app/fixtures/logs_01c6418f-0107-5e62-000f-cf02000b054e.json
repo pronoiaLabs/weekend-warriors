@@ -1,0 +1,3330 @@
+[
+ {
+  "event_ts": "2026-08-08T16:48:04.506Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "resolving pipeline specs from table"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:05.422Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:05.422Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:09.270Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "structured",
+  "message": "starting pipeline (source=rest_api, destination=snowflake, dataset=RAW, disposition=None, resources=all, params=none)"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:09.270Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "starting pipeline (source=rest_api, destination=snowflake, dataset=RAW, disposition=None, resources=all, params=none)"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:09.365Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "structured",
+  "message": "resolved runtime tokens: {'{current_season}': 2026} (season rollover month 8)"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:09.365Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "resolved runtime tokens: {'{current_season}': 2026} (season rollover month 8)"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:09.502Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:09.502Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:12.894Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "The state was restored from the destination snowflake (dlt.destinations.snowflake):RAW"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:12.977Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:12.978Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:15.401Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "The schema nfl_reference version 2 hash 1+02MzF0lFT9mqPesyb4yYP577jCGBfAYBEdKFv7TRo= was restored from the destination snowflake:RAW"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:15.506Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/teams"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:15.756Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 32"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:15.760Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:15.888Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:15.891Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Paginator SinglePagePaginator at 7fe70de18250 does not have more pages"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:15.891Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.037Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.037Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=584"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.155Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.156Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=728"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.266Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.267Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=914"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.385Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.386Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1135"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.523Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.523Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1306"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.637Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.638Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1407"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.757Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.758Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1507"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.893Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:16.894Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1608"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.012Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.013Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1709"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.199Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.200Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1845"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.331Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.331Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=1997"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.447Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.448Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=2134"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.595Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.596Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=2287"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.710Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.711Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=2420"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.823Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.824Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=2572"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.956Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:17.957Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=2732"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.083Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.083Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=21218"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.280Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.281Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=21332"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.383Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.384Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=21692"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.509Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.510Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=21849"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.644Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.645Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=22034"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.765Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.766Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=22250"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.881Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.882Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=22429"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.993Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:18.994Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=22530"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.110Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.110Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=22630"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.256Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.258Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=22731"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.379Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.379Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=22848"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.527Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.528Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=23006"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.693Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.693Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=23171"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.814Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.814Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=23328"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.930Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:19.931Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=23483"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.050Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.051Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=23642"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.208Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.209Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=23783"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.316Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.317Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=24912"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.452Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.452Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=25884"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.572Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.573Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=26725"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.682Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.683Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=26929"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.791Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.792Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=30974"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.913Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:20.914Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=31860"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.025Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.026Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=32784"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.157Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.158Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33836"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.279Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.279Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=34661"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.403Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.404Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=35875"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.503Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.504Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=36028"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.612Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.613Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=37596"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.722Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.723Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=39022"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.919Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:21.919Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=39182"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.028Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.029Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=40810"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.168Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.223Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=42032"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.337Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.339Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=42342"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.449Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.449Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=43582"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.581Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.582Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=44389"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.693Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.694Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=45510"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.813Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.814Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=45654"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.944Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:22.945Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=47301"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.078Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.078Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=48597"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.181Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.182Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=48808"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.315Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.316Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=49978"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.421Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.421Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=50898"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.529Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.530Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=51874"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.678Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.679Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=52861"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.801Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.802Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=53646"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.907Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:23.908Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=54893"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.044Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.048Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=55053"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.155Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.156Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=56438"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.267Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.268Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=57630"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.372Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.373Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=58123"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.493Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.493Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=59242"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.615Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.616Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=60252"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.725Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.726Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=61218"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.829Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.830Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=62412"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.959Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:24.960Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=63420"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.071Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.072Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=64347"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.182Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.183Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=65659"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.310Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.310Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=67226"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.483Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.484Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=67593"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.616Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.616Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=69281"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.724Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.725Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=70731"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.843Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.844Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=72522"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.956Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:25.957Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=73883"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.078Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.079Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=75774"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.187Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.188Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=77176"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.311Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.312Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=79419"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.470Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.470Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=80540"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.594Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.594Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=83796"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.722Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.723Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=88441"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.845Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.846Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=88886"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.955Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:26.956Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=89245"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.086Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.087Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=89535"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.221Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.222Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=89752"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.336Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.337Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=90086"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.458Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.459Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=251406"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.568Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.569Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=278411"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.684Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.685Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=279145"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.799Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.800Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=279562"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.908Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:27.909Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=280333"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.037Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.038Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=281505"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.152Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.153Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=281975"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.272Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.333Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=366145"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.438Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.439Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=860999"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.550Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.551Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13873917"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.654Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.655Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13874268"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.765Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.767Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13874644"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.872Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:28.873Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13875066"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.051Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.052Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13877866"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.162Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.163Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13878464"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.281Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.282Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13878878"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.396Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.397Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=13882134"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.559Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.560Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33934151"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.667Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.668Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33934622"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.784Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.785Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33935172"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.916Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:29.917Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33935664"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.027Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.028Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33936184"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.132Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.133Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33937537"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.243Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.244Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33939045"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.349Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.350Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943255"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.477Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.478Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943355"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.585Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.586Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943455"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.696Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.697Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943555"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.823Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.824Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943655"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.935Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:30.936Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943755"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.046Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.047Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943855"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.158Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.159Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33943955"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.275Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.276Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944055"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.404Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.405Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944155"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.524Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.524Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944255"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.653Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.654Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944355"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.783Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.784Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944455"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.922Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:31.923Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944555"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.048Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.048Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944655"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.169Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.171Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944755"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.314Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.314Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944855"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.458Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.459Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33944955"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.650Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 100"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.651Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Making GET request to https://api.balldontlie.io/nfl/v1/players?per_page=100&cursor=33945055"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.762Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted data of type list from path data with length 21"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.762Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Paginator JSONResponseCursorPaginator at 7fe70e193bd0: cursor_path: (meta.next_cursor) cursor_param: cursor does not have more pages"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.848Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created none pool with 1 workers"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.848Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Running file normalizing"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.849Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Found 1 load packages"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.851Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Found 2 files in schema nfl_reference load_id 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.852Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created new load package 1786207695.503329 on loading volume with 2 files"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:32.857Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created items normalizer JsonLItemsNormalizer with writer JsonlWriter for item format object and file format jsonl on table players"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.253Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created items normalizer JsonLItemsNormalizer with writer JsonlWriter for item format object and file format jsonl on table teams"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.323Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Processed all items in 2 files"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.323Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Schema nfl_reference with version 2 was not modified. Save skipped"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.324Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Committing storage, do not kill this process"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.324Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted package 1786207695.503329 processed"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.324Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Closing processing pool"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.324Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Processing pool closed"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.369Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created thread pool with 20 workers"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.369Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Running file loading"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.369Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Found 1 load packages"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.369Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Loading schema from load package in 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.371Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Loaded schema name nfl_reference and version 2"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.372Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:33.372Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:35.508Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will start initialize storage"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:35.848Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will update schema to package schema"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:36.319Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Schema with hash 1+02MzF0lFT9mqPesyb4yYP577jCGBfAYBEdKFv7TRo= inserted at 2026-08-01 13:48:35.974174+00:00 found in storage, no upgrade required"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:36.319Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will truncate tables"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:37.057Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will start initialize storage for staging dataset"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:37.467Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will update schema to package schema for staging dataset"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:37.914Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Schema with hash c+NcBarZ3ulchgtNYpxqFAoDgpR/4T/X5mVvyD1Jebo= inserted at 2026-08-01 19:01:23.663296+00:00 found in storage, no upgrade required"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:37.915Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will truncate tables for staging dataset"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.842Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "0 started jobs found, which should be continued"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.909Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 0 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.909Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 2, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.910Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load file 1786207695.503329/new_jobs/players.2a7fb822d3.0.jsonl.gz with table name players"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.911Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load file 1786207695.503329/new_jobs/teams.b1946165d2.0.jsonl.gz with table name teams"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.912Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.912Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.913Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:38.913Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.912Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 2 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:39.912Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:40.913Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 2 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:40.913Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:41.913Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 2 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:41.914Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:42.914Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 2 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:42.914Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:43.561Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 2 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:43.563Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Job for teams.b1946165d2.jsonl.gz completed in load 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:43.563Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:44.278Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:44.280Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Job players.2a7fb822d3.jsonl.gz CREATED a new FOLLOWUP JOB /tmp/players.9d7ca6914b.0.sql placed in new_jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:44.280Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Job for players.2a7fb822d3.jsonl.gz completed in load 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:44.280Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 1, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:44.281Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load file 1786207695.503329/new_jobs/players.9d7ca6914b.0.sql with table name players"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:44.282Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:44.282Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:45.282Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:45.282Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:46.282Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:46.282Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:47.283Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:47.283Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:48.085Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.cursor",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Retrieved results for query ID: 01c64190-0107-5e73-000f-cf02000ae4d2"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:48.144Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:48.144Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Job for players.9d7ca6914b.sql completed in load 1786207695.503329"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:48.144Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:48.145Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:48.145Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.821Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "All jobs completed, archiving package 1786207695.503329 with aborted set to False"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.821Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Closing processing pool"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.821Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Processing pool closed"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.828Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "structured",
+  "message": "load complete: Pipeline nfl_reference load step completed in 17.45 seconds\n1 load package(s) were loaded to destination snowflake and into dataset RAW\nThe snowflake destination used snowflake://WG00994/NFL_PROD_DB location to store data\nLoad package 1786207695.503329 is LOADED and contains no failed jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.828Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "load complete: Pipeline nfl_reference load step completed in 17.45 seconds"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.828Z",
+  "severity": null,
+  "logger_name": null,
+  "container_name": "dlt",
+  "log_format": "continuation",
+  "message": "1 load package(s) were loaded to destination snowflake and into dataset RAW"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.828Z",
+  "severity": null,
+  "logger_name": null,
+  "container_name": "dlt",
+  "log_format": "continuation",
+  "message": "The snowflake destination used snowflake://WG00994/NFL_PROD_DB location to store data"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.828Z",
+  "severity": null,
+  "logger_name": null,
+  "container_name": "dlt",
+  "log_format": "continuation",
+  "message": "Load package 1786207695.503329 is LOADED and contains no failed jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.831Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "structured",
+  "message": "row counts: {'players': 13521, 'teams': 32}"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.831Z",
+  "severity": "INFO",
+  "logger_name": "dlt_pipeline",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "row counts: {'players': 13521, 'teams': 32}"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.878Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:50.878Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:53.698Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "The state was restored from the destination snowflake (dlt.destinations.snowflake):OPS"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:53.783Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:53.783Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.136Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "The schema ops_meta version 2 hash 8Ib6BMOdftN+eFIh7KG+VGNe54IRXaSWmeFL8OhaJSg= was restored from the destination snowflake:OPS"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.307Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created none pool with 1 workers"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.307Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Running file normalizing"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.307Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Found 1 load packages"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.309Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Found 1 files in schema ops_meta load_id 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.310Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created new load package 1786207736.269165 on loading volume with 1 files"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.314Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created items normalizer JsonLItemsNormalizer with writer JsonlWriter for item format object and file format jsonl on table _dlt_runs"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.315Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Processed all items in 1 files"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.316Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Schema ops_meta with version 2 was not modified. Save skipped"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.316Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Committing storage, do not kill this process"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.316Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Extracted package 1786207736.269165 processed"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.316Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Closing processing pool"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.316Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Processing pool closed"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.345Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Created thread pool with 20 workers"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.345Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Running file loading"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.345Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Found 1 load packages"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.345Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Loading schema from load package in 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.345Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Loaded schema name ops_meta and version 2"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.345Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:56.349Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:58.531Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will start initialize storage"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:59.798Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Client for snowflake will update schema to package schema"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:59.974Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Schema with hash 8Ib6BMOdftN+eFIh7KG+VGNe54IRXaSWmeFL8OhaJSg= inserted at 2026-08-01 19:01:48.124491+00:00 found in storage, no upgrade required"
+ },
+ {
+  "event_ts": "2026-08-08T16:48:59.974Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "0 started jobs found, which should be continued"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:00.093Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 0 for 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:00.094Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 1, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:00.094Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load file 1786207736.269165/new_jobs/_dlt_runs.394144d40b.0.jsonl.gz with table name _dlt_runs"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:00.095Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:00.095Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:01.095Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:01.095Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:02.096Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:02.096Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:03.096Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:03.097Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:04.097Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:04.097Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:04.177Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will complete 1 for 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:04.177Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Job for _dlt_runs.394144d40b.jsonl.gz completed in load 1786207736.269165"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:04.178Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Will load additional 0, creating jobs"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:04.178Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Snowflake Connector for Python Version: 4.7.2, Python Version: 3.11.15, Platform: Linux-5.15.206-14.2026072210gc681dfd+snow+aws+5.15+amd64.x86_64-x86_64-with-glibc2.41"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:04.178Z",
+  "severity": "INFO",
+  "logger_name": "snowflake.connector.connection",
+  "container_name": "dlt",
+  "log_format": "stdlib",
+  "message": "Connecting to GLOBAL Snowflake domain"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:07.245Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "All jobs completed, archiving package 1786207736.269165 with aborted set to False"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:07.245Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Closing processing pool"
+ },
+ {
+  "event_ts": "2026-08-08T16:49:07.245Z",
+  "severity": "INFO",
+  "logger_name": "dlt",
+  "container_name": "dlt",
+  "log_format": "dlt",
+  "message": "Processing pool closed"
+ }
+]
