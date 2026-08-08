@@ -5,10 +5,49 @@ same format as WORKFLOW-1.md: one section per phase, appended as each phase clos
 Plan of record: the approved "ops-dashboard: loop-based autonomous build" plan.
 Branch: `feat/ops-dashboard` off `main`.
 
-## HANDOFF (filled in at the end)
+## HANDOFF
 
-Placeholder. The final phase replaces this with the exact command sequence to run
-on return, in order, plus every open question.
+The dashboard is complete and LOCAL-ONLY, per your call at the end of the loop:
+no SPCS service, no role, no pool, nothing applied to the account. The whole
+loop touched Snowflake with read-only SELECT / SHOW statements exclusively.
+
+**To use it:**
+
+```bash
+cd ops-dashboard
+make install     # once
+make dev-api     # terminal 1
+make dev-web     # terminal 2, then open http://localhost:5173
+```
+
+**First thing worth checking, found by the dashboard itself:** WNBA's daily
+crons did not fire on Aug 8. The overview shows wnba_reference 14:00 and
+wnba_games 15:00 as missed slots; the only WNBA rows in V_PIPELINE_RUNS are
+the two manual 16:00 runs. Check:
+
+```bash
+snow sql -c weekend-warriors -q "SHOW TASKS IN SCHEMA DLT_DB.OPS;" --format JSON
+```
+
+and look at the wnba_* tasks' state (suspended vs started) and last scheduled
+time.
+
+**Branch state:** feat/ops-dashboard, 8 commits, NOT pushed (your call to
+make). CI has two new jobs (api lint+tests, web typecheck+build) that will run
+once pushed.
+
+**Open questions, in priority order:**
+1. WNBA missed crons above.
+2. Missed-slot counts are inflated for pipelines younger than the lookback
+   window (every pre-existence slot counts as missed). Cleanest fix: a
+   created_at column in the registry; see Phase 2 notes.
+3. `.brainstorm/` wireframes: track or gitignore.
+4. SPCS deploy artifacts are parked in ops-dashboard/deploy/ (kept by your
+   choice); the local Docker image build was skipped, so the Dockerfile is
+   the one unverified artifact on the branch.
+5. Two UI branches have no fixture data proving them on screen: the DISAGREES
+   flag chip and a populated missed-slot strip. Both are implemented and
+   type-checked; they will first render when real data produces them.
 
 ---
 
@@ -128,3 +167,63 @@ record-missing history; its history stays visible in incidents and on the
 pipeline page.
 
 **Open:** the missed-slot inflation decision above.
+
+---
+
+## Phases 3 and 4: the four pages
+
+**Ran:** three react-developer subagents in sequence, each verifying with tsc,
+oxlint, vite build, and a headless Chrome render against the fixture API
+before returning; each page committed separately after an independent re-check
+in the main loop. Foundation + Fleet (tokens and status vocabulary lifted from
+the wireframe, typed API client, URL-backed ?sport= filter, timeline board
+with computed positions), then Incidents (day-grouped feed, four severity
+classes, VerdictPair / SeverityBadge / MiniRunStrip as shared components),
+then Pipeline + Run detail (HeatStrip, SegmentedDurationBar, MetricDotStrip,
+LogTable, Tabs).
+
+**Result:** all four pages render live data with zero console errors. The
+design-rules checklist held: dual verdicts never merged, sample counts beside
+every maximum, dots never curves, disagreement neutral gray, healthy renders
+no card, absence renders loudly at every level.
+
+**Surprises:**
+- The subagent permission stalls from Phase 0/1 did not recur after the
+  bypass-mode flip; all three page agents ran clean.
+- Vite 8 binds localhost only, so curl checks need localhost, not 127.0.0.1.
+- The wireframe's catalogued inconsistencies were resolved as planned: the
+  DISAGREES run-history flag exists, the heatmap has a missed state, nav is
+  Overview | Incidents only, EXIT_STATUS copy reflects both observed cases.
+
+**Changed from plan:** 4a merged into Phase 3 (a rendering Fleet page was the
+natural proof of the foundation); 4c and 4d merged into one agent because
+they share the diagnostic widget set.
+
+**Open:** the DISAGREES chip and populated slot strips have no fixture data
+proving them visually; a small duplicated relative-time helper between
+Incidents and format.ts, left deliberately.
+
+---
+
+## Phase 5: deploy artifacts parked, CI wired
+
+**Ran:** wrote ops-dashboard/deploy/ (two-stage Dockerfile, SHA-tagged spec
+template with endpoints and readiness probe, 01_ops_role / 02_ops_pool /
+03_service SQL) and the Makefile setup / spec-upload / image-push / deploy /
+endpoint / service-logs targets; added two ci.yml sibling jobs (api: ruff +
+pytest via uv; web: npm ci + tsc + build). deploy.yml untouched, deliberately.
+
+**Result:** mid-phase you clarified the dashboard should run LOCALLY to avoid
+paying for an always-on pool, and chose to keep the deploy artifacts parked
+rather than delete them. README reframed local-first; the `make setup` gate
+text and 01_ops_role.sql headers document the service-owner-role trap for
+whenever the trade flips. The local Docker image build was skipped, so the
+Dockerfile is written but unverified.
+
+**Surprises:** none beyond the scope change itself.
+
+**Changed from plan:** the plan's Phase 6 handoff assumed an SPCS deploy
+sequence; the HANDOFF at the top of this file is local-first instead.
+
+**Open:** Dockerfile unverified; deploy.yml wiring stays future work if the
+service is ever wanted.

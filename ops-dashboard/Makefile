@@ -8,6 +8,18 @@
 UV      ?= uv
 UV_RUN  := $(UV) run --extra dev
 
+# Image tag = short git SHA. NEVER latest: ALTER SERVICE only rolls when the
+# rendered spec text changes, and a fixed tag makes every push a silent no-op.
+TAG        ?= $(shell git rev-parse --short HEAD)
+IMAGE      := ops-dashboard:$(TAG)
+IMAGE_REPO := /dlt_db/deploy/images
+
+# Optional connection override: `make image-push SNOW_CONN=other`.
+SNOW_CONN ?=
+SNOW_CLI := snow $(if $(SNOW_CONN),--connection $(SNOW_CONN),)
+# For SQL files that pick their own role via USE ROLE.
+SNOW := $(SNOW_CLI) sql
+
 # Terminal banner helper: `@$(call hdr,message)` prints a bold cyan section header.
 # (Keep messages comma-free -- commas split $(call) arguments.)
 define hdr
@@ -17,7 +29,9 @@ endef
 .DEFAULT_GOAL := help
 
 .PHONY: help install dev-api dev-web \
-        test lint build
+        test lint build \
+        setup spec-upload image-build image-login image-push \
+        deploy endpoint service-status service-logs
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<target>\033[0m\n"} \
@@ -52,3 +66,45 @@ lint: ## Ruff on the api + type-check the web (tsc -b: the root tsconfig only ho
 
 build: ## Production build of the web app into web/dist
 	cd web && npm run build
+
+##@ Snowflake setup (live; run by a human, never CI)
+
+setup: ## Apply deploy/sql/*.sql: role, pool, service (CONFIRM=1 required)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates OPS_DASHBOARD_ROLE (grants incl. ACCOUNTADMIN bind), OPS_DASHBOARD_POOL"; \
+		echo "(always-on XS node) and the OPS_DASHBOARD service. 03_service.sql needs its"; \
+		echo "<GIT_SHA> placeholder filled in first."; \
+		echo "Re-run with CONFIRM=1"; \
+		exit 2; \
+	fi
+	@for f in deploy/sql/*.sql; do echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
+
+##@ SPCS image and service
+
+spec-upload: ## Upload the service spec template to @DLT_DB.DEPLOY.SPECS
+	$(SNOW_CLI) stage copy deploy/spcs/ops_dashboard.tmpl.yaml @DLT_DB.DEPLOY.SPECS --overwrite
+
+image-build: ## Build the SPCS image (linux/amd64; Docker required)
+	docker build --platform linux/amd64 --load -f deploy/spcs/Dockerfile -t $(IMAGE) .
+
+image-login: ## Docker-login to the Snowflake image registry via snow
+	$(SNOW_CLI) spcs image-registry login
+
+image-push: image-build image-login ## Build + push ops-dashboard:<git sha>
+	@host="$$($(SNOW_CLI) spcs image-registry url)"; \
+	  target="$$host$(IMAGE_REPO)/$(IMAGE)"; \
+	  echo "== pushing $$target =="; \
+	  docker tag $(IMAGE) "$$target" && docker push "$$target"; \
+	  echo "== pushed tag $(TAG); deploy with: make deploy TAG=$(TAG) =="
+
+deploy: spec-upload ## Roll the service to TAG (upgrades in place)
+	$(SNOW) --role OPS_DASHBOARD_ROLE -q "ALTER SERVICE DLT_DB.DEPLOY.OPS_DASHBOARD FROM @DLT_DB.DEPLOY.SPECS SPECIFICATION_TEMPLATE_FILE = 'ops_dashboard.tmpl.yaml' USING (tag => '$(TAG)');"
+
+endpoint: ## Show the ingress URL (populates once the service is READY)
+	$(SNOW) -q "SHOW ENDPOINTS IN SERVICE DLT_DB.DEPLOY.OPS_DASHBOARD;" --format JSON
+
+service-status: ## Service state and container status
+	$(SNOW) -q "SELECT SYSTEM\$$GET_SERVICE_STATUS('DLT_DB.DEPLOY.OPS_DASHBOARD');" --format JSON
+
+service-logs: ## Tail the app container log
+	$(SNOW) -q "SELECT SYSTEM\$$GET_SERVICE_LOGS('DLT_DB.DEPLOY.OPS_DASHBOARD', 0, 'app', 200);"

@@ -1,0 +1,28 @@
+# SPCS service spec template for the ops dashboard.
+#
+# Uploaded to @DLT_DB.DEPLOY.SPECS and rendered server-side by
+# CREATE SERVICE ... SPECIFICATION_TEMPLATE_FILE ... USING (tag => '<git sha>').
+#
+# THE TAG IS A VARIABLE, NEVER :latest, AND THAT IS LOAD-BEARING.
+# ALTER SERVICE only performs a rolling upgrade when the rendered spec TEXT
+# differs from the previous one. With :latest the text is byte-identical after
+# an image push and the alter is a silent no-op: the service keeps running the
+# old code while everything reports success. A git SHA in the tag makes every
+# deploy a real text change.
+#
+# WARNING: the renderer substitutes template variables ANYWHERE in the file,
+# comments included, so no variable syntax may appear in prose here.
+
+spec:
+  containers:
+    - name: app
+      image: /DLT_DB/DEPLOY/IMAGES/ops-dashboard:{{ tag }}
+      env:
+        SNOWFLAKE_WAREHOUSE: DLT_OPS_WH
+      readinessProbe:
+        port: 8000
+        path: /api/health
+  endpoints:
+    - name: app
+      port: 8000
+      public: true
