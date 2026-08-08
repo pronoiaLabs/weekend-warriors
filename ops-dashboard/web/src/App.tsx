@@ -1,20 +1,8 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-
-function Fleet() {
-  return <p>Fleet overview - coming in phase 4</p>
-}
-
-function Incidents() {
-  return <p>Incidents - coming in a later phase</p>
-}
-
-function PipelineDetail() {
-  return <p>Pipeline detail - coming in a later phase</p>
-}
-
-function RunDetail() {
-  return <p>Run detail - coming in a later phase</p>
-}
+import Fleet from './pages/Fleet.tsx'
+import Incidents from './pages/Incidents.tsx'
+import PipelineDetail from './pages/PipelineDetail.tsx'
+import RunDetail from './pages/RunDetail.tsx'
 
 export default function App() {
   return (
