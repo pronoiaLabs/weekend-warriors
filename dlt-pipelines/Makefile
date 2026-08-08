@@ -178,11 +178,11 @@ endef
 .PHONY: help doctor install secrets setup \
         test test-config lint fmt list plan \
         run-local run-snowflake run-spcs \
-        sync-sql tasks-sql emit \
-        setup-base setup-dev setup-prod setup-source new-source \
+        sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
+        setup-base setup-dev setup-prod setup-ops setup-source new-source \
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
-        sync-apply tasks-apply deploy \
+        sync-apply tasks-apply tasks-suspend tasks-resume deploy \
         clean
 
 help: ## Show this help
@@ -343,6 +343,14 @@ tasks-sql: build ## Emit per-pipeline Task DDL -> build/tasks.sql
 	$(UV_RUN) python -m deploy.tasks.generate_tasks > build/tasks.sql
 	@echo "Wrote build/tasks.sql"
 
+tasks-suspend-sql: build ## Emit ALTER TASK ... SUSPEND -> build/suspend.sql
+	$(UV_RUN) python -m deploy.tasks.generate_tasks --suspend > build/suspend.sql
+	@echo "Wrote build/suspend.sql"
+
+tasks-resume-sql: build ## Emit ALTER TASK ... RESUME -> build/resume.sql
+	$(UV_RUN) python -m deploy.tasks.generate_tasks --resume > build/resume.sql
+	@echo "Wrote build/resume.sql"
+
 emit: sync-sql tasks-sql ## Emit both sync.sql and tasks.sql
 
 ##@ Snowflake setup (live; requires a snow connection)
@@ -394,6 +402,26 @@ setup-prod: ## Apply production DDL sql/prod/* -- tailor to the customer's needs
 # hands an adopter somebody else's API credential.
 #
 # This is the one setup target you run more than once, once per source.
+setup-ops: ## Apply observability DDL sql/ops/* -- event table + binding (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates DLT_OPS_WH and the DLT_DB.OPS.DLT_EVENTS event table, and binds"; \
+		echo "it to DLT_DB so every SPCS job writes telemetry there instead of to the"; \
+		echo "shared SNOWFLAKE.TELEMETRY.EVENTS. Rows already in the shared table stay"; \
+		echo "there: history splits at this point."; \
+		echo "Needs ACCOUNTADMIN for the ALTER DATABASE ... SET EVENT_TABLE."; \
+		echo "Requires setup-base. Re-run with CONFIRM=1"; \
+		echo "(optionally SNOW_CONN=<connection>)."; \
+		exit 2; \
+	fi
+	@for f in sql/ops/*.sql; do echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
+	@echo "Observability ready, but NOT yet in effect on any warm compute pool."
+	@echo "  1. snow sql -q \"SHOW PARAMETERS LIKE 'EVENT_TABLE' IN ACCOUNT;\"   -- level must read ACCOUNT"
+	@echo "     (check ACCOUNT, not DATABASE: SPCS ignores the database-level binding)"
+	@echo "  2. Cycle any pool with live nodes, or the old routing persists:"
+	@echo "     snow sql -q \"ALTER COMPUTE POOL DLT_DEV_POOL SUSPEND;\"   -- auto_resume brings it back"
+	@echo "  3. make run-spcs NAME=sample, then confirm rows land in DLT_DB.OPS.DLT_EVENTS"
+	@echo "     while MAX(TIMESTAMP) in SNOWFLAKE.TELEMETRY.EVENTS stays put."
+
 setup-source: ## Apply one source's DDL sql/sources/$(SOURCE)/* (SOURCE=nfl, guard: CONFIRM=1)
 	@if [ -z "$(SOURCE)" ]; then \
 		echo "Set SOURCE=<name>, e.g. make setup-source SOURCE=nfl CONFIRM=1"; \
@@ -484,10 +512,31 @@ tasks-apply: tasks-sql ## Apply build/tasks.sql to the account
 	  && printf '\033[0;32m✓ applied %s task(s)\033[0m \033[2m(full log: build/tasks.out)\033[0m\n' "$$(grep -c 'CREATE OR ALTER TASK' build/tasks.sql)" \
 	  || { printf '\033[0;31m✗ tasks apply failed\033[0m\n'; cat build/tasks.out; exit 1; }
 
-deploy: sync-apply tasks-apply ## Sync registry + apply Tasks (Tasks created SUSPENDED)
-	@echo "Deployed. Tasks are created SUSPENDED by design - resume one at a time, e.g.:"
-	@echo "  snow sql --role $(PROD_ROLE) -q \"ALTER TASK DLT_DB.OPS.dlt_task_nfl_reference RESUME;\""
-	@echo "Cheapest first (nfl_reference), confirming each before the next."
+# SUSPEND BEFORE APPLY IS MANDATORY, NOT TIDINESS.
+#   CREATE OR ALTER TASK fails on a task that is started, with
+#   `091421 (22000): Unable to update graph with root task <name> since that root
+#   task is not suspended`, and changes nothing. `snow sql -f` stops at the first
+#   error, so a fleet whose first task is running aborts before the rest are even
+#   attempted: some Tasks carry the new spec, some the old, and the output does not
+#   say which. Measured against the live 17-Task fleet on 2026-08-08.
+tasks-suspend: tasks-suspend-sql ## Suspend every Task (run BEFORE tasks-apply)
+	@$(call hdr,Suspend per-pipeline Tasks)
+	@$(SNOW_LOADER) -f build/suspend.sql > build/suspend.out 2>&1 \
+	  && printf '\033[0;32m✓ suspended %s task(s)\033[0m \033[2m(full log: build/suspend.out)\033[0m\n' "$$(grep -c 'ALTER TASK' build/suspend.sql)" \
+	  || { printf '\033[0;31m✗ suspend failed\033[0m\n'; cat build/suspend.out; exit 1; }
+
+tasks-resume: tasks-resume-sql ## Resume every Task (run AFTER tasks-apply)
+	@$(call hdr,Resume per-pipeline Tasks)
+	@$(SNOW_LOADER) -f build/resume.sql > build/resume.out 2>&1 \
+	  && printf '\033[0;32m✓ resumed %s task(s)\033[0m \033[2m(full log: build/resume.out)\033[0m\n' "$$(grep -c 'ALTER TASK' build/resume.sql)" \
+	  || { printf '\033[0;31m✗ resume failed\033[0m\n'; cat build/resume.out; exit 1; }
+
+# Order is load bearing and the three steps are not independently useful:
+# suspend -> apply -> resume. Leaving any one out leaves the fleet either
+# half-applied or stopped, and stopped looks exactly like success.
+deploy: sync-apply tasks-suspend tasks-apply tasks-resume ## Sync registry + suspend, apply and resume Tasks
+	@echo "Deployed. Confirm every Task is running, because suspended looks like success:"
+	@echo "  snow sql --role $(PROD_ROLE) -q \"SHOW TASKS IN SCHEMA DLT_DB.OPS;\""
 
 ##@ Cleanup
 

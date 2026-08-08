@@ -40,6 +40,29 @@
 #     below the container starts, reaches dlt.secrets, and dies with a KeyError at
 #     09:00 UTC. The values come from the registry (`secret` / `env_var` fields) via
 #     generate_tasks.py, so the binding lives beside the pipeline it belongs to.
+#
+# WHY platformMonitor IS HERE, AND WHY ALL FIVE GROUPS
+#     Container logs reach the event table with no configuration at all, but METRICS
+#     do not: without the block at the bottom of this file the account collects zero
+#     rows of CPU, memory or container state. Verified by probe on 2026-08-08, which
+#     also confirmed platformMonitor is accepted by EXECUTE JOB SERVICE at all. The
+#     docs do not say either way, and the Prometheus-sidecar restriction that reads
+#     like a prohibition governs user-published metrics, a different mechanism.
+#
+#     All five groups are enabled deliberately, on the principle that collecting is
+#     cheap and re-running a fleet to add a group later is not. Downstream queries
+#     select what they need. Measured on a real pipeline run: storage emitted nothing
+#     and network one sample, while system and system_limits carried the useful part.
+#
+#     Do not expect per-run peaks from this. The scrape interval is about 30 seconds
+#     and runs are 53 to 130 seconds, so container.cpu.usage lands once or twice per
+#     run. The value is the trend across many runs, not the maximum within one, and
+#     any column built on it should be named accordingly.
+#
+#     THIS BLOCK IS A SPEC CHANGE AND NOT AN IMAGE CHANGE, which is why it can ship
+#     without a rebuild. It does still require the full suspend, tasks-apply, resume
+#     cycle, because the spec is inlined into every Task by generate_tasks.py rather
+#     than read from a stage at run time.
 spec:
   containers:
     - name: dlt
@@ -59,3 +82,11 @@ spec:
         - snowflakeSecret: {{ secret }}
           secretKeyRef: secret_string
           envVarName: {{ env_var }}
+  platformMonitor:
+    metricConfig:
+      groups:
+        - system
+        - system_limits
+        - status
+        - network
+        - storage

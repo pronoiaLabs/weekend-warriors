@@ -93,3 +93,11 @@ spec:
         - snowflakeSecret: {{ secret }}
           secretKeyRef: secret_string
           envVarName: {{ env_var }}
+  platformMonitor:
+    metricConfig:
+      groups:
+        - system
+        - system_limits
+        - status
+        - network
+        - storage

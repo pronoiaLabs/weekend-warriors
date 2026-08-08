@@ -96,6 +96,42 @@ def test_template_parses_as_jinja(filename: str) -> None:
     _env().parse((SPECS / filename).read_text())
 
 
+# The five SPCS platform metric groups. Enabled everywhere on purpose: collecting is
+# cheap, and adding a group later means re-applying every Task in the fleet.
+EXPECTED_METRIC_GROUPS = {"system", "system_limits", "status", "network", "storage"}
+
+
+@pytest.mark.parametrize("filename", sorted(EXPECTED_VARIABLES))
+def test_every_template_enables_platform_metrics(filename: str) -> None:
+    """platformMonitor must be present, complete, and a sibling of `containers`.
+
+    WITHOUT IT THE ACCOUNT COLLECTS ZERO METRIC ROWS AND NOTHING SAYS SO. Container
+    logs arrive with no configuration at all, so the absence looks exactly like a
+    working setup until someone queries for RECORD_TYPE = 'METRIC' and gets nothing.
+    That is how this went unnoticed until the design was already written against
+    metric names that were never being emitted.
+
+    The nesting matters as much as the presence. `platformMonitor` belongs under
+    `spec`, beside `containers`, NOT inside a container. Indented one level too far it
+    is silently ignored: the spec still parses, the job still runs, and no metric is
+    ever produced. Asserting on the parsed YAML rather than on the file text is what
+    makes that detectable here.
+    """
+    text = (SPECS / filename).read_text()
+    spec = yaml.safe_load(_env().from_string(text).render(**SUBSTITUTIONS))["spec"]
+
+    assert "platformMonitor" not in spec["containers"][0], (
+        f"{filename}: platformMonitor is nested inside the container, where it is "
+        f"ignored without error. It belongs under spec, beside containers."
+    )
+    groups = set(spec["platformMonitor"]["metricConfig"]["groups"])
+    assert groups == EXPECTED_METRIC_GROUPS, (
+        f"{filename}: metric groups are {sorted(groups)}, expected "
+        f"{sorted(EXPECTED_METRIC_GROUPS)}. Changing this set requires suspending, "
+        f"re-applying and resuming every Task, so it should be a deliberate edit."
+    )
+
+
 @pytest.mark.parametrize("filename", sorted(EXPECTED_VARIABLES))
 def test_rendered_template_is_valid_yaml_with_the_expected_shape(filename: str) -> None:
     text = (SPECS / filename).read_text()

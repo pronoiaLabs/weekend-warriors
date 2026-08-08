@@ -155,6 +155,55 @@ def test_tasks_are_emitted_suspended() -> None:
     assert "-- ALTER TASK" in sql, "resume must stay commented out"
 
 
+def test_suspend_and_resume_cover_the_same_pipelines_as_tasks() -> None:
+    """The three outputs must agree about which pipelines are Tasks.
+
+    They are applied as one sequence, suspend -> apply -> resume, so a pipeline present
+    in one and missing from another leaves the fleet half-stopped or half-applied. All
+    three gate on the same `spec.schedule`, and this asserts they still do.
+    """
+    from deploy.tasks.generate_tasks import resume_sql, suspend_sql  # noqa: PLC0415
+
+    scheduled = [s for s in load_registry().pipelines if s.schedule]
+    assert scheduled, "registry declares no scheduled pipelines"
+
+    for spec in scheduled:
+        assert f"dlt_task_{spec.name} SUSPEND" in suspend_sql(spec)
+        assert f"dlt_task_{spec.name} RESUME" in resume_sql(spec)
+        assert f"dlt_task_{spec.name}" in task_sql(spec)
+
+    # `sample` has no schedule and must appear in none of them.
+    unscheduled = [s for s in load_registry().pipelines if not s.schedule]
+    for spec in unscheduled:
+        assert "ALTER TASK" not in suspend_sql(spec)
+        assert "ALTER TASK" not in resume_sql(spec)
+
+
+def test_suspend_tolerates_a_task_that_does_not_exist_yet() -> None:
+    """`IF EXISTS` on suspend, and deliberately NOT on resume.
+
+    Suspend runs before tasks.sql, when a first deploy or a partially built fleet means
+    a Task legitimately may not exist; without IF EXISTS the pass aborts on the first
+    missing name and leaves the rest started, which is the exact problem it prevents.
+
+    Resume runs after tasks.sql created them, so a missing Task there means the apply
+    failed partway and the error is the only thing that would say so.
+    """
+    from deploy.tasks.generate_tasks import resume_sql, suspend_sql  # noqa: PLC0415
+
+    spec = next(s for s in load_registry().pipelines if s.schedule)
+    assert "ALTER TASK IF EXISTS" in suspend_sql(spec)
+    assert "IF EXISTS" not in resume_sql(spec)
+
+
+def test_suspend_and_resume_are_mutually_exclusive() -> None:
+    """Asking for both selects neither coherently, so argparse must reject the pair."""
+    from deploy.tasks.generate_tasks import main  # noqa: PLC0415
+
+    with pytest.raises(SystemExit):
+        main(["--suspend", "--resume"])
+
+
 def test_generator_covers_every_scheduled_pipeline() -> None:
     from deploy.tasks.generate_tasks import main  # noqa: PLC0415
 
