@@ -788,6 +788,270 @@ h1 {
   color: var(--ink-2);
 }
 
+/* ---- incident feed ---- */
+/* The feed is one column of prose-width articles rather than a grid, so it runs
+   narrower than the board pages. */
+.wrap.narrow {
+  max-width: 860px;
+}
+
+.day-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-5);
+  margin: 26px 0 10px;
+}
+
+.incident {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.incident.sev-missing {
+  border-left-color: var(--red);
+}
+
+.incident.sev-failure {
+  border-left-color: var(--red-lite);
+}
+
+/* A disagreement's strip is gray, not a lighter red: it is a finding. */
+.incident.sev-disagree {
+  border-left-color: var(--ink-4);
+}
+
+.incident.sev-missed {
+  border-style: solid;
+  border-left: 3px dashed var(--red);
+}
+
+.inc-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.sev {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.sev.missing {
+  background: var(--red);
+  border-color: var(--red);
+  color: #ffffff;
+}
+
+.sev.failure {
+  background: var(--red-wash);
+  border-color: var(--red-line);
+  color: var(--red-ink);
+}
+
+/* A disagreement is a finding, not a failure: never red. */
+.sev.disagree {
+  background: var(--line-soft);
+  border-color: var(--line-strong);
+  color: var(--ink-2);
+}
+
+.sev.missed {
+  background: var(--surface);
+  border: 1px dashed var(--red);
+  color: var(--red-ink);
+}
+
+.inc-top .pipe {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.inc-top .pipe:hover {
+  text-decoration: underline;
+}
+
+.inc-top .when {
+  font-size: 12px;
+  color: var(--ink-5);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.inc-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--ink-2);
+}
+
+.evidence {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.evidence .label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-5);
+  margin-bottom: 4px;
+}
+
+.evidence .label.gap {
+  margin-top: 10px;
+}
+
+.evidence code {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  word-break: break-word;
+}
+
+.evidence .src-note {
+  font-size: 11px;
+  color: var(--ink-5);
+  margin-top: 3px;
+}
+
+.slotstrip {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.slotstrip .slot {
+  width: 30px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.slotstrip .slot.cur {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.slotstrip .cap {
+  font-size: 11px;
+  color: var(--ink-4);
+  margin-left: 6px;
+}
+
+/* Named apart from the card's .verdicts so the two never inherit each other's
+   layout; both exist to keep TASK_STATE and DLT_STATUS from being merged. */
+.vpair {
+  display: flex;
+  gap: 10px;
+}
+
+.vpair .v {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.vpair.alarmed .v {
+  border-color: var(--red-line);
+  background: var(--red-wash);
+}
+
+.vpair .v.hatch {
+  background: var(--hatch);
+  border-color: var(--red-ink);
+}
+
+.vpair .v .src {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-5);
+}
+
+.vpair .v .val {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Text sitting on the hatch needs its own backing to stay legible, the same
+   trick the hatched timeline block uses. */
+.vpair .v.hatch .src,
+.vpair .v.hatch .val,
+.vpair .v.hatch .prov {
+  background: var(--surface);
+  border-radius: 2px;
+}
+
+.vpair .v .val.ok {
+  color: var(--ink-2);
+}
+
+.vpair .v .val.bad {
+  color: var(--red-ink);
+}
+
+.vpair .v .val.none {
+  color: var(--ink-4);
+}
+
+.vpair .v .prov {
+  font-size: 10px;
+  color: var(--ink-5);
+  margin-top: 2px;
+}
+
+.vpair .vs {
+  align-self: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-5);
+}
+
+.inc-foot {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.inc-foot a {
+  color: var(--ink-3);
+}
+
+.inc-foot span {
+  color: var(--ink-5);
+}
+
 .foot {
   margin-top: 28px;
   font-size: 12px;

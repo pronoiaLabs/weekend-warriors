@@ -1,4 +1,9 @@
-import type { IncidentCountsPayload, OverviewPayload, SportsPayload } from './types.ts'
+import type {
+  IncidentCountsPayload,
+  IncidentsPayload,
+  OverviewPayload,
+  SportsPayload,
+} from './types.ts'
 
 async function get<T>(
   path: string,
@@ -32,4 +37,14 @@ export function fetchIncidentCounts(
   signal?: AbortSignal,
 ): Promise<IncidentCountsPayload> {
   return get<IncidentCountsPayload>('/api/incidents', { sport, days: String(days) }, signal)
+}
+
+/** The whole feed, unfiltered by kind: the chip counts have to describe the
+    window rather than the current selection, so the kind filter stays local. */
+export function fetchIncidents(
+  sport: string,
+  days: number,
+  signal?: AbortSignal,
+): Promise<IncidentsPayload> {
+  return get<IncidentsPayload>('/api/incidents', { sport, days: String(days) }, signal)
 }

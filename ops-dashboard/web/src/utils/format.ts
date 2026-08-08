@@ -15,6 +15,12 @@ const MONTH_DAY = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
   timeZone: 'UTC',
 })
+const MONTH_DAY_YEAR = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
 
 export function hhmm(iso: string): string {
   return HHMM.format(new Date(iso))
@@ -38,6 +44,12 @@ export function shortDate(iso: string): string {
 /** "Saturday 2026-08-08" from a bare YYYY-MM-DD. */
 export function longDay(isoDate: string): string {
   return `${WEEKDAY_LONG.format(new Date(`${isoDate}T00:00:00Z`))} ${isoDate}`
+}
+
+/** "Saturday, Aug 8 2026" from a bare YYYY-MM-DD, the incident feed day header. */
+export function longDayTitle(isoDate: string): string {
+  const at = new Date(`${isoDate}T00:00:00Z`)
+  return `${WEEKDAY_LONG.format(at)}, ${MONTH_DAY_YEAR.format(at).replace(',', '')}`
 }
 
 export function num(value: number | null | undefined): string {
