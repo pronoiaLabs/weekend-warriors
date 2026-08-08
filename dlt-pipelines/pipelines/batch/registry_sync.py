@@ -77,24 +77,36 @@ WHEN MATCHED THEN UPDATE SET
     write_disposition = s.write_disposition,
     pipeline_group = s.pipeline_group,
     season_rollover_month = s.season_rollover_month,
+    secret = s.secret,
+    env_var = s.env_var,
+    external_access = s.external_access,
     config = s.config,
     updated_at = CURRENT_TIMESTAMP()
 WHEN NOT MATCHED THEN INSERT
     (name, source, schedule, target_database, dataset_name, write_disposition,
-     pipeline_group, season_rollover_month, config, enabled, updated_at)
+     pipeline_group, season_rollover_month, secret, env_var, external_access,
+     config, enabled, updated_at)
     VALUES
     (s.name, s.source, s.schedule, s.target_database, s.dataset_name,
-     s.write_disposition, s.pipeline_group, s.season_rollover_month, s.config,
+     s.write_disposition, s.pipeline_group, s.season_rollover_month, s.secret,
+     s.env_var, s.external_access, s.config,
      TRUE, CURRENT_TIMESTAMP())"""
 
 
 def _merge_header(vals: "list[str]") -> str:
-    """Build the MERGE ... USING(SELECT ...) header from 9 value tokens.
+    """Build the MERGE ... USING(SELECT ...) header from 12 value tokens.
 
     vals order: name, source, schedule, target_database, dataset_name,
-    write_disposition, pipeline_group, season_rollover_month, config. The
-    write_disposition and config tokens arrive already wrapped in PARSE_JSON(...) by the
-    caller, since both columns are VARIANT.
+    write_disposition, pipeline_group, season_rollover_month, secret, env_var,
+    external_access, config. The write_disposition and config tokens arrive already
+    wrapped in PARSE_JSON(...) by the caller, since both columns are VARIANT.
+
+    WHY secret / env_var / external_access ARE HERE AND NOT ONLY IN THE YAML.
+        Same reason as season_rollover_month: a container in SPCS builds its spec from
+        THIS TABLE, not from registries/*.yml, and `validate()` rejects a pipeline that
+        has a schedule but declares none of the three. Leaving them unsynced does not
+        fail the sync -- it fails every scheduled Task at run time, with a RegistryError
+        raised from spec_from_row before the pipeline does any work.
     """
     return (
         f"MERGE INTO {REGISTRY_TABLE} AS t\n"
@@ -107,14 +119,20 @@ def _merge_header(vals: "list[str]") -> str:
         f"    {vals[5]} AS write_disposition,\n"
         f"    {vals[6]} AS pipeline_group,\n"
         f"    {vals[7]} AS season_rollover_month,\n"
-        f"    {vals[8]} AS config\n"
+        f"    {vals[8]} AS secret,\n"
+        f"    {vals[9]} AS env_var,\n"
+        f"    {vals[10]} AS external_access,\n"
+        f"    {vals[11]} AS config\n"
     )
 
 
 # Parameterised MERGE for a single pipeline row. %s order must match _row_params().
 MERGE_SQL = (
     _merge_header(
-        ["%s", "%s", "%s", "%s", "%s", "PARSE_JSON(%s)", "%s", "%s", "PARSE_JSON(%s)"]
+        [
+            "%s", "%s", "%s", "%s", "%s", "PARSE_JSON(%s)", "%s", "%s",
+            "%s", "%s", "%s", "PARSE_JSON(%s)",
+        ]
     )
     + _MERGE_TAIL
 )
@@ -136,6 +154,9 @@ def _row_params(spec: PipelineSpec) -> tuple[Any, ...]:
         json.dumps(spec.write_disposition),
         spec.group,
         spec.season_rollover_month,
+        spec.secret,
+        spec.env_var,
+        spec.external_access,
         json.dumps(spec.config),
     )
 
@@ -176,6 +197,11 @@ def merge_sql_literal(spec: PipelineSpec) -> str:
         # Unquoted: the column is NUMBER, and validate() has already proved it is an
         # int 1-12, so there is nothing here for a quote to protect against.
         str(spec.season_rollover_month),
+        # NULL for an unscheduled pipeline. _sql_literal renders None as NULL, which is
+        # what `sample` needs: validate() only demands these three when a schedule is set.
+        _sql_literal(spec.secret),
+        _sql_literal(spec.env_var),
+        _sql_literal(spec.external_access),
         f"PARSE_JSON($${config_json}$$)",
     ]
     return _merge_header(vals) + _MERGE_TAIL + ";"

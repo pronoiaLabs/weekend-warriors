@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS DLT_DB.OPS.PIPELINE_REGISTRY (
     write_disposition VARIANT,
     pipeline_group    STRING,
     season_rollover_month NUMBER(2,0)   DEFAULT 8,
+    secret            STRING,
+    env_var           STRING,
+    external_access   STRING,
     config            VARIANT,
     enabled           BOOLEAN           DEFAULT TRUE,
     updated_at        TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP(),
@@ -69,13 +72,33 @@ COMMENT = 'Control-plane registry of dlt pipelines. Synced from pipelines/batch/
 -- The CREATE above is IF NOT EXISTS, so it is a no-op once the table exists and will
 -- NOT add a new column. This ALTER is what does it, and it is safe to re-run.
 --
--- Existing rows take the DEFAULT of 'DLT', which is the pre-change behaviour: every
+-- Existing rows are backfilled to 'DLT', which is the pre-change behaviour: every
 -- pipeline loaded into DLT_DEV_DB / DLT_PROD_DB. `make sync-apply` then overwrites
 -- each row with the stem from registries/*.yml. Until that sync runs, a container
 -- reading this table sends NFL data to the old shared database, so the ALTER and the
 -- sync belong in the same sitting.
+--
+-- WHY THE DEFAULT IS AN UPDATE RATHER THAN A DEFAULT CLAUSE, IN BOTH MIGRATIONS BELOW.
+--     `ADD COLUMN IF NOT EXISTS <col> <type>` is a clean no-op when the column is
+--     already there. Add `DEFAULT <value>` to it and Snowflake stops honouring the
+--     IF NOT EXISTS, raising `ambiguous column name '<COL>'` instead:
+--
+--         ALTER TABLE t ADD COLUMN IF NOT EXISTS b STRING;              -- no-op, fine
+--         ALTER TABLE t ADD COLUMN IF NOT EXISTS b STRING DEFAULT 'x';  -- 002028 error
+--
+--     So a DEFAULT here makes this file work exactly once per column and fail every run
+--     after, which breaks `make setup-base` for the whole account rather than for one
+--     statement. The column DEFAULT is not worth that: `registry_sync` binds every
+--     column on every MERGE, so nothing ever relies on it. The guarded UPDATE gives the
+--     one thing that did matter, backfilling rows that predate the column, and is itself
+--     a no-op on re-run. `ALTER COLUMN ... SET DEFAULT` is not an escape hatch either;
+--     Snowflake rejects it as an unsupported feature.
 ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
-    ADD COLUMN IF NOT EXISTS target_database STRING DEFAULT 'DLT';
+    ADD COLUMN IF NOT EXISTS target_database STRING;
+
+UPDATE DLT_DB.OPS.PIPELINE_REGISTRY
+    SET target_database = 'DLT'
+    WHERE target_database IS NULL;
 
 -- ADDING season_rollover_month TO AN ACCOUNT THAT ALREADY HAS THE TABLE.
 -- Same story as target_database above: the CREATE is a no-op once the table exists, so
@@ -89,10 +112,48 @@ ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
 -- last season while the current one is being played, and the API answers a stale season
 -- with data rather than an error.
 --
--- Existing rows take the DEFAULT of 8, which is the pre-change behaviour. `make
+-- Existing rows are backfilled to 8, which is the pre-change behaviour. `make
 -- sync-apply` then writes each pipeline's real value from its registry file.
+--
+-- The backfill is not cosmetic. `spec_from_row` in pipelines/batch/models.py reads this
+-- column through `int(...)`, so a NULL is a TypeError rather than a fallback, and a
+-- container that fires between this ALTER and the sync would die on it.
 ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
-    ADD COLUMN IF NOT EXISTS season_rollover_month NUMBER(2,0) DEFAULT 8;
+    ADD COLUMN IF NOT EXISTS season_rollover_month NUMBER(2,0);
+
+UPDATE DLT_DB.OPS.PIPELINE_REGISTRY
+    SET season_rollover_month = 8
+    WHERE season_rollover_month IS NULL;
+
+-- ADDING secret / env_var / external_access TO AN ACCOUNT THAT ALREADY HAS THE TABLE.
+--
+-- WHY THESE THREE ARE COLUMNS AND NOT ONLY YAML. A scheduled pipeline must record the
+-- Snowflake SECRET holding its credential, the env var that secret binds to, and the
+-- external access integration that gives the container egress. `validate()` refuses a
+-- `schedule` without all three, because a Task passes no arguments and the alternative
+-- is a container dying at 09:00 UTC with nobody watching.
+--
+-- generate_tasks.py reads registries/*.yml, so the Task DDL was always correct: the
+-- secret was bound and the EAI attached. The container is the problem. It rebuilds its
+-- spec from THIS TABLE (DLT_REGISTRY_SOURCE=auto), so with no columns to read it saw
+-- None for all three and raised RegistryError from spec_from_row before doing any work.
+-- Every scheduled Task failed that way, and the Task DDL looking right is exactly what
+-- made it hard to see.
+--
+-- NO BACKFILL, UNLIKE THE TWO MIGRATIONS ABOVE. There is no sensible account-wide
+-- default: the values are per source (DLT_DB.OPS.NFL_API_KEY against
+-- DLT_DB.OPS.WNBA_API_KEY, and one EAI per upstream host). Rows stay NULL until
+-- `make sync-apply` writes each pipeline's real values, so the ALTER and the sync
+-- belong in the same sitting. NULL is also correct and permanent for `sample`, which
+-- has no schedule and needs none of them.
+ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
+    ADD COLUMN IF NOT EXISTS secret STRING;
+
+ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
+    ADD COLUMN IF NOT EXISTS env_var STRING;
+
+ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
+    ADD COLUMN IF NOT EXISTS external_access STRING;
 
 -- MIGRATING AN ACCOUNT CREATED BEFORE write_disposition BECAME VARIANT.
 -- The CREATE above is IF NOT EXISTS, so re-running this file will NOT change the

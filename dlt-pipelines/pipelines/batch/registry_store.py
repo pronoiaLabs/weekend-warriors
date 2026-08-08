@@ -57,6 +57,30 @@ _log = logging.getLogger("dlt_pipeline")
 REGISTRY_TABLE = "DLT_DB.OPS.PIPELINE_REGISTRY"
 
 # Columns selected from the table; column order is irrelevant since we read by name.
+#
+# THIS TUPLE MUST LIST EVERY COLUMN spec_from_row READS, AND OMITTING ONE FAILS QUIETLY.
+#     An unselected column is simply absent from the row dict. spec_from_row then either
+#     substitutes the dataclass default, which is a wrong value that looks like a right
+#     one, or gets None and trips validate(). Neither failure names the SELECT list, and
+#     the registry table itself looks perfectly correct when you go and inspect it.
+#
+#     Both halves of that have already bitten:
+#
+#     season_rollover_month  Added to the table and to registry_sync for the WNBA, but
+#                            not here, so every container silently fell back to the NFL
+#                            default of 8. The two rules agree in August and diverge in
+#                            May, so it would have surfaced next spring as a season of
+#                            stale WNBA data loaded with no error at all.
+#
+#     secret / env_var /     Never columns at all until the migration that added them.
+#     external_access        Declared in registries/*.yml and correctly inlined into the
+#                            Task DDL by generate_tasks.py, which reads the YAML, so
+#                            everything looked right except the container, which rebuilt
+#                            its spec from the table, saw None, and raised RegistryError
+#                            on every scheduled pipeline of both sports at every fire.
+#
+#     tests/test_registry_config.py rebuilds a spec from a row containing ONLY these
+#     columns, so adding a field to PipelineSpec without adding it here now fails there.
 _COLUMNS = (
     "name",
     "source",
@@ -65,6 +89,10 @@ _COLUMNS = (
     "dataset_name",
     "write_disposition",
     "pipeline_group",
+    "season_rollover_month",
+    "secret",
+    "env_var",
+    "external_access",
     "config",
     "enabled",
 )

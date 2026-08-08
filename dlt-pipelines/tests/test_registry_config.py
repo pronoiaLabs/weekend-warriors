@@ -707,18 +707,93 @@ def test_merge_sql_and_row_params_align() -> None:
     # indices below when a column is added: this assertion exists to make that a
     # deliberate edit rather than a silently misaligned MERGE, where every value
     # after the new column would land in the wrong field.
-    assert MERGE_SQL.count("%s") == len(params) == 9
+    assert MERGE_SQL.count("%s") == len(params) == 12
     assert params[0] == "nfl_stats"
     assert params[3] == "DLT"                   # target_database (stem, not full name)
     assert params[4] == "RAW"                   # dataset_name
     assert params[6] == "batch_hourly"          # pipeline_group
     assert params[7] == 5                       # season_rollover_month
-    assert json.loads(params[8]) == {"credentials": "secret:x"}  # config JSON
+    # The three scheduling bindings. Unsynced, these are None inside SPCS and every
+    # scheduled Task dies in spec_from_row before doing any work, while the Task DDL
+    # still looks correct because generate_tasks.py reads the YAML rather than the table.
+    assert params[8] == "DLT_DB.OPS.NFL_API_KEY"   # secret
+    assert params[9] == "SOURCES__NFL__API_KEY"    # env_var
+    assert params[10] == "NFL_API_EAI"             # external_access
+    assert json.loads(params[11]) == {"credentials": "secret:x"}  # config JSON
     # config bind is wrapped in PARSE_JSON so VARIANT typing is correct.
     assert "PARSE_JSON(%s)" in MERGE_SQL
     assert "MERGE INTO DLT_DB.OPS.PIPELINE_REGISTRY" in MERGE_SQL
     # enabled is only set on INSERT, never on UPDATE (preserves manual disables).
     assert "enabled" not in MERGE_SQL.split("WHEN MATCHED")[1].split("WHEN NOT MATCHED")[0]
+
+
+def test_scheduled_spec_round_trips_through_the_registry_table() -> None:
+    """A row the sync writes must rebuild into a spec that validate() accepts.
+
+    THIS IS THE ASSERTION THAT WAS MISSING, and its absence cost a production outage.
+    secret / env_var / external_access were declared in registries/*.yml and were
+    correctly inlined into the generated Task DDL, so `make tasks-sql` looked right and
+    every existing test passed. They were simply never columns on PIPELINE_REGISTRY.
+
+    A container in SPCS does not read the YAML. It rebuilds its spec from the table, got
+    None for all three, and raised RegistryError from spec_from_row before doing any
+    work -- on every scheduled pipeline, of both sports, at every fire.
+
+    Asserting on the sync alone would not have caught it, nor would asserting on the
+    YAML. Only the round trip does, which is why this test walks the values out through
+    the MERGE and back in through spec_from_row rather than checking either half.
+    """
+    from pipelines.batch.registry_store import _COLUMNS  # noqa: PLC0415
+    from pipelines.batch.registry_sync import (  # noqa: PLC0415
+        _merge_header,
+        _row_params,
+    )
+
+    spec = PipelineSpec(
+        name="nfl_stats",
+        source="rest_api",
+        config={"credentials": "secret:x"},
+        schedule="0 10 * * *",
+        secret="DLT_DB.OPS.NFL_API_KEY",
+        env_var="SOURCES__NFL__API_KEY",
+        external_access="NFL_API_EAI",
+        group="batch_hourly",
+        season_rollover_month=5,
+    )
+
+    params = _row_params(spec)
+    # Take the column names from the MERGE's own SELECT aliases rather than repeating
+    # them here, so this breaks if the header and the bind order ever drift apart.
+    header = _merge_header([f"<{i}>" for i in range(len(params))])
+    # Only the SELECT-list lines, which are the ones carrying a placeholder token. The
+    # `MERGE INTO ... AS t` line also contains " AS " and is not a column.
+    written = [
+        line.split(" AS ")[1].rstrip(",")
+        for line in header.splitlines()
+        if " AS " in line and line.strip().startswith("<")
+    ]
+    assert len(written) == len(params), "MERGE header and bind values are misaligned"
+    row_written = dict(zip(written, params, strict=True))
+
+    # The store reads a fixed column list. `enabled` is the one column it selects but the
+    # MERGE only ever sets on INSERT, so it is not expected in row_written.
+    unwritten = [c for c in _COLUMNS if c not in row_written and c != "enabled"]
+    assert not unwritten, f"registry_store selects columns the sync never writes: {unwritten}"
+
+    # Simulate the actual SELECT: only _COLUMNS survives the trip back. A field that the
+    # sync writes but the store forgets to select disappears exactly here, which is the
+    # bug this test exists for.
+    row_read = {k: v for k, v in row_written.items() if k in _COLUMNS}
+    rebuilt = spec_from_row(row_read)  # raises RegistryError if a binding did not survive
+
+    assert rebuilt.secret == spec.secret
+    assert rebuilt.env_var == spec.env_var
+    assert rebuilt.external_access == spec.external_access
+    assert rebuilt.schedule == spec.schedule
+    # Not merely non-None: an unselected column silently becomes the dataclass default of
+    # 8, which is the NFL answer and would quietly give the WNBA a stale season each May.
+    assert rebuilt.season_rollover_month == 5
+    assert rebuilt.config == spec.config
 
 
 def test_prune_sql_placeholder_count() -> None:
