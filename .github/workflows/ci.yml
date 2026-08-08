@@ -60,8 +60,13 @@ jobs:
         #
         # Scoped to this step rather than the job so that a step which genuinely
         # should fail without a credential still does.
+        #
+        # ONE ENTRY PER SOURCE IN pipelines/batch/registries/. Adding a league without
+        # adding its key here fails the whole suite on ConfigFieldMissingException,
+        # which reads like a broken pipeline rather than a missing line in this file.
         env:
           SOURCES__NFL__API_KEY: ci-dummy-not-a-real-key
+          SOURCES__WNBA__API_KEY: ci-dummy-not-a-real-key
         run: pytest -q
 
       # Render the Task DDL and the resume statements. generate_tasks raises on any

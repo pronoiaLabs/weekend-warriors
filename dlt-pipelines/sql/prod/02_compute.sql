@@ -29,11 +29,28 @@ USE ROLE SYSADMIN;
 -- ---------------------------------------------------------------------------
 CREATE COMPUTE POOL IF NOT EXISTS DLT_POOL
     MIN_NODES          = 1
-    MAX_NODES          = 3
+    MAX_NODES          = 10
     INSTANCE_FAMILY    = CPU_X64_S
     AUTO_SUSPEND_SECS  = 300
     AUTO_RESUME        = TRUE
     COMMENT            = 'Production SPCS compute pool for dlt job services. CPU_X64_S (2 vCPU / 8 GiB).';
+
+-- WIDENING AN ACCOUNT THAT ALREADY HAS THE POOL.
+-- CREATE COMPUTE POOL IF NOT EXISTS above is a NO-OP once the pool exists, so editing
+-- MAX_NODES up there changes nothing on an account that has already run this file. This
+-- ALTER is what does it, and it is safe to re-run. Same pattern as the ALTER TABLE in
+-- sql/base/03_registry.sql, and for the same reason.
+--
+-- MAX_NODES IS A CEILING, NOT A RESERVATION. Billing is per node that is actually
+-- running: raising the maximum costs nothing while the pool is idle, and the pool
+-- suspends entirely after AUTO_SUSPEND_SECS. MIN_NODES is the property that holds warm
+-- capacity, which is why it stays at 1.
+--
+-- 3 was sized for one sport. Each additional league adds roughly ten scheduled Tasks,
+-- and staggering them one per hour runs out of hours long before the work runs out. A
+-- job that cannot get a node waits rather than failing, so the symptom of leaving this
+-- at 3 would be Tasks quietly finishing late, which is harder to notice than an error.
+ALTER COMPUTE POOL DLT_POOL SET MAX_NODES = 10;
 
 GRANT USAGE   ON COMPUTE POOL DLT_POOL TO ROLE DLT_LOADER_ROLE;
 GRANT MONITOR ON COMPUTE POOL DLT_POOL TO ROLE DLT_LOADER_ROLE;

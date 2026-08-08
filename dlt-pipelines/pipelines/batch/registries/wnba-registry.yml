@@ -1,0 +1,500 @@
+# WNBA pipelines, loaded from the BallDontLie WNBA API.
+#
+# Every file in this directory is merged into one registry, so pipeline names must be
+# unique across ALL of them, not just within this file. `defaults:` below applies only
+# to this file's pipelines, which is what keeps a per-source file self-contained.
+#
+# SECRETS ARE NEVER STORED HERE. A `secret:<path>` value points at a key in
+# .dlt/secrets.toml (or a Snowflake SECRET bound to an env var); see the client block.
+#
+# ---------------------------------------------------------------------------
+# READ THIS BEFORE COPYING ANYTHING FROM nfl-registry.yml.
+#
+# Same vendor, same host, same auth, different sport. The shapes diverge in ways that
+# do not raise errors, and every claim below was confirmed against the live API rather
+# than read off the OpenAPI spec, which is wrong in at least one place (`/odds`
+# documents `dates` and the API rejects it, demanding `dates[]`).
+#
+#   1. season_type has THREE incompatible encodings here and none match the NFL's.
+#      String `regular|playoffs` on the advanced and shot-location endpoints; integer
+#      2|3 on the two *_season_stats endpoints; a free-form string on /games. The NFL
+#      uses integer 1|2|3 everywhere. Sending one encoding globally would break roughly
+#      half the endpoints, so this file sets season_type ONLY where it is genuinely
+#      needed and otherwise takes the API default.
+#
+#   2. Bracket suffixes differ from the NFL's, and inconsistently. WNBA /team_stats
+#      wants `team_ids[]` where the NFL wants a bare `team_ids`. A wrong suffix does
+#      NOT error: the parameter is ignored and you silently get unfiltered results,
+#      which looks like a working pipeline returning too much data.
+#
+#   3. /standings takes NO season and returns all 19 seasons (2008 to 2026, 235 rows)
+#      in a single unpaginated request. The NFL REQUIRES season and 400s without it. So
+#      the {current_season} token that the NFL standings pipeline depends on is
+#      deliberately absent here.
+#
+#   4. /plays returns a bare {data: [...]} with no `meta` envelope, no cursor and no
+#      per_page. The NFL's plays endpoint paginates. Pointing the cursor paginator at
+#      this one gives it nothing to read.
+#
+#   5. Field renames on shared concepts: `city` not `location`, `home_score` not
+#      `home_team_score`, no `week` at all, no `experience` on a player, and
+#      `turnover` singular on player stats against `turnovers` plural on team stats.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Anchors only.
+#
+# load_registry reads `defaults` and `pipelines` from the top level and ignores
+# anything else, so this key never reaches a PipelineSpec. pyyaml expands the alias at
+# parse time, which means the registry table and the task generator both receive a
+# fully expanded copy; nothing downstream has to understand anchors.
+#
+# On auth: BallDontLie wants the raw key in an `Authorization` header with no scheme
+# prefix. dlt's `auth: {token: ...}` shorthand would send "Authorization: Bearer <key>",
+# so use the explicit api_key form.
+#
+# On the paginator: `single_page` is the client-wide default because several endpoints
+# here (/teams, /standings, /plays) return a bare `data` array with no `meta` object at
+# all. Paginated resources override it, which keeps the unusual case local to the
+# resource that is unusual. That is a heavier default than the NFL file needed, where
+# only /teams was unpaginated.
+# ---------------------------------------------------------------------------
+anchors:
+  wnba_client: &wnba_client
+    base_url: "https://api.balldontlie.io/wnba/v1/"
+    auth:
+      # resolved from .dlt/secrets.toml -> [sources.wnba] api_key = "..."
+      # env var equivalent: SOURCES__WNBA__API_KEY
+      type: api_key
+      name: Authorization
+      location: header
+      api_key: "secret:sources.wnba.api_key"
+    paginator: single_page
+
+  # Cursor paginator, repeated on every resource that actually paginates. per_page maxes
+  # at 100 here and the API default is 25, so omitting it quadruples the request count
+  # for the same data.
+  wnba_cursor: &wnba_cursor
+    type: cursor
+    cursor_path: meta.next_cursor
+    cursor_param: cursor
+
+# `write_disposition` is deliberately NOT set here. dlt applies a pipeline-level
+# disposition to EVERY resource in a source, overwriting anything a resource declares,
+# which would make a mixed pipeline impossible.
+#
+# `season_rollover_month: 5` IS THE ONE FIELD THAT MUST NOT BE COPIED FROM THE NFL.
+# It feeds the {current_season} token. The WNBA plays May to September inside a single
+# calendar year; the NFL opens in August and runs into February. Under the NFL's rule of
+# 8, every WNBA load in May, June and July would resolve to LAST season while the
+# current one is being played, and the API answers a stale season with data rather than
+# an error. The two rules agree in August, which is exactly why leaving this at the
+# default would look correct on the day it was written and break the following spring.
+defaults:
+  destination: snowflake
+  database: WNBA              # -> WNBA_DEV_DB / WNBA_PROD_DB
+  dataset_name: RAW           # target Snowflake schema inside that database
+  group: wnba                 # selects the whole sport: make run-local GROUP=wnba
+  season_rollover_month: 5    # WNBA 2026 ran 8 May to 24 Sep. See models.current_season.
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  secret: DLT_DB.OPS.WNBA_API_KEY     # Snowflake SECRET holding the API key
+  env_var: SOURCES__WNBA__API_KEY     # matches `secret:sources.wnba.api_key` above
+  external_access: WNBA_API_EAI       # egress to api.balldontlie.io
+
+# Schedules are staggered one pipeline per hour and avoid the NFL's occupied slots
+# (08:00 to 13:00, and 22:00 UTC). DLT_POOL now allows 10 nodes so this is no longer a
+# capacity constraint, but one pipeline per hour keeps a failed run trivial to attribute
+# and keeps SHOW SERVICES readable.
+#
+# Note the WNBA offseason: from October to April the daily pipelines still fire and find
+# nothing new. Cheap no-ops rather than errors, and nothing suspends them.
+pipelines:
+
+  # --- Reference data: teams + players -------------------------------------
+  # Slow-changing entities everything else joins against. Bundled because they share a
+  # cadence and are both small; that is the only reason to bundle resources.
+  #
+  # No season token: both are current state, not seasonal. A player's `team` is their
+  # CURRENT team, which is why per-game affiliation has to come off the facts instead.
+  - name: wnba_reference
+    source: rest_api
+    schedule: "0 14 * * *"
+    config:
+      client: *wnba_client
+      resource_defaults:
+        endpoint:
+          data_selector: data
+      resources:
+        # 35 rows, which is more than the active franchises: the API carries historical
+        # and all-star entries too. Small enough that a full replace beats reasoning
+        # about what changed.
+        - name: teams
+          write_disposition: replace
+          endpoint:
+            path: teams
+
+        - name: players
+          primary_key: id
+          write_disposition: merge
+          endpoint:
+            path: players
+            paginator: *wnba_cursor
+            params:
+              per_page: 100
+
+  # --- Games ----------------------------------------------------------------
+  # Daily, because scores land the same day. ONE resource, unlike the NFL's three: the
+  # WNBA expresses postseason as a boolean ON THE RECORD rather than as a request
+  # parameter with three values, so there is nothing to fan out over. /games does accept
+  # a season_type string, but it is unenumerated in the spec and omitting it returns
+  # everything.
+  - name: wnba_games
+    source: rest_api
+    schedule: "0 15 * * *"
+    config:
+      client: *wnba_client
+      resources:
+        - name: games
+          primary_key: id
+          write_disposition: merge
+          endpoint:
+            path: games
+            data_selector: data
+            paginator: *wnba_cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+
+  # --- Box scores: player and team ------------------------------------------
+  # Daily, after games. Neither record carries an `id`, hence composite keys.
+  #
+  # WORTH KNOWING BEFORE MODELLING THESE: they embed a REDUCED game, only
+  # {id, date, season}, where the NFL embeds the full game including both nested teams.
+  # So there is no game__home_team__id here, and anything needing it joins to `games`.
+  - name: wnba_stats
+    source: rest_api
+    schedule: "0 16 * * *"
+    config:
+      client: *wnba_client
+      resource_defaults:
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator: *wnba_cursor
+          params:
+            per_page: 100
+            seasons[]: "{current_season}"
+      resources:
+        - name: player_stats
+          primary_key: [player__id, game__id]
+          endpoint:
+            path: player_stats
+
+        - name: team_stats
+          primary_key: [team__id, game__id]
+          endpoint:
+            path: team_stats
+
+  # --- Play by play ---------------------------------------------------------
+  # Weekly, and the only expensive pipeline here: one request per game, roughly 333
+  # games and 404 plays per game for a full season.
+  #
+  # SIMPLER THAN THE NFL EQUIVALENT, and worth understanding why. The NFL needs three
+  # parent/child pairs because its /plays takes a season_type that must match its
+  # parent's, and a mismatch is silent. WNBA /plays takes `game_id` and NOTHING else:
+  # no season_type, no cursor, no per_page. So one parent, one child.
+  #
+  # The parent is `selected: false`: it exists only to yield game ids and is never
+  # loaded. The season filter belongs on the parent, since the child is already scoped
+  # by the game it was handed.
+  - name: wnba_plays
+    source: rest_api
+    schedule: "0 17 * * 2"
+    config:
+      client: *wnba_client
+      resources:
+        - name: games_ref
+          selected: false
+          endpoint:
+            path: games
+            data_selector: data
+            paginator: *wnba_cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+
+        # A play has no `id` of its own. `order` is documented as starting at 1 and
+        # incrementing sequentially within a game, so (game_id, order) is the grain.
+        #
+        # ORDER IS A RESERVED WORD in Snowflake. dlt quotes identifiers on this
+        # destination so it lands as an ordinary column, but hand-written SQL against
+        # it needs quoting.
+        #
+        # No paginator override: the client default of single_page is already right,
+        # because this endpoint returns a bare {data: [...]} with no meta at all.
+        - name: plays
+          primary_key: [game_id, order]
+          write_disposition: merge
+          endpoint:
+            path: plays
+            data_selector: data
+            params:
+              game_id: "{resources.games_ref.id}"
+
+  # --- Standings ------------------------------------------------------------
+  # NO SEASON PARAMETER, DELIBERATELY. Unlike the NFL, where /standings 400s without
+  # one, this endpoint returns every season it has (2008 to 2026) in a single
+  # unpaginated request. Asking for one season would discard 18 others that came free.
+  #
+  # scd2 with merge_key: season, matching the NFL. Without a merge_key dlt treats every
+  # load as a full extract and retires anything absent from it; naming `season` switches
+  # it to partition mode, so each season is only compared against itself. Since every
+  # run returns every season, each partition genuinely IS fully extracted, which is the
+  # condition partition mode assumes.
+  - name: wnba_standings
+    source: rest_api
+    schedule: "0 18 * * 2"
+    config:
+      client: *wnba_client
+      resources:
+        - name: standings
+          merge_key: season
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          endpoint:
+            path: standings
+            data_selector: data
+
+  # --- Season aggregates ----------------------------------------------------
+  # Season-to-date averages, recomputed by the API as games are played, so weekly is
+  # enough. `season` here is SINGULAR, not the `seasons[]` array the game-grain
+  # endpoints take.
+  #
+  # A traded player gets one row per team, which is why team__id is in the key.
+  # season_type is left unset: on THESE two endpoints it is an integer (2 regular, 3
+  # playoffs) rather than the string the advanced endpoints want, and the API default
+  # covers the common case.
+  - name: wnba_season_stats
+    source: rest_api
+    schedule: "0 19 * * 2"
+    config:
+      client: *wnba_client
+      resource_defaults:
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator: *wnba_cursor
+          params:
+            per_page: 100
+            season: "{current_season}"
+      resources:
+        - name: player_season_stats
+          primary_key: [player__id, season, season_type, team__id]
+          endpoint:
+            path: player_season_stats
+
+        - name: team_season_stats
+          primary_key: [team__id, season, season_type]
+          endpoint:
+            path: team_season_stats
+
+  # --- Advanced stats, game grain -------------------------------------------
+  # ONE RESOURCE EACH, NOT A measure_type FAN-OUT. These two endpoints accept a
+  # measure_type parameter and then ignore it: every value returns the same 5 stat keys
+  # and the response echoes measure_type back as null. Verified across all 8 values.
+  # Fanning out would multiply the request count for identical data.
+  - name: wnba_advanced_game
+    source: rest_api
+    schedule: "0 20 * * 2"
+    config:
+      client: *wnba_client
+      resource_defaults:
+        primary_key: id
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator: *wnba_cursor
+          params:
+            per_page: 100
+            seasons[]: "{current_season}"
+      resources:
+        - name: player_game_advanced_stats
+          endpoint:
+            path: player_game_advanced_stats
+
+        - name: team_game_advanced_stats
+          endpoint:
+            path: team_game_advanced_stats
+
+  # --- Advanced stats, season grain -----------------------------------------
+  # ONE TABLE PER measure_type, and this is the significant modelling decision here.
+  #
+  # Each of these endpoints returns its metrics inside a free-form `stats` object that
+  # the spec declares as additionalProperties with no typing, and the key set changes
+  # with measure_type. Measured: player advanced 74 keys, misc 38, scoring 48, usage 48,
+  # defense 38. Unioning them into one table keyed by measure_type gives roughly 185
+  # columns at about 75% null per row. Separate resources give dense, readable tables
+  # that dbt joins on (player__id, season, season_type).
+  #
+  # PLAYER AND TEAM SUPPORT DIFFERENT measure_types. This is neither symmetric nor
+  # documented. Verified by probe, where "0 rows" means the API returns an empty list
+  # rather than an error:
+  #
+  #     measure_type    player   team
+  #     advanced          74      44
+  #     misc              38     0 rows
+  #     scoring           48     0 rows
+  #     usage             48     0 rows
+  #     defense           38     0 rows
+  #     four_factors    0 rows    26
+  #     opponent        0 rows    52
+  #     base            0 rows   0 rows
+  #
+  # Assuming symmetry would create permanently empty tables that look like broken
+  # pipelines. Only the combinations that return data are declared.
+  #
+  # `season` is REQUIRED on these four endpoints, which 400 without it. That is what
+  # makes the {current_season} token load-bearing here rather than a convenience.
+  #
+  # per_mode and scope are pinned to their API defaults (totals, general). Crossing them
+  # in would turn 8 tables into 32 for marginal value; per_game and clutch stay
+  # reachable with `--param`.
+  #
+  # `id` is safe as a merge key: verified globally unique, with zero overlap either
+  # across seasons or across measure_types.
+  #
+  # Every resource repeats `endpoint.path` because the resource name is the table name
+  # and differs from the path. dlt fills a missing path with the RESOURCE name, which
+  # here would 404.
+  - name: wnba_advanced_season
+    source: rest_api
+    schedule: "0 21 * * 2"
+    config:
+      client: *wnba_client
+      resource_defaults:
+        primary_key: id
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator: *wnba_cursor
+          params:
+            per_page: 100
+            season: "{current_season}"
+      resources:
+        - name: player_season_advanced
+          endpoint:
+            path: player_season_advanced_stats
+            params:
+              measure_type: advanced
+        - name: player_season_misc
+          endpoint:
+            path: player_season_advanced_stats
+            params:
+              measure_type: misc
+        - name: player_season_scoring
+          endpoint:
+            path: player_season_advanced_stats
+            params:
+              measure_type: scoring
+        - name: player_season_usage
+          endpoint:
+            path: player_season_advanced_stats
+            params:
+              measure_type: usage
+        - name: player_season_defense
+          endpoint:
+            path: player_season_advanced_stats
+            params:
+              measure_type: defense
+
+        - name: team_season_advanced
+          endpoint:
+            path: team_season_advanced_stats
+            params:
+              measure_type: advanced
+        - name: team_season_four_factors
+          endpoint:
+            path: team_season_advanced_stats
+            params:
+              measure_type: four_factors
+        - name: team_season_opponent
+          endpoint:
+            path: team_season_advanced_stats
+            params:
+              measure_type: opponent
+
+  # --- Shot locations -------------------------------------------------------
+  # A basketball concept with no NFL analogue. `season` is REQUIRED here too.
+  #
+  # The payload is `stats.shot_zones`, a DICT of 8 zones each holding {fga, fgm,
+  # fg_pct}. Being a dict rather than a list, dlt flattens it into columns
+  # (stats__shot_zones__corner_3__fga and so on) rather than spawning a child table.
+  #
+  # by_zone and 5ft_range are split into separate tables because they use entirely
+  # different zone names, so one table would be the sparse union of both.
+  - name: wnba_shot_locations
+    source: rest_api
+    schedule: "0 1 * * 3"
+    config:
+      client: *wnba_client
+      resource_defaults:
+        primary_key: id
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator: *wnba_cursor
+          params:
+            per_page: 100
+            season: "{current_season}"
+      resources:
+        - name: player_shots_by_zone
+          endpoint:
+            path: player_shot_locations
+            params:
+              distance_range: by_zone
+        - name: player_shots_5ft
+          endpoint:
+            path: player_shot_locations
+            params:
+              distance_range: 5ft_range
+
+        - name: team_shots_by_zone
+          endpoint:
+            path: team_shot_locations
+            params:
+              distance_range: by_zone
+        - name: team_shots_5ft
+          endpoint:
+            path: team_shot_locations
+            params:
+              distance_range: 5ft_range
+
+  # --- Injuries -------------------------------------------------------------
+  # Daily, and the only pipeline here whose history cannot be reconstructed. The
+  # endpoint answers "who is hurt right now" and keeps no archive, so a status not
+  # captured while it was true is gone permanently.
+  #
+  # scd2 with NO merge_key, deliberately, and the opposite of the standings choice
+  # above. Every run extracts the COMPLETE current list, so full-extract mode is
+  # correct: when a player drops off the list, dlt stamps _dlt_valid_to on their row.
+  # That timestamp IS the recovery date, which the API never states directly.
+  #
+  # No season token: this endpoint has no season parameter at all.
+  - name: wnba_injuries
+    source: rest_api
+    schedule: "0 23 * * *"
+    config:
+      client: *wnba_client
+      resources:
+        - name: player_injuries
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          endpoint:
+            path: player_injuries
+            data_selector: data
+            paginator: *wnba_cursor
+            params:
+              per_page: 100

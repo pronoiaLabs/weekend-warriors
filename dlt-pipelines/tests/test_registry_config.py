@@ -102,6 +102,46 @@ def test_real_registry_sends_every_nfl_pipeline_to_the_nfl_databases():
         )
 
 
+def test_real_registry_sends_every_wnba_pipeline_to_the_wnba_databases():
+    """The twin of the NFL check, and the point of the whole database-stem design.
+
+    One sport landing in another's database is not a crash: dlt would create the tables
+    and load them, and the mistake would only surface as an NFL warehouse that somehow
+    contains basketball.
+    """
+    registry = load_registry()
+    wnba = [s for s in registry.pipelines if s.name.startswith("wnba_")]
+    assert wnba, "expected the WNBA pipelines to be present"
+
+    for spec in wnba:
+        assert resolve_database(spec, "DEV") == "WNBA_DEV_DB"
+        assert resolve_database(spec, "PROD") == "WNBA_PROD_DB"
+        assert spec.dataset_name == "RAW"
+        # The rollover is what makes {current_season} right for this sport. Inheriting
+        # the default of 8 would resolve May, June and July to the previous season
+        # while the current one is being played.
+        assert spec.season_rollover_month == 5, (
+            f"{spec.name}: WNBA seasons open in May, not August"
+        )
+
+
+def test_each_source_declares_one_rollover_month() -> None:
+    """A league whose pipelines disagree about its own season boundary.
+
+    Nothing downstream would notice: each pipeline resolves its own token, so the
+    symptom is one table holding 2026 while its neighbour holds 2027, which reads like
+    a load failure rather than a config error.
+    """
+    by_source: dict[str, set[int]] = {}
+    for spec in load_registry().pipelines:
+        by_source.setdefault(spec.name.split("_", 1)[0], set()).add(
+            spec.season_rollover_month
+        )
+
+    for source, months in by_source.items():
+        assert len(months) == 1, f"{source}: conflicting rollover months {months}"
+
+
 def test_real_registry_leaves_sample_in_the_shared_databases():
     # sample is the credential-free smoke test. It must not depend on any sport's
     # database existing, or a broken sport would take the smoke test down with it.
@@ -129,14 +169,51 @@ def test_real_registry_leaves_sample_in_the_shared_databases():
     ],
 )
 def test_current_season_rolls_over_on_1_august(day, expected) -> None:
-    assert current_season(day) == expected
+    assert current_season(today=day) == expected
 
 
 def test_current_season_does_not_roll_over_at_the_super_bowl() -> None:
     # The tempting alternative. It would make every February-to-July load ask for a
     # season that has not been played, and the API answers that with an empty list
     # rather than an error, so the run would look fine and load nothing.
-    assert current_season(date(2027, 3, 1)) == 2026
+    assert current_season(today=date(2027, 3, 1)) == 2026
+
+
+@pytest.mark.parametrize(
+    "day, expected",
+    [
+        (date(2027, 4, 30), 2026),   # offseason: last COMPLETED season
+        (date(2027, 5, 1), 2027),    # rollover, the season opens this month
+        (date(2027, 9, 24), 2027),   # final day of the regular season
+        (date(2027, 12, 25), 2027),  # deep offseason, still the 2027 season
+        (date(2028, 1, 10), 2027),   # new calendar year, season unchanged
+        (date(2028, 4, 30), 2027),   # right up to the next rollover
+    ],
+)
+def test_wnba_season_rolls_over_on_1_may(day, expected) -> None:
+    """The WNBA plays May to September inside ONE calendar year.
+
+    Under the NFL's rollover of 8, every date from May to July resolves to the previous
+    season while the current one is being played. That is not a crash: the API answers
+    a stale season with real data, so the load succeeds and holds the wrong year.
+    """
+    assert current_season(5, today=day) == expected
+
+
+def test_the_two_sports_agree_in_august_which_is_why_this_needed_a_test() -> None:
+    """Why a shared constant would have shipped looking correct.
+
+    This work was done in August 2026, when both rules give 2026. Any smoke test written
+    on the day would have passed with the rollover hardcoded to 8, and the WNBA
+    pipelines would have started loading the wrong season the following May.
+    """
+    august = date(2026, 8, 2)
+    assert current_season(8, today=august) == current_season(5, today=august) == 2026
+
+    # ...and here is where they part company.
+    may = date(2027, 5, 15)
+    assert current_season(8, today=may) == 2026
+    assert current_season(5, today=may) == 2027
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +231,29 @@ def test_scheduled_pipeline_without_bindings_is_rejected() -> None:
 def test_unscheduled_pipeline_needs_no_bindings() -> None:
     # `sample` is exactly this: no schedule, no secret, no egress.
     _spec().validate()
+
+
+@pytest.mark.parametrize("month", [0, 13, -1, 8.5, "8", None, True])
+def test_rollover_month_outside_1_to_12_is_rejected(month) -> None:
+    """A bad rollover month produces a wrong YEAR, not an error, so validate() must.
+
+    current_season compares `day.month >= rollover_month`. A 0 makes every date resolve
+    to the current calendar year and a 13 makes every date resolve to the previous one.
+    Both are plausible years the API accepts, so the load succeeds and quietly holds the
+    wrong season.
+
+    True is in the list because bool subclasses int in Python, so `1 <= True <= 12`
+    passes on its own and a stray `season_rollover_month: yes` in YAML would be read as
+    January.
+    """
+    with pytest.raises(RegistryError) as exc:
+        _spec(season_rollover_month=month).validate()
+    assert "season_rollover_month" in str(exc.value)
+
+
+@pytest.mark.parametrize("month", [1, 5, 8, 12])
+def test_valid_rollover_months_are_accepted(month) -> None:
+    _spec(season_rollover_month=month).validate()
 
 
 def test_real_registry_every_scheduled_pipeline_can_actually_run() -> None:
@@ -216,6 +316,15 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_standings": 1,      # the resource itself
         "nfl_advanced_stats": 1, # once, in resource_defaults
         "nfl_plays": 3,          # the three parents that drive the fan-out
+        # WNBA. Fewer tokens than the NFL for the same coverage, because /plays takes
+        # no season_type and so needs one parent instead of three.
+        "wnba_games": 1,             # once, in resource_defaults
+        "wnba_stats": 1,             # once, in resource_defaults
+        "wnba_season_stats": 1,      # once, in resource_defaults
+        "wnba_advanced_game": 1,     # once, in resource_defaults
+        "wnba_advanced_season": 1,   # once, in resource_defaults, all 8 measure_types
+        "wnba_shot_locations": 1,    # once, in resource_defaults
+        "wnba_plays": 1,             # the single parent driving the fan-out
     }
     for name, count in expected.items():
         values = season_params(registry.get(name).config)
@@ -223,11 +332,32 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
             f"{name}: expected {count} season token(s), got {values}"
         )
 
+    # Nothing season-scoped may be left out of the dict above. Without this, adding a
+    # pipeline that needs a season and forgetting to list it here passes silently,
+    # which is the exact failure the dict is meant to catch.
+    checked = set(expected) | {
+        "nfl_reference", "nfl_injuries",
+        "wnba_reference", "wnba_injuries", "wnba_standings",
+        "sample",
+    }
+    assert {s.name for s in registry.pipelines} == checked, (
+        "a pipeline is neither asserted to carry a season token nor asserted to have "
+        "none. Add it to `expected` or to the no-token test below."
+    )
+
 
 def test_pipelines_with_no_season_have_no_token() -> None:
     # teams, players and injuries are current state, not seasonal. A season filter on
     # them would not narrow anything; it would just be a param the API ignores.
-    for name in ("nfl_reference", "nfl_injuries"):
+    #
+    # wnba_standings is the interesting one and NOT an oversight. Unlike the NFL's,
+    # this endpoint takes no season at all and returns every season it holds (2008 to
+    # 2026) in one unpaginated request, so a token would throw away 18 seasons that
+    # came free.
+    for name in (
+        "nfl_reference", "nfl_injuries",
+        "wnba_reference", "wnba_injuries", "wnba_standings",
+    ):
         assert "{current_season}" not in json.dumps(load_registry().get(name).config)
 
 
@@ -569,6 +699,7 @@ def test_merge_sql_and_row_params_align() -> None:
         env_var="SOURCES__NFL__API_KEY",
         external_access="NFL_API_EAI",
         group="batch_hourly",
+        season_rollover_month=5,
     )
     params = _row_params(spec)
 
@@ -576,12 +707,13 @@ def test_merge_sql_and_row_params_align() -> None:
     # indices below when a column is added: this assertion exists to make that a
     # deliberate edit rather than a silently misaligned MERGE, where every value
     # after the new column would land in the wrong field.
-    assert MERGE_SQL.count("%s") == len(params) == 8
+    assert MERGE_SQL.count("%s") == len(params) == 9
     assert params[0] == "nfl_stats"
     assert params[3] == "DLT"                   # target_database (stem, not full name)
     assert params[4] == "RAW"                   # dataset_name
     assert params[6] == "batch_hourly"          # pipeline_group
-    assert json.loads(params[7]) == {"credentials": "secret:x"}  # config JSON
+    assert params[7] == 5                       # season_rollover_month
+    assert json.loads(params[8]) == {"credentials": "secret:x"}  # config JSON
     # config bind is wrapped in PARSE_JSON so VARIANT typing is correct.
     assert "PARSE_JSON(%s)" in MERGE_SQL
     assert "MERGE INTO DLT_DB.OPS.PIPELINE_REGISTRY" in MERGE_SQL

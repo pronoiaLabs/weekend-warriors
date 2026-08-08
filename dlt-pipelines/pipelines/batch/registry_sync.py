@@ -76,23 +76,25 @@ WHEN MATCHED THEN UPDATE SET
     dataset_name = s.dataset_name,
     write_disposition = s.write_disposition,
     pipeline_group = s.pipeline_group,
+    season_rollover_month = s.season_rollover_month,
     config = s.config,
     updated_at = CURRENT_TIMESTAMP()
 WHEN NOT MATCHED THEN INSERT
     (name, source, schedule, target_database, dataset_name, write_disposition,
-     pipeline_group, config, enabled, updated_at)
+     pipeline_group, season_rollover_month, config, enabled, updated_at)
     VALUES
     (s.name, s.source, s.schedule, s.target_database, s.dataset_name,
-     s.write_disposition, s.pipeline_group, s.config, TRUE, CURRENT_TIMESTAMP())"""
+     s.write_disposition, s.pipeline_group, s.season_rollover_month, s.config,
+     TRUE, CURRENT_TIMESTAMP())"""
 
 
 def _merge_header(vals: "list[str]") -> str:
-    """Build the MERGE ... USING(SELECT ...) header from 8 value tokens.
+    """Build the MERGE ... USING(SELECT ...) header from 9 value tokens.
 
     vals order: name, source, schedule, target_database, dataset_name,
-    write_disposition, pipeline_group, config. The write_disposition and config tokens
-    arrive already wrapped in PARSE_JSON(...) by the caller, since both columns are
-    VARIANT.
+    write_disposition, pipeline_group, season_rollover_month, config. The
+    write_disposition and config tokens arrive already wrapped in PARSE_JSON(...) by the
+    caller, since both columns are VARIANT.
     """
     return (
         f"MERGE INTO {REGISTRY_TABLE} AS t\n"
@@ -104,14 +106,15 @@ def _merge_header(vals: "list[str]") -> str:
         f"    {vals[4]} AS dataset_name,\n"
         f"    {vals[5]} AS write_disposition,\n"
         f"    {vals[6]} AS pipeline_group,\n"
-        f"    {vals[7]} AS config\n"
+        f"    {vals[7]} AS season_rollover_month,\n"
+        f"    {vals[8]} AS config\n"
     )
 
 
 # Parameterised MERGE for a single pipeline row. %s order must match _row_params().
 MERGE_SQL = (
     _merge_header(
-        ["%s", "%s", "%s", "%s", "%s", "PARSE_JSON(%s)", "%s", "PARSE_JSON(%s)"]
+        ["%s", "%s", "%s", "%s", "%s", "PARSE_JSON(%s)", "%s", "%s", "PARSE_JSON(%s)"]
     )
     + _MERGE_TAIL
 )
@@ -132,6 +135,7 @@ def _row_params(spec: PipelineSpec) -> tuple[Any, ...]:
         spec.dataset_name,
         json.dumps(spec.write_disposition),
         spec.group,
+        spec.season_rollover_month,
         json.dumps(spec.config),
     )
 
@@ -169,6 +173,9 @@ def merge_sql_literal(spec: PipelineSpec) -> str:
         _sql_literal(spec.dataset_name),
         f"PARSE_JSON($${disposition_json}$$)",
         _sql_literal(spec.group),
+        # Unquoted: the column is NUMBER, and validate() has already proved it is an
+        # int 1-12, so there is nothing here for a quote to protect against.
+        str(spec.season_rollover_month),
         f"PARSE_JSON($${config_json}$$)",
     ]
     return _merge_header(vals) + _MERGE_TAIL + ";"

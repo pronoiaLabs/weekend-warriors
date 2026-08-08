@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS DLT_DB.OPS.PIPELINE_REGISTRY (
     dataset_name      STRING            DEFAULT 'RAW',
     write_disposition VARIANT,
     pipeline_group    STRING,
+    season_rollover_month NUMBER(2,0)   DEFAULT 8,
     config            VARIANT,
     enabled           BOOLEAN           DEFAULT TRUE,
     updated_at        TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP(),
@@ -75,6 +76,23 @@ COMMENT = 'Control-plane registry of dlt pipelines. Synced from pipelines/batch/
 -- sync belong in the same sitting.
 ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
     ADD COLUMN IF NOT EXISTS target_database STRING DEFAULT 'DLT';
+
+-- ADDING season_rollover_month TO AN ACCOUNT THAT ALREADY HAS THE TABLE.
+-- Same story as target_database above: the CREATE is a no-op once the table exists, so
+-- this ALTER is what adds the column, and it is safe to re-run.
+--
+-- WHY THIS COLUMN EXISTS AT ALL. It feeds the `{current_season}` token, and the month a
+-- season starts is per sport: 8 for the NFL, 5 for the WNBA. A container in SPCS reads
+-- its spec from THIS TABLE, not from the YAML, so a rollover that lives only in
+-- registries/*.yml would be correct on a laptop and silently fall back to the default 8
+-- inside every scheduled Task. For the WNBA that means May, June and July resolving to
+-- last season while the current one is being played, and the API answers a stale season
+-- with data rather than an error.
+--
+-- Existing rows take the DEFAULT of 8, which is the pre-change behaviour. `make
+-- sync-apply` then writes each pipeline's real value from its registry file.
+ALTER TABLE DLT_DB.OPS.PIPELINE_REGISTRY
+    ADD COLUMN IF NOT EXISTS season_rollover_month NUMBER(2,0) DEFAULT 8;
 
 -- MIGRATING AN ACCOUNT CREATED BEFORE write_disposition BECAME VARIANT.
 -- The CREATE above is IF NOT EXISTS, so re-running this file will NOT change the

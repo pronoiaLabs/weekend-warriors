@@ -200,9 +200,15 @@ def _apply_constants(cfg: dict[str, Any]) -> None:
 #     A backfill still wins: --param merges into endpoint.params after this runs, so
 #     `--param season=2023` overwrites the resolved value the same way it overwrites a
 #     literal.
-def _token_values() -> dict[str, Any]:
-    """Resolve the token table once per call, so the date is read at run time."""
-    return {"{current_season}": current_season()}
+def _token_values(spec: PipelineSpec) -> dict[str, Any]:
+    """Resolve the token table once per call, so the date is read at run time.
+
+    Takes the spec because the season boundary is per sport: `season_rollover_month` is
+    8 for the NFL and 5 for the WNBA. One `{current_season}` token serves every league,
+    which keeps the registries uniform and means a new sport adds a line of YAML rather
+    than a token and a function.
+    """
+    return {"{current_season}": current_season(spec.season_rollover_month)}
 
 
 def _resolve_tokens(obj: Any, tokens: dict[str, Any]) -> Any:
@@ -228,11 +234,17 @@ def build_source(spec: PipelineSpec):
     if spec.source == "rest_api":
         from dlt.sources.rest_api import rest_api_source  # noqa: PLC0415
 
-        tokens = _token_values()
+        tokens = _token_values(spec)
         cfg = _resolve_tokens(cfg, tokens)
         # Logged because a wrong year is invisible afterwards: the run succeeds, the
         # row counts look ordinary, and only a COUNT(DISTINCT season) would show it.
-        log.info("resolved runtime tokens: %s", tokens)
+        # The rollover month rides along because it is what makes the year right or
+        # wrong, and it is the thing you will want to check when the year looks off.
+        log.info(
+            "resolved runtime tokens: %s (season rollover month %s)",
+            tokens,
+            spec.season_rollover_month,
+        )
         _apply_constants(cfg)
         return rest_api_source(cfg, name=spec.name)
 
