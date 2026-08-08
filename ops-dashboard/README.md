@@ -11,12 +11,15 @@ connection, read-only.
 
 ```bash
 make install    # api deps (uv) + web deps (npm), one time
-make dev-api    # terminal 1: FastAPI on :8000
-make dev-web    # terminal 2: Vite on :5173, proxying /api
+make serve      # build the web app, serve everything on http://localhost:8000
 ```
 
-Open http://localhost:5173. Pages: fleet overview (schedule board + exception-only
-sport panels), incidents feed, pipeline detail, run detail.
+One command, one port: FastAPI serves the built bundle and /api together, the
+same shape the SPCS container would use. For development with hot reload use
+two terminals instead: `make dev-api` (:8000) and `make dev-web` (:5173).
+
+Pages: fleet overview (schedule board + exception-only sport panels), incidents
+feed, pipeline detail, run detail.
 
 `OPS_DASHBOARD_DATA=fixtures make dev-api` serves recorded fixture data with no
 Snowflake connection at all; the test suite always runs in that mode.

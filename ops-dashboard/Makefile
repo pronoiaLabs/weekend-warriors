@@ -28,7 +28,7 @@ endef
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install dev-api dev-web \
+.PHONY: help install dev-api dev-web serve \
         test lint build \
         setup spec-upload image-build image-login image-push \
         deploy endpoint service-status service-logs
@@ -52,6 +52,10 @@ dev-api: ## Run FastAPI with reload on :8000
 
 dev-web: ## Run the Vite dev server (proxies /api to :8000)
 	cd web && npm run dev
+
+serve: build ## Build the web app and serve api + web together on :8000
+	@$(call hdr,dashboard on http://localhost:8000)
+	cd api && $(UV_RUN) uvicorn app.main:app --port 8000
 
 ##@ Quality
 
