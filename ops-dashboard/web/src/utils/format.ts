@@ -59,3 +59,55 @@ export function num(value: number | null | undefined): string {
 export function duration(seconds: number | null | undefined): string | null {
   return seconds == null ? null : `${seconds} s`
 }
+
+/** "hh:mm:ss", the log table's timestamp. Milliseconds are dropped: two lines
+    of the same second are already adjacent in EVENT_TS order. */
+export function hhmmss(iso: string): string {
+  return new Date(iso).toISOString().slice(11, 19)
+}
+
+/** "Sat 2026-08-08", the run detail header's day. */
+export function dayDate(iso: string): string {
+  return `${WEEKDAY.format(new Date(iso))} ${iso.slice(0, 10)}`
+}
+
+/** "Mo 27", one heatmap cell's label. */
+export function dayShort(isoDate: string): string {
+  const at = new Date(`${isoDate}T00:00:00Z`)
+  return `${WEEKDAY.format(at).slice(0, 2)} ${isoDate.slice(8, 10)}`
+}
+
+/** Relative age against a timestamp taken from the payload. The browser clock
+    is never the reference: a stale tab would otherwise age the page by itself. */
+export function relativeTo(at: string, reference: string): string {
+  const minutes = Math.max(0, Math.round((Date.parse(reference) - Date.parse(at)) / 60000))
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? 'yesterday' : `${days} days ago`
+}
+
+const KIB = 1024
+
+/** Bytes at the unit the wireframe quotes: MiB for a container's usage, GiB
+    once it passes a gibibyte. */
+export function bytes(value: number | null | undefined): string {
+  if (value == null) return 'NULL'
+  if (value >= KIB ** 3) return `${(value / KIB ** 3).toFixed(2)} GiB`
+  if (value >= KIB ** 2) return `${Math.round(value / KIB ** 2)} MiB`
+  if (value >= KIB) return `${Math.round(value / KIB)} KiB`
+  return `${value} B`
+}
+
+export function cores(value: number | null | undefined): string {
+  return value == null ? 'NULL' : `${value.toFixed(2)} cores`
+}
+
+/** One metric value in its own unit, for the summary table and the dot strips. */
+export function metricValue(value: number | null | undefined, unit: string | null): string {
+  if (value == null) return 'NULL'
+  if (unit === 'byte') return bytes(value)
+  if (unit === 'core' || unit === 'cpu') return value.toFixed(2)
+  return num(Math.round(value * 100) / 100)
+}

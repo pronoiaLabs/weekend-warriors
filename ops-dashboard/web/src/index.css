@@ -1057,3 +1057,709 @@ h1 {
   font-size: 12px;
   color: var(--ink-5);
 }
+
+.foot a {
+  color: var(--ink-3);
+}
+
+/* ---- detail pages: pipeline and run ---- */
+/* Narrower than the board: both pages are one column of evidence. */
+.wrap.detail {
+  max-width: 960px;
+}
+
+.crumb {
+  font-size: 12px;
+  color: var(--ink-5);
+  margin-bottom: 14px;
+}
+
+.crumb a {
+  color: var(--ink-3);
+}
+
+.headcard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+
+.headcard.attn {
+  border-color: var(--red-edge);
+}
+
+.headcard .row1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headcard h1 {
+  font-family: var(--mono);
+  font-size: 22px;
+  margin: 0;
+}
+
+.headcard .badges {
+  margin-left: auto;
+}
+
+.headcard .facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px 24px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.headcard .facts .f .v {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.headcard .facts .f .v.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.headcard .facts .f .k {
+  font-size: 11px;
+  color: var(--ink-5);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---- heat strip ---- */
+.heatcard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+}
+
+.heatcard .hh {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+}
+
+.heatcard .hh small {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-5);
+  margin-left: 8px;
+}
+
+.heatrow {
+  display: flex;
+  gap: 4px;
+  min-width: 620px;
+}
+
+.hcell {
+  flex: 1;
+  text-align: center;
+}
+
+.hcell .day {
+  font-size: 10px;
+  color: var(--ink-5);
+  font-family: var(--mono);
+  margin-bottom: 3px;
+}
+
+.hcell .day.today {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Layout only: colour comes from the shared .st state classes. */
+.hcell .box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hcell a.box:hover {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.hcell .box.blank {
+  background: var(--line-soft);
+  border: 1px solid var(--line);
+}
+
+/* The hatched cell's glyph needs solid backing to stay legible. */
+.hcell .box em {
+  background: var(--surface);
+  font-style: normal;
+  padding: 0 3px;
+  border-radius: 2px;
+}
+
+.heatlegend {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--ink-4);
+  flex-wrap: wrap;
+}
+
+.heatlegend .key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.heatlegend .sw {
+  display: inline-block;
+  width: 16px;
+  height: 12px;
+}
+
+.heatlegend .sw.blank {
+  background: var(--line-soft);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+/* ---- run history rows ---- */
+.runrow {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.runrow.bad {
+  border-left: 3px solid var(--red);
+}
+
+.runrow-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+
+.runrow-head:hover {
+  background: var(--surface-2);
+}
+
+.runrow-head .outcome {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--ink-2);
+  min-width: 92px;
+}
+
+.runrow-head .outcome.fail {
+  color: var(--red-ink);
+}
+
+.runrow-head .ts {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-3);
+  min-width: 140px;
+}
+
+.runrow-head .flag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: var(--r-sm);
+}
+
+.runrow-head .flag.missing {
+  background: var(--red);
+  color: #ffffff;
+}
+
+/* A disagreement is a finding, not a failure, so its chip stays neutral. */
+.runrow-head .flag.disagrees {
+  background: var(--line-soft);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+}
+
+.runrow-head .cells {
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--ink-4);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.runrow-head .cells b {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.runrow-body {
+  border-top: 1px solid var(--line-soft);
+  padding: 16px 18px;
+}
+
+.runrow-foot {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--ink-5);
+}
+
+.runrow-foot a {
+  color: var(--ink-3);
+}
+
+/* ---- segmented duration bar ---- */
+.durbar {
+  margin-bottom: 14px;
+}
+
+.durbar .bar {
+  display: flex;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  max-width: 520px;
+}
+
+.durbar.labeled .bar {
+  height: 30px;
+  max-width: none;
+  border-radius: 5px;
+}
+
+.durbar .seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Hatched: the zone before the first log line, where a death is infrastructure. */
+.durbar .seg.startup {
+  background: repeating-linear-gradient(135deg, #e4e4e7 0 5px, #fafafa 5px 10px);
+  color: var(--ink-2);
+  border-right: 2px solid var(--surface);
+}
+
+.durbar .seg.work {
+  background: var(--ink-4);
+  color: #ffffff;
+}
+
+.durbar .seg.work.fail {
+  background: var(--red);
+}
+
+.durbar .dur-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-5);
+  font-family: var(--mono);
+  margin-top: 4px;
+}
+
+.durbar .dur-legend {
+  font-size: 11.5px;
+  color: var(--ink-4);
+  margin-top: 6px;
+}
+
+.durbar .dur-legend b {
+  color: var(--ink-2);
+}
+
+.durcard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px 20px;
+}
+
+/* ---- tabs ---- */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.tab {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-4);
+  padding: 7px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab.on {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.tabpane {
+  padding: 14px 0 0;
+}
+
+.wrap.detail > .tabset .tabpane {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  padding: 16px 18px;
+}
+
+.pane-src {
+  font-size: 11px;
+  color: var(--ink-5);
+  margin: 0 0 10px;
+  word-break: break-word;
+}
+
+.pane-src.after {
+  margin: 8px 0 0;
+}
+
+.pane-src.bad {
+  color: var(--red-ink);
+}
+
+.pane-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-5);
+  margin: 12px 0 4px;
+}
+
+/* ---- log table ---- */
+.logchips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.logchips .cap {
+  font-size: 11px;
+  color: var(--ink-5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.logchips .chip {
+  padding: 3px 10px;
+}
+
+.logtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+  table-layout: fixed;
+}
+
+.logtable th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-5);
+  font-weight: 700;
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font);
+}
+
+.logtable th:nth-child(1) {
+  width: 74px;
+}
+
+.logtable th:nth-child(2) {
+  width: 70px;
+}
+
+.logtable th:nth-child(3) {
+  width: 190px;
+}
+
+.logtable td {
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+  color: var(--ink-3);
+  word-break: break-word;
+}
+
+.logtable .sev-ERROR {
+  color: var(--red-ink);
+  font-weight: 700;
+}
+
+.logtable .sev-WARNING {
+  color: var(--ink-3);
+  font-weight: 700;
+}
+
+.logtable .sev-INFO {
+  color: var(--ink-5);
+}
+
+/* ---- metric cards and dot strips ---- */
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.mcard {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  background: var(--bg);
+}
+
+.mcard .mv {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.mcard .mk {
+  font-size: 11px;
+  color: var(--ink-5);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mstrip {
+  margin: 10px 0 18px;
+  max-width: 720px;
+}
+
+.mstrip .mhead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mstrip .mhead .mname {
+  font-family: var(--mono);
+  color: var(--ink-3);
+}
+
+.mstrip .mhead .mmax {
+  color: var(--ink-3);
+}
+
+.mstrip .strip {
+  position: relative;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+}
+
+/* The limit is a dashed rule, never a filled bar: nothing here is a curve. */
+.mstrip .strip .limit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--ink-5);
+}
+
+.mstrip .strip .limit small {
+  position: absolute;
+  right: 4px;
+  top: -14px;
+  font-size: 10px;
+  color: var(--ink-5);
+}
+
+.mstrip .strip .dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 2px solid var(--surface);
+  transform: translate(-50%, 50%);
+}
+
+.mstrip .strip .empty {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ink-5);
+}
+
+.mstrip .strip-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--ink-5);
+  font-family: var(--mono);
+  margin-top: 2px;
+}
+
+/* ---- error box ---- */
+.errbox {
+  background: var(--red-wash);
+  border: 1px solid var(--red-line);
+  border-left: 4px solid var(--red);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #7f1d1d;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---- run detail header and facts ---- */
+.runhead {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.runhead h1 {
+  font-family: var(--mono);
+  font-size: 22px;
+  margin: 0;
+}
+
+.runhead .when {
+  color: var(--ink-4);
+  font-size: 13px;
+}
+
+.agree {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 8px;
+}
+
+.agree code {
+  background: var(--line-soft);
+  border-radius: var(--r-sm);
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.runfacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.runfacts .fact {
+  background: var(--surface);
+  padding: 8px 12px;
+}
+
+.runfacts .fact .k {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  font-family: var(--mono);
+}
+
+.runfacts .fact .v {
+  font-size: 13.5px;
+  margin-top: 2px;
+  font-family: var(--mono);
+  word-break: break-word;
+}
+
+.runfacts .fact .v.bad {
+  color: var(--red-ink);
+  font-weight: 700;
+}
+
+.runfacts .fact .v small {
+  color: var(--ink-5);
+  font-weight: 400;
+}
+
+/* ---- generic data table, used by the metrics and row count panes ---- */
+table.data {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+table.data th,
+table.data td {
+  border-bottom: 1px solid var(--line-soft);
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+table.data th {
+  color: var(--ink-5);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+}
+
+table.data td {
+  font-family: var(--mono);
+  color: var(--ink-3);
+}

@@ -1,7 +1,12 @@
 import type {
   IncidentCountsPayload,
   IncidentsPayload,
+  LogsPayload,
+  MetricsPayload,
   OverviewPayload,
+  PipelineDetailPayload,
+  RowCountsPayload,
+  RunDetailPayload,
   SportsPayload,
 } from './types.ts'
 
@@ -47,4 +52,45 @@ export function fetchIncidents(
   signal?: AbortSignal,
 ): Promise<IncidentsPayload> {
   return get<IncidentsPayload>('/api/incidents', { sport, days: String(days) }, signal)
+}
+
+export function fetchPipelineDetail(
+  sport: string,
+  name: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<PipelineDetailPayload> {
+  return get<PipelineDetailPayload>(
+    `/api/pipelines/${encodeURIComponent(sport)}/${encodeURIComponent(name)}`,
+    { limit: String(limit) },
+    signal,
+  )
+}
+
+export function fetchRun(queryId: string, signal?: AbortSignal): Promise<RunDetailPayload> {
+  return get<RunDetailPayload>(`/api/runs/${encodeURIComponent(queryId)}`, {}, signal)
+}
+
+/** `severity` is an exact SEVERITY match server side, so only a single level can
+    be pushed down; anything broader is narrowed by the caller. */
+export function fetchRunLogs(
+  queryId: string,
+  severity: string | null,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<LogsPayload> {
+  const params: Record<string, string> = { limit: String(limit) }
+  if (severity) params.severity = severity
+  return get<LogsPayload>(`/api/runs/${encodeURIComponent(queryId)}/logs`, params, signal)
+}
+
+export function fetchRunMetrics(queryId: string, signal?: AbortSignal): Promise<MetricsPayload> {
+  return get<MetricsPayload>(`/api/runs/${encodeURIComponent(queryId)}/metrics`, {}, signal)
+}
+
+export function fetchRunRowCounts(
+  queryId: string,
+  signal?: AbortSignal,
+): Promise<RowCountsPayload> {
+  return get<RowCountsPayload>(`/api/runs/${encodeURIComponent(queryId)}/rowcounts`, {}, signal)
 }
