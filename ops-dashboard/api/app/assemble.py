@@ -292,6 +292,39 @@ def incidents(
     return {"days": days, "now": _iso(now), "counts": counts, "incidents": entries}
 
 
+def pipelines_index(
+    pipelines: list[dict[str, Any]],
+    runs_window: list[dict[str, Any]],
+    now: datetime,
+) -> dict[str, Any]:
+    """One row per registered pipeline, including ones that never ran."""
+    by_pipeline: dict[str, list[dict[str, Any]]] = {}
+    for run in runs_window:
+        by_pipeline.setdefault(run["pipeline"], []).append(run)
+    for runs in by_pipeline.values():
+        runs.sort(key=lambda r: r["run_started_at"], reverse=True)
+
+    rows = []
+    for pipe in pipelines:
+        history = by_pipeline.get(pipe["name"], [])
+        latest = history[0] if history else None
+        rows.append(
+            {
+                "pipeline": pipe["name"],
+                "sport": pipe["sport"],
+                "enabled": pipe["enabled"],
+                "schedule": schedule.prose(pipe["schedule"]),
+                "cron": pipe["schedule"],
+                "next_fire": _iso(schedule.next_fire(pipe["schedule"], now)),
+                "latest": _block_for_run(latest) if latest else None,
+                "succeeded": sum(1 for r in history if r.get("task_state") == "SUCCEEDED"),
+                "runs_in_window": len(history),
+                "window_days": WINDOW_DAYS,
+            }
+        )
+    return {"now": _iso(now), "window_days": WINDOW_DAYS, "pipelines": rows}
+
+
 def pipeline_detail(
     pipe: dict[str, Any],
     history: list[dict[str, Any]],

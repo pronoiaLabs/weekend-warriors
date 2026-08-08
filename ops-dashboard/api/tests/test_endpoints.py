@@ -49,6 +49,21 @@ def test_incidents_kind_filter(client: TestClient) -> None:
     assert all(e["kind"] == "missing" for e in body["incidents"])
 
 
+def test_pipelines_index(client: TestClient) -> None:
+    body = client.get("/api/pipelines").json()
+    assert len(body["pipelines"]) == 17
+    by_name = {p["pipeline"]: p for p in body["pipelines"]}
+    ref = by_name["nfl_reference"]
+    assert ref["schedule"] == "daily 08:00 UTC"
+    assert ref["latest"]["state"] == "succeeded"
+    assert ref["succeeded"] > 0
+    # A pipeline that never ran still gets a row, with latest None.
+    never_ran = [p for p in body["pipelines"] if p["latest"] is None]
+    assert all(p["runs_in_window"] == 0 for p in never_ran)
+    wnba = client.get("/api/pipelines?sport=WNBA").json()["pipelines"]
+    assert len(wnba) == 10 and all(p["sport"] == "WNBA" for p in wnba)
+
+
 def test_pipeline_detail(client: TestClient) -> None:
     body = client.get("/api/pipelines/NFL/nfl_stats").json()
     assert body["schedule"] == "daily 10:00 UTC"

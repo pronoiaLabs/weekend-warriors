@@ -326,3 +326,22 @@ export interface RowCountsPayload {
   row_counts: Record<string, number> | null
   prev_row_counts: Record<string, number> | null
 }
+
+export interface PipelineIndexRow {
+  pipeline: string
+  sport: string
+  enabled: boolean
+  schedule: string
+  cron: string
+  next_fire: string
+  latest: Block | null
+  succeeded: number
+  runs_in_window: number
+  window_days: number
+}
+
+export interface PipelinesIndexPayload {
+  now: string
+  window_days: number
+  pipelines: PipelineIndexRow[]
+}

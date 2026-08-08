@@ -9,6 +9,7 @@ pretend to be one. Mirrors dlt-pipelines/pipelines/common/snowflake_session.py
 import json
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,9 @@ _SPCS_TOKEN = Path("/snowflake/session/token")
 
 _lock = threading.Lock()
 _conn: snowflake.connector.SnowflakeConnection | None = None
+
+_CACHE_MAX_ENTRIES = 256
+_query_cache: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
 
 
 def in_spcs() -> bool:
@@ -49,9 +53,33 @@ def _connect() -> snowflake.connector.SnowflakeConnection:
 def query(sql: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Run one SELECT, returning rows as dicts with lowercase keys.
 
+    Results are cached for OPS_DASHBOARD_CACHE_SECONDS (default 60): the views
+    change at most once per cron fire, so page navigation should cost warehouse
+    seconds once per TTL, not once per click. Rows are shallow-copied on every
+    hit because datasource normalization rewrites values in place.
+
     One cached connection per process; a failed cursor tears it down and retries
     once so an expired session heals instead of poisoning every later request.
     """
+    key = (sql, json.dumps(params or {}, sort_keys=True, default=str))
+    now = time.monotonic()
+    hit = _query_cache.get(key)
+    if hit is not None and now - hit[0] < _cache_ttl():
+        return [dict(row) for row in hit[1]]
+
+    rows = _query_live(sql, params)
+    _query_cache[key] = (now, [dict(row) for row in rows])
+    if len(_query_cache) > _CACHE_MAX_ENTRIES:
+        oldest = min(_query_cache, key=lambda k: _query_cache[k][0])
+        del _query_cache[oldest]
+    return rows
+
+
+def _cache_ttl() -> float:
+    return float(os.environ.get("OPS_DASHBOARD_CACHE_SECONDS", "60"))
+
+
+def _query_live(sql: str, params: dict[str, Any] | None) -> list[dict[str, Any]]:
     global _conn
     with _lock:
         for attempt in (1, 2):

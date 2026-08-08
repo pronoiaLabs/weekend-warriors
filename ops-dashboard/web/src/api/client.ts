@@ -5,6 +5,7 @@ import type {
   MetricsPayload,
   OverviewPayload,
   PipelineDetailPayload,
+  PipelinesIndexPayload,
   RowCountsPayload,
   RunDetailPayload,
   SportsPayload,
@@ -52,6 +53,13 @@ export function fetchIncidents(
   signal?: AbortSignal,
 ): Promise<IncidentsPayload> {
   return get<IncidentsPayload>('/api/incidents', { sport, days: String(days) }, signal)
+}
+
+export function fetchPipelinesIndex(
+  sport: string,
+  signal?: AbortSignal,
+): Promise<PipelinesIndexPayload> {
+  return get<PipelinesIndexPayload>('/api/pipelines', { sport }, signal)
 }
 
 export function fetchPipelineDetail(

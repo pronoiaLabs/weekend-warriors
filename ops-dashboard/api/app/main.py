@@ -118,6 +118,12 @@ def create_app() -> FastAPI:
             payload["incidents"] = [e for e in payload["incidents"] if e["kind"] == kind]
         return payload
 
+    @app.get("/api/pipelines")
+    def pipelines_index(sport: str = Query("all")) -> dict[str, Any]:
+        wanted = _check_sport(sport)
+        pipes = [p for p in datasource.pipelines() if wanted is None or p["sport"] == wanted]
+        return assemble.pipelines_index(pipes, datasource.runs_window(assemble.WINDOW_DAYS, wanted), _now())
+
     @app.get("/api/pipelines/{sport}/{name}")
     def pipeline(sport: str, name: str, limit: int = Query(8, ge=1, le=50)) -> dict[str, Any]:
         _check_sport(sport)
