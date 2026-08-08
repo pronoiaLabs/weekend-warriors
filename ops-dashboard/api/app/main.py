@@ -1,14 +1,13 @@
-"""FastAPI app for the ops dashboard.
-
-Phase 0: a health endpoint and an optional SPA mount. Snowflake-backed
-endpoints arrive in later phases.
-"""
+"""FastAPI app for the ops dashboard."""
 
 import os
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
+
+from app import datasource
 
 
 def create_app() -> FastAPI:
@@ -17,6 +16,19 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "ops-dashboard"}
+
+    # Endpoints are sync on purpose: the Snowflake connector is blocking, and
+    # FastAPI runs `def` routes on a threadpool instead of stalling the loop.
+    @app.get("/api/runs")
+    def runs(
+        sport: str = Query("all"),
+        limit: int = Query(50, ge=1, le=500),
+    ) -> dict[str, Any]:
+        known = datasource.list_sports()
+        wanted = None if sport == "all" else sport
+        if wanted is not None and wanted not in known:
+            raise HTTPException(status_code=404, detail=f"unknown sport {sport!r}")
+        return {"sports": known, "runs": datasource.recent_runs(wanted, limit)}
 
     static_dir = _static_dir()
     if static_dir is not None:

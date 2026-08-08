@@ -48,3 +48,40 @@ fallback already serves web/dist at / when it exists.
 
 **Open:** `.brainstorm/` wireframes are untracked; decide track vs gitignore on
 return.
+
+---
+
+## Phase 1: prove the data path
+
+**Ran:** wrote app/db.py (two-branch auth keyed on /snowflake/session/token,
+session TIMEZONE=UTC, one cached connection with a single retry),
+app/registry.py (sports from TARGET_DATABASE where SCHEDULE is not null, 60s
+TTL cache), app/datasource.py (live/fixtures seam via OPS_DASHBOARD_DATA), and
+GET /api/runs. Started uvicorn against the live account, recorded
+app/fixtures/{runs,registry}.json from real responses, wrote tests, ran
+pytest + ruff.
+
+**Result:** /api/runs returns live rows from both sports in one feed, newest
+first, UTC Z timestamps (16:47Z for the 09:47-07:00 row, correct), ROW_COUNTS
+parsed to an object. ?sport=WNBA returns exactly the 2 WNBA runs; unknown
+sport is a 404. 8 tests passed, ruff clean. Fixture scrub check found only
+QUERY_ID / JOB_* identifiers, which already appear throughout the repo docs;
+no credentials, no account identifiers.
+
+**Surprises:**
+- A subagent hit two more permission prompts and the loop stalled while the
+  user was still here to see it. Root cause of the day: settings-file
+  permission edits do not apply mid-session, and subagents queue prompts
+  invisibly. Resolution: defaultMode bypassPermissions in settings.local.json
+  plus the user flipping the live mode, and permission-sensitive work moved
+  into the main loop.
+- EXIT_STATUS is not always NULL: the generic Task failure message yields
+  EXIT_STATUS='FAILED'. The wireframe's "EXIT_STATUS is always NULL" footnote
+  overstates; it is NULL for infra-level failures and 'FAILED' when the
+  container exited nonzero. The run page copy must reflect both cases.
+
+**Changed from plan:** Phase 1 was built in the main loop rather than by a
+subagent, after the stall. Later phases keep implementation subagents but
+anything likely to prompt runs in the main loop.
+
+**Open:** none.
