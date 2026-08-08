@@ -200,6 +200,24 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pyyaml
+      # THIS STEP IS NOT OPTIONAL AND MUST NOT BE REORDERED.
+      #
+      # CREATE OR ALTER TASK FAILS on a Task that is started:
+      #   091421 (22000): Unable to update graph with root task <name> since that
+      #   root task is not suspended
+      # and changes nothing. `snow sql -f` stops at the first error, so applying
+      # tasks.sql to a running fleet aborts before most of it is attempted, leaving
+      # some Tasks on the new spec and some on the old with nothing saying which.
+      # Measured against the live 17-Task fleet on 2026-08-08.
+      #
+      # ALTER TASK IF EXISTS ... SUSPEND is a clean no-op for a Task that does not
+      # exist yet, so this is safe on a first deploy and on a partial fleet.
+      - name: Suspend scheduled Tasks
+        run: |
+          python -m deploy.tasks.generate_tasks --suspend > suspend.sql
+          echo "----- suspend.sql -----" && cat suspend.sql
+          snow sql -f suspend.sql -x
+
       - name: Generate and apply per-pipeline Tasks
         run: |
           python -m deploy.tasks.generate_tasks > tasks.sql
@@ -208,7 +226,7 @@ jobs:
 
       # THIS STEP IS NOT OPTIONAL AND MUST NOT BE REORDERED.
       #
-      # CREATE OR ALTER TASK resets a Task to SUSPENDED. Without this, every deploy
+      # CREATE OR ALTER TASK leaves a Task SUSPENDED. Without this, every deploy
       # that touches a registry file would silently stop the entire schedule: the
       # DDL succeeds, nothing errors, and the next cron fire never happens. That
       # failure has already happened once by hand.

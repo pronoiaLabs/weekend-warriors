@@ -234,19 +234,56 @@ AS
 """
 
 
+def suspend_sql(spec: PipelineSpec) -> str:
+    """Emit `ALTER TASK ... SUSPEND` for one pipeline. Apply BEFORE tasks.sql.
+
+    `CREATE OR ALTER TASK` REFUSES TO TOUCH A TASK THAT IS STARTED.
+        It fails with `091421 (22000): Unable to update graph with root task
+        <name> since that root task is not suspended`, and changes nothing.
+        Measured against a live 17-Task fleet on 2026-08-08.
+
+        The failure is worse than it first looks, because `snow sql -f` stops at the
+        first error. A fleet where task 1 is started aborts before tasks 2..17 are
+        even attempted, so a partial re-apply leaves some Tasks carrying the new spec
+        and some the old, with nothing in the output saying which.
+
+        This is the exact inverse of what the module used to claim, and of what
+        CLAUDE.md still said until this change: that the DDL succeeds and silently
+        suspends. Erroring is the better behaviour of the two. It also means the
+        remedy is different, and there was no target for it, which is why this
+        function exists.
+
+    `IF EXISTS` IS LOAD BEARING.
+        On a first deploy no Task exists yet, and on a partial fleet only some do.
+        A bare `ALTER TASK` would abort the suspend pass on the first missing name
+        and leave the rest started, reproducing the problem it is meant to prevent.
+        Verified as a clean no-op against a name that does not exist.
+
+    Same `spec.schedule` test as task_sql, so the two outputs cannot disagree about
+    which pipelines are Tasks.
+    """
+    if not spec.schedule:
+        return f"-- skipped '{spec.name}': no schedule in registry\n"
+    return f"ALTER TASK IF EXISTS {TASKS_SCHEMA}.dlt_task_{spec.name} SUSPEND;\n"
+
+
 def resume_sql(spec: PipelineSpec) -> str:
-    """Emit `ALTER TASK ... RESUME` for one pipeline.
+    """Emit `ALTER TASK ... RESUME` for one pipeline. Apply AFTER tasks.sql.
 
     WHY THIS EXISTS AS A SEPARATE OUTPUT RATHER THAN A LINE IN task_sql.
-    `CREATE OR ALTER TASK` RESETS A TASK TO SUSPENDED. Applying tasks.sql over a
-    running schedule therefore stops it, silently: the DDL succeeds, nothing errors,
-    and the next cron fire simply never happens. That is not hypothetical -- all seven
-    Tasks were found suspended after a re-apply, hours after they were resumed.
+    `CREATE OR ALTER TASK` leaves a Task suspended, so a fleet is stopped once
+    tasks.sql has been applied and stays stopped until something resumes it. The DDL
+    succeeds and nothing errors, so the next cron fire simply never happens.
 
     Interactively that is the right default (see IT EMITS SQL RATHER THAN APPLYING IT
     above: generating a schedule and starting one are different decisions). But CI
     re-applies tasks.sql on every registry change, so for CI the default is a trap,
     and the fix is a second file it applies immediately afterwards.
+
+    NO `IF EXISTS` HERE, DELIBERATELY, unlike suspend_sql. Resume runs after tasks.sql
+    has created every Task, so a missing one means the apply failed partway and the
+    error is the only signal that would say so. Suspend runs before, when absence is
+    expected and harmless.
 
     Same `spec.schedule` test as task_sql, so the two outputs cannot disagree about
     which pipelines are Tasks.
@@ -268,7 +305,17 @@ def main(argv: Sequence[str] = ()) -> int:
         prog="generate_tasks",
         description="Emit Snowflake Task DDL from pipelines/batch/registries/.",
     )
-    parser.add_argument(
+    # Mutually exclusive: each flag selects a different one-statement-per-Task output,
+    # and asking for two at once has no sensible meaning. argparse rejects the pair
+    # rather than letting the first `if` silently win.
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--suspend",
+        action="store_true",
+        help="emit ALTER TASK IF EXISTS ... SUSPEND instead of the CREATE OR ALTER TASK "
+        "DDL. Apply BEFORE tasks.sql: CREATE OR ALTER fails on a started Task.",
+    )
+    mode.add_argument(
         "--resume",
         action="store_true",
         help="emit ALTER TASK ... RESUME instead of the CREATE OR ALTER TASK DDL. "
@@ -277,6 +324,12 @@ def main(argv: Sequence[str] = ()) -> int:
     args = parser.parse_args(argv)
 
     registry = load_registry()
+    if args.suspend:
+        print("-- Generated from pipelines/batch/registries/. Apply BEFORE tasks.sql.\n")
+        for spec in registry.pipelines:
+            print(suspend_sql(spec), end="")
+        return 0
+
     if args.resume:
         print("-- Generated from pipelines/batch/registries/. Apply AFTER tasks.sql.\n")
         for spec in registry.pipelines:

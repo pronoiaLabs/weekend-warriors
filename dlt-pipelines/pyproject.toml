@@ -11,10 +11,22 @@ requires-python = ">=3.11"
 # not on the load path. pyarrow becomes required again only if you set
 # loader_file_format="parquet", use filesystem staging, or call
 # pipeline.dataset().arrow()/df().
+# snowflake-telemetry-python is imported optionally by pipelines/common/observability.py,
+# which falls back to a plain formatter when it is absent. That fallback is why the
+# dependency went unnoticed for so long: without it every container log line is
+# unstructured text and RECORD:severity_text in the event table is NULL, with nothing
+# erroring anywhere.
+#
+# Be clear about what it buys. configure_logging attaches its handler to the
+# `dlt_pipeline` logger and nothing else, and that logger is 385 of 13,514 measured
+# lines, under 3%. dlt's own logger and snowflake.connector reach stdout by another
+# path and stay raw whatever is installed. The regex parser in sql/ops/ is the primary
+# path permanently; this only makes the small slice authoritative.
 dependencies = [
     "dlt[snowflake]>=1.0",
     "snowflake-connector-python>=3.7",   # imported directly by pipelines/common/snowflake_session.py
     "pyyaml>=6",                         # imported directly by pipelines/batch/models.py
+    "snowflake-telemetry-python>=0.6",   # optional import in pipelines/common/observability.py
 ]
 
 [project.optional-dependencies]

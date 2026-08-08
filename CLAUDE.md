@@ -118,7 +118,11 @@ Root [.github/workflows/](.github/workflows/). `ci.yml` never touches Snowflake,
 
 `deploy.yml` computes path filters once and gates each job on them, so a change deploys only what it affects: image rebuild, registry resync, Task reapply, dev spec upload, dbt build, agent redeploy. `sql/**` is in **no** filter. Those files create roles, pools and grants as `SYSADMIN` / `USERADMIN` / `ACCOUNTADMIN` and stay a deliberate `make setup-*` run by a human.
 
-**`CREATE OR ALTER TASK` resets a Task to suspended.** Reapplying `tasks.sql` over a running schedule silently stops it: the DDL succeeds and the next cron fire never happens. `generate_tasks.py --resume` emits the matching `ALTER TASK ... RESUME` statements, and the deploy job applies them straight after. Anyone running `make tasks-apply` by hand has to resume the Tasks themselves.
+**`CREATE OR ALTER TASK` refuses to touch a started Task, and leaves it suspended once it can.** Both halves matter and they bite at different moments.
+
+Applying `tasks.sql` to a running fleet fails with `091421 (22000): Unable to update graph with root task <name> since that root task is not suspended`, and changes nothing. Because `snow sql -f` stops at the first error, a fleet whose first Task is running aborts before the rest are attempted: some Tasks carry the new spec, some the old, and nothing in the output says which. Then, once the DDL does apply, every Task is left suspended, so the schedule is stopped until something resumes it.
+
+So a Task reapply is always three steps, `make deploy` chains them, and `deploy.yml` mirrors it: `make tasks-suspend` → `make tasks-apply` → `make tasks-resume`. `generate_tasks.py` emits each with `--suspend` and `--resume`. Suspend uses `ALTER TASK IF EXISTS` so a first or partial deploy is safe; resume deliberately does not, because a missing Task there means the apply failed partway and the error is the only signal. Verify with `SHOW TASKS`, not with the target's exit code: suspended looks exactly like success.
 
 ### Why CI can reach Snowflake at all
 
@@ -130,4 +134,16 @@ What makes it work is that **network policies override rather than stack**. A po
 
 - **Nothing chains dbt behind the ingestion Tasks.** `dbt build` runs on a code push, not when new rows land in `RAW`. A Task graph with dbt as a child of the last dlt Task is the natural shape and is not built.
 - **`stats?seasons[]=<year>` is incomplete.** A 2023 replay returned 47 of 49 games; both missing games have data when fetched by `game_id`. Fetching per game the way `plays` does would close it. The dbt reconciliation tests exist to keep this visible.
-- **No alerting on Task failure.** Visible only in `TASK_HISTORY` and `_DLT_RUNS`.
+- **No alerting on Task failure.** Nothing reads the telemetry on a schedule. The raw material now exists (see below), but the modelling layer and any alert on top of it do not.
+- **`_DLT_RUNS` under-reports failures, systematically.** `record_run` is called from inside `run_pipeline`, so a spec rejected by `validate()` dies several frames earlier and is never recorded. Measured over one week: 22 Task failures, 17 `_DLT_RUNS` rows. The gap correlates with severity, since the worse the failure the earlier it happens, so anything built on `_DLT_RUNS` alone reads rosier than reality. Use `TASK_HISTORY` as the spine and join `_DLT_RUNS` on.
+
+## Telemetry
+
+SPCS job containers write logs and platform metrics to **`DLT_DB.OPS.DLT_EVENTS`**, a dedicated event table created by `make setup-ops CONFIRM=1` from [sql/ops/](dlt-pipelines/sql/ops/). It exists rather than using the shared `SNOWFLAKE.TELEMETRY.EVENTS` because a dynamic table cannot source the `SNOWFLAKE` database, which forecloses incremental refresh.
+
+Two things about the binding are undocumented and cost a failed verification each:
+
+- **SPCS reads the ACCOUNT-level `EVENT_TABLE` parameter and ignores a database-level one**, contrary to the general event-table documentation but consistent with the SPCS monitoring page. A database binding reads back as `level=DATABASE` while doing nothing.
+- **A compute pool node resolves its event table when the node starts.** Changing the parameter does not affect a pool with live nodes; `ALTER COMPUTE POOL ... SUSPEND` and let it auto-resume. Recreating the service is not sufficient.
+
+All three job spec templates declare `platformMonitor` with all five metric groups. Metrics are sampled roughly every 30 seconds against runs of 53 to 130 seconds, so expect 1 to 4 samples per run: useful as a trend across runs, not as a per-run peak. `storage` has never emitted a row, and there is no container exit code anywhere, so failure reason still comes from `TASK_HISTORY.ERROR_MESSAGE`.
