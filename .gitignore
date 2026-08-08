@@ -6,6 +6,18 @@
 *.p8
 *.pem
 
+# Ad-hoc SQL scratch at the repository root. These are where a credential actually
+# gets typed: `ALTER SECRET ... SET SECRET_STRING = '<key>'` has to be run by hand
+# once per secret, and the file it was typed into then sits in the working tree as
+# an ordinary untracked file that `git add .` would happily stage.
+#
+# LEADING SLASH IS LOAD-BEARING, as it is for /.docs/ below. These patterns must
+# match only the repository root: dlt-pipelines/sql/ and dbt-pipelines/ are full of
+# committed .sql, and a bare `test.sql` or `scratch*.sql` would match at any depth.
+/test.sql
+/scratch.sql
+/scratch*.sql
+
 # Python
 .venv/
 venv/
