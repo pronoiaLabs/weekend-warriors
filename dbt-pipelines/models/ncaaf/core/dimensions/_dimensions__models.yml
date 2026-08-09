@@ -1,0 +1,134 @@
+version: 2
+
+models:
+
+  - name: dim_ncaaf_conference
+    description: >
+      Every conference, 25 rows, SCD1. College-specific dimension: standings
+      publish per conference and the FBS/FCS subdivision hangs off it.
+    columns:
+      - name: conference_key
+        tests: [unique, not_null]
+      - name: conference_id
+        tests: [unique, not_null]
+      - name: conference_name
+        tests: [unique, not_null]
+      - name: subdivision
+        tests:
+          - not_null
+          - accepted_values: {values: ['FBS', 'FCS']}
+      - name: is_fbs
+        tests: [not_null]
+
+  - name: dim_ncaaf_team
+    description: >
+      Every team the source references, 536 rows, SCD1. Only ~134 are FBS
+      programs; filter on is_fbs (the WNBA is_franchise move). Conference
+      membership is CURRENT; season-accurate conference lives on
+      fact_ncaaf_standing.
+    columns:
+      - name: team_key
+        tests: [unique, not_null]
+      - name: team_id
+        tests: [unique, not_null]
+      - name: college
+        tests: [not_null]
+      - name: team_full_name
+        tests: [not_null]
+      - name: team_type
+        tests:
+          - not_null
+          - accepted_values: {values: ['FBS', 'FCS', 'Unaffiliated']}
+      - name: is_fbs
+        tests: [not_null]
+      - name: conference_key
+        description: "NULL for the 29 unaffiliated teams. Deliberately untested."
+      - name: conference_name
+        description: "Joined from the conference dimension; NULL for unaffiliated teams."
+
+  - name: dim_ncaaf_player
+    description: >
+      Player biographical attributes, 124,089 rows, SCD1 -- the largest
+      dimension in the account. Current team only; prefer the stat-line
+      team_key on the facts wherever the grain allows.
+    columns:
+      - name: player_key
+        tests: [unique, not_null]
+      - name: player_id
+        tests: [unique, not_null]
+      - name: full_name
+        tests: [not_null]
+      - name: current_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+
+  - name: dim_ncaaf_game
+    description: >
+      Descriptive context per game, ~4,977 rows, 2024-2026. THE ONLY PLACE
+      THE FULL NCAAF SLATE IS READABLE: scheduled 2026 games live here with
+      is_completed false and NULL scores; facts hold completed games only.
+      Carries the final line (NULL-guarded upstream). is_postseason = week
+      999.
+    columns:
+      - name: game_key
+        tests: [unique, not_null]
+      - name: game_id
+        tests: [unique, not_null]
+      - name: game_date
+        tests: [not_null]
+      - name: game_datetime_et
+        description: "Kickoff in US Eastern; what the schedule semantic view exposes."
+        tests: [not_null]
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_date')", field: date_key}
+      - name: season
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: is_postseason
+        tests: [not_null]
+      - name: is_completed
+        tests: [not_null]
+      - name: home_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: away_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: winner_team_key
+        description: "NULL on scheduled rows and tied finals. Explicit CASE upstream, never a hashed NULL."
+        tests:
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: home_team_score
+        description: "NULL on scheduled rows by construction."
+      - name: away_team_score
+        description: "NULL on scheduled rows by construction."
+
+  - name: dim_ncaaf_date
+    description: >
+      Conformed calendar, dense generated spine from the earliest standings
+      season through 60 days past the last scheduled game (self-widening as
+      the postseason slate loads). ncaaf_season rolls over in August, so
+      January bowl dates belong to the prior year's season. No week column:
+      weeks live on games.
+    columns:
+      - name: date_key
+        tests: [unique, not_null]
+      - name: full_date
+        tests: [unique, not_null]
+      - name: ncaaf_season
+        tests: [not_null]
+      - name: calendar_year
+        tests: [not_null]
+      - name: calendar_month
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 12}
+      - name: is_weekend
+        description: "Derived from dayname(), not dayofweek() -- the latter's numbering depends on the session WEEK_START parameter."
+        tests: [not_null]

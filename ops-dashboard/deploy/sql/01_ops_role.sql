@@ -68,8 +68,7 @@ GRANT SELECT ON TABLE WNBA_PROD_DB.OPS.DBT_TRIGGER_LOADS TO ROLE OPS_DASHBOARD_R
 GRANT USAGE ON DATABASE NCAAF_PROD_DB TO ROLE OPS_DASHBOARD_ROLE;
 GRANT USAGE ON SCHEMA NCAAF_PROD_DB.OPS TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON VIEW NCAAF_PROD_DB.OPS.V_PIPELINE_RUNS TO ROLE OPS_DASHBOARD_ROLE;
--- No DBT_TRIGGER_LOADS grant yet: the table arrives with the NCAAF dbt loop
--- (sql/sources/ncaaf/05_dbt_trigger.sql). Add the grant when that ships.
+GRANT SELECT ON TABLE NCAAF_PROD_DB.OPS.DBT_TRIGGER_LOADS TO ROLE OPS_DASHBOARD_ROLE;
 
 -- A public endpoint requires this account-level privilege on the CREATING
 -- role. ACCOUNTADMIN is unavoidable here and this is the only statement that

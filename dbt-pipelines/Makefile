@@ -59,6 +59,7 @@ deploy-sport: ## Upload the source tree to a sport's prod object (SPORT=nfl|wnba
 deploy-all: deploy-dev ## Deploy dev + every sport object
 	@$(MAKE) deploy-sport SPORT=nfl
 	@$(MAKE) deploy-sport SPORT=wnba
+	@$(MAKE) deploy-sport SPORT=ncaaf
 
 ##@ Run builds by hand
 

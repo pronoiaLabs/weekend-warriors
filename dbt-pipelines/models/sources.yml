@@ -627,3 +627,228 @@ sources:
             tests:
               - not_null
               - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+  - name: ncaaf_raw
+    description: >
+      Raw NCAAF (college football) data landed by dlt from the BallDontLie
+      API. Owned by the dlt pipeline -- dbt reads this schema and must never
+      write to it. Deliberately NOT environment-driven, matching the other
+      sports: every developer reads the same production raw tables.
+
+      Grain note: like WNBA there are no child tables at all -- nested API
+      objects became double-underscore columns, and dlt repeats the whole
+      parent payload on every child row. One naming asymmetry is load-bearing:
+      GAMES pairs VISITOR_TEAM__* team blocks with AWAY_SCORE_* score columns.
+
+      Variant-twin registry: where the API mixed ints and floats across rows,
+      dlt split the column into <column> plus <column>__V_DOUBLE. Reading only
+      the base column silently drops the float rows, so prep folds every twin
+      with ncaaf_coalesce_variant(). Seven twins across four tables, each
+      listed in its table's description below; auditable against
+      INFORMATION_SCHEMA.COLUMNS LIKE '%__V_DOUBLE'.
+    database: NCAAF_PROD_DB
+    schema: RAW
+
+    loaded_at_field: "TO_TIMESTAMP_TZ(_dlt_load_id::FLOAT::NUMBER)"
+    # Games and stats load daily but standings, season stats and rankings are
+    # weekly Monday crons, so the WNBA thresholds apply: one missed week warns,
+    # two error.
+    freshness:
+      warn_after: {count: 9, period: day}
+      error_after: {count: 16, period: day}
+
+    tables:
+
+      # ---------------------------------------------------------------------
+      # Reference / dimension sources
+      # ---------------------------------------------------------------------
+      - name: conferences
+        description: >
+          25 rows, FBS and FCS both (IDs 1-11 are FBS including 'FBS Indep.',
+          12-25 FCS). ABBREVIATION equals NAME on every row, so prep keeps
+          only one. The subdivision split is derived in stg_ncaaf__conferences
+          from the ID ranges, verified against the live API.
+        columns:
+          - name: id
+            description: "BallDontLie conference ID. Natural key."
+            tests: [unique, not_null]
+
+      - name: teams
+        description: >
+          536 rows covering FBS, FCS and below. CONFERENCE is a bare NUMBER
+          id joining to conferences (the API's own spec wrongly documents a
+          string) and is NULL for 29 rows, so it carries no not_null test.
+          Only ~134 rows are FBS programs; stg_ncaaf__teams classifies every
+          row rather than filtering any, the WNBA is_franchise pattern.
+        columns:
+          - name: id
+            description: "BallDontLie team ID. Natural key."
+            tests: [unique, not_null]
+          - name: conference
+            description: "Conference id, NULL for 29 independents/unmapped rows."
+            tests:
+              - relationships: {to: "source('ncaaf_raw', 'conferences')", field: id}
+
+      - name: players
+        description: >
+          124,089 rows -- the largest reference table in the account, FBS+FCS
+          rosters with churn. HEIGHT, WEIGHT and JERSEY_NUMBER are TEXT and
+          arrived in a later schema evolution (NULL in early loads). Holds
+          each player's current team only.
+        columns:
+          - name: id
+            description: "BallDontLie player ID. Natural key."
+            tests: [unique, not_null]
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'teams')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Game-grain sources
+      # ---------------------------------------------------------------------
+      - name: games
+        description: >
+          One row per game, seasons 2024-2026, ~4,977 rows including the full
+          2026 scheduled slate. STATUS is 'pre'/'post' with an undocumented
+          STATUS_STATE ('scheduled'/'final'); a live value could appear
+          mid-load so neither is tested with accepted_values. SCHEDULED ROWS
+          CARRY FAKE ZERO TOTALS in HOME_SCORE/AWAY_SCORE with NULL quarter
+          scores: completedness must derive from status, never from scores.
+          Postseason (bowls, CFP) is WEEK 999 -- no season_type exists for
+          this sport -- with one known upstream mislabel (the Jan 2025 Gator
+          Bowl as week 1). Team blocks are VISITOR_TEAM__*, score columns are
+          AWAY_SCORE_*; prep normalizes to home/away. HOME/AWAY_SCORE_OT
+          arrived late (appended after _DLT_ID).
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: season
+            tests: [not_null]
+          - name: home_team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'teams')", field: id}
+          - name: visitor_team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'teams')", field: id}
+
+      - name: player_stats
+        description: >
+          One row per player per completed game, ~173,688 rows. Embeds the
+          full game payload (GAME__* including scores) but NOT the game's
+          team blocks -- home/away identity joins from games. Stat fields:
+          passing, rushing, receiving, tackles, sacks; no fumbles, no
+          kicking/punting, no returns (the API does not carry them), and no
+          receiving_targets column despite the spec (never non-null upstream,
+          and dlt drops all-null columns).
+          Variant twins: TACKLES_FOR_LOSS__V_DOUBLE, PASSING_QBR__V_DOUBLE,
+          SACKS__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, game__id]
+        columns:
+          - name: player__id
+            tests: [not_null]
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'games')", field: id}
+
+      - name: team_stats
+        description: >
+          One row per team per completed game, ~6,698 rows (a handful of
+          completed games have no stat rows; fact_ncaaf_team_game anchors on
+          games for exactly that reason). GAME__* here is the trimmed 4-field
+          stub (id/date/season/week), unlike player_stats.
+          THIRD_DOWN_EFFICIENCY / FOURTH_DOWN_EFFICIENCY are TEXT '5-12'
+          made-attempts pairs and POSSESSION_TIME is TEXT '31:24'; prep
+          parses all three. No variant twins.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, game__id]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'teams')", field: id}
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'games')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Season-grain sources
+      # ---------------------------------------------------------------------
+      - name: player_season_stats
+        description: >
+          One row per player per season, ~17,198 rows (2024-2025). Carries
+          BOTH a top-level TEAM__* (the stat line's team) and a nested
+          PLAYER__TEAM__* (the player's current team); they can disagree
+          across transfers, and prep uses the stat-line TEAM__* only.
+          Variant twin: RECEIVING_YARDS_PER_GAME__V_DOUBLE -- the most
+          dangerous twin in the schema, because the base column is NUMBER and
+          a per-game average is almost always fractional, so the base column
+          alone is near-useless.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests: [not_null]
+
+      - name: team_season_stats
+        description: >
+          One row per team per season, ~270 rows -- FBS coverage only
+          (about 135 teams x 2 completed seasons). Includes opponent totals
+          (OPP_PASSING_YARDS, OPP_RUSHING_YARDS) that exist nowhere else.
+          Variant twin: PASSING_YARDS_PER_GAME__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'teams')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Snapshot sources
+      # ---------------------------------------------------------------------
+      - name: standings
+        description: >
+          THE ONLY SCD2 TABLE IN THIS SOURCE: dlt loads it with merge/scd2,
+          so rows carry _DLT_VALID_FROM/_DLT_VALID_TO and history accumulates
+          weekly. Current rows are WHERE _DLT_VALID_TO IS NULL. One row per
+          team per conference per season version; CONFERENCE__* here is the
+          only denormalized conference block in the source. WINS is NULL on
+          preseason rows (the API publishes 0-0 slates before kickoff).
+          Records can carry ties historically. Variant twins:
+          WIN_PERCENTAGE__V_DOUBLE, GAMES_BEHIND__V_DOUBLE.
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'teams')", field: id}
+          - name: season
+            tests: [not_null]
+
+      - name: rankings
+        description: >
+          AP-style poll, one row per season/week/rank, 25 rows per published
+          week, weeks 2-16. NO POLL IDENTIFIER EXISTS -- the API exposes one
+          poll and does not say which. The endpoint returns only the latest
+          published week per call, so the weekly cron accumulates the season
+          poll by poll and history was backfilled week by week. RECORD is a
+          TEXT 'W-L' pair; TREND is text like '+1'/'-'. A rank tie produced
+          one 26-row week in 2024.
+        columns:
+          - name: season
+            tests: [not_null]
+          - name: week
+            tests: [not_null]
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('ncaaf_raw', 'teams')", field: id}

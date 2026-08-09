@@ -114,6 +114,32 @@ models:
         +materialized: semantic_view
         +schema: ANALYTICS
 
+    # -------------------------------------------------------------------------
+    # ncaaf -- third league, same layer shape. Differences live in the models:
+    # completedness derives from the source's pre/post status (fake 0-0 totals
+    # on scheduled rows), postseason is week 999 (no season_type exists for
+    # this sport), and the rankings tree has no NFL/WNBA sibling -- the AP-style
+    # poll is unique to college.
+    # -------------------------------------------------------------------------
+    ncaaf:
+      +tags: ['ncaaf']
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'ncaaf') | as_bool }}"
+
+      prep:
+        +materialized: view
+        +schema: PREP
+
+      core:
+        +schema: CORE
+        dimensions:
+          +materialized: table
+        facts:
+          +materialized: table
+
+      semantic_views:
+        +materialized: semantic_view
+        +schema: ANALYTICS
+
 tests:
   cortex_agent_lifecycle:
     # Singular tests are per-sport (tests/nfl/, tests/wnba/) and gate on
@@ -123,6 +149,8 @@ tests:
       +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
     wnba:
       +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'wnba') | as_bool }}"
+    ncaaf:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'ncaaf') | as_bool }}"
 
 sources:
   cortex_agent_lifecycle:
@@ -133,3 +161,5 @@ sources:
       +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
     wnba_raw:
       +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'wnba') | as_bool }}"
+    ncaaf_raw:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'ncaaf') | as_bool }}"
