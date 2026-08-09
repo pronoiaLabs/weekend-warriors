@@ -1,0 +1,325 @@
+# NCAAF pipelines, loaded from the BallDontLie NCAAF API.
+#
+# Every file in this directory is merged into one registry, so pipeline names must be
+# unique across ALL of them, not just within this file. `defaults:` below applies only
+# to this file's pipelines, which is what keeps a per-source file self-contained.
+#
+# SECRETS ARE NEVER STORED HERE. A `secret:<path>` value points at a key in
+# .dlt/secrets.toml (or a Snowflake SECRET bound to an env var); see the client block.
+#
+# THE VENDOR SPEC IS WRONG ABOUT THIS API in several places, so everything below is
+# authored from live probes (2026-08-09, recorded in WORKFLOW-7), the same discipline
+# the WNBA registry established. The probe facts that shape this file:
+#
+#   - The team object is {id, conference, college, name, full_name, abbreviation}
+#     where `conference` is the NUMERIC conference id (the spec claims a bare string
+#     and no id). Team-to-conference joins are direct.
+#   - /teams ignores its documented conference_id filter and always returns all 536
+#     teams (FBS and FCS both) in one unpaginated payload. 29 teams have a null
+#     conference.
+#   - Game status is WNBA-shaped ('pre'/'post' plus an undocumented `status_state`),
+#     NOT the NFL's kickoff-time strings. Scheduled games carry FAKE ZERO totals in
+#     home_score/away_score with null quarter scores: completedness must come from
+#     status, never from scores. That is a dbt-layer concern, recorded here so nobody
+#     "fixes" the raw load to null them.
+#   - There is NO season_type parameter anywhere, unlike the NFL. Bowls and the CFP
+#     are marked week 999 on the row (with at least one known mislabel: the Jan 2025
+#     Gator Bowl carries week 1). No resource triplication needed.
+#   - /standings requires BOTH conference_id and season, so a standings load fans out
+#     over the conference list.
+#   - /rankings with only a season returns ONLY THE LATEST WEEK (one AP-shaped poll,
+#     25 rows, no poll identifier). Weeks 2-16 exist for a completed season; a
+#     backfill iterates `week=` by hand.
+
+# ---------------------------------------------------------------------------
+# Anchors only. load_registry reads `defaults` and `pipelines` and ignores this key;
+# pyyaml expands the alias at parse time so nothing downstream sees anchors.
+#
+# Same auth shape as the NFL and WNBA clients: BallDontLie wants the raw key in an
+# Authorization header with no scheme prefix, so the explicit api_key form, not the
+# `auth: {token: ...}` shorthand that would send "Bearer <key>".
+#
+# `single_page` is the client-wide default because /conferences, /teams, /standings
+# and /rankings all return a bare `data` array with no `meta` object. Paginated
+# endpoints override it locally.
+# ---------------------------------------------------------------------------
+anchors:
+  ncaaf_client: &ncaaf_client
+    base_url: "https://api.balldontlie.io/ncaaf/v1/"
+    auth:
+      # resolved from .dlt/secrets.toml -> [sources.ncaaf] api_key = "..."
+      # env var equivalent: SOURCES__NCAAF__API_KEY
+      type: api_key
+      name: Authorization
+      location: header
+      api_key: "secret:sources.ncaaf.api_key"
+    paginator: single_page
+
+# `write_disposition` deliberately NOT set in defaults (a pipeline-level disposition
+# overwrites every resource's own; see the NFL registry header for the full note).
+# `database` is a STEM: NCAAF -> NCAAF_DEV_DB / NCAAF_PROD_DB via models.resolve_database.
+defaults:
+  destination: snowflake
+  database: NCAAF             # -> NCAAF_DEV_DB / NCAAF_PROD_DB
+  dataset_name: RAW           # target Snowflake schema inside that database
+  group: ncaaf                # selects the whole sport: make run-local GROUP=ncaaf
+  # College football rolls over in August, same as the NFL. Declared explicitly even
+  # though 8 is the default: a silent fallback is the documented failure mode, and the
+  # WNBA's 5 exists precisely because nobody should have to remember which sports
+  # inherit the default.
+  season_rollover_month: 8
+  load_warehouse: DLT_WH      # shared Gen2 multi-cluster warehouse
+  compute_pool: DLT_POOL      # shared SPCS compute pool
+  secret: DLT_DB.OPS.NCAAF_API_KEY    # Snowflake SECRET holding the API key
+  env_var: SOURCES__NCAAF__API_KEY    # matches `secret:sources.ncaaf.api_key` above
+  external_access: NCAAF_API_EAI      # egress to api.balldontlie.io
+
+pipelines:
+  # --- Reference data: conferences + teams + players ------------------------
+  # Slow-changing entities everything else joins against, bundled because they share
+  # a cadence. Conferences are first-class here, unlike the NFL where conference is
+  # an enum on the team: college realignment makes the list itself data.
+  - name: ncaaf_reference
+    source: rest_api
+    # weekly, Wednesday. 536 teams and 124k players make this the largest reference
+    # crawl in the account (~1,250 requests); rosters churn on the college calendar
+    # (signing days, transfer portal windows), not daily waivers, so weekly is
+    # enough. 02:00 Wed sits an hour after WNBA's shot_locations (01:00 Wed) and
+    # well clear of the NFL band.
+    schedule: "0 2 * * 3"
+    config:
+      client: *ncaaf_client
+      resource_defaults:
+        endpoint:
+          data_selector: data  # rows live under `data`; without this the envelope loads as one row
+      resources:
+        # 25 rows, one request, no meta. Full snapshot, `replace`, no key needed.
+        - name: conferences
+          write_disposition: replace
+          endpoint:
+            path: conferences
+
+        # All 536 teams (FBS + FCS) in ONE unpaginated payload; the documented
+        # conference_id filter is ignored by the server, so there is nothing to
+        # filter by and nothing to paginate. Full snapshot beats incremental.
+        - name: teams
+          write_disposition: replace
+          endpoint:
+            path: teams
+
+        # Every player, cursor-paginated. `merge` on the integer `id` so re-runs
+        # update in place (transfers, measurements) instead of appending. The
+        # nested `team` object flattens to team__id etc., which is wanted: one flat
+        # table, no child table for a single embedded record.
+        #
+        # /players/active exists but is a subset by definition; the full list is
+        # what the modelling layer wants, and departures are visible as players
+        # whose team stops producing stat rows.
+        - name: players
+          primary_key: id
+          write_disposition: merge
+          endpoint:
+            path: players
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+
+  # --- Schedule and results --------------------------------------------------
+  # ONE resource, not the NFL's three: this API has no season_type parameter, and
+  # postseason games arrive in the same stream marked week 999. The full 2026 slate
+  # is already live (probe: week 1 starts 2026-08-29, all status 'pre'), so a daily
+  # in-season run keeps both the schedule and the scores fresh, and `merge` on `id`
+  # updates a game in place as it goes pre -> post.
+  #
+  # `seasons[]` (bracketed array form) scoped to the current season for the same
+  # reason as every other sport: a Task passes no arguments, and a bare /games pulls
+  # every season the API holds. A backfill overrides it:
+  #   make run-snowflake NAME=ncaaf_games PARAM="seasons[]=2024"
+  - name: ncaaf_games
+    source: rest_api
+    # daily. 06:00 UTC is 2am ET: the latest college kickoffs (Hawaii, ~10:30pm ET
+    # Saturday) go final around 05:45 UTC, so a daily 06:00 run captures the whole
+    # Saturday slate the same night. The NCAAF band is 02:00-07:59 UTC, below the
+    # NFL's 08:00-13:00 and WNBA's 14:00-23:00.
+    schedule: "0 6 * * *"
+    config:
+      client: *ncaaf_client
+      resources:
+        - name: games
+          primary_key: id
+          write_disposition: merge
+          endpoint:
+            path: games
+            data_selector: data
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+
+  # --- Box scores: player grain and team grain -------------------------------
+  # Two tables, one pipeline, same bundling logic as nfl_stats: both are facts
+  # produced by a game finishing, and they share a cadence. Roughly 3,000+ games a
+  # season across FBS+FCS puts player_stats in the low hundreds of thousands of rows
+  # per season: the largest tables in this file, hence their own pipeline so a
+  # failure here cannot take the schedule down with it.
+  #
+  # IDENTITY: neither endpoint returns an id. Player stats embed the full player,
+  # team and game objects (flattened to player__id, game__id, ...); team stats embed
+  # team plus a 4-field game stub. Composite keys over the flattened ids, verified
+  # against live payloads.
+  #
+  # No season_type split needed (none exists); postseason rows arrive with the
+  # regular stream.
+  - name: ncaaf_stats
+    source: rest_api
+    # daily, an hour after games. Box scores follow the games that just went final;
+    # the two stay separate pipelines so a stats failure cannot take the schedule
+    # refresh down with it.
+    schedule: "0 7 * * *"
+    config:
+      client: *ncaaf_client
+      resource_defaults:
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator:
+            type: cursor
+            cursor_path: meta.next_cursor
+            cursor_param: cursor
+          params:
+            per_page: 100
+            seasons[]: "{current_season}"
+      resources:
+        - name: player_stats
+          primary_key: [player__id, game__id]
+          endpoint:
+            path: player_stats
+        - name: team_stats
+          primary_key: [team__id, game__id]
+          endpoint:
+            path: team_stats
+
+  # --- Season aggregates ------------------------------------------------------
+  # Per-player and per-team season rollups the API maintains server-side. Loaded
+  # rather than modelled because they include rate stats (yards_per_game, ratings)
+  # whose denominators the game tables cannot always reproduce, and the team rollup
+  # carries opponent totals (opp_passing_yards) that exist nowhere else.
+  #
+  # `season` here is the SINGULAR param (probe-verified working); scoped to the
+  # current season because a bare run would pull every season's rollups. Rows carry
+  # `season`, so the composite keys make multi-season backfills merge cleanly.
+  - name: ncaaf_season_stats
+    source: rest_api
+    # weekly, Monday. Season rollups only move when games complete, and the college
+    # week is effectively over Saturday night; Monday 03:00 sits after standings.
+    schedule: "0 3 * * 1"
+    config:
+      client: *ncaaf_client
+      resource_defaults:
+        write_disposition: merge
+        endpoint:
+          data_selector: data
+          paginator:
+            type: cursor
+            cursor_path: meta.next_cursor
+            cursor_param: cursor
+          params:
+            per_page: 100
+            season: "{current_season}"
+      resources:
+        - name: player_season_stats
+          primary_key: [player__id, season]
+          endpoint:
+            path: player_season_stats
+        - name: team_season_stats
+          primary_key: [team__id, season]
+          endpoint:
+            path: team_season_stats
+
+  # --- Standings ---------------------------------------------------------------
+  # /standings requires BOTH conference_id and season (HTTP 400 otherwise), so one
+  # season's standings is a fan-out: the parent lists the 25 conferences, dlt issues
+  # one /standings request per conference id. Same two-step pattern as nfl_plays,
+  # including the format-placeholder syntax (the dict `resolve` form is for PATH
+  # params only and fails the whole source for query params).
+  #
+  # A SNAPSHOT, NOT A FACT: scd2 with merge_key season, exactly the NFL standings
+  # rationale. Every run visits all 25 conferences, so a season's extract is
+  # complete and partition-by-season retirement is correct. Standings exist
+  # preseason with 0-0 records and null wins (probe: 2026 already populated), so
+  # the first in-season run versions them rather than creating them.
+  #
+  # No paginator override: the response has no meta object; client-wide single_page
+  # is already right.
+  - name: ncaaf_standings
+    source: rest_api
+    # weekly, Monday. Standings settle when the Saturday slate finishes; Monday
+    # 02:00 UTC (Sunday 10pm ET) has every weekend game final, including the rare
+    # Sunday game. scd2 versions the weekly snapshot.
+    schedule: "0 2 * * 1"
+    config:
+      client: *ncaaf_client
+      resources:
+        # Parent. Never loaded; exists only to yield conference ids for the fan-out.
+        # ncaaf_reference owns the conferences TABLE.
+        - name: conferences_ref
+          selected: false
+          endpoint:
+            path: conferences
+            data_selector: data
+
+        - name: standings
+          merge_key: season
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          endpoint:
+            path: standings
+            data_selector: data
+            params:
+              conference_id: "{resources.conferences_ref.id}"
+              # REQUIRED by the API (singular). A backfill overrides season but the
+              # fan-out still visits every conference:
+              #   make run-snowflake NAME=ncaaf_standings RESOURCE=standings PARAM="season=2024"
+              season: "{current_season}"
+
+  # --- Rankings (AP-shaped poll) -----------------------------------------------
+  # Unique to college football. THE ENDPOINT IS A "LATEST WEEK" WINDOW: with only a
+  # season it returns the 25 rows of the most recent published week, not the whole
+  # season (probe: season=2025 alone returns week 16 only; weeks 2-16 exist via the
+  # week param; week 1 is empty; there is exactly one poll and no poll id field).
+  #
+  # The weekly scheduled run therefore captures each week as it is published, and
+  # `merge` on [season, week, team__id] accumulates the season poll-by-poll without
+  # ever re-fetching history. A season backfill is a manual week loop:
+  #   for w in 2..16: make run-snowflake NAME=ncaaf_rankings RESOURCE=rankings PARAM="season=2025&week=$w"
+  # (run.py passes PARAM through; each week merges on its own key rows.)
+  #
+  # If a scheduled run fires before the first poll of a season exists, the API
+  # returns 200 with an empty array and the run is a clean no-op: correct behavior,
+  # not a failure to investigate.
+  - name: ncaaf_rankings
+    source: rest_api
+    # weekly, Monday. The AP poll releases Sunday afternoon US time (~18:00 UTC);
+    # Monday 04:00 UTC captures the fresh week. Before the season's first poll the
+    # endpoint returns an empty array and the run is a clean no-op by design.
+    schedule: "0 4 * * 1"
+    config:
+      client: *ncaaf_client
+      resources:
+        - name: rankings
+          primary_key: [season, week, team__id]
+          write_disposition: merge
+          endpoint:
+            path: rankings
+            data_selector: data
+            params:
+              # REQUIRED by the API (singular). No `week` here: bare season means
+              # "latest published week", which is exactly what a weekly run wants.
+              season: "{current_season}"

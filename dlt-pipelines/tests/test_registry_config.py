@@ -125,6 +125,24 @@ def test_real_registry_sends_every_wnba_pipeline_to_the_wnba_databases():
         )
 
 
+def test_real_registry_sends_every_ncaaf_pipeline_to_the_ncaaf_databases():
+    """Sport #3, same stem discipline as the first two."""
+    registry = load_registry()
+    ncaaf = [s for s in registry.pipelines if s.name.startswith("ncaaf_")]
+    assert ncaaf, "expected the NCAAF pipelines to be present"
+
+    for spec in ncaaf:
+        assert resolve_database(spec, "DEV") == "NCAAF_DEV_DB"
+        assert resolve_database(spec, "PROD") == "NCAAF_PROD_DB"
+        assert spec.dataset_name == "RAW"
+        # Same rollover as the NFL, but asserted rather than inherited: the WNBA's
+        # month exists precisely because the default is a silent fallback, and this
+        # test is what notices if the explicit declaration is ever dropped.
+        assert spec.season_rollover_month == 8, (
+            f"{spec.name}: college football seasons open in August"
+        )
+
+
 def test_each_source_declares_one_rollover_month() -> None:
     """A league whose pipelines disagree about its own season boundary.
 
@@ -325,6 +343,13 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "wnba_advanced_season": 1,   # once, in resource_defaults, all 8 measure_types
         "wnba_shot_locations": 1,    # once, in resource_defaults
         "wnba_plays": 1,             # the single parent driving the fan-out
+        # NCAAF. No season_type parameter exists for this sport, so no resource is
+        # triplicated and every pipeline needs exactly one token.
+        "ncaaf_games": 1,            # the single games resource
+        "ncaaf_stats": 1,            # once, in resource_defaults
+        "ncaaf_season_stats": 1,     # once, in resource_defaults
+        "ncaaf_standings": 1,        # the standings child; the conference parent is season-free
+        "ncaaf_rankings": 1,         # bare season = latest published week, by design
     }
     for name, count in expected.items():
         values = season_params(registry.get(name).config)
@@ -338,6 +363,7 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
     checked = set(expected) | {
         "nfl_reference", "nfl_injuries",
         "wnba_reference", "wnba_injuries", "wnba_standings",
+        "ncaaf_reference",
         "sample",
     }
     assert {s.name for s in registry.pipelines} == checked, (
@@ -357,6 +383,7 @@ def test_pipelines_with_no_season_have_no_token() -> None:
     for name in (
         "nfl_reference", "nfl_injuries",
         "wnba_reference", "wnba_injuries", "wnba_standings",
+        "ncaaf_reference",
     ):
         assert "{current_season}" not in json.dumps(load_registry().get(name).config)
 
