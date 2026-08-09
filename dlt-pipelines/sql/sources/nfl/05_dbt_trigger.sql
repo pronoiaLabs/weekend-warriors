@@ -170,10 +170,13 @@ BEGIN
 
   -- TASK_HISTORY.RETURN_VALUE comes ONLY from SYSTEM$SET_RETURN_VALUE; a
   -- proc's RETURN string never reaches it (verified: None). V_DBT_RUNS
-  -- parses build_id out of this. Guarded because the call errors when the
-  -- proc is invoked outside a task run (manual smoke tests).
+  -- parses build_id out of this. Two traps, both verified: the function
+  -- demands a CONSTANT argument (a :bind or concatenation is a compilation
+  -- error), hence EXECUTE IMMEDIATE assembling a literal; and it errors
+  -- when the proc runs outside a task (manual smoke tests), hence the
+  -- guard.
   BEGIN
-    SELECT SYSTEM$SET_RETURN_VALUE('built after ' || :drained || ' load(s), build_id ' || :build_id);
+    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''built after ' || drained || ' load(s), build_id ' || build_id || ''')';
   EXCEPTION
     WHEN OTHER THEN
       NULL;

@@ -156,12 +156,18 @@ bindings verified via TAG_REFERENCES; DBT_RUNNER_ROLE reads
 ACCOUNT_USAGE.TASK_HISTORY with no new grant (verified empirically).
 ALTER TASK SET TAG works on a started task, no suspend needed.
 
-**One correction:** TASK_HISTORY.RETURN_VALUE comes only from
-SYSTEM$SET_RETURN_VALUE, not from a proc's RETURN string (verified None),
-so SP_DBT_BUILD now sets it explicitly (guarded for non-task invocations);
-V_DBT_RUNS parses build_id from it. Self-verifies on the next scheduled
-build; today's three builds predate it and stay unjoined, which is fine
-since this data is disposable until the happy-state truncation.
+**One correction, which took two rounds:** TASK_HISTORY.RETURN_VALUE comes
+only from SYSTEM$SET_RETURN_VALUE, not from a proc's RETURN string
+(verified None), so SP_DBT_BUILD now sets it explicitly; V_DBT_RUNS parses
+build_id from it. The first version failed silently in production because
+the guard swallowed the real error: **the function demands a CONSTANT
+argument**, and stamping a concatenation with :binds is a compilation
+error ("argument 1 ... needs to be constant"). Found by escalating probe
+tasks (literal stamp works; + graph child works; + EXECUTE DBT PROJECT
+works; + binds fails), fixed by assembling the message into a literal via
+EXECUTE IMMEDIATE. Builds that ran before the fix stay unjoined and render
+unlinked on the dashboard, which is fine since this data is disposable
+until the happy-state truncation.
 
 **Changed from plan:** retention lives in 06 (same owner as the tables)
 rather than a separate file.
