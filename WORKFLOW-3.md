@@ -212,3 +212,26 @@ apostrophe names (Flau'jae Johnson) render, proving the '' escaping.
 **Changed from plan:** nothing structural.
 
 **Open:** none new.
+
+## Phase 5 - the wnba_analyst agent
+
+**Ran:** agents/wnba_analyst.sql written (470 lines, 442-line spec, four
+cortex_analyst_text_to_sql tools, claude-opus-5 orchestration, same budget
+and structure as nfl_analyst field for field). Deployed to dev via
+run-operation deploy_wnba_analyst.
+
+**Result:** GATE GREEN. Agent WNBA_DEV_DB.DEV_TGORDONJR.WNBA_ANALYST
+exists; all four tool_resources point at the dev semantic views; zero
+unsubstituted <<>> tokens.
+
+**Notable content choices:** ROUTE BY TIME FIRST is the lead orchestration
+axis (TeamHistory is the only multi-year tool; nfl_analyst has no such
+axis); nfl's direction-resolution rule is replaced by grain resolution
+between the two player tools; W-L-no-ties stated as both fact and format;
+SQL-generation rules deliberately absent (they live in the views); the
+not-available list declines play-by-play, weight/college, multi-season
+player stats, shot coordinates, championships, live data.
+
+**Changed from plan:** none.
+
+**Open:** none new.
