@@ -68,3 +68,10 @@ logs.txt
 FIX-PLAN.md
 FIX-PLAN.html
 SPCS-PLAN.md
+
+# Session records and the personal task tracker: working notes for the
+# maintainer, not part of the public codebase. They stay on disk (CLAUDE.md
+# and the session tooling read them) but are not published.
+WORKFLOW-*.md
+BACKLOG.md
+BACKLOG.html
