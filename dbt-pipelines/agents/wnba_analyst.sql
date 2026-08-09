@@ -28,19 +28,22 @@
 {% macro deploy_wnba_analyst(alter=false) %}
 {%- set spec -%}
 models:
-  # claude-opus-5: Anthropic's flagship. 1M token context, 128K output, strongest
-  # on long-horizon agentic work and tool selection, which is what orchestration
-  # is. Public Preview, so not for production-critical use yet.
+  # claude-sonnet-5: cost decision, 2026-08-09. The Cortex Agents rate card
+  # (Credit Consumption Table 6d) prices it at 1.30/6.50 credits per 1M
+  # input/output tokens versus claude-opus-5's 3.25/16.26, roughly 40% of the
+  # cost per question. That price is promotional: it rises 50% on 2026-09-01
+  # to claude-sonnet-4-5's rate (1.95/9.76), still ~60% of opus.
+  # Identifier verified against the Cortex Agents supported-model list.
   #
-  # Verified available in this account. Requires cross-region inference, which is
-  # set to ANY_REGION at the account level.
+  # Requires cross-region inference, which is set to ANY_REGION at the
+  # account level.
   #
-  # Matches nfl_analyst deliberately: routing here is harder, not easier, because
-  # this agent carries five tools split across two time horizons plus a
-  # played-versus-scheduled axis.
-  # Alternatives: claude-sonnet-5 (lower latency and cost), gemini-3.1-pro, or
-  # 'auto' to let Snowflake choose.
-  orchestration: claude-opus-5
+  # Matches nfl_analyst deliberately. Routing here is the harder job: five
+  # tools split across two time horizons plus a played-versus-scheduled axis,
+  # so if a cheaper model degrades anywhere it will show here first.
+  # Alternatives: claude-opus-5 (prior choice), claude-haiku-4-5,
+  # gemini-3.1-pro, or 'auto' to let Snowflake choose.
+  orchestration: claude-sonnet-5
 
 orchestration:
   budget:

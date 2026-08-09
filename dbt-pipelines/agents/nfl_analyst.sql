@@ -27,18 +27,22 @@
 {% macro deploy_nfl_analyst(alter=false) %}
 {%- set spec -%}
 models:
-  # claude-opus-5: Anthropic's flagship. 1M token context, 128K output, strongest
-  # on long-horizon agentic work and tool selection -- which is what orchestration
-  # is. Public Preview, so not for production-critical use yet.
+  # claude-sonnet-5: cost decision, 2026-08-09. The Cortex Agents rate card
+  # (Credit Consumption Table 6d) prices it at 1.30/6.50 credits per 1M
+  # input/output tokens versus claude-opus-5's 3.25/16.26, roughly 40% of the
+  # cost per question. That price is promotional: it rises 50% on 2026-09-01
+  # to claude-sonnet-4-5's rate (1.95/9.76), still ~60% of opus.
+  # Identifier verified against the Cortex Agents supported-model list.
   #
-  # Verified available in this account. Requires cross-region inference, which is
-  # set to ANY_REGION at the account level.
+  # Requires cross-region inference, which is set to ANY_REGION at the
+  # account level.
   #
   # NOTE: GLM models are NOT available in Snowflake Cortex. The hosted families
   # are Anthropic Claude, OpenAI GPT, Google Gemini, Meta Llama, Mistral and
-  # DeepSeek. Alternatives here: claude-sonnet-5 (lower latency and cost),
-  # gemini-3.1-pro, or 'auto' to let Snowflake choose.
-  orchestration: claude-opus-5
+  # DeepSeek. Alternatives here: claude-opus-5 (prior choice, stronger
+  # routing), claude-haiku-4-5 (20% of opus cost), gemini-3.1-pro, or 'auto'
+  # to let Snowflake choose.
+  orchestration: claude-sonnet-5
 
 orchestration:
   budget:
