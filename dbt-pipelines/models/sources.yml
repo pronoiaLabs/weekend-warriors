@@ -222,3 +222,399 @@ sources:
               - relationships: {to: "source('nfl_raw', 'players')", field: id}
           - name: week
             tests: [not_null]
+
+  - name: wnba_raw
+    description: >
+      Raw WNBA data landed by dlt from the BallDontLie API. Owned by the dlt
+      pipeline -- dbt reads this schema and must never write to it.
+
+      Deliberately NOT environment-driven, matching nfl_raw: every developer
+      reads the same production raw tables.
+
+      Grain note: dlt flattens parent records into every child row (GAME__* /
+      TEAM__* / PLAYER__* payloads), and unlike NFL there are no child tables
+      at all -- nested API objects became double-underscore columns.
+
+      Variant-twin registry: where the API mixed ints and floats across rows,
+      dlt split the column into <column> plus <column>__V_DOUBLE. Reading only
+      the base column silently drops the float rows, so prep folds every twin
+      back together with wnba_coalesce_variant(). Each affected table lists
+      its twins in its description below; this is the canonical registry,
+      auditable against INFORMATION_SCHEMA.COLUMNS LIKE '%__V_DOUBLE'.
+    database: WNBA_PROD_DB
+    schema: RAW
+
+    loaded_at_field: "TO_TIMESTAMP_TZ(_dlt_load_id::FLOAT::NUMBER)"
+    # Looser than nfl_raw: most WNBA pipelines are weekly Tuesday crons, so
+    # one missed week warns and two missed weeks error.
+    freshness:
+      warn_after: {count: 9, period: day}
+      error_after: {count: 16, period: day}
+
+    tables:
+
+      # ---------------------------------------------------------------------
+      # Reference / dimension sources
+      # ---------------------------------------------------------------------
+      - name: teams
+        description: >
+          35 rows, of which only 15 are real franchises (IDs 1-15, including
+          the defunct Sacramento Monarchs and Houston Comets) -- the rest are
+          All-Star squads, national teams, TBD placeholders, and the 2026
+          expansion teams Tempo (TOR) and Fire (POR). All 20 non-original rows
+          have NULL conference, so there is no accepted_values test on
+          conference and no unique test on abbreviation (the TBD placeholders
+          share codes). stg_wnba__teams classifies every row instead of
+          filtering any.
+        columns:
+          - name: id
+            description: "BallDontLie team ID. Natural key."
+            tests: [unique, not_null]
+
+      - name: players
+        description: >
+          Player roster, 860 rows. Holds each player's CURRENT team only.
+          WEIGHT and COLLEGE are corrupted upstream -- when weight is absent
+          the college name shifts into the WEIGHT field (0 of 860 rows have a
+          numeric weight), so prep drops both columns.
+        columns:
+          - name: id
+            description: "BallDontLie player ID. Natural key."
+            tests: [unique, not_null]
+          - name: team__id
+            description: "Current team. Verified non-null for all 860 rows."
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      - name: games
+        description: >
+          One row per game, 2026 season only, 333 rows including All-Star,
+          preseason and future scheduled games. STATUS is 'pre' (scheduled) or
+          'post' (completed) today; a live-game status could appear mid-load,
+          so status is documented rather than tested. POSTSEASON is a boolean;
+          the full season-type classification (including All-Star and
+          Preseason) is derived in stg_wnba__games.
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: season
+            tests: [not_null]
+          - name: home_team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+          - name: visitor_team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Box-score fact sources
+      # ---------------------------------------------------------------------
+      - name: player_stats
+        description: >
+          Player box score, one row per player per game, 5,751 rows. MIN is
+          TEXT. NULL means ZERO for stat columns -- the API omits zero-valued
+          keys -- except on DNP rows (MIN = '0'), where every stat is NULL.
+          Prep applies the DNP-aware coalesce. Uses TURNOVER and PF where
+          team_stats says TURNOVERS and FOULS; prep normalizes both sides.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [game__id, player__id]
+        columns:
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'games')", field: id}
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+          - name: team__id
+            description: "Team the player appeared for in THIS game. The only historical team affiliation available."
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      - name: team_stats
+        description: >
+          Team box score, one row per team per game, 476 rows (238 games x 2).
+          Carries FG_PCT / FG3_PCT / FT_PCT which player_stats lacks.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [game__id, team__id]
+        columns:
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'games')", field: id}
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      - name: player_injuries
+        description: >
+          Injury report snapshot, 38 rows. dlt SCD2 (_dlt_valid_from /
+          _dlt_valid_to); history accrues as the daily pipeline reruns.
+          RETURN_DATE is TEXT.
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: standings
+        description: >
+          One row per team per season, dlt SCD2. The ONLY multi-season table:
+          235 rows spanning 2008-2026 (all 19 seasons present). Split records
+          (home/away/conference) are 'W-L' text with no tie position.
+          Variant twins: GAMES_BEHIND__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season, _dlt_valid_from]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+          - name: season
+            tests: [not_null]
+
+      # ---------------------------------------------------------------------
+      # Season aggregate sources -- SEASON_TYPE is '2' (regular) / '3'
+      # (playoffs) integer-as-text here, but 'regular' / 'playoffs' strings on
+      # the advanced and shot-location tables. wnba_season_type_name()
+      # normalizes all of it in prep.
+      # ---------------------------------------------------------------------
+      - name: player_season_stats
+        description: >
+          Basic per-season line, one row per player per season per season
+          type, 196 rows (2026 only). SUBSET WARNING: covers fewer players
+          than the advanced-season family (196 vs 224) -- never use this
+          table as the spine of a player-season mart.
+          Variant twins: FG3M__V_DOUBLE, FG3_PCT__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season, season_type]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: team_season_stats
+        description: >
+          Team per-season line, 15 rows (2026 regular season).
+          Variant twins: FG3A__V_DOUBLE, OREB__V_DOUBLE, STL__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season, season_type]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Advanced stats -- unlike NFL's Next Gen sources, these cover ONE
+      # unified player population: all five player_season_* tables span the
+      # identical 224 players (verified pairwise in prod), because basketball
+      # has no positional disciplines. This is why sv_wnba_player_advanced
+      # ships enabled while sv_nfl_player_advanced is disabled.
+      # ---------------------------------------------------------------------
+      - name: player_game_advanced_stats
+        description: >
+          Advanced player box score, one row per player per game, 5,569 rows,
+          124 columns with metrics nested under STATS__FOUR_FACTORS__* /
+          STATS__ADVANCED__* / STATS__SCORING__* / STATS__USAGE__* /
+          STATS__MISC__*. Covers fewer player-games than player_stats --
+          fact_player_game_advanced left-joins accordingly.
+          Variant twins (15): assist_to_turnover, estimated_net_rating,
+          net_rating, offensive_rebound_percentage (advanced and four_factors),
+          percentage_assisted3pt, percentage_points3pt,
+          percentage_points_fast_break, percentage_unassisted3pt, and the
+          usage percentage_{blocks, blocks_allowed, personal_fouls,
+          rebounds_offensive, steals, three_pointers_made} -- all under their
+          STATS__* prefixes.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [game__id, player__id]
+        columns:
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'games')", field: id}
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: team_game_advanced_stats
+        description: "Advanced team box score, one row per team per game, 466 rows, 94 columns, same STATS__* nesting."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [game__id, team__id]
+        columns:
+          - name: game__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'games')", field: id}
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      - name: player_season_advanced
+        description: >
+          One row per player per season (224 rows, 2026 regular season only;
+          SEASON_TYPE='regular', SCOPE/MEASURE_TYPE/PER_MODE are constants).
+          Roughly half the columns are *_RANK league ranks, dropped in prep.
+          Variant twins: STATS__MIN__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: player_season_misc
+        description: "Same grain and population as player_season_advanced (224 rows)."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: player_season_scoring
+        description: >
+          Same grain and population as player_season_advanced (224 rows).
+          Variant twins: STATS__MIN__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: player_season_usage
+        description: "Same grain and population as player_season_advanced (224 rows)."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: player_season_defense
+        description: "Same grain and population as player_season_advanced (224 rows)."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: team_season_advanced
+        description: "One row per team per season (15 rows, 2026 regular season)."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      - name: team_season_four_factors
+        description: "Same grain as team_season_advanced (15 rows)."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      - name: team_season_opponent
+        description: "Same grain as team_season_advanced (15 rows). Opponent-allowed measures."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      # ---------------------------------------------------------------------
+      # Shot locations -- pivoted wide: STATS__SHOT_ZONES__<ZONE>__{FGA,FGM,
+      # FG_PCT}. Zone names starting with a digit got a leading underscore
+      # from dlt (STATS__SHOT_ZONES___30_34_FT__...). Core unpivots to long.
+      # ---------------------------------------------------------------------
+      - name: player_shots_by_zone
+        description: >
+          One row per player per season (223 rows), court-zone scheme
+          (restricted area, paint, mid-range, corner/above-break 3, backcourt).
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: player_shots_5ft
+        description: >
+          One row per player per season (223 rows), 5-foot distance bands.
+          Variant twins: STATS__SHOT_ZONES___30_34_FT__FG_PCT__V_DOUBLE,
+          STATS__SHOT_ZONES___35_39_FT__FG_PCT__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player__id, season]
+        columns:
+          - name: player__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'players')", field: id}
+
+      - name: team_shots_by_zone
+        description: >
+          One row per team per season (15 rows), court-zone scheme.
+          Variant twins: STATS__SHOT_ZONES__BACKCOURT__FG_PCT__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}
+
+      - name: team_shots_5ft
+        description: >
+          One row per team per season (15 rows), 5-foot distance bands.
+          Variant twins: STATS__SHOT_ZONES___35_39_FT__FG_PCT__V_DOUBLE,
+          STATS__SHOT_ZONES___40_FT__FG_PCT__V_DOUBLE.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [team__id, season]
+        columns:
+          - name: team__id
+            tests:
+              - not_null
+              - relationships: {to: "source('wnba_raw', 'teams')", field: id}

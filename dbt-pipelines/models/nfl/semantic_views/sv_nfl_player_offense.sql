@@ -108,7 +108,7 @@ dimensions (
 
     -- when
     weeks.season as season
-        comment = 'NFL season. Currently covers 2023 to 2025; new seasons are added as they load. A season starting in year N runs through February of N+1.'
+        comment = 'NFL season. Currently covers 2023 to 2025; new seasons are added as they load. A season starting in year N runs through February of N+1.',
     weeks.week as week
         comment = 'Week within the season phase. Regular season is weeks 1 to 18; numbering restarts for preseason and postseason.',
     weeks.season_type as season_type_name

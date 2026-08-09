@@ -1,0 +1,201 @@
+version: 2
+
+models:
+
+  - name: dim_wnba_team
+    description: >
+      Every team the source references. Grain: team. 35 rows, SCD1.
+      Only 17 are franchises; the rest are All-Star squads, national sides and
+      TBD placeholders, kept because games and box scores reference them by id.
+      Filter on is_franchise. No division column -- the WNBA has none.
+    columns:
+      - name: team_key
+        description: "Surrogate key. Grain of this dimension."
+        tests: [unique, not_null]
+      - name: team_id
+        tests: [unique, not_null]
+      - name: team_abbreviation
+        description: >
+          NOT unique, unlike the NFL dimension: the two placeholder rows both
+          spell it 'TBD', giving 34 distinct values over 35 rows. Identify a
+          team by team_key or team_id.
+        tests: [not_null]
+      - name: team_full_name
+        tests: [not_null]
+      - name: team_type
+        description: "Classification over explicit ids, not over conference -- conference is NULL for 20 of 35 rows."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Franchise', 'All-Star', 'National', 'Placeholder', 'Unknown']
+      - name: is_franchise
+        description: "17 rows true. The filter almost every consumer wants."
+        tests: [not_null]
+      - name: is_defunct
+        description: "Sacramento Monarchs (folded 2009) and Houston Comets (2008). Still franchises, still carry standings history."
+        tests: [not_null]
+      - name: conference
+        description: >
+          Populated for the 15 original franchises only, NULL for the other 20
+          including the two 2026 expansion clubs. Deliberately NOT tested
+          not_null. Season-accurate conference lives on fact_wnba_team_season.
+        tests:
+          - accepted_values: {values: ['Eastern Conference', 'Western Conference']}
+
+  - name: dim_wnba_player
+    description: >
+      Player biographical attributes. Grain: player. 860 rows, SCD1.
+      CARRIES A CURRENT TEAM, deliberately deviating from the NFL dimension:
+      WNBA coverage is a single season, so current team and season team are the
+      same team, and the five player-season advanced sources carry no team at
+      all. Prefer fact_wnba_player_game.team_key wherever the grain allows.
+      No weight and no college -- both are corrupted upstream and quarantined
+      in stg_wnba__players.
+    columns:
+      - name: player_key
+        description: "Surrogate key. Grain of this dimension."
+        tests: [unique, not_null]
+      - name: player_id
+        tests: [unique, not_null]
+      - name: full_name
+        tests: [not_null]
+      - name: position_abbreviation
+        description: "Single-vocabulary column, 4 values. Authoritative input for position_name."
+        tests:
+          - not_null
+          - accepted_values: {values: ['G', 'F', 'C', 'NA']}
+      - name: position_name
+        description: >
+          Clean label derived from position_abbreviation, NOT the raw source
+          text. The source's POSITION column carries two vocabularies at once
+          (191 rows 'Guard' against 169 'G'), which would split a semantic-view
+          filter in half. This is the column to expose.
+        tests:
+          - not_null
+          - accepted_values: {values: ['Guard', 'Forward', 'Center', 'Unknown']}
+      - name: position_source
+        description: "Raw source label. Audit only -- do NOT expose in a semantic view or filter on it."
+      - name: has_known_position
+        description: "False for the 130 players on the 'Not Available' member."
+        tests: [not_null]
+      - name: height_inches
+        description: "NULL for the 540 players with no height on file."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 60, max_value: 90, severity: warn}
+      - name: age
+        description: "NULL for the 541 players with no age on file."
+      - name: current_team_key
+        description: >
+          The player's CURRENT team, not a historical one. Accurate today
+          because coverage is one season; it becomes wrong the moment a second
+          season lands.
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: current_team_abbreviation
+        description: "Joined from dim_wnba_team for readability. Same caveat as current_team_key."
+        tests: [not_null]
+
+  - name: dim_wnba_game
+    description: >
+      Descriptive context per game. Grain: game. 333 rows, 2026 only.
+      NOT all played: 93 rows are still scheduled and one of the 240 complete
+      rows is the postponed game 24935 with no result. Unlike the NFL
+      dimension this one carries the final line, because fact_wnba_team_game covers
+      only the 239 games with a result and dim_wnba_game is the only complete
+      schedule. Scores are NULL on the 93 scheduled rows, but the postponed
+      row keeps its 0-0 line, so filter on has_result, not on the score.
+    columns:
+      - name: game_key
+        description: "Surrogate key. Grain of this dimension."
+        tests: [unique, not_null]
+      - name: game_id
+        tests: [unique, not_null]
+      - name: game_date
+        tests: [not_null]
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_date')", field: date_key}
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        description: >
+          Four-way classification. Only 'Regular Season' (332) and 'All-Star'
+          (1) appear today; the other two are legitimate members whose rows
+          have not landed, so they are listed rather than removed.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Regular Season', 'Postseason', 'All-Star', 'Preseason']
+      - name: game_status
+        description: "Source label, not a decoded enum -- a load can land mid-game."
+        tests:
+          - not_null
+          - accepted_values: {values: ['pre', 'post', 'in'], severity: warn}
+      - name: game_state
+        tests: [not_null]
+      - name: is_completed
+        description: "240 rows true, which includes the postponed no-result game. Use has_result to mean 'has a score'."
+        tests: [not_null]
+      - name: has_result
+        description: "239 rows true. The exact scope of fact_wnba_team_game, published so consumers do not restate the rule."
+        tests: [not_null]
+      - name: home_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: away_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: winner_team_key
+        description: >
+          NULL on the 94 rows with no result. Written as an explicit CASE
+          rather than hashing a NULL id, which would produce a real-looking key
+          that resolves to no team.
+        tests:
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: home_team_score
+        description: "NULL on the 93 scheduled rows and the 1 postponed row. Prefer fact_wnba_team_game for scoring analysis."
+      - name: away_team_score
+        description: "NULL on the 93 scheduled rows and the 1 postponed row."
+      - name: went_to_overtime
+        tests: [not_null]
+
+  - name: dim_wnba_date
+    description: >
+      Conformed calendar, generated as a dense spine. Grain: date. 6,940 rows,
+      2008-01-01 to 2026-12-31. The range comes from stg_wnba__standings, not
+      from games: standings spans 19 seasons with no dates, games covers 2026
+      only, so a games-derived spine would leave every pre-2026 standings row
+      with nothing to join to. No week concept -- the WNBA schedule has none.
+    columns:
+      - name: date_key
+        description: "Surrogate key. Grain of this dimension."
+        tests: [unique, not_null]
+      - name: full_date
+        tests: [unique, not_null]
+      - name: wnba_season
+        description: >
+          Equal to calendar_year, unlike nfl_season. A WNBA season runs May to
+          October and closes inside one calendar year, so there is no January
+          rollover. Published as its own column so a query reads the same
+          against either sport.
+        tests: [not_null]
+      - name: calendar_year
+        tests: [not_null]
+      - name: calendar_month
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 12}
+      - name: month_name
+        tests: [not_null]
+      - name: day_of_week
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 6}
+      - name: day_name
+        tests: [not_null]
+      - name: is_weekend
+        description: "Derived from dayname(), not dayofweek() -- the latter's numbering depends on the session WEEK_START parameter."
+        tests: [not_null]

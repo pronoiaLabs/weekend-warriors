@@ -18,16 +18,23 @@ models:
   cortex_agent_lifecycle:
 
     # -------------------------------------------------------------------------
-    # nfl -- one league. Config is nested per sport so a second league can be
-    # added as a sibling key without touching these settings.
+    # nfl -- one league. Config is nested per sport, so each league is a
+    # sibling key with its own settings.
     #
     # NOTE: the path nesting must match the folder nesting. These keys are
     # directory names, so models/nfl/prep/ requires nfl: > prep:. Flattening
     # them silently drops the materialization and +schema configs -- the models
     # still build, just as views in the default target schema.
+    #
+    # +enabled gates each sport on DBT_SPORT (set by env.yml): the target
+    # database is one global value per run, so a run whose target is
+    # NFL_*_DB must not be able to build WNBA models into it, and vice versa.
+    # The gate makes that structural instead of relying on --select discipline.
+    # The 'nfl' default keeps a bare parse (no env.yml) building prod-shaped NFL.
     # -------------------------------------------------------------------------
     nfl:
       +tags: ['nfl']
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
 
       # PREP -- thin views over NFL_PROD_DB.RAW. Rename, cast, strip the dlt
       # bookkeeping columns and the flattened parent payload, hash surrogate keys.
@@ -78,3 +85,51 @@ models:
         +schema: ANALYTICS
         eval_dataset:
           +enabled: false
+
+    # -------------------------------------------------------------------------
+    # wnba -- second league, sibling of nfl per the note above. Same layer
+    # shape; differences from NFL live in the models, not the config:
+    # no plays (upstream endpoint broken), no phase-split player facts (a
+    # basketball box score is one block), and sv_wnba_player_advanced ships
+    # ENABLED because the five advanced season sources cover the identical
+    # 223-player set (verified 100% pairwise overlap) -- the disjointness that
+    # disabled sv_nfl_player_advanced does not exist in this source.
+    # -------------------------------------------------------------------------
+    wnba:
+      +tags: ['wnba']
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'wnba') | as_bool }}"
+
+      prep:
+        +materialized: view
+        +schema: PREP
+
+      core:
+        +schema: CORE
+        dimensions:
+          +materialized: table
+        facts:
+          +materialized: table
+
+      semantic_views:
+        +materialized: semantic_view
+        +schema: ANALYTICS
+
+tests:
+  cortex_agent_lifecycle:
+    # Singular tests are per-sport (tests/nfl/, tests/wnba/) and gate on
+    # DBT_SPORT exactly like the model trees: a test whose refs are disabled
+    # is a parse error, not a skip.
+    nfl:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
+    wnba:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'wnba') | as_bool }}"
+
+sources:
+  cortex_agent_lifecycle:
+    # Sources gate on DBT_SPORT too, so their yml tests follow their sport.
+    # Without this a WNBA build runs the nfl_raw source tests and an NFL raw
+    # data problem fails a WNBA gate, defeating the per-sport isolation.
+    nfl_raw:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
+    wnba_raw:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'wnba') | as_bool }}"

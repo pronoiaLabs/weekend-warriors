@@ -1,0 +1,567 @@
+version: 2
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # Team-season facts.
+  #
+  # Three facts at team x season rather than one, because coverage differs by a
+  # factor of nineteen: fact_wnba_team_season spans 2008-2026 and the other two are
+  # 2026 only. Joining them on (team_id, season) is safe; merging them into one
+  # model would leave 220 of 235 rows almost entirely NULL.
+  # ---------------------------------------------------------------------------
+  - name: fact_wnba_team_season
+    description: >
+      Final standings. Grain: team x season. 235 rows, 17 franchises across the
+      19 seasons from 2008 to 2026.
+      THE ONLY MULTI-YEAR FACT IN THE WNBA SET -- every other source is 2026
+      only, so this is the one place a year-over-year question can be answered.
+      Team counts per season are uneven (12 in 2024, 13 in 2025, 15 in 2026)
+      because the league expanded, so a per-team average must divide by that
+      season's team count.
+      A snapshot fact: measures are the record as of the standings read, not
+      events, so wins is additive across seasons and playoff_seed is not.
+      The 2026 row is mid-season and trails the game log by up to two decided
+      games per team; see assert_wnba_standings_reconcile_to_team_games.
+      Carries no points for or against -- the source has none, unlike NFL.
+    columns:
+      - name: team_season_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: team_id
+        tests: [not_null]
+      - name: season
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 2008, max_value: 2026}
+      - name: conference
+        description: "The conference the team played in THAT season, which dim_wnba_team cannot supply -- it knows only the current one."
+        tests:
+          - not_null
+          - accepted_values: {values: ['Eastern Conference', 'Western Conference']}
+      - name: wins
+        tests: [not_null]
+      - name: losses
+        tests: [not_null]
+      - name: games_played
+        description: "wins + losses. Basketball has no ties, so there is no third term."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 46}
+      - name: win_pct
+        description: >
+          The source's own value, three decimal places, passed through so the
+          source stays authoritative on its rounding. A 0-1 FRACTION, like
+          every other rate in the WNBA core layer and like NFL fact_wnba_team_season.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: win_pct_computed
+        description: "The same ratio at full precision from wins and losses. NULL only for a 0-0 team."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: home_wins
+        description: "Parsed from the source's '11-6' text by wnba_parse_record. No tie component."
+        tests: [not_null]
+      - name: home_losses
+        tests: [not_null]
+      - name: away_wins
+        tests: [not_null]
+      - name: away_losses
+        tests: [not_null]
+      - name: conference_wins
+        tests: [not_null]
+      - name: conference_losses
+        tests: [not_null]
+      - name: playoff_seed
+        description: >
+          A genuine conference seed, 1-8, populated on EVERY row -- unlike the
+          NFL source's column of the same name, which is really a conference
+          rank. No made_playoffs flag is derived from it: the WNBA has changed
+          the size of its playoff field across the 19 seasons covered, so any
+          single cutoff would be wrong for most of them.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 8}
+      - name: games_behind
+        description: "dlt variant twin folded back in prep. Half-game values are the majority, so reading the base column alone would have nulled them."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0}
+    tests:
+      # the declared grain
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_id, season]
+
+  - name: fact_wnba_team_season_advanced
+    description: >
+      Full season team profile: box score averages, efficiency ratings, the
+      four factors, and the box score allowed. Grain: team x season. 15 rows,
+      2026 regular season only.
+      A four-way inner join across team_season_stats, _advanced, _four_factors
+      and _opponent, all of which hold the same 15 team-seasons.
+      MIXES UNITS ON PURPOSE and names every column for what it is: anything
+      ending _per_game is an average from team_season_stats, anything with an
+      opp_ prefix is a SEASON TOTAL from team_season_opponent, and possessions
+      and minutes_played are totals too. Nothing here is safely summed without
+      checking which kind it is.
+      Two games-played columns, and that is not a mistake -- the two endpoint
+      families disagree on 4 of 15 teams and box_score_games_played is the
+      denominator of the averages.
+      All percentages are 0-1 fractions; the four taken from team_season_stats
+      arrive 0-100 and are divided by 100 in the model.
+    columns:
+      - name: team_season_advanced_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: team_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: games_played
+        description: "From the advanced family, which agrees with four_factors and opponent on all 15 rows."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 46}
+      - name: box_score_games_played
+        description: >
+          From team_season_stats, and the denominator of every *_per_game
+          column here. Differs from games_played on 4 of 15 rows today because
+          the two endpoints were captured a game apart.
+        tests: [not_null]
+      - name: wins
+        tests: [not_null]
+      - name: losses
+        tests: [not_null]
+      - name: win_pct
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: points_per_game
+        description: "An AVERAGE, not a season total. 79.7 to 96.1 today."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 40, max_value: 130, severity: warn}
+      - name: field_goal_pct
+        description: "Converted from the source's 0-100 scale to a fraction."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: three_point_pct
+        description: "Converted from the source's 0-100 scale to a fraction."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: free_throw_pct
+        description: "Converted from the source's 0-100 scale to a fraction."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: effective_field_goal_pct
+        description: "Already a fraction on the source. No conversion."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: true_shooting_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: offensive_rating
+        description: "Points per 100 possessions. 98.9 to 114.6 today."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 50, max_value: 150, severity: warn}
+      - name: opp_points
+        description: "A SEASON TOTAL, not a per-game average. 2,389 to 2,914 today."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 5000, severity: warn}
+      - name: opp_effective_field_goal_pct
+        description: "The defensive half of the four factors, which is what makes them a defensive measure and not only an offensive one."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: plus_minus
+        description: "This team's own season margin, the one unprefixed measure on the opponent source."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_id, season]
+
+  - name: fact_wnba_team_season_shooting
+    description: >
+      Season team shooting unpivoted to one row per shot location.
+      Grain: team x season x zone_scheme x zone. 240 rows: 15 teams x 16
+      locations, being 7 court zones plus 9 distance bands.
+      THE TWO SCHEMES DESCRIBE THE SAME SHOTS. Summing across both counts every
+      attempt twice; always filter zone_scheme. Verified: the zone total and
+      the band total are identical for all 15 teams.
+      The source's CORNER_3 is dropped because it is
+      LEFT_CORNER_3 + RIGHT_CORNER_3, not an eighth zone -- left_corner_3 and
+      right_corner_3 both survive.
+      fga and fgm are 0-filled (a missing key means no attempts) and fg_pct is
+      NULLed where there were no attempts, because the source writes 0.0 there
+      and that would drag every average down.
+    columns:
+      - name: team_season_shooting_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: team_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: zone_scheme
+        description: "Which cut of the same shots this row belongs to. NEVER sum across both."
+        tests:
+          - not_null
+          - accepted_values: {values: ['zone', 'distance_5ft']}
+      - name: zone
+        description: >
+          Location slug. 7 for scheme 'zone' (corner_3 deliberately absent),
+          9 zero-padded ft_ bands for 'distance_5ft', which sort in court order.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['restricted_area', 'in_the_paint_non_ra', 'mid_range',
+                       'left_corner_3', 'right_corner_3', 'above_the_break_3',
+                       'backcourt',
+                       'ft_00_04', 'ft_05_09', 'ft_10_14', 'ft_15_19',
+                       'ft_20_24', 'ft_25_29', 'ft_30_34', 'ft_35_39',
+                       'ft_40_plus']
+      - name: fga
+        description: "0-filled: a NULL upstream means the team took no shots from here."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: fgm
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: fg_pct
+        description: "NULL where fga is 0 -- undefined, not zero. Already a fraction on the source."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_id, season, zone_scheme, zone]
+
+  # ---------------------------------------------------------------------------
+  # Player-season facts.
+  #
+  # fact_wnba_player_season covers 196 players and fact_wnba_player_season_advanced covers
+  # 224. THE ADVANCED FACT IS THE SPINE. Building a player-season mart off the
+  # basic line and joining advanced on drops 28 players silently.
+  # ---------------------------------------------------------------------------
+  - name: fact_wnba_player_season
+    description: >
+      Basic season line. Grain: player x season x season type. 196 rows, all
+      2026 regular season today.
+      EVERY MEASURE IS A PER-GAME AVERAGE and every column is named _per_game
+      to say so. SUM(points_per_game) over players is meaningless.
+      Not a rollup of fact_wnba_player_game: it is a separate endpoint, and the two
+      disagree on the denominator for about a third of players. Where they
+      agree on games played, the averages agree to within 0.005. See
+      assert_wnba_player_season_reconciles_to_player_games.
+      games_played is the source's own and is sometimes impossible -- 18 of 196
+      rows report more games than the leading team has played. It is carried
+      anyway because it is the denominator the source used for every average on
+      the row.
+      A SUBSET of fact_wnba_player_season_advanced's 224 players, not the reverse.
+      The three percentages arrive 0-100 and are divided by 100 here.
+    columns:
+      - name: player_season_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_player')", field: player_key}
+      - name: player_id
+        tests: [not_null]
+      - name: team_key
+        description: >
+          The team this season line belongs to, which is not always the player's
+          current team -- the two differ on 16 of 196 rows because the player
+          was traded.
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: games_played
+        description: >
+          The source's count and the denominator of every average on the row.
+          Known to overstate: 18 of 196 rows exceed the league's maximum team
+          game count. Do not use it as an appearance count -- count non-DNP
+          rows in fact_wnba_player_game instead.
+        tests: [not_null]
+      - name: minutes_per_game
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 48, severity: warn}
+      - name: points_per_game
+        description: "An AVERAGE. 0 to 26.62 today."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 60, severity: warn}
+      - name: rebounds_per_game
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 30, severity: warn}
+      - name: assists_per_game
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 20, severity: warn}
+      - name: field_goal_pct
+        description: "Converted from the source's 0-100 scale to a fraction."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: three_point_pct
+        description: "Converted from the source's 0-100 scale to a fraction."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: free_throw_pct
+        description: "Converted from the source's 0-100 scale to a fraction."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, season, season_type]
+
+  - name: fact_wnba_player_season_advanced
+    description: >
+      Full advanced season profile: efficiency, ratings, pace, usage, shot and
+      scoring distribution, team share, and defence. Grain: player x season.
+      224 rows, 2026 regular season only.
+      A five-way INNER JOIN across player_season_{advanced, misc, scoring,
+      usage, defense}, which is honest because all five cover the identical
+      224-player population. If that ever stops being true the inner join drops
+      players silently, which is what
+      assert_wnba_advanced_family_is_complete exists to make loud.
+      THE SPINE OF THE PLAYER-SEASON MART. fact_wnba_player_season is the subset.
+      The five sources disagree on their shared columns (games_played on 20 of
+      224), so each duplicated measure is taken from one named source and the
+      choice is recorded in the model.
+      MINUTES MEANS TWO THINGS ACROSS THE FIVE: advanced and scoring return per
+      game, misc and defense return the season total. Both are published under
+      distinct names.
+      Team is dim_wnba_player's CURRENT team, an approximation for the 10 players
+      with team_count = 2. No team_id is published, deliberately.
+      Every percentage already arrives as a fraction; no conversion here.
+    columns:
+      - name: player_season_advanced_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_player')", field: player_key}
+      - name: player_id
+        tests: [not_null]
+      - name: team_key
+        description: >
+          dim_wnba_player's CURRENT team, not the team of record for the season.
+          The WNBA source carries no team history at all. Agrees with the five
+          sources' own team ids on 223 of 224 rows.
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: team_abbreviation
+        description: "Stamped from dim_wnba_player alongside team_key, so a display label needs no second join."
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: games_played
+        description: "From advanced. The other four disagree on 20 of 224 rows because the endpoints were read a game apart."
+        tests: [not_null]
+      - name: team_count
+        description: "Number of clubs the player appeared for this season. 2 on 10 rows, which is where team_key becomes an approximation."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 3}
+      - name: minutes_per_game
+        description: "PER GAME, from advanced. Not the same unit as total_minutes_played."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 48, severity: warn}
+      - name: total_minutes_played
+        description: "SEASON TOTAL, from misc. usage carries the same total rounded to a whole minute and is not used."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: field_goal_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: true_shooting_pct
+        description: "Can exceed 1 for a player with a handful of three-point attempts; 1.25 is the maximum today."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 2, severity: warn}
+      - name: usage_pct
+        description: "The standard possession-based rate, from advanced. Not a share of a team total."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: rebounds_defensive_pct
+        description: >
+          Share of the TEAM's defensive rebounds, from usage. NOT the same as
+          defensive_rebound_pct on this row, which is the standard rate against
+          available rebounds. Same suffix, different denominator.
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: points_paint_pct
+        description: "Share of the PLAYER'S OWN points, from scoring. A third denominator again."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: field_goals_attempted
+        description: "A SEASON TOTAL. Equals the sum of fga over either zone_scheme in fact_wnba_player_season_shooting, exactly."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, season]
+
+  - name: fact_wnba_player_season_shooting
+    description: >
+      Season player shooting unpivoted to one row per shot location.
+      Grain: player x season x zone_scheme x zone. 3,568 rows: 223 players x 16
+      locations. Identical shape, vocabulary and rules to
+      fact_wnba_team_season_shooting.
+      THE TWO SCHEMES DESCRIBE THE SAME SHOTS. Summing across both counts every
+      attempt twice; always filter zone_scheme. Verified: the zone total, the
+      band total and fact_wnba_player_season_advanced.field_goals_attempted are all
+      identical for all 223 players.
+      223 players, not 224: one player in the advanced family has no
+      shot-location row. That is source coverage, not a join loss.
+      The source's CORNER_3 is dropped because it is
+      LEFT_CORNER_3 + RIGHT_CORNER_3, not an eighth zone.
+      fga and fgm are 0-filled and fg_pct is NULLed where there were no
+      attempts -- 159 of the 223 backcourt rows are exactly that case, and the
+      source's 0.0 there would make the backcourt look like a shooting problem.
+    columns:
+      - name: player_season_shooting_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_player')", field: player_key}
+      - name: player_id
+        tests: [not_null]
+      - name: team_key
+        description: "The team the shot-location endpoint attributed the season to."
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: zone_scheme
+        description: "Which cut of the same shots this row belongs to. NEVER sum across both."
+        tests:
+          - not_null
+          - accepted_values: {values: ['zone', 'distance_5ft']}
+      - name: zone
+        description: "Location slug. Same 16-value vocabulary as fact_wnba_team_season_shooting, on purpose."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['restricted_area', 'in_the_paint_non_ra', 'mid_range',
+                       'left_corner_3', 'right_corner_3', 'above_the_break_3',
+                       'backcourt',
+                       'ft_00_04', 'ft_05_09', 'ft_10_14', 'ft_15_19',
+                       'ft_20_24', 'ft_25_29', 'ft_30_34', 'ft_35_39',
+                       'ft_40_plus']
+      - name: fga
+        description: "0-filled: a NULL upstream means the player took no shots from here."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: fgm
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: fg_pct
+        description: "NULL where fga is 0 -- undefined, not zero. Already a fraction on the source."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, season, zone_scheme, zone]
+
+  # ---------------------------------------------------------------------------
+  # Injury report
+  # ---------------------------------------------------------------------------
+  - name: fact_wnba_player_injury
+    description: >
+      Injury report with SCD2 history. Grain: player x report version. 38 rows.
+      Filter is_current for the live report; without it a player with three
+      status updates contributes three rows. All 38 rows are the first version
+      today, so the flag looks redundant and stops being so on the next load
+      that supersedes a row.
+      No report date on the source, unlike NFL: dlt's valid_from is the only
+      timestamp and doubles as the report version.
+      return_date is INFERRED -- the source text has no year in it, and prep
+      supplies the year from valid_from. It is wrong across a New Year
+      boundary. Show return_date_text to a human.
+      No game key: the source reports against a moment, not a game.
+    columns:
+      - name: player_injury_key
+        description: "Surrogate key over player_id and valid_from. Grain of this fact."
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_player')", field: player_key}
+      - name: player_id
+        tests: [not_null]
+      - name: team_key
+        description: "The club the player was with when the injury was reported, which is the only meaningful attribution for an injury."
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_date')", field: date_key}
+      - name: reported_date
+        description: "Date part of valid_from. The source supplies no report date of its own."
+        tests: [not_null]
+      - name: injury_status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Out', 'Day-To-Day']
+              severity: warn
+      - name: return_date_text
+        description: "The source's year-less text: 'Aug 10', 'May 1'. The version to show a human."
+      - name: return_date
+        description: "return_date_text plus the year of valid_from. Ours, not the source's, and wrong across a New Year boundary."
+      - name: valid_from
+        description: "SCD2 start, and the report version. Carries the surrogate key."
+        tests: [not_null]
+      - name: valid_to
+        description: "SCD2 end. NULL on all 38 rows today."
+      - name: is_current
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_id, valid_from]

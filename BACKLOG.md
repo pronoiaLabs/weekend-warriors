@@ -41,18 +41,32 @@ on granularity (one dbt run per sport per day vs per pipeline) and on where the
 graph is generated (`generate_tasks.py` already renders the dlt Tasks and is the
 natural place to add AFTER dependencies).
 
-## WNBA dbt models and Cortex agent
+## Fix or replace the wnba_plays pipeline
 
-**Problem:** `dbt-pipelines` only models NFL (`models/nfl/`, NFL semantic views,
-NFL agent). WNBA raw data has been landing in `WNBA_PROD_DB.RAW` since Aug 8
-with nothing built on top of it.
+**Problem:** the `/plays` WNBA endpoint returns a bare `{data: [...]}` with no
+`meta`, so the cursor paginator cannot walk it; the pipeline has never produced
+a PLAYS table anywhere (dev or prod). WNBA play-by-play is simply absent, and
+the wnba_analyst agent declines those questions.
 
-**The fix:** mirror the NFL layer structure (`prep/` -> `core/` -> `semantic_views/`)
-for WNBA, plus a `deploy_<name>` agent macro. The NFL layer is the template;
-the WORKING-SESSION.md runbook in dbt-pipelines was built for exactly this kind
-of guided build. Watch for the cross-discipline trap that disabled
-`sv_nfl_player_advanced`: check WNBA endpoint overlap before promising
-cross-stat comparisons in a semantic view.
+**The fix:** a per-game fetch loop like NFL `plays` uses (fan out over
+`games_ref`), or a response adapter that tolerates the meta-less shape. The
+registry comments on `wnba_plays` document the pagination problem. Until then
+the scheduled Task is idle spend on every fire; consider suspending it.
+
+## Investigate NFL raw drift flagged by the reconciliation tests
+
+**Problem:** as of Aug 8 the NFL dev rebuild fails three data checks that all
+passed when the models were authored: 2 `team_stats` rows reference games
+absent from `GAMES` (source relationship test), `assert_player_game_phase_coverage`
+is 1 row over its documented threshold, and `assert_phase_fact_measures_reconcile`
+returns 12 rows. Code is unchanged; a week of daily loads moved the data. This
+is the `stats?seasons[]` incompleteness gap doing what the tests were built to
+surface.
+
+**The fix:** replay the affected games by `game_id` (the known workaround), or
+adjust thresholds if investigation shows benign timing effects. Until then NFL
+`dbt build` is red on these three and `dbt run` (models only) is the clean path,
+which is how the Aug 8 NFL prod refresh was run.
 
 ## Slack alerting on pipeline failures
 

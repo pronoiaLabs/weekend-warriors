@@ -159,7 +159,7 @@ dimensions (
         sample_values ('Offense - Skill', 'Unknown'),
 
     weeks.season as season
-        comment = 'NFL season. Currently covers 2023 to 2025; new seasons are added as they load.'
+        comment = 'NFL season. Currently covers 2023 to 2025; new seasons are added as they load.',
     weeks.week as week
         comment = 'Week within the season phase. Regular season weeks 1 to 18, postseason weeks 1 to 5. Week 0 season totals are excluded from this view.',
     weeks.season_type as season_type_name
