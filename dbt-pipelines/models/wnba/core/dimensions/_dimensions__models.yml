@@ -113,6 +113,9 @@ models:
         tests: [unique, not_null]
       - name: game_date
         tests: [not_null]
+      - name: game_datetime_et
+        description: "Tip-off in US Eastern; what the schedule semantic view exposes."
+        tests: [not_null]
       - name: date_key
         tests:
           - not_null

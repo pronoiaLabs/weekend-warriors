@@ -16,6 +16,13 @@
     draw. This view answers "what is on the schedule and what has been
     played", never "who won".
 
+    TIP-OFF TIMES ARE US EASTERN, not UTC. The conversion happens upstream in
+    stg_wnba__games (game_datetime_et), so every consumer shares one display
+    convention rather than each one shifting at read time. This view exposes
+    ONLY the ET column, deliberately: two time columns is an invitation to
+    answer with the wrong one. The dimension keeps the name game_datetime so
+    the verified queries and the NEXT GAME rule read naturally.
+
     ROLE-PLAYING JOINS: dim_wnba_team appears twice, as home_teams and
     away_teams, because a schedule row has two participants and "a team's
     schedule" means the OR of both sides. The AI_SQL_GENERATION clause spells
@@ -52,9 +59,9 @@ dimensions (
     games.game_date as game_date
         with synonyms ('date', 'day of game')
         comment = 'Calendar date of the game. Completed games run 2026-05-08 to 2026-08-08; scheduled games run through 2026-09-25.',
-    games.game_datetime as game_datetime
+    games.game_datetime as game_datetime_et
         with synonyms ('tip-off time', 'start time')
-        comment = 'Full timestamp including tip-off time, in UTC.',
+        comment = 'Full timestamp including tip-off time, in US EASTERN time (the league''s publishing convention). Same instant as the warehouse''s UTC column, shifted for display; the offset in the value shows -0400 or -0500.',
     games.season as season
         comment = 'WNBA season. This view holds 2026 only.',
     games.season_type_name as season_type_name
@@ -111,9 +118,10 @@ metrics (
         comment = 'Games still to be played. 93 today, through 2026-09-25.'
 )
 
-comment = 'The 2026 WNBA schedule at game grain, played and unplayed alike: 333 games, 240 completed and 93 upcoming through 2026-09-25. The only view where future games exist. Use it for the upcoming slate, a team''s next game, games remaining, and schedule questions by date or phase. Deliberately carries NO scores or results; those belong to the team performance view.'
+comment = 'The 2026 WNBA schedule at game grain, played and unplayed alike: 333 games, 240 completed and 93 upcoming through 2026-09-25. The only view where future games exist. Use it for the upcoming slate, a team''s next game, games remaining, and schedule questions by date or phase. Tip-off times are US Eastern. Deliberately carries NO scores or results; those belong to the team performance view.'
 
-ai_sql_generation 'UPCOMING MEANS NOT COMPLETED: for any question about upcoming, next, remaining or future games, filter is_completed = false. Do NOT compare game_date to the current date; the schedule is a nightly snapshot and the completion flag is the source of truth.
+ai_sql_generation 'TIMES ARE US EASTERN: game_datetime is already converted to US Eastern time for display. Do not convert it again, and say "ET" when presenting a time.
+UPCOMING MEANS NOT COMPLETED: for any question about upcoming, next, remaining or future games, filter is_completed = false. Do NOT compare game_date to the current date; the schedule is a nightly snapshot and the completion flag is the source of truth.
 A TEAM''S SCHEDULE NEEDS BOTH SIDES: a team appears sometimes as the home team and sometimes as the away team, so "games for the Aces" must use an OR across home and away team name or abbreviation. Filtering only one side silently halves the schedule.
 NEXT GAME: a team''s next game is its earliest game_datetime among rows where is_completed = false, with the OR across both sides applied.
 GRAIN: one row per GAME, not per team-game. Counting rows counts games directly; nothing here appears twice.

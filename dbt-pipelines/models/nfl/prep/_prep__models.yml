@@ -64,6 +64,12 @@ models:
         tests: [unique, not_null]
       - name: game_date
         tests: [not_null]
+      - name: game_datetime_et
+        description: >
+          Kickoff as a US Eastern timestamp, the same instant as
+          game_datetime. Derived once here so every consumer shares one
+          display convention.
+        tests: [not_null]
       - name: season
         tests:
           - not_null

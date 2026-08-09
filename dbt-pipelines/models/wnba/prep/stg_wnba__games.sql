@@ -43,8 +43,12 @@ renamed as (
         {{ dbt_utils.generate_surrogate_key(['id']) }}       as game_key,
         id                                                  as game_id,
 
-        -- when
+        -- when. The source lands UTC; game_datetime_et is the same instant in
+        -- US Eastern, the league's publishing convention. Derived here rather
+        -- than at read time so every consumer inherits one display
+        -- convention. convert_timezone handles the DST boundary.
         date                                                as game_datetime,
+        convert_timezone('America/New_York', date)          as game_datetime_et,
         date::date                                          as game_date,
         season,
 

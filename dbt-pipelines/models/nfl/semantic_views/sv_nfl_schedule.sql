@@ -19,6 +19,15 @@
     no secondary state label, and ties are real results so is_completed and
     has-a-result are the same thing here.
 
+    KICKOFF TIMES ARE US EASTERN, not UTC. The conversion happens upstream in
+    stg_nfl__games (game_datetime_et), so every consumer shares one display
+    convention rather than each one shifting at read time, and it matches the
+    source's own kickoff-time status strings, which are already ET. This view
+    exposes ONLY the ET column, deliberately: two time columns is an
+    invitation to answer with the wrong one. The dimension keeps the name
+    game_datetime so the verified queries and the NEXT GAME rule read
+    naturally.
+
     ROLE-PLAYING JOINS: dim_team appears twice, as home_teams and away_teams,
     because a schedule row has two participants and "a team's schedule" means
     the OR of both sides.
@@ -54,9 +63,9 @@ dimensions (
     games.game_date as game_date
         with synonyms ('date', 'day of game')
         comment = 'Calendar date of the game.',
-    games.game_datetime as game_datetime
+    games.game_datetime as game_datetime_et
         with synonyms ('kickoff time', 'start time')
-        comment = 'Full timestamp including kickoff time, in UTC.',
+        comment = 'Full timestamp including kickoff time, in US EASTERN time (the league''s publishing convention, matching the kickoff-time status strings). Same instant as the warehouse''s UTC column, shifted for display; the offset in the value shows -0400 or -0500.',
     games.season as season
         comment = 'NFL season, 2023 through 2026. A season''s January and February games belong to the prior year''s season. 2026 is the only season with unplayed games, so schedule questions mean 2026.',
     games.week as week
@@ -114,9 +123,10 @@ metrics (
         comment = 'Games still to be played. All of them are 2026 games.'
 )
 
-comment = 'The NFL schedule at game grain, played and unplayed alike: completed games for the 2023-2025 seasons plus the full 2026 slate (321 games, one played). The only view where future games exist. Use it for the upcoming slate, a team''s next game, the week 1 matchups, bye-week style gap questions and schedule lookups by date, week or venue. Deliberately carries NO scores or results; those belong to the team performance view.'
+comment = 'The NFL schedule at game grain, played and unplayed alike: completed games for the 2023-2025 seasons plus the full 2026 slate (321 games, one played). The only view where future games exist. Use it for the upcoming slate, a team''s next game, the week 1 matchups, bye-week style gap questions and schedule lookups by date, week or venue. Kickoff times are US Eastern. Deliberately carries NO scores or results; those belong to the team performance view.'
 
-ai_sql_generation 'SCHEDULE QUESTIONS DEFAULT TO 2026: it is the only season with unplayed games, so questions about upcoming games, the slate, or "this season''s schedule" mean season = 2026 unless another season is named.
+ai_sql_generation 'TIMES ARE US EASTERN: game_datetime is already converted to US Eastern time for display, matching the kickoff-time status strings. Do not convert it again, and say "ET" when presenting a time.
+SCHEDULE QUESTIONS DEFAULT TO 2026: it is the only season with unplayed games, so questions about upcoming games, the slate, or "this season''s schedule" mean season = 2026 unless another season is named.
 UPCOMING MEANS NOT COMPLETED: for any question about upcoming, next, remaining or future games, filter is_completed = false. Do NOT compare game_date to the current date and do NOT parse the game_status string; the schedule is a nightly snapshot and the completion flag is the source of truth.
 A TEAM''S SCHEDULE NEEDS BOTH SIDES: a team appears sometimes as the home team and sometimes as the away team, so "games for the Chiefs" must use an OR across home and away team name or abbreviation. Filtering only one side silently halves the schedule.
 NEXT GAME: a team''s next game is its earliest game_datetime among rows where is_completed = false, with the OR across both sides applied.

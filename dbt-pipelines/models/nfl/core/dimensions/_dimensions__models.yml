@@ -83,6 +83,9 @@ models:
         tests: [unique, not_null]
       - name: game_date
         tests: [not_null]
+      - name: game_datetime_et
+        description: "Kickoff in US Eastern; what the schedule semantic view exposes."
+        tests: [not_null]
       - name: is_completed
         description: "False for scheduled games, which have no fact rows."
         tests: [not_null]
