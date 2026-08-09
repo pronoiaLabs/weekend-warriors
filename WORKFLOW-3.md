@@ -75,4 +75,57 @@ disabled-model gating; the Phase 0 backfill made that moot, everything ships
 enabled.
 
 **Open:** rename/move of the NFL_ANALYTICS project object (cosmetic,
-user's call, HANDOFF).
+user's call, HANDOFF). RESOLVED mid-Phase-2: user chose to create a neutral
+object now; the loop runs against `DLT_DB.DEPLOY.CORTEX_LIFECYCLE` from
+Phase 2 on. Old object left in place; cleanup in HANDOFF.
+
+## Phase 2 - prep layer (23 models)
+
+**Ran:** two parallel implementation agents wrote models/wnba/prep/: 9
+box-score/reference models plus `_prep__models.yml`, and 14 advanced/shot
+models plus `_prep__advanced_models.yml` (23 models, not the plan's
+miscounted 24). Both agents DESCRIBEd every raw table and render-checked
+every expression read-only before writing. Deployed to the new
+`DLT_DB.DEPLOY.CORTEX_LIFECYCLE` object and built in wnba_dev.
+
+**Result:** GATE GREEN. `dbt build --env wnba_dev`: 23 view models, 284 data
+tests, PASS=308 ERROR=0.
+
+**Surprises, data:**
+- The season aggregate tables (player/team_season_stats) hold PER-GAME
+  AVERAGES, not totals, and every percentage in the source is on a 0-100
+  scale. Phase 3's player-season reconciliation test must compare averages
+  derived from games, not sums.
+- No preseason games exist in the data at all: earliest GAMES date is
+  2026-05-08, every completed game from day one has box scores, and the
+  standings snapshot's games-played total reconciles exactly to the dated
+  games. The Preseason branch of season_type_name is real but currently
+  matches zero rows.
+- DNPs are spelled two ways (MIN='0' on 1,069 rows, MIN='--' on 7);
+  1,076 DNP rows total, never NULL MIN.
+- GAMES writes 0-0 into scheduled games' scores; prep nulls scores unless
+  status='post' (93 fake shutouts avoided). One completed game (24935) is
+  postponed-with-no-result; game_state keeps it visible.
+- Player-game four-factors eFG% is NOT a duplicate of the advanced eFG%
+  (differs on 4,469 of 5,569 rows, and is not the team value either); kept
+  qualified as four_factors_effective_field_goal_pct. corner_3 equals
+  left+right corners (double-count trap documented for the core unpivot).
+- PLAYER_INJURIES.RETURN_DATE has no year; parsed with the SCD2 validity
+  year, wrong across a New Year boundary, stated in the header.
+- PLAYER_SEASON_STATS.GAMES_PLAYED can exceed season length (player 384:
+  38 games vs max 33). Left as-is, flagged before anything divides by it.
+
+**Surprises, mechanism:**
+- nfl_raw SOURCE tests ran inside the WNBA build (sources were not
+  sport-gated) and 2 pre-existing NFL failures leaked in:
+  team_stats.game__id has 2 rows referencing games absent from GAMES.
+  Fixed by gating sources on DBT_SPORT in dbt_project.yml. The NFL drift
+  itself is real, untouched here, and listed in HANDOFF.
+- Mid-phase, per user: project object moved to
+  `DLT_DB.DEPLOY.CORTEX_LIFECYCLE` (sport-neutral, control-plane schema).
+
+**Changed from plan:** model count 23 not 24; neutral project object created
+mid-loop instead of at handoff.
+
+**Open:** NFL raw drift (2 orphan team_stats rows); GAMES_PLAYED
+overcount oddity.

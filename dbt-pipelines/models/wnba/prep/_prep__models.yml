@@ -1,0 +1,370 @@
+version: 2
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # Reference
+  # ---------------------------------------------------------------------------
+  - name: stg_wnba__teams
+    description: >
+      Every team row the source carries, 35 of them, classified rather than
+      filtered. Grain: team. Only 17 are franchises; the rest are All-Star
+      squads, national sides and TBD placeholders, all of which are referenced
+      by id from games and box scores, so none can be dropped here.
+    columns:
+      - name: team_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: team_id
+        tests: [unique, not_null]
+      - name: team_abbreviation
+        description: >
+          NOT unique: the two TBD placeholder rows (ids 32, 33) share the code
+          'TBD'. Use team_key or team_id to identify a team.
+        tests: [not_null]
+      - name: conference
+        description: >
+          Populated for the 15 original franchises only and NULL for all 20
+          remaining rows, including the 2026 expansion clubs. That is why
+          classification runs off ids, not off this column. Untested for the
+          same reason.
+      - name: team_type
+        description: "Franchise (17), All-Star (11), National (5), Placeholder (2)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Franchise', 'All-Star', 'National', 'Placeholder']
+      - name: is_franchise
+        description: "The filter downstream models want: ids 1-15 plus Toronto (30) and Portland (31)."
+        tests: [not_null]
+      - name: is_defunct
+        description: "Sacramento Monarchs (14) and Houston Comets (15). Still franchises, still carry standings back to 2008."
+        tests: [not_null]
+
+  - name: stg_wnba__players
+    description: >
+      Player roster, 860 rows. Grain: player. Team is CURRENT ONLY and is not
+      promoted to dim_player. WEIGHT and COLLEGE are deliberately absent:
+      upstream shifts the college name into the WEIGHT field whenever weight
+      is missing, so 0 of 860 rows carry a numeric weight and neither column
+      is recoverable here.
+    columns:
+      - name: player_key
+        tests: [unique, not_null]
+      - name: player_id
+        tests: [unique, not_null]
+      - name: full_name
+        tests: [not_null]
+      - name: position
+        description: >
+          Two vocabularies at once: 191 rows say 'Guard' and 169 say 'G'.
+          Group by position_abbreviation instead; this column is for display.
+          'Not Available' on 130 rows is the source's explicit unknown member.
+        tests: [not_null]
+      - name: position_abbreviation
+        description: "Single vocabulary: G / F / C / NA. The column to group by."
+        tests: [not_null]
+      - name: height_inches
+        description: "Parsed from \"6' 2\\\"\". NULL for the 540 players with no height on file. Observed range 63-83."
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 60
+              max_value: 84
+              severity: warn
+      - name: current_team_key
+        description: "Current roster spot only. Per-game affiliation comes from stg_wnba__player_stats.team_key."
+        tests: [not_null]
+      - name: current_team_id
+        tests: [not_null]
+
+  - name: stg_wnba__games
+    description: >
+      One row per game, 333 rows, 2026 season only. Grain: game. 240 rows are
+      completed and 93 are still scheduled, so scores are NULL rather than the
+      source's fake 0-0 on anything not yet played. season_type_name is
+      derived here rather than by wnba_season_type_name, because the source
+      carries only a POSTSEASON boolean and the All-Star and Preseason cases
+      need game context.
+    columns:
+      - name: game_key
+        tests: [unique, not_null]
+      - name: game_id
+        tests: [unique, not_null]
+      - name: game_date
+        tests: [not_null]
+      - name: season
+        tests:
+          - not_null
+          - accepted_values: {values: [2026], quote: false}
+      - name: season_type_name
+        description: >
+          332 Regular Season and 1 All-Star today. Postseason and Preseason
+          match zero rows: the postseason has not been played, and the
+          2026-05-08 opener cutoff is the earliest date in the source. Both
+          branches exist for later loads.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: is_completed
+        description: "STATUS = 'post'. True for 240 rows, including the one postponed 0-0 game that has no result."
+        tests: [not_null]
+      - name: game_status
+        description: "'pre' or 'post' today. A live in-progress value can land mid-load, so this is documented rather than tested."
+      - name: home_team_key
+        tests: [not_null]
+      - name: away_team_key
+        tests: [not_null]
+      - name: home_team_score
+        description: "NULLABLE by design -- NULL for the 93 scheduled games."
+      - name: away_team_score
+        description: "NULLABLE by design -- NULL for the 93 scheduled games."
+      - name: winner_team_id
+        description: >
+          NULLABLE by design -- NULL for scheduled games and for game 24935,
+          the postponed 2026-07-17 fixture whose 0-0 line is not a tie but an
+          absent result. Basketball has no ties.
+
+  # ---------------------------------------------------------------------------
+  # Fact staging
+  # ---------------------------------------------------------------------------
+  - name: stg_wnba__player_stats
+    description: >
+      Player box score with DNP rows separated from played rows.
+      Grain: player x game. 5,751 rows, of which 1,076 are DNPs (MIN '0' on
+      1,069 and '--' on 7; MIN is never NULL). Measures are 0-filled on the
+      4,675 played rows, because the API omits zero-valued keys, and left NULL
+      on DNP rows so an AVG excludes bench nights instead of scoring them as
+      zeros.
+    columns:
+      - name: player_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        description: "Team the player appeared for in THIS game. The only accurate historical affiliation in the source."
+        tests: [not_null]
+      - name: minutes_played
+        description: >
+          Parsed by wnba_parse_minutes. NULL for the 7 '--' rows, which are
+          DNPs the source did not quantify, so this is not a safe DNP test on
+          its own -- use is_dnp.
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 60, severity: warn}
+      - name: is_dnp
+        description: "No minutes on the floor: MIN '0' or '--'. 1,076 rows."
+        tests: [not_null]
+      - name: game_played_count
+        description: "The denominator for a hand-rolled per-game average. 0 on DNP rows, 1 otherwise."
+        tests:
+          - not_null
+          - accepted_values: {values: [0, 1], quote: false}
+      - name: pts
+        description: "NULL on DNP rows by design, 0-filled on played rows."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 80, severity: warn}
+      - name: turnovers
+        description: "Source column TURNOVER, renamed to match team_stats."
+      - name: personal_fouls
+        description: "Source column PF, renamed to match team_stats' FOULS."
+
+  - name: stg_wnba__team_stats
+    description: >
+      Team box score with the flattened game payload stripped.
+      Grain: team x game. 476 rows covering 238 of the 240 completed games;
+      the two gaps are the 2026-08-08 fixtures the load has not reached, so
+      downstream left-joins. No team DNP exists, so the 0-fill is
+      unconditional. Carries no points column: team points live on
+      stg_wnba__games.
+    columns:
+      - name: team_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: fg_pct
+        description: "Source-authoritative, not recomputed. 0-100 scale, not 0-1."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
+      - name: ft_pct
+        description: "Source-authoritative, not recomputed. 0-100 scale, not 0-1."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
+      - name: turnovers
+        tests: [not_null]
+      - name: personal_fouls
+        description: "Source column FOULS, renamed to match player_stats' PF."
+        tests: [not_null]
+
+  - name: stg_wnba__player_injuries
+    description: >
+      Injury report, SCD2 history preserved. Grain: player x report version,
+      38 rows, all first-version today. There is no report-date column in the
+      source, so _dlt_valid_from is both the version stamp and the report
+      timestamp, and it carries the surrogate key.
+    columns:
+      - name: player_injury_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        description: "The player's team at the time of the report."
+        tests: [not_null]
+      - name: injury_status
+        description: "'Out' on 31 rows, 'Day-To-Day' on 7. Warn-only: the feed can add a status without notice."
+        tests:
+          - accepted_values:
+              values: ['Out', 'Day-To-Day']
+              severity: warn
+      - name: return_date_text
+        description: "Raw source text, year-less: 'Aug 10', 'Sep 17', 'May 1'. Retained because the year on return_date is inferred, not sourced."
+      - name: return_date
+        description: >
+          return_date_text parsed against the year of _dlt_valid_from. Wrong
+          across a New Year boundary by construction. Eight rows resolve to a
+          date already in the past, which is how this feed spells "out
+          indefinitely".
+      - name: valid_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+
+  - name: stg_wnba__standings
+    description: >
+      Current SCD2 version of the standings. Grain: team x season. 235 rows
+      spanning all 19 seasons from 2008 to 2026, which makes this the only
+      table in the WNBA set that can answer a year-over-year question -- every
+      other source is 2026 only. Split records are parsed from 'W-L' text;
+      basketball has no tie component.
+    columns:
+      - name: team_season_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: conference
+        description: "The conference the team played in THAT season, which is the historically accurate one."
+        tests:
+          - not_null
+          - accepted_values: {values: ['Eastern Conference', 'Western Conference']}
+      - name: wins
+        tests: [not_null]
+      - name: losses
+        tests: [not_null]
+      - name: win_percentage
+        description: "Straight from the source, three decimal places. Observed 0.088 to 0.853."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: win_pct_computed
+        description: "W / (W + L) at full precision, via wnba_win_pct. NULL only if no games played."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: games_behind
+        description: "dlt variant twin folded back with wnba_coalesce_variant: 228 integer rows, 7 float. The base column alone loses every half-game deficit."
+        tests: [not_null]
+      - name: playoff_seed
+        description: >
+          A genuine conference seed here, unlike the NFL source's same-named
+          column. Runs 1-8 and is populated on every row.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 8}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_key, season]
+
+  # ---------------------------------------------------------------------------
+  # Season aggregates -- PER-GAME AVERAGES, not totals
+  # ---------------------------------------------------------------------------
+  - name: stg_wnba__player_season_stats
+    description: >
+      Basic per-season line. Grain: player x season x season type. 196 rows,
+      all 2026 regular season.
+
+      SUBSET WARNING: 196 players against the advanced-season family's 224.
+      Never use this as the spine of a player-season mart, or joining the
+      advanced tables onto it silently drops 28 players. Build the spine off
+      the advanced family and left-join this on.
+
+      Every measure is a PER-GAME AVERAGE, not a season total. Multiply by
+      games_played for totals. Percentages are on a 0-100 scale.
+    columns:
+      - name: player_season_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: player_id
+        tests: [not_null]
+      - name: team_key
+        description: "The team this season line belongs to. Differs from the player's current team on 16 of 196 rows."
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        description: "Derived by wnba_season_type_name from the '2' / '3' encoding. NULL would mean a new upstream encoding, hence not_null."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: games_played
+        tests: [not_null]
+      - name: fg3m
+        description: "dlt variant twin folded back: 32 integer rows, 164 float. Per game."
+      - name: fg3_pct
+        description: "dlt variant twin folded back: 56 integer rows, 140 float. 0-100 scale."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
+      - name: pts
+        description: "Points PER GAME. Summing this column over players produces a number with no meaning."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 40, severity: warn}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_key, season, season_type]
+
+  - name: stg_wnba__team_season_stats
+    description: >
+      Team per-season line. Grain: team x season x season type. 15 rows, all
+      2026 regular season: the 13 current original franchises plus the two
+      expansion clubs. Every measure is a PER-GAME AVERAGE, not a season
+      total. Percentages are on a 0-100 scale.
+    columns:
+      - name: team_season_stats_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        description: "Derived by wnba_season_type_name from the '2' / '3' encoding."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Preseason', 'Regular Season', 'Postseason', 'All-Star']
+      - name: games_played
+        tests: [not_null]
+      - name: fg3a
+        description: "dlt variant twin folded back: 2 integer rows, 13 float. Per game."
+        tests: [not_null]
+      - name: oreb
+        description: "dlt variant twin folded back: 2 integer rows, 13 float. Per game."
+        tests: [not_null]
+      - name: stl
+        description: "dlt variant twin folded back: 4 integer rows, 11 float. Per game."
+        tests: [not_null]
+      - name: pts
+        description: "Points PER GAME. Observed 79.7 to 96.1."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 50, max_value: 130, severity: warn}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_key, season, season_type]

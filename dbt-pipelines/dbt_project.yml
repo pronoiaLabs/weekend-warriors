@@ -123,3 +123,13 @@ tests:
       +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
     wnba:
       +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'wnba') | as_bool }}"
+
+sources:
+  cortex_agent_lifecycle:
+    # Sources gate on DBT_SPORT too, so their yml tests follow their sport.
+    # Without this a WNBA build runs the nfl_raw source tests and an NFL raw
+    # data problem fails a WNBA gate, defeating the per-sport isolation.
+    nfl_raw:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
+    wnba_raw:
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'wnba') | as_bool }}"

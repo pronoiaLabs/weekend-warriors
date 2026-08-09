@@ -1,0 +1,471 @@
+version: 2
+
+# -----------------------------------------------------------------------------
+# The advanced / shot-location half of the WNBA prep layer. The box score and
+# reference models are documented in _prep__models.yml alongside this file.
+#
+# Two rules run through every model here and are stated once rather than
+# fourteen times:
+#
+#   RANKS ARE DROPPED. Every season-grain source ships a *_RANK column beside
+#   roughly every metric. A rank is only valid over the population it was
+#   computed on, and it survives whatever filter a query applies, so it is
+#   wrong the moment the scope narrows. Ordering by the metric re-derives it
+#   correctly at any scope, so nothing is lost. Counts are per model below.
+#
+#   REQUEST-ECHO CONSTANTS ARE DROPPED. SCOPE, MEASURE_TYPE, PER_MODE and
+#   DISTANCE_RANGE are the API parameters echoed back into the response. Each
+#   was verified constant with SELECT DISTINCT before removal. SEASON_TYPE is
+#   also constant today ('regular') but is KEPT, as season_type_name, because
+#   it is the one that stops being constant when postseason data lands.
+#
+# Surrogate keys deliberately exclude season_type, matching the declared
+# grain. If postseason rows arrive, the unique test on the key fails, which is
+# the signal to widen the grain rather than a bug to work around.
+# -----------------------------------------------------------------------------
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # Advanced box score -- game grain
+  # ---------------------------------------------------------------------------
+  - name: stg_wnba__player_game_advanced
+    description: >
+      Advanced player box score, five STATS__* groups flattened to 74 flat
+      metrics. Grain: player x game. 5,569 rows, fewer than the 5,751 in
+      stg_wnba__player_stats, so the core fact left-joins rather than inner.
+      Three group name collisions were resolved by measuring agreement:
+      MINUTES (five identical copies, one kept and parsed) and
+      OFFENSIVE_REBOUND_PERCENTAGE (identical, ADVANCED copy kept) collapse,
+      while EFFECTIVE_FIELD_GOAL_PERCENTAGE does NOT -- the FOUR_FACTORS and
+      ADVANCED values differ on 4,469 of 5,569 rows, so both survive and the
+      four-factors one keeps its qualifier. PERIOD is 0 on every row and is
+      dropped. 14 of the 15 registered variant twins are folded; the
+      fifteenth belonged to the dropped rebound duplicate.
+    columns:
+      - name: player_game_advanced_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        description: "Team the player appeared for in THIS game."
+        tests: [not_null]
+      - name: minutes_played
+        description: "Parsed from 'MM:SS'. NULL if the source string matched neither supported shape."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 60, severity: warn}
+      - name: four_factors_effective_field_goal_pct
+        description: >
+          The FOUR_FACTORS group's eFG, kept separate from
+          effective_field_goal_pct. It matches neither the player's own rate
+          nor her team's row in stg_wnba__team_game_advanced (44 of 5,569),
+          so it is a third series and must not be treated as either.
+      - name: effective_field_goal_pct
+        description: "The player's own eFG, from the ADVANCED group."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1.5, severity: warn}
+      - name: true_shooting_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1.5, severity: warn}
+
+  - name: stg_wnba__team_game_advanced
+    description: >
+      Advanced team box score, same five-group flattening as the player
+      model and the same column vocabulary, so a player can be compared to
+      her team without translation. Grain: team x game. 466 rows (233 games
+      x 2), 74 flat metrics. All three collisions collapse here (eFG,
+      offensive rebound rate and usage rate are each identical between
+      groups on all 466 rows), unlike the player grain. TEAM_TURNOVER_PCT
+      and ESTIMATED_TEAM_TURNOVER_PCT differ on all 466 rows and are kept
+      separately. No variant twins on this table.
+    columns:
+      - name: team_game_advanced_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: minutes_played
+        description: "Parsed from 'MMM:SS'. Roughly 200 at team level, five players on the floor."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 350, severity: warn}
+      - name: effective_field_goal_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+
+  # ---------------------------------------------------------------------------
+  # Advanced season aggregates -- player grain.
+  #
+  # All five cover the identical 224 players, verified pairwise in prod, and
+  # that is what lets sv_wnba_player_advanced ship enabled where the NFL
+  # equivalent could not. Note the population is WIDER than the 196 players in
+  # stg_wnba__player_season_stats, so this family is the spine of a
+  # player-season mart and the basic line is the left join, not the reverse.
+  # ---------------------------------------------------------------------------
+  - name: stg_wnba__player_season_advanced
+    description: >
+      Season efficiency, pace and rate stats. Grain: player x season.
+      224 rows, 2026 regular season. 35 of 105 source columns dropped as
+      *_RANK, 3 as request-echo constants (scope 'general', measure_type
+      'advanced', per_mode 'totals'). Variant twin STATS__MIN folded.
+    columns:
+      - name: player_season_advanced_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        description: "Constant 'Regular Season' today. Normalized from the source's 'regular' encoding."
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: games_played
+        tests: [not_null]
+      - name: team_count
+        description: "Teams the player appeared for this season. > 1 means team_key is only her last one."
+      - name: true_shooting_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1.5, severity: warn}
+      - name: usage_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+
+  - name: stg_wnba__player_season_misc
+    description: >
+      Season totals the basic box score omits: points by origin (paint, fast
+      break, off turnovers, second chance), the same four allowed, and the
+      foul and block counts. Grain: player x season. 224 rows, same
+      population as the rest of the family. 18 of 68 source columns dropped
+      as *_RANK, 3 as request-echo constants (measure_type 'misc'). No
+      variant twins. NBA_FANTASY_PTS lands as fantasy_points: the 'nba' is a
+      provider artifact, not a league attribution.
+    columns:
+      - name: player_season_misc_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: games_played
+        tests: [not_null]
+
+  - name: stg_wnba__player_season_scoring
+    description: >
+      How a season's points and shots were distributed, by shot value, by
+      court origin, and by whether the basket was assisted. Grain: player x
+      season. 224 rows. 23 of 79 source columns dropped as *_RANK, 3 as
+      request-echo constants (measure_type 'scoring'). Variant twin
+      STATS__MIN folded. Every _pct here is a share of the PLAYER's own
+      total; the same suffix on stg_wnba__player_season_usage is a share of
+      the TEAM. field_goal_pct is the only real shooting percentage on the
+      model.
+    columns:
+      - name: player_season_scoring_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: field_goal_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: points_paint_pct
+        description: "Share of this player's points scored in the paint, not a shooting rate."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+
+  - name: stg_wnba__player_season_usage
+    description: >
+      A player's share of her team's activity, one column per counting stat.
+      Grain: player x season. 224 rows. 23 of 78 source columns dropped as
+      *_RANK, 3 as request-echo constants (measure_type 'usage'). No variant
+      twins. usage_pct is the one exception on the model: it is the standard
+      possession-based rate, not a share of a team total.
+    columns:
+      - name: player_season_usage_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: usage_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: points_pct
+        description: "Share of the team's points. Not comparable with points_2pt_pct on the scoring model."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: rebounds_offensive_pct
+        description: >
+          Share of the TEAM's offensive rebounds. The similarly named
+          offensive_rebound_pct on stg_wnba__player_season_advanced is the
+          standard rate against available rebounds. Not interchangeable.
+
+  - name: stg_wnba__player_season_defense
+    description: >
+      Season defensive totals, rates, win shares, and what opponents scored
+      by origin. Grain: player x season. 224 rows. 18 of 68 source columns
+      dropped as *_RANK, 3 as request-echo constants (measure_type
+      'defense'). No variant twins. The only member of the family with no
+      TEAM_COUNT column, so a multi-team player cannot be spotted from this
+      model alone.
+    columns:
+      - name: player_season_defense_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: defensive_rebound_pct
+        description: "Source DREB_PCT. Rate against available rebounds."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: rebounds_defensive_pct
+        description: >
+          Source PCT_DREB. Share of the team's defensive rebounds. A
+          different measure from defensive_rebound_pct above, not a
+          duplicate, which is why both survive.
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+
+  # ---------------------------------------------------------------------------
+  # Advanced season aggregates -- team grain. 15 rows each, one per active
+  # franchise. The rank columns are doubly pointless at this width: over 15
+  # teams any ordering is trivial to re-derive.
+  # ---------------------------------------------------------------------------
+  - name: stg_wnba__team_season_advanced
+    description: >
+      Season team efficiency, ratings and pace. Grain: team x season.
+      15 rows, 2026 regular season. 19 of 58 source columns dropped as
+      *_RANK, 3 as request-echo constants (measure_type 'advanced'). No
+      variant twins. Column names match stg_wnba__player_season_advanced
+      wherever the metric exists on both.
+    columns:
+      - name: team_season_advanced_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: games_played
+        tests: [not_null]
+      - name: win_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: net_rating
+        description: "offensive_rating minus defensive_rating. Sums to roughly zero across the league."
+
+  - name: stg_wnba__team_season_four_factors
+    description: >
+      The four factors of winning basketball (shooting, turnovers,
+      rebounding, free throws) for the team and, symmetrically, for its
+      opponents. Grain: team x season. 15 rows. 13 of 40 source columns
+      dropped as *_RANK, 3 as request-echo constants (measure_type
+      'four_factors'). No variant twins. The opp_ half is the reason this
+      table is not derivable from the other team_season_* models.
+    columns:
+      - name: team_season_four_factors_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: effective_field_goal_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: opp_effective_field_goal_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: offensive_rebound_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+
+  - name: stg_wnba__team_season_opponent
+    description: >
+      The full box score a team ALLOWED over the season. Grain: team x
+      season. 15 rows. 26 of 66 source columns dropped as *_RANK, the
+      highest share in the family, and a defensive rank is good when the
+      number is LOW, which is a direction no caller can infer from a column
+      name -- re-deriving forces the choice to be explicit. 3 request-echo
+      constants dropped (measure_type 'opponent'). No variant twins. Every
+      measure carries an opp_ prefix except plus_minus, which is the
+      defending team's own margin.
+    columns:
+      - name: team_season_opponent_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: opp_points
+        tests: [not_null]
+      - name: opp_field_goal_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: plus_minus
+        description: "This team's season point margin, not the opponent's."
+
+  # ---------------------------------------------------------------------------
+  # Shot locations. KEPT WIDE: the source is pivoted one column trio per zone
+  # and prep stays 1:1 with it, so these models are the only place in the
+  # project where a zone is a column rather than a row. core unpivots them.
+  #
+  # Two schemes over the same shots. by_zone cuts the court into regions,
+  # 5ft cuts it into distance bands. The band slugs are zero-padded ft_ names
+  # (ft_00_04 ... ft_40_plus) because the source names start with a digit and
+  # are not legal identifiers unquoted; the full mapping is in each model's
+  # header comment.
+  # ---------------------------------------------------------------------------
+  - name: stg_wnba__player_shots_by_zone
+    description: >
+      Season shooting by court zone, eight zone trios wide. Grain: player x
+      season. 223 rows, 2026 regular season, one short of the 224 in the
+      advanced-season family. 3 request-echo constants dropped
+      (distance_range 'by_zone'). No variant twins on this table.
+      corner_3_* is NOT an eighth zone: it equals left_corner_3_* plus
+      right_corner_3_*, verified null-safe on all 223 rows, so summing all
+      eight double counts the corners. NULL means zero attempts, not
+      unknown; nothing is coalesced here.
+    columns:
+      - name: player_shots_zone_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: restricted_area_fg_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: corner_3_fga
+        description: "left_corner_3_fga + right_corner_3_fga. Redundant by construction, kept because prep is 1:1."
+
+  - name: stg_wnba__player_shots_5ft
+    description: >
+      Season shooting by 5-foot distance band, nine band trios wide, the
+      same shots as stg_wnba__player_shots_by_zone cut a different way.
+      Grain: player x season. 223 rows. 3 request-echo constants dropped
+      (distance_range '5ft_range'). Variant twins folded: the 30-34 and
+      35-39 foot FG_PCT columns. NULL means zero attempts, not unknown.
+    columns:
+      - name: player_shots_5ft_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: ft_00_04_fg_pct
+        description: "Source LESS_THAN_5_FT. Highest volume band for most players."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: ft_40_plus_fg_pct
+        description: "Source _40_FT. The only open-ended band, 40 feet and out."
+
+  - name: stg_wnba__team_shots_by_zone
+    description: >
+      Season team shooting by court zone, eight zone trios wide, same slugs
+      as the player model so both unpivot into one vocabulary. Grain: team x
+      season. 15 rows. 4 request-echo constants dropped, one more than the
+      player model because only the team tables carry MEASURE_TYPE ('base').
+      Variant twin folded: BACKCOURT FG_PCT. corner_3_* equals
+      left_corner_3_* plus right_corner_3_*, verified exactly on all 15
+      rows.
+    columns:
+      - name: team_shots_zone_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: restricted_area_fga
+        tests: [not_null]
+      - name: restricted_area_fg_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
+      - name: corner_3_fga
+        description: "left_corner_3_fga + right_corner_3_fga. Redundant by construction, kept because prep is 1:1."
+
+  - name: stg_wnba__team_shots_5ft
+    description: >
+      Season team shooting by 5-foot distance band, nine band trios wide.
+      Grain: team x season. 15 rows. 4 request-echo constants dropped
+      (measure_type 'base', distance_range '5ft_range', per_mode 'totals'
+      plus the kept season_type). Variant twins folded: the 35-39 and
+      40-plus foot FG_PCT columns -- a DIFFERENT pair from the player model,
+      which splits at 30-34 and 35-39, because the split follows whichever
+      cells landed on a clean integer rather than anything about the
+      endpoint.
+    columns:
+      - name: team_shots_5ft_key
+        description: "Surrogate key. Grain of this model."
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - accepted_values: {values: ['Regular Season', 'Postseason']}
+      - name: ft_00_04_fga
+        tests: [not_null]
+      - name: ft_00_04_fg_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
