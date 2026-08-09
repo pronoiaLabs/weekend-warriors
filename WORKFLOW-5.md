@@ -92,3 +92,78 @@ DBT_BUILDS insert) moved to Phase 2 so the 05_dbt_trigger.sql files are
 touched once, alongside the tables and child task the proc references.
 
 **Open:** none.
+
+## Phase 2 - harvest machinery + live E2E
+
+**Ran:** sql/ops/06_dbt_harvest.sql (DBT_BUILDS / DBT_QUERY_LOG /
+DBT_QUERY_OPERATOR_STATS + SP_DBT_HARVEST + retention task + grant slice);
+both 05_dbt_trigger.sql files gained the build_id plumbing and a
+DBT_HARVEST_<SPORT> child task; fired DLT_TASK_WNBA_GAMES and
+DLT_TASK_NFL_REFERENCE as the live test. Applied twice where it mattered
+(idempotency).
+
+**Result: GATE GREEN, after a real shakedown.** The proven chain: load ->
+build fires with a minted build_id -> every dbt query tagged with it ->
+DBT_BUILDS row (drained loads, exec query id) -> harvest child logs the
+queries and captures operator stats. A third build (the next scheduled WNBA
+load) then ran the whole chain unattended: 1,263 tagged queries, 245
+profiled, zero intervention.
+
+**Five real-world corrections, each now encoded in the files:**
+- EXECUTE DBT PROJECT's ENV_VARS clause validates at CREATE PROCEDURE time
+  and rejects a Scripting :bind -> EXECUTE IMMEDIATE with the (self-minted)
+  build_id inlined.
+- GET_QUERY_OPERATOR_STATS is far slower live than spiked: 0.5 s to 50 s+
+  per call (spike sample averaged 660 ms), and the first-run backlog plus
+  two concurrent harvests drove both children into their 30-min timeout.
+  Fix: 200-per-run cap, heaviest first.
+- Serial profiling was the wrong shape entirely -> Snowflake Scripting
+  ASYNC child jobs, 8 per chunk (matching default MAX_CONCURRENCY_LEVEL),
+  AWAIT ALL per chunk inside an exception handler (AWAIT is fail-fast and
+  unawaited children are auto-cancelled at proc exit). Snowpark was
+  evaluated and rejected: collect_nowait/AsyncJob is documented as
+  unsupported inside Python stored procedures. Measured result: 174
+  profiles in 182 s, zero errors, versus timeout before.
+- EXECUTION_TIME > 0 is not a metadata filter: USE and ALTER SESSION report
+  8-14 ms of "execution time", so the first day admitted 9k+ no-ops to the
+  profile queue. Fix: QUERY_TYPE allowlist (SELECT/INSERT/MERGE/UPDATE/
+  DELETE/CTAS/COPY/UNLOAD).
+- Claim-first dedupe (flip STATS_CAPTURED, then profile) so concurrent
+  sport harvests never pay the same profile call twice.
+
+**Also:** two stuck old-code harvest calls were cancelled mid-shakedown
+(committed rows kept; incremental state self-heals). The QUERY_HISTORY
+stored-proc prohibition being owner's-rights-only held in task context too.
+
+**Changed from plan:** one harvest child per sport instead of two (Phase 0
+finding); profile-eligibility narrowed to plan-bearing statement types,
+which is what the user's "skip the metadata no-ops" choice meant all along.
+
+**Open:** none.
+
+## Phase 3 - V_DBT_RUNS, retention, cost tags
+
+**Ran:** sql/ops/07_dbt_runs.sql (V_DBT_RUNS: live per-DB TASK_HISTORY
+UNION ACCOUNT_USAGE, QUALIFY dedupe, joined to DBT_BUILDS and per-build
+query rollups) and 08_cost_tags.sql (COST_CENTER tag on DBT_WH /
+DEVELOPMENT_WH / DLT_OPS_WH and the five dbt tasks). Retention rode in
+Phase 2's 06 file (weekly, 90 d query log + operator stats, 365 d build +
+trigger audit rows).
+
+**Result:** GATE GREEN. The view returns the full task history including
+WORKFLOW-4's documented rollout failures, correctly attributed; tag
+bindings verified via TAG_REFERENCES; DBT_RUNNER_ROLE reads
+ACCOUNT_USAGE.TASK_HISTORY with no new grant (verified empirically).
+ALTER TASK SET TAG works on a started task, no suspend needed.
+
+**One correction:** TASK_HISTORY.RETURN_VALUE comes only from
+SYSTEM$SET_RETURN_VALUE, not from a proc's RETURN string (verified None),
+so SP_DBT_BUILD now sets it explicitly (guarded for non-task invocations);
+V_DBT_RUNS parses build_id from it. Self-verifies on the next scheduled
+build; today's three builds predate it and stay unjoined, which is fine
+since this data is disposable until the happy-state truncation.
+
+**Changed from plan:** retention lives in 06 (same owner as the tables)
+rather than a separate file.
+
+**Open:** V_DBT_RUNS build_id join confirmation on the next natural build.

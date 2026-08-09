@@ -122,6 +122,13 @@ AS
 $$
 DECLARE
   drained INTEGER;
+  -- The build id ties everything together: it rides into every dbt query's
+  -- QUERY_TAG via ENV_VARS (see dbt-pipelines/macros/query_tags.sql), and
+  -- into DLT_DB.OPS.DBT_BUILDS below, which is what the harvest and the ops
+  -- dashboard join on.
+  build_id VARCHAR DEFAULT UUID_STRING();
+  started_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP();
+  exec_qid VARCHAR;
 BEGIN
   -- Drain FIRST. This is the stream consumption; without it the task
   -- re-fires every interval forever.
@@ -137,15 +144,43 @@ BEGIN
 
   -- Explicit ENVIRONMENT: the project object defaults to dev. A partial dbt
   -- failure raises here, failing the task with the message in TASK_HISTORY.
-  EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_WNBA
-    ARGS = 'build'
-    ENVIRONMENT = 'wnba_prod';
+  -- EXECUTE IMMEDIATE because ENV_VARS validates its values at CREATE
+  -- PROCEDURE time and rejects a Scripting :bind ("must be a single-quoted
+  -- string literal, a session variable, or a bind placeholder (?)"); the
+  -- build_id is a self-minted UUID, so inlining it is safe.
+  EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_WNBA'
+    || ' ARGS = ''build'''
+    || ' ENVIRONMENT = ''wnba_prod'''
+    || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';
 
-  RETURN 'built after ' || drained || ' load(s)';
+  -- A DBT_BUILDS row means the build succeeded: on failure the RAISE above
+  -- skips this, and TASK_HISTORY is the record. LAST_QUERY_ID() here is the
+  -- EXECUTE DBT PROJECT statement, the join key into execution history.
+  exec_qid := LAST_QUERY_ID();
+  INSERT INTO DLT_DB.OPS.DBT_BUILDS
+    (BUILD_ID, SPORT, ENVIRONMENT, PROJECT_FQN, ARGS, DRAINED_LOADS, EXEC_QUERY_ID, STARTED_AT, FINISHED_AT)
+  VALUES
+    (:build_id, 'wnba', 'wnba_prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_WNBA', 'build',
+     :drained, :exec_qid, :started_at, CURRENT_TIMESTAMP());
+
+  -- TASK_HISTORY.RETURN_VALUE comes ONLY from SYSTEM$SET_RETURN_VALUE; a
+  -- proc's RETURN string never reaches it (verified: None). V_DBT_RUNS
+  -- parses build_id out of this. Guarded because the call errors when the
+  -- proc is invoked outside a task run (manual smoke tests).
+  BEGIN
+    SELECT SYSTEM$SET_RETURN_VALUE('built after ' || :drained || ' load(s), build_id ' || :build_id);
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
+  RETURN 'built after ' || drained || ' load(s), build_id ' || build_id;
 END;
 $$;
 
 -- CREATE OR ALTER TASK refuses to touch a started task; suspend first.
+-- The whole graph (root AND child) must be suspended to alter either.
+ALTER TASK IF EXISTS WNBA_PROD_DB.OPS.DBT_HARVEST_WNBA SUSPEND;
 ALTER TASK IF EXISTS WNBA_PROD_DB.OPS.DBT_BUILD_WNBA SUSPEND;
 
 CREATE OR ALTER TASK WNBA_PROD_DB.OPS.DBT_BUILD_WNBA
@@ -157,5 +192,20 @@ CREATE OR ALTER TASK WNBA_PROD_DB.OPS.DBT_BUILD_WNBA
 AS
   CALL WNBA_PROD_DB.OPS.SP_DBT_BUILD();
 
--- Not redundant: CREATE OR ALTER TASK leaves the task suspended.
+-- Harvest child: runs only after a SUCCESSFUL build (task-graph semantics;
+-- a child AFTER a triggered root fires normally, verified WORKFLOW-5
+-- Phase 0). A harvest failure fails this task's own run, never the build.
+-- The proc it calls lives in sql/ops/06_dbt_harvest.sql -- apply that file
+-- before this one on a fresh account.
+CREATE OR ALTER TASK WNBA_PROD_DB.OPS.DBT_HARVEST_WNBA
+  WAREHOUSE = DBT_WH
+  USER_TASK_TIMEOUT_MS = 1800000
+  COMMENT = 'Query log + operator-stats harvest after each WNBA dbt build. NOT managed by generate_tasks.py.'
+  AFTER WNBA_PROD_DB.OPS.DBT_BUILD_WNBA
+AS
+  CALL DLT_DB.OPS.SP_DBT_HARVEST();
+
+-- Not redundant: CREATE OR ALTER TASK leaves tasks suspended. Children
+-- resume BEFORE the root; a resumed root with a suspended child skips it.
+ALTER TASK WNBA_PROD_DB.OPS.DBT_HARVEST_WNBA RESUME;
 ALTER TASK WNBA_PROD_DB.OPS.DBT_BUILD_WNBA RESUME;
