@@ -178,3 +178,37 @@ deviation documented); no made_playoffs flag (playoff field size varies
 across 19 seasons; seed published instead).
 
 **Open:** none new.
+
+## Phase 4 - semantic views
+
+**Ran:** one agent wrote all four views (consistent voice; the routing
+clauses cross-reference each other), column-verified against the dev core
+tables with sample values pulled live. Deploy + full build + one live
+SEMANTIC_VIEW() smoke question per view.
+
+**Result:** GATE GREEN. Build 629/629 PASS including 4 semantic view
+models. Smoke answers sane: MIN leads franchise avg win pct (.640, best
+.824 PHX-adjacent values check out), player views return real leaders,
+apostrophe names (Flau'jae Johnson) render, proving the '' escaping.
+
+**Decisions that matter downstream:**
+- One rate scale everywhere: fact_wnba_team_game's 0-100 box percentages
+  are NOT exposed; the same rates are sum-over-sum metrics instead. All
+  stored rates presented as 0-1 fractions with a display rule (0.462 shown
+  as 46.2%), matching sv_nfl_team_performance exactly (it never multiplies
+  by 100 either).
+- Turnover margin is not computable in a single-row aggregation (no
+  opponent_turnovers column): direction rule tells the Analyst to group
+  opponents' rows; steals flagged as not-the-same-thing.
+- team_history uses the fact's season-accurate conference, not the dim's
+  (NULL for the 2026 expansion clubs); team_performance warns a conference
+  filter silently drops Fire and Tempo.
+- season_type_name gets sample_values WITHOUT is_enum (only 'Regular
+  Season' and 'All-Star' have landed; Postseason/Preseason legitimate).
+- player_advanced avg_* metrics carry unweighted-mean warnings plus a
+  minutes-floor rule; no championship data exists and the history view
+  says so as its strongest rule.
+
+**Changed from plan:** nothing structural.
+
+**Open:** none new.

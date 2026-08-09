@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: sv_wnba_team_performance
+    description: >
+      Team results and box score at team-by-game grain, 2026 season. 478 rows over 239
+      decided games, so each game appears twice, once per team. Carries scoring, shooting
+      volume, rebounding, assists, steals, blocks, turnovers and fouls, with the opponent
+      on the row so opponent splits need no self-join. Standings are deliberately excluded
+      to avoid a second join path to wins and losses. The stored 0-100 percentage columns
+      are not exposed; shooting rates are published as sum-over-sum metrics on a 0-1
+      fraction scale instead, matching every other WNBA view.
+
+  - name: sv_wnba_team_history
+    description: >
+      Regular season standings at team-by-season grain, 2008 through 2026. 235 rows over
+      17 franchises, including the two that folded. The only multi-season WNBA view, so
+      every franchise-history and year-over-year question belongs here. Carries records,
+      home, road and conference splits, games behind and playoff seed. The source has no
+      championship, finals or postseason data of any kind, and no season-grain scoring.
+
+  - name: sv_wnba_player_performance
+    description: >
+      The individual box score at player-by-game grain, 2026 season. 5,751 rows over 237
+      games and 231 players. One view rather than the NFL project's offence and defence
+      split, because a basketball box score has no phases: steals, blocks and rebounds
+      live here alongside scoring. The 1,076 did-not-play rows are included with NULL
+      measures, so every per-game metric divides by summed games played rather than by
+      row count.
+
+  - name: sv_wnba_player_advanced
+    description: >
+      Advanced player metrics at player-by-season grain, 2026 regular season, 224 players.
+      Efficiency, usage, offensive and defensive ratings, pace, four factors, scoring
+      distribution, share of team output and defensive measures. Ships enabled where
+      sv_nfl_player_advanced is disabled, because the five source endpoints behind it
+      cover one identical player population rather than disjoint positional groups. Rate
+      leaderboards require a minimum minutes floor and team is a current-roster
+      approximation.
