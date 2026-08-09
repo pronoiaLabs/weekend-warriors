@@ -208,19 +208,19 @@
       </div>
     </li>
 
-    <li class="item" data-key="dbt-trigger-observability" data-cat="dashboard">
+    <li class="item" data-key="tag-spcs-pools" data-cat="dashboard">
       <div class="row">
-        <input type="checkbox" id="cb-dbt-trigger-observability">
+        <input type="checkbox" id="cb-tag-spcs-pools">
         <div class="body">
           <div class="title-line">
-            <label class="title" for="cb-dbt-trigger-observability">dbt trigger observability</label>
+            <label class="title" for="cb-tag-spcs-pools">Tag SPCS compute pools for ingestion cost attribution</label>
             <span class="chip">dashboard</span>
           </div>
           <details>
             <summary>Problem and fix</summary>
             <div class="detail">
-              <p><b>Problem:</b> the <code>DBT_BUILD_&lt;SPORT&gt;</code> tasks are invisible to <code>V_TASK_RUNS</code> by design, and nothing rolls up <code>DBT_PROJECT_EXECUTION_HISTORY</code>, per-sport <code>TASK_HISTORY</code>, and the <code>DBT_TRIGGER_LOADS</code> audit tables into one place. The ops dashboard has no dbt panel. Also unset: retention on the audit tables (one row per load, forever; years from mattering at current volume).</p>
-              <p><b>The fix:</b> a <code>V_DBT_RUNS</code> view joining task history to execution history and drained loads, a dashboard card on top, and a retention task mirroring <code>sql/ops/05_retention.sql</code>.</p>
+              <p><b>Problem:</b> <code>sql/ops/08_cost_tags.sql</code> tags the warehouses and dbt tasks with <code>COST_CENTER</code>, but ingestion cost lives in the SPCS compute pools, deliberately left untagged (and the 17 ingestion tasks are untouchable by standing rule). Component-level cost covers dbt/dev/ops but not ingestion.</p>
+              <p><b>The fix:</b> decide whether to <code>ALTER COMPUTE POOL ... SET TAG</code> the pools, and whether ingestion tasks should carry the tag via the <code>generate_tasks.py</code> template. Low urgency: pool cost is visible untagged in <code>SNOWPARK_CONTAINER_SERVICES_HISTORY</code>.</p>
             </div>
           </details>
         </div>

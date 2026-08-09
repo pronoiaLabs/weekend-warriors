@@ -167,3 +167,102 @@ since this data is disposable until the happy-state truncation.
 rather than a separate file.
 
 **Open:** V_DBT_RUNS build_id join confirmation on the next natural build.
+
+## Phase 4 - dashboard API
+
+**Ran:** (delegated to a python subagent against a fixed endpoint contract)
+four routes in ops-dashboard/api following the datasource/main seam:
+GET /api/dbt/builds, /api/dbt/builds/{id}, /api/dbt/builds/{id}/queries,
+/api/dbt/queries/{qid}/operators. Fixtures recorded from the live tables
+(read-only), 8 new tests including 404 paths, deploy/sql/01_ops_role.sql
+grants kept in sync.
+
+**Result:** GATE GREEN. 41 API tests pass, ruff clean, live smoke test of
+all four endpoints against Snowflake.
+
+**One shared-helper fix rode along:** _iso_utc now converts tz-aware values
+to UTC before stamping Z. The dbt tables are TIMESTAMP_TZ (unlike the LTZ
+views), arrive in writer-local offsets regardless of session TIMEZONE, and
+were being stamped as UTC while holding -07:00 wall time. Guarded on
+tzinfo, so LTZ/NTZ payloads are byte-identical to before.
+
+**Changed from plan:** none.
+
+**Open:** endpoints 2-4 return 404 live until a post-RETURN_VALUE build
+exists (fixtures cover the joined shape; recorded values, real join).
+
+## Phase 5 - dashboard web
+
+**Ran:** (delegated to a react subagent against the same contract) /dbt
+page (interleaved newest-first build table, state chips, failed-query
+highlighting), /dbt/builds/:buildId detail (facts grid, triggering loads,
+slowest-first query table with per-query operator expanders), Fleet dbt
+card (latest build per sport), TopBar nav, types + client + CSS.
+
+**Result:** GATE GREEN. tsc, oxlint and vite build clean; make test lint
+green over the combined API + web tree.
+
+**Notes:** operator breakdown deliberately compact (share-of-time column,
+top statistics, no nested bags); node names shown without the
+model.cortex_agent_lifecycle. prefix; sub-second timings render in ms via
+a new shared elapsedMs formatter.
+
+**Changed from plan:** single interleaved table instead of per-sport
+grouping (the feed is newest-first across sports; grouping would destroy
+the ordering that matters).
+
+**Open:** none.
+
+## Phase 6 - docs and wrap-up
+
+**Ran:** CLAUDE.md (event-driven section now covers the harvest child,
+build_id plumbing and SET_RETURN_VALUE; new "dbt observability" section
+under Telemetry with the four hard-won GET_QUERY_OPERATOR_STATS facts);
+BACKLOG.md/.html (dbt-trigger-observability item closed, SPCS pool-tagging
+item added); dbt-pipelines README (query-tag contract paragraph). Scaffold
+template + tests landed back in Phase 2's commit. Full dlt suite 189
+passed; BACKLOG.html re-validated.
+
+**Changed from plan:** none.
+
+**Open:** in HANDOFF.
+
+## HANDOFF
+
+**End state: dbt builds are first-class observability citizens.** Every
+prod build mints a build_id that rides in every query's JSON QUERY_TAG;
+a harvest child task persists the build's query log and (ASYNC, 8-wide,
+200-per-run) operator-stats profiles into DLT_DB.OPS; V_DBT_RUNS joins
+task history, build records and per-build rollups; COST_CENTER object tags
+sit on the warehouses and dbt tasks; and the ops dashboard has a /dbt page,
+build detail with query-profile drill-down, and a Fleet card.
+
+**Verified live:** the full chain end to end including one fully unattended
+build+harvest cycle, plus the shakedown corrections recorded in Phase 2
+(ENV_VARS binds, operator-stats latency, ASYNC rework, metadata-noise
+filter, claim-first dedupe, SET_RETURN_VALUE).
+
+**Still pending when this log closed:** the first V_DBT_RUNS row with a
+parsed build_id (needs one natural build after the SET_RETURN_VALUE patch;
+a watcher was running). Until then the dashboard's build-detail endpoints
+404 live and the /dbt list shows unlinked rows, both by design.
+
+**The user intends to truncate the observability tables once at a happy
+state** (first-day data is shakedown noise: three builds, one with
+pre-patch NULL joins, backlog-heavy query log). Truncation is theirs to
+run: DBT_BUILDS, DBT_QUERY_LOG, DBT_QUERY_OPERATOR_STATS, and optionally
+both DBT_TRIGGER_LOADS.
+
+**Costs:** harvest adds roughly 2-4 min of XSMALL DBT_WH per build day
+under the 200-cap (backlog drains then stabilizes); operator rows ~5-15k
+per WNBA build under full capture, 90-day retention.
+
+**Follow-ups, priority order:**
+1. WNBA play-by-play modeling (BACKLOG, unchanged, still top).
+2. deploy.yml dbt job wiring (BACKLOG, unchanged).
+3. NFL raw drift (BACKLOG, unchanged; gates run->build flip).
+4. SPCS pool cost tagging decision (new BACKLOG item).
+5. Optional harvest tuning if runtime ever matters: batch the claim
+   UPDATEs (the remaining serial cost, ~0.4 s per row).
+
+**Branch state:** feat/dbt-observability, NOT pushed, no PR (your call).

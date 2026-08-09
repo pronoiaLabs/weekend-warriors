@@ -54,18 +54,19 @@ and make the job deploy all three objects (a matrix or `make deploy-all`).
 Note the job then only needs to DEPLOY: the triggers run the builds when data
 lands, so the CI build step becomes optional-or-removed.
 
-## dbt trigger observability
+## Tag SPCS compute pools for ingestion cost attribution
 
-**Problem:** the `DBT_BUILD_<SPORT>` tasks are invisible to `V_TASK_RUNS` by
-design, and nothing rolls up `DBT_PROJECT_EXECUTION_HISTORY`, the per-sport
-`TASK_HISTORY`, and the `DBT_TRIGGER_LOADS` audit tables into one place. The
-ops dashboard has no dbt panel. Also unset: retention on the audit tables
-(they grow one row per load, forever, which at current volume is years away
-from mattering).
+**Problem:** `sql/ops/08_cost_tags.sql` tags the warehouses and dbt tasks
+with `DLT_DB.OPS.COST_CENTER`, but ingestion cost lives in the SPCS compute
+pools, which the file deliberately leaves untagged (and the 17 ingestion
+tasks are untouchable by standing rule). Component-level cost reporting
+therefore covers dbt/dev/ops but not ingestion.
 
-**The fix:** a `V_DBT_RUNS` view per sport (or in DLT_DB.OPS) joining task
-history to execution history and drained loads, a dashboard card on top, and
-a retention task mirroring `sql/ops/05_retention.sql`.
+**The fix:** decide whether to `ALTER COMPUTE POOL ... SET TAG` the pools
+(object tagging supports compute pools) and whether the ingestion tasks
+should carry the tag too, which would mean amending the generate_tasks.py
+template rather than hand-editing tasks. Low urgency: pool cost is visible
+untagged in `SNOWFLAKE.ACCOUNT_USAGE.SNOWPARK_CONTAINER_SERVICES_HISTORY`.
 
 ## Investigate NFL raw drift flagged by the reconciliation tests
 
