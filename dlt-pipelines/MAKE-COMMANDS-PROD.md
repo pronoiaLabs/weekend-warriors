@@ -1,4 +1,9 @@
-# Running the NFL pipelines in production
+# Running the NFL and NCAAF pipelines in production
+
+(The mechanics here -- Tasks, tokens, deployment, watching, backfilling --
+apply to every sport. The schedules and calendars are per sport: NFL below,
+NCAAF in its own section near the end. WNBA cadences live only in
+`wnba-registry.yml`'s comments.)
 
 Scheduled Snowflake Tasks loading `NFL_PROD_DB.RAW`. The third runbook, after
 [MAKE-COMMANDS.md](MAKE-COMMANDS.md) (laptop) and [MAKE-COMMANDS-SPCS.md](MAKE-COMMANDS-SPCS.md)
@@ -294,3 +299,50 @@ Two workable options, neither built:
   passing.
 
 Whichever gets built, the merge keys mean a backfill and a scheduled run cannot corrupt each other.
+
+---
+
+## NCAAF: schedules and calendar
+
+Deployed 2026-08-09 (WORKFLOW-7). The band is **02:00-07:59 UTC**, below the
+NFL's 08:00-13:00 and the WNBA's 14:00-23:00 (+ Wed 01:00), so the three
+sports never stack against the shared 600 req/min API limit or `DLT_POOL`.
+
+| Pipeline | Cron (UTC) | Cadence | Why |
+|---|---|---|---|
+| `ncaaf_standings` | `0 2 * * 1` | Monday | weekend settled by Sunday 10pm ET; scd2 weekly snapshot |
+| `ncaaf_season_stats` | `0 3 * * 1` | Monday | rollups move when games complete |
+| `ncaaf_rankings` | `0 4 * * 1` | Monday | AP poll releases Sunday ~18:00 UTC; endpoint returns the latest week only, so the weekly run accumulates the season |
+| `ncaaf_reference` | `0 2 * * 3` | Wednesday | 536 teams + 124k players is ~1,250 requests; college rosters churn on portal windows, not daily waivers |
+| `ncaaf_games` | `0 6 * * *` | daily | the latest kickoffs (Hawaii, 10:30pm ET Sat) go final ~05:45 UTC; 06:00 catches the whole slate same-night |
+| `ncaaf_stats` | `0 7 * * *` | daily | box scores an hour behind the games |
+
+**No injuries, no plays, no odds.** The API has no NCAAF injuries endpoint at
+all; play-by-play carries no down/distance/field position (scoring timeline
+only) and odds were scoped out. All three can be added later as registry
+entries.
+
+**Postseason has no flag.** No `season_type` and no `postseason` boolean
+exist for this sport; bowls and the CFP arrive in the same `/games` stream
+marked `week: 999` (with at least one known mislabel, the Jan 2025 Gator
+Bowl as week 1). Anything that separates regular season from bowls does it
+on `week`, downstream.
+
+### 2026 season dates
+
+| Date | Event |
+|---|---|
+| ~11 Aug 2026 | preseason AP poll (first `ncaaf_rankings` rows of the season) |
+| 29 Aug 2026 (Sat) | week 1 begins; 1,623 games already on the schedule |
+| Sep-Nov | regular season, Saturdays; weeks 1-16 |
+| early Dec | conference championships (still week-numbered) |
+| mid Dec onward | bowls + CFP, `week: 999` |
+| Jan 2027 | CFP final; season 2026 rows carry January dates |
+| 1 Aug 2027 | `{current_season}` rolls to 2027 (`season_rollover_month: 8`) |
+
+**Rankings backfill is a week loop**, unlike everything else: the endpoint
+returns only one week per call, so history is
+`PARAM="rankings:season=2025 rankings:week=5"` iterated over weeks 2-16.
+Games, stats and season stats take the usual season params; standings takes
+`PARAM="standings:season=2024"` and fans out over all 25 conferences on its
+own.
