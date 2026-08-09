@@ -80,3 +80,7 @@ BACKLOG.html
 # Consumption Table PDF): theirs to publish, ours to read locally. Leading
 # slash anchors to the root, same as /.docs/ above.
 /*.pdf
+
+# Local working copy of an upstream template: reference material for the
+# maintainer, never part of this codebase.
+/dlt-snowflake-template/
