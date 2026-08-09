@@ -105,16 +105,19 @@ CREATE TABLE IF NOT EXISTS NFL_PROD_DB.OPS.DBT_TRIGGER_LOADS (
   LOAD_ID             VARCHAR,
   PIPELINE            VARCHAR,
   STATUS              NUMBER,
-  INSERTED_AT         TIMESTAMP_NTZ,
-  DRAINED_AT          TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+  -- TIMESTAMP_TZ matches _DLT_LOADS.INSERTED_AT exactly: the drain INSERT
+  -- selects it straight through, and a TZ->NTZ mismatch fails the INSERT
+  -- (found live; the Phase 0 spike's fake table was NTZ and hid it).
+  INSERTED_AT         TIMESTAMP_TZ,
+  DRAINED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
 COMMENT = 'Audit: which loads triggered which dbt build. The INSERT that fills this is also the stream consumption that stops re-triggering.';
 
 CREATE OR REPLACE PROCEDURE NFL_PROD_DB.OPS.SP_DBT_BUILD()
 RETURNS VARCHAR
 LANGUAGE SQL
-EXECUTE AS CALLER
 COMMENT = 'Drain DBT_LOADS_STREAM, then dbt run for NFL. Caller''s rights: EXECUTE DBT PROJECT requires it.'
+EXECUTE AS CALLER
 AS
 $$
 DECLARE
