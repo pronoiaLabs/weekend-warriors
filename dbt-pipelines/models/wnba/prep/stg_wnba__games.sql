@@ -8,7 +8,7 @@
     stg_wnba__games -- one row per game, 333 rows, 2026 season only.
 
     Home and away sit side by side here, matching the source. The unpivot to
-    team x game grain happens downstream in fact_team_game, not here -- prep
+    team x game grain happens downstream in fact_wnba_team_game, not here -- prep
     stays a faithful 1:1 view of the source shape.
 
     Unlike the NFL games source, this one is not all finished games. 240 rows

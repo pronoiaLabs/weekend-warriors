@@ -44,7 +44,7 @@ models:
   - name: stg_wnba__players
     description: >
       Player roster, 860 rows. Grain: player. Team is CURRENT ONLY and is not
-      promoted to dim_player. WEIGHT and COLLEGE are deliberately absent:
+      promoted to dim_wnba_player. WEIGHT and COLLEGE are deliberately absent:
       upstream shifts the college name into the WEIGHT field whenever weight
       is missing, so 0 of 860 rows carry a numeric weight and neither column
       is recoverable here.

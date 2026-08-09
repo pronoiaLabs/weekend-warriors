@@ -8,7 +8,7 @@
     stg_wnba__team_stats -- team box score, one row per team per game.
     476 rows, covering 238 of the 240 completed games. The two gaps are the
     2026-08-08 games, whose box scores the load has not reached yet, so
-    fact_team_game left-joins this rather than inner-joining.
+    fact_wnba_team_game left-joins this rather than inner-joining.
 
     dlt flattened the full game record and the team record into every row.
     Everything but game__id and team__id is dropped here, with game_date and
@@ -23,7 +23,7 @@
 
     There is no points column. The source does not carry one at team x game
     grain: team points live on stg_wnba__games as home_team_score /
-    away_team_score, and fact_team_game is where the two meet.
+    away_team_score, and fact_wnba_team_game is where the two meet.
 
     FG_PCT / FG3_PCT / FT_PCT come straight from the source and are NOT
     recomputed. The source is authoritative on its own rounding, and a rate

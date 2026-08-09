@@ -129,3 +129,52 @@ mid-loop instead of at handoff.
 
 **Open:** NFL raw drift (2 orphan team_stats rows); GAMES_PLAYED
 overcount oddity.
+
+## Phase 3 - core layer (4 dims, 11 facts, 6 reconciliation tests)
+
+**Ran:** two parallel agents: dims + game facts + 2 singular tests, and
+season facts + 4 singular tests. Both render-executed every model body
+read-only before writing. Then the collision fix below, redeploy, full build.
+
+**Result:** GATE GREEN. `dbt build --env wnba_dev`: 15 table models, 23
+views, 586 data tests, 1 seed, PASS=625 ERROR=0. All six reconciliation
+tests pass with evidence-backed thresholds.
+
+**The collision:** dbt model names are project-global, so WNBA core models
+reusing NFL's names (dim_team, fact_team_game, dim_date...) failed the
+deploy at parse ("two schema.yml entries for the same resource"), enabled
+gating notwithstanding. All 15 WNBA core models renamed sport-qualified
+(dim_wnba_*, fact_wnba_*), matching the sv_wnba_* pattern. NFL keeps its
+generic names; harmonizing NFL to dim_nfl_* someday is a HANDOFF note.
+Plan said "12 facts"; it is 11.
+
+**Measured facts worth knowing:**
+- Player-box sums reconcile to team box scores EXACTLY (474 rows, threshold
+  0), across three independent sources (points from games, rebounds/assists
+  from team_stats, player sums from player_stats).
+- Standings trail the game log by exactly 3 games today: 2 same-day
+  snapshot lag (24989/24990) plus game 24896 (2026-06-30, fully boxscored)
+  which the provider's standings endpoint simply omits. Flagship test
+  tolerance 2 per team, standings-never-lead and league-balance asserted.
+- Season aggregate sources: per-game averages; the two 0-100-scale tables
+  normalized to 0-1 fractions in core (NFL's fact_team_season.win_pct
+  convention). MINUTES means per-game in advanced/scoring but season-total
+  in misc/usage/defense (published as two columns). The advanced five
+  disagree on shared columns (games_played 204/224 agreement); each
+  duplicate is taken from one named source.
+- The advanced game source writes REAL ZEROS into 975 DNP rows, so
+  fact_wnba_player_game_advanced republishes is_dnp; averages there must
+  filter it (semantic view rule).
+- games_played impossibility test derives the season max from
+  fact_wnba_team_game each run (18 of 196 rows breach today, max 44 vs 33).
+- Postponed game 24935 carries a fake 0-0 'post' line; facts scope on
+  winner_team_id is not null.
+- fg_pct nulled where fga = 0 in the shooting facts (source writes 0.0,
+  which would read as a shooting problem in AVG).
+
+**Changed from plan:** sport-qualified core names (collision); 11 facts not
+12; dim_wnba_game carries the final line (only complete schedule, NFL
+deviation documented); no made_playoffs flag (playoff field size varies
+across 19 seasons; seed published instead).
+
+**Open:** none new.

@@ -19,9 +19,10 @@
        stops collapsing the two fields.
 
     2. It holds each player's CURRENT team only. There is no team history, so
-       these columns are named current_team_* and are deliberately NOT
-       promoted to dim_player. Per-game team affiliation comes from
-       stg_wnba__player_stats.team_key instead.
+       these columns are named current_team_*. dim_wnba_player promotes them
+       as a documented approximation (the season-advanced sources carry no
+       team, and with single-season coverage current team ~= season team);
+       per-game team affiliation comes from stg_wnba__player_stats.team_key.
 
     3. POSITION carries two vocabularies at once: 191 rows say 'Guard' and 169
        say 'G' for the same thing, with 130 rows on the explicit unknown member
@@ -86,8 +87,9 @@ renamed as (
 
         age,
 
-        -- current team only -- see header. Kept so a "who is on the roster
-        -- now" question is answerable, but NOT promoted to dim_player.
+        -- current team only -- see header. Promoted to dim_wnba_player as a
+        -- documented approximation: the season-advanced sources carry no
+        -- team, and with single-season coverage current team ~= season team.
         {{ dbt_utils.generate_surrogate_key(['team_id']) }} as current_team_key,
         team_id                                         as current_team_id,
 

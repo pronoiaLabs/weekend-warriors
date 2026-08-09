@@ -1,0 +1,335 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# Game-grain facts. The season-grain facts are documented in
+# _facts_season__models.yml, which is a separate file in this same directory:
+# the two together cover models/wnba/core/facts/, and neither is the whole
+# picture on its own.
+# ---------------------------------------------------------------------------
+
+models:
+
+  - name: fact_wnba_team_game
+    description: >
+      One row per team per game. Grain: team x game. 478 rows = 239 games x 2.
+      GAMES unpivoted to team level (UNION ALL, cannot fan out) with the
+      TEAM_STATS box score left-joined on.
+      SCOPE IS GAMES WITH A RESULT, not completed games: the postponed game
+      24935 is complete and carries a 0-0 line, so the filter reads
+      winner_team_id rather than the score, and 239 games qualify, not 240.
+      Four rows have has_box_score = false, the two 2026-08-08 games (24989,
+      24990) whose box scores have not loaded.
+      TEAM POINTS COME FROM THE GAME RECORD, not from TEAM_STATS, which has no
+      points column at all.
+      Covers the All-Star game too -- filter on season_type_name, do not
+      assume regular season.
+      Guarded by tests/wnba/assert_wnba_fact_wnba_team_game_is_mirrored.sql and
+      tests/wnba/assert_wnba_player_box_reconciles_to_team_box.sql.
+    columns:
+      - name: team_game_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_game')", field: game_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: opponent_team_key
+        description: "Carried so opponent analysis needs no self-join."
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_date')", field: date_key}
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Regular Season', 'Postseason', 'All-Star', 'Preseason']
+      - name: points_scored
+        description: "From the game record, not the box score. Never NULL -- no-result games are out of scope."
+        tests: [not_null]
+      - name: points_allowed
+        tests: [not_null]
+      - name: point_margin
+        tests: [not_null]
+      - name: is_home
+        tests: [not_null]
+      - name: is_win
+        description: "Exhaustive with is_loss. Basketball has no ties, and a drawn score means no result, which is filtered out."
+        tests: [not_null]
+      - name: is_loss
+        tests: [not_null]
+      - name: win_count
+        description: "Additive counter, so a record is a plain sum."
+        tests:
+          - not_null
+          - accepted_values: {values: [0, 1], quote: false}
+      - name: loss_count
+        tests:
+          - not_null
+          - accepted_values: {values: [0, 1], quote: false}
+      - name: has_box_score
+        description: "False on 4 of 478 rows. Filter on this rather than null-checking a measure."
+        tests: [not_null]
+      - name: rebounds
+        description: "NULL where has_box_score is false."
+      - name: field_goal_pct
+        description: >
+          NULL where has_box_score is false. On a 0-100 scale (46.2, not
+          0.462), straight from the source and NOT recomputed, so it is not
+          additive -- recompute from the summed counts instead of averaging.
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
+      - name: turnovers
+        description: "NULL where has_box_score is false."
+
+    tests:
+      # the declared grain
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+
+  - name: fact_wnba_team_game_advanced
+    description: >
+      Advanced team box score. Grain: team x game. 466 rows = 233 games x 2,
+      49 measures curated from the 74 the staging view flattens.
+      COVERAGE IS NARROWER THAN fact_wnba_team_game: six games with a result have no
+      advanced rows (24832, 24833, 24896, 24955 the All-Star game, 24989,
+      24990), so join from fact_wnba_team_game with a LEFT JOIN, never the reverse.
+      The 17 usage shares are dropped: at team grain each is near 100 by
+      construction.
+      Every measure except the counting block is a rate or a rating and is NOT
+      additive -- average it, weighted by possessions where the games differ.
+    columns:
+      - name: team_game_advanced_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: team_game_key
+        description: "Same hash inputs as fact_wnba_team_game.team_game_key, so the two facts join directly."
+        tests:
+          - not_null
+          - relationships: {to: "ref('fact_wnba_team_game')", field: team_game_key}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_game')", field: game_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_date')", field: date_key}
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        description: "Taken from dim_wnba_game so this fact cannot disagree with fact_wnba_team_game about a game's season type."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Regular Season', 'Postseason', 'All-Star', 'Preseason']
+      - name: minutes_played
+        description: "Roughly 199 per team per game -- five players on the floor. NOT comparable to a player's figure."
+        tests: [not_null]
+      - name: offensive_rating
+        description: "Points per 100 possessions. Average it, do not sum it."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 200, severity: warn}
+      - name: defensive_rating
+        tests: [not_null]
+      - name: net_rating
+        description: "offensive_rating - defensive_rating, from the source."
+        tests: [not_null]
+      - name: pace
+        tests: [not_null]
+      - name: possessions
+        description: "The correct weight when averaging any rating across games."
+        tests: [not_null]
+      - name: effective_field_goal_pct
+        description: >
+          One column, not two. The four-factors copy was verified identical on
+          all 466 rows and dropped upstream -- a team has no on-court context
+          distinct from itself. On fact_wnba_player_game_advanced the same pair
+          disagrees and both survive.
+        tests: [not_null]
+      - name: team_turnover_pct
+        description: "Distinct from estimated_team_turnover_pct: they differ on all 466 rows, which is what 'estimated' means."
+        tests: [not_null]
+      - name: points_paint
+        description: "A count, so this one IS additive."
+        tests: [not_null]
+
+    tests:
+      # the declared grain
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+
+  - name: fact_wnba_player_game
+    description: >
+      The player box score. Grain: player x game. 5,751 rows over 237 games and
+      231 players -- every row the source carries, nothing filtered.
+      ONE FACT, NOT THREE, deliberately deviating from the NFL phase split: a
+      basketball box score has no phases, so there is no mostly-NULL wide table
+      to avoid and no key appearing in two facts.
+      DNPs ARE INCLUDED WITH EVERY MEASURE NULL (1,076 of 5,751), which is what
+      makes avg(points) mean points per game PLAYED. Use game_played_count as
+      the additive denominator; count(*) is games dressed.
+      No percentage columns on purpose -- divide summed counts.
+      Guarded by tests/wnba/assert_wnba_player_box_reconciles_to_team_box.sql.
+    columns:
+      - name: player_game_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_player')", field: player_key}
+      - name: team_key
+        description: >
+          The team the player appeared for in THIS game. The only historically
+          accurate affiliation in the source -- prefer it over
+          dim_wnba_player.current_team_key.
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_date')", field: date_key}
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        description: "Joined from dim_wnba_game so the 22 All-Star player-games are labelled and can be excluded."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Regular Season', 'Postseason', 'All-Star', 'Preseason']
+      - name: is_dnp
+        description: "True on 1,076 rows. Every measure below is NULL on those rows, by contract."
+        tests: [not_null]
+      - name: game_played_count
+        description: "1 on a played row, 0 on a DNP. The additive denominator for a per-game rate."
+        tests:
+          - not_null
+          - accepted_values: {values: [0, 1], quote: false}
+      - name: minutes_played
+        description: >
+          NULL on every DNP row and additionally on the 7 rows the source spelt
+          '--' rather than '0', where it genuinely did not say.
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 60, severity: warn}
+      - name: points
+        description: "NULL on DNP rows, NOT 0. Reconciles exactly to fact_wnba_team_game.points_scored when summed per team-game."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 70, severity: warn}
+      - name: rebounds
+        description: "The source's own total, NOT recomputed as offensive + defensive."
+      - name: assists
+      - name: plus_minus
+        description: "A differential, not a count. Additive across one player's games; averaging it across players asks a different question."
+
+    tests:
+      # the declared grain
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, player_id]
+
+  - name: fact_wnba_player_game_advanced
+    description: >
+      Advanced player box score. Grain: player x game. 5,569 rows, 56 measures
+      curated from the 74 the staging view flattens.
+      A LEFT-JOIN PARTNER TO fact_wnba_player_game, never an inner one: 182 of that
+      fact's rows have no row here (93 in four games with no advanced coverage
+      at all, 89 individual gaps in covered games of which 86 are DNPs). No row
+      here lacks a fact_wnba_player_game row.
+      THE DNP TRAP IS INVERTED HERE, which is why is_dnp is republished: 975
+      DNP player-games DO have an advanced row and the source writes real zeros
+      into it (offensive_rating is 0 on 973 of them). avg() does not protect
+      you -- filter is_dnp = false before averaging anything.
+      Both effective field goal columns are kept and they are different
+      numbers; see four_factors_effective_field_goal_pct.
+    columns:
+      - name: player_game_advanced_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: player_game_key
+        description: "Same hash inputs as fact_wnba_player_game.player_game_key, so the two facts join directly."
+        tests:
+          - not_null
+          - relationships: {to: "ref('fact_wnba_player_game')", field: player_game_key}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_player')", field: player_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_team')", field: team_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_wnba_date')", field: date_key}
+      - name: season
+        tests: [not_null]
+      - name: season_type_name
+        description: >
+          Only 'Regular Season' can appear today: the All-Star game 24955 is
+          one of the four games with no advanced coverage. The full member list
+          is tested anyway, so a later load lands in a documented value.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Regular Season', 'Postseason', 'All-Star', 'Preseason']
+      - name: is_dnp
+        description: >
+          Republished from stg_wnba__player_stats. True on 975 of these rows,
+          and unlike fact_wnba_player_game the measures beside it are 0 rather than
+          NULL. The single most important filter in this fact.
+        tests: [not_null]
+      - name: minutes_played
+        description: "NULL on all but 12 of the DNP rows, while the ratings on those same rows read 0."
+      - name: usage_pct
+        description: "0 on 974 of the 975 DNP rows. Filter is_dnp before averaging."
+        tests: [not_null]
+      - name: offensive_rating
+        description: "0 on 973 of the 975 DNP rows. Filter is_dnp before averaging."
+        tests: [not_null]
+      - name: effective_field_goal_pct
+        description: "The player's OWN rate."
+        tests: [not_null]
+      - name: four_factors_effective_field_goal_pct
+        description: >
+          NOT the same number as effective_field_goal_pct: they disagree on
+          4,469 of 5,569 rows, and this one does not match the player's team
+          row either (44 of 5,569). It is the four-factors context around the
+          player. The group qualifier stays in the name on purpose.
+        tests: [not_null]
+      - name: opp_points_paint
+        description: >
+          Per-player, not the opponent's team line. Measured: all 466 game x
+          team groups carry more than one distinct value across their players,
+          so read it as an on-court defensive signal. The opponent's actual box
+          score is on fact_wnba_team_game_advanced.
+      - name: points_pct
+        description: "The player's share of her team's points, so these sum to roughly 100 across a team's players in one game."
+
+    tests:
+      # the declared grain
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, player_id]
