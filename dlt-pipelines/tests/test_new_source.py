@@ -39,11 +39,12 @@ def scaffold(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_writes_the_four_expected_files(scaffold: Path) -> None:
+def test_writes_the_five_expected_files(scaffold: Path) -> None:
     for rel in (
         f"sql/sources/{NAME}/01_databases.sql",
         f"sql/sources/{NAME}/02_external_access.sql",
         f"sql/sources/{NAME}/03_secrets.sql",
+        f"sql/sources/{NAME}/05_dbt_trigger.sql",
         f"pipelines/batch/registries/{NAME}-registry.yml",
     ):
         assert (scaffold / rel).is_file(), rel
@@ -93,6 +94,21 @@ def test_the_five_names_agree_across_all_four_files(scaffold: Path) -> None:
     ref = spec.config["client"]["auth"]["api_key"]
     assert ref == f"secret:sources.{NAME}.api_key"
     assert spec.env_var == ref.removeprefix("secret:").upper().replace(".", "__")
+
+
+def test_dbt_trigger_names_agree(scaffold: Path) -> None:
+    # The trigger file's stream, task, environment and project object must all
+    # carry the sport name, or the build fires against the wrong sport. The
+    # scaffold follows the <name>_prod env convention (NFL's plain 'prod' is a
+    # grandfathered hand-edit, not the pattern).
+    sql = (scaffold / "sql" / "sources" / NAME / "05_dbt_trigger.sql").read_text()
+    upper = NAME.upper()
+    assert f"CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper}" in sql
+    assert f"ON TABLE {upper}_PROD_DB.RAW._DLT_LOADS" in sql
+    assert f"DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}" in sql
+    assert f"ENVIRONMENT = '{NAME}_prod'" in sql
+    # the observability trap: never the generated-task prefix
+    assert f"DLT_TASK_" not in sql.replace("DLT_TASK_ prefix", "")
 
 
 def test_host_reaches_both_the_network_rule_and_the_base_url(scaffold: Path) -> None:
