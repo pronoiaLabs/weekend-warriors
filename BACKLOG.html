@@ -208,6 +208,25 @@
       </div>
     </li>
 
+    <li class="item" data-key="query-tag-analytics" data-cat="dashboard">
+      <div class="row">
+        <input type="checkbox" id="cb-query-tag-analytics">
+        <div class="body">
+          <div class="title-line">
+            <label class="title" for="cb-query-tag-analytics">Query-tag analytics: model regressions and cost per sport</label>
+            <span class="chip">dashboard</span>
+          </div>
+          <details>
+            <summary>Problem and fix</summary>
+            <div class="detail">
+              <p><b>Problem:</b> the query tags and harvest tables (PR #8) capture per-model, per-build, per-sport performance, but nothing consumes them analytically: "which model regressed" and "what does each sport cost in credits" go unasked.</p>
+              <p><b>The fix:</b> (a) a regression view over <code>DBT_QUERY_LOG</code> (each model's latest elapsed/bytes vs its trailing median) surfaced on the dashboard; (b) a credits-per-sport rollup joining <code>QUERY_ATTRIBUTION_HISTORY</code> (QUERY_TAG + CREDITS_ATTRIBUTED_COMPUTE, ~8h lag) on the tag fields. Let a few days of tagged data accumulate first.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </li>
+
     <li class="item" data-key="harvest-warehouse" data-cat="dashboard">
       <div class="row">
         <input type="checkbox" id="cb-harvest-warehouse">

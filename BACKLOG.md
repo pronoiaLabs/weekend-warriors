@@ -54,7 +54,24 @@ and make the job deploy all three objects (a matrix or `make deploy-all`).
 Note the job then only needs to DEPLOY: the triggers run the builds when data
 lands, so the CI build step becomes optional-or-removed.
 
-## Isolate the dbt harvest onto its own warehouse
+## Query-tag analytics: model regressions and cost per sport
+
+**Problem:** the query tags and harvest tables (PR #8) capture per-model,
+per-build, per-sport performance, but nothing consumes them analytically yet.
+Two questions the raw material can already answer go unasked: "which model
+regressed against its own history" and "what does each sport's modeling
+actually cost in credits".
+
+**The fix:** two small additions on top of the existing tables.
+(a) A regression view over `DLT_DB.OPS.DBT_QUERY_LOG`: each model's latest
+elapsed/bytes vs its trailing median (window function per `NODE`), surfaced
+as a dashboard card or a column on the /dbt build detail page. The operator
+stats are already there for diagnosis when something flags.
+(b) A credits-per-sport rollup joining
+`SNOWFLAKE.ACCOUNT_USAGE.QUERY_ATTRIBUTION_HISTORY` (carries QUERY_TAG and
+CREDITS_ATTRIBUTED_COMPUTE, ~8h lag) on the tag's `sport`/`build_id` fields:
+real chargeback numbers per sport, per build, per model. Let a few days of
+tagged data accumulate first so the medians and rollups have history.
 
 **Problem:** the harvest's 8-wide async profiling saturates `DBT_WH`'s default
 concurrency (MAX_CONCURRENCY_LEVEL 8), so a build arriving mid-harvest queues
