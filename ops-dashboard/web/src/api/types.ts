@@ -345,3 +345,96 @@ export interface PipelinesIndexPayload {
   window_days: number
   pipelines: PipelineIndexRow[]
 }
+
+/** One event-driven dbt build: the DBT_BUILD_<SPORT> task run, joined to the
+    EXECUTE DBT PROJECT execution it launched. BUILD_ID is null when the task
+    died before the dbt project object was ever invoked, which is why every
+    field downstream of it is nullable too. */
+export interface DbtBuildRow {
+  sport: string
+  task_name: string
+  run_query_id: string
+  build_id: string | null
+  state: string
+  error_message: string | null
+  args: string
+  environment: string | null
+  project_fqn: string | null
+  drained_loads: number | null
+  exec_query_id: string | null
+  scheduled_time: string | null
+  started_at: string | null
+  completed_time: string | null
+  duration_s: number | null
+  n_queries: number | null
+  n_failed_queries: number | null
+  n_node_queries: number | null
+  sum_elapsed_ms: number | null
+  max_elapsed_ms: number | null
+  sum_bytes_scanned: number | null
+  sum_rows_produced: number | null
+}
+
+export interface DbtBuildsPayload {
+  /** Newest first. */
+  builds: DbtBuildRow[]
+}
+
+/** One row the trigger stream carried into this build: a successful dlt load,
+    drained from RAW._DLT_LOADS by SP_DBT_BUILD before the build ran. */
+export interface DbtLoadRow {
+  load_id: string
+  pipeline: string
+  status: number
+  inserted_at: string
+  drained_at: string
+}
+
+export interface DbtBuildDetailPayload {
+  build: DbtBuildRow
+  loads: DbtLoadRow[]
+}
+
+/** One query the build issued. `stats_captured` says whether the operator
+    breakdown exists for it: without it there is nothing to expand. */
+export interface DbtQueryRow {
+  query_id: string
+  node: string | null
+  query_type: string
+  execution_status: string
+  error_message: string | null
+  start_time: string
+  end_time: string
+  total_elapsed_time: number
+  compilation_time: number
+  execution_time: number
+  queued_overload_time: number
+  bytes_scanned: number
+  rows_produced: number | null
+  rows_inserted: number | null
+  warehouse_name: string
+  stats_captured: boolean
+}
+
+export interface DbtBuildQueriesPayload {
+  /** Slowest first. */
+  queries: DbtQueryRow[]
+}
+
+/** One node of a query plan. The three statistic bags are free-form JSON from
+    GET_QUERY_OPERATOR_STATS, so they stay unknown-valued rather than pretending
+    to a shape that varies by operator type. */
+export interface DbtQueryOperator {
+  step_id: number
+  operator_id: number
+  parent_operators: number[] | null
+  operator_type: string
+  operator_statistics: Record<string, unknown> | null
+  execution_time_breakdown: Record<string, unknown> | null
+  operator_attributes: Record<string, unknown> | null
+}
+
+export interface DbtQueryOperatorsPayload {
+  query_id: string
+  operators: DbtQueryOperator[]
+}

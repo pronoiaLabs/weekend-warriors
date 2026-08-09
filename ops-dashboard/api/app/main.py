@@ -30,6 +30,24 @@ def _find_run(query_id: str) -> dict[str, Any]:
     return found
 
 
+def _check_dbt_sport(sport: str) -> str | None:
+    """V_DBT_RUNS spells sport lowercase; the registry spells it as the database
+    stem. Same validation, one case fold, so an unknown sport is still a 404
+    rather than a silently empty list."""
+    if sport == "all":
+        return None
+    if sport.upper() not in datasource.list_sports():
+        raise HTTPException(status_code=404, detail=f"unknown sport {sport!r}")
+    return sport.lower()
+
+
+def _find_build(build_id: str) -> dict[str, Any]:
+    found = datasource.dbt_build_by_id(build_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail=f"unknown build {build_id!r}")
+    return found
+
+
 # The two headline dot strips. Everything else appears in the summary table:
 # collect everything, filter downstream.
 _STRIP_METRICS = {"container.cpu.usage": "cpu", "container.memory.usage": "memory"}
@@ -178,6 +196,42 @@ def create_app() -> FastAPI:
             "row_counts": found.get("row_counts"),
             "prev_row_counts": detail["prev_row_counts"],
         }
+
+    # dbt builds are a separate spine from the dlt runs above: TASK_HISTORY for
+    # the DBT_BUILD_% tasks, joined to the build record the proc writes. They
+    # share no view, no sport casing and no query id with /api/runs.
+    @app.get("/api/dbt/builds")
+    def dbt_builds(
+        sport: str = Query("all"),
+        limit: int = Query(50, ge=1, le=200),
+    ) -> dict[str, Any]:
+        wanted = _check_dbt_sport(sport)
+        return {"builds": datasource.dbt_builds(wanted, limit)}
+
+    @app.get("/api/dbt/builds/{build_id}")
+    def dbt_build(build_id: str) -> dict[str, Any]:
+        found = _find_build(build_id)
+        loads = datasource.dbt_build_loads(
+            found["sport"], found.get("started_at"), found.get("completed_time")
+        )
+        return {"build": found, "loads": loads}
+
+    @app.get("/api/dbt/builds/{build_id}/queries")
+    def dbt_build_queries(
+        build_id: str,
+        limit: int = Query(100, ge=1, le=500),
+    ) -> dict[str, Any]:
+        # Validate the build first: an unknown id would otherwise read as a
+        # build that ran no queries.
+        _find_build(build_id)
+        return {"queries": datasource.dbt_queries(build_id, limit)}
+
+    @app.get("/api/dbt/queries/{query_id}/operators")
+    def dbt_query_operators(query_id: str) -> dict[str, Any]:
+        rows = datasource.dbt_operators(query_id)
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"no operator stats for {query_id!r}")
+        return {"query_id": query_id, "operators": rows}
 
     static_dir = _static_dir()
     if static_dir is not None:

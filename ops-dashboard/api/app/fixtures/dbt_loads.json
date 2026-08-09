@@ -1,0 +1,48 @@
+{
+  "nfl": [
+    {
+      "load_id": "1786281307.1549983",
+      "pipeline": "nfl_reference",
+      "status": 0,
+      "inserted_at": "2026-08-09T13:15:42.053Z",
+      "drained_at": "2026-08-09T13:28:35.047Z"
+    },
+    {
+      "load_id": "1786275386.2981386",
+      "pipeline": "nfl_reference",
+      "status": 0,
+      "inserted_at": "2026-08-09T11:37:04.127Z",
+      "drained_at": "2026-08-09T12:20:32.568Z"
+    }
+  ],
+  "wnba": [
+    {
+      "load_id": "1786284039.2896333",
+      "pipeline": "wnba_reference",
+      "status": 0,
+      "inserted_at": "2026-08-09T14:00:57.310Z",
+      "drained_at": "2026-08-09T14:01:39.959Z"
+    },
+    {
+      "load_id": "1786281308.9766319",
+      "pipeline": "wnba_games",
+      "status": 0,
+      "inserted_at": "2026-08-09T13:15:25.615Z",
+      "drained_at": "2026-08-09T13:28:40.473Z"
+    },
+    {
+      "load_id": "1786275385.1184356",
+      "pipeline": "wnba_plays",
+      "status": 0,
+      "inserted_at": "2026-08-09T11:37:46.235Z",
+      "drained_at": "2026-08-09T12:20:25.087Z"
+    },
+    {
+      "load_id": "1786275386.755258",
+      "pipeline": "wnba_games",
+      "status": 0,
+      "inserted_at": "2026-08-09T11:36:43.252Z",
+      "drained_at": "2026-08-09T12:20:25.087Z"
+    }
+  ]
+}

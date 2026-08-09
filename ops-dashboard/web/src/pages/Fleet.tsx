@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
-import { fetchIncidentCounts, fetchOverview, fetchSports } from '../api/client.ts'
-import type { AnomalyKind, OverviewPayload, SportPanel, SportSummary } from '../api/types.ts'
+import { Link } from 'react-router-dom'
+import { fetchDbtBuilds, fetchIncidentCounts, fetchOverview, fetchSports } from '../api/client.ts'
+import type {
+  AnomalyKind,
+  DbtBuildRow,
+  OverviewPayload,
+  SportPanel,
+  SportSummary,
+} from '../api/types.ts'
 import { AnnotationNote } from '../components/AnnotationNote.tsx'
+import { DbtStateChip } from '../components/DbtStateChip.tsx'
 import type { FilterChip } from '../components/FilterChipRow.tsx'
 import { FilterChipRow } from '../components/FilterChipRow.tsx'
 import { Expander } from '../components/Expander.tsx'
@@ -14,9 +22,12 @@ import { StatTile } from '../components/StatTile.tsx'
 import { TimelineBoard } from '../components/TimelineBoard.tsx'
 import { TopBar } from '../components/TopBar.tsx'
 import { ALL_SPORTS, useSportFilter } from '../hooks/useSportFilter.ts'
-import { hhmm, longDay, num, weekday } from '../utils/format.ts'
+import { duration, hhmm, longDay, num, relativeTo, weekday } from '../utils/format.ts'
 
 const INCIDENT_DAYS = 7
+// Enough builds to hold the latest of every sport without asking for a page of
+// history this card would throw away.
+const DBT_BUILD_LIMIT = 10
 
 const WORST_LABEL: Record<AnomalyKind, string> = {
   missing: 'WORST: RECORD MISSING',
@@ -98,11 +109,48 @@ function SportPanelSection({ panel, open, onToggle }: PanelProps) {
   )
 }
 
+/** The builds feed arrives newest first, so the first row carrying a sport is
+    that sport's latest build. */
+function latestPerSport(builds: DbtBuildRow[]): DbtBuildRow[] {
+  const latest = new Map<string, DbtBuildRow>()
+  for (const build of builds) {
+    if (!latest.has(build.sport)) latest.set(build.sport, build)
+  }
+  return [...latest.values()].sort((left, right) => left.sport.localeCompare(right.sport))
+}
+
+interface DbtCardProps {
+  build: DbtBuildRow
+  now: string
+  search: string
+}
+
+function DbtBuildCard({ build, now, search }: DbtCardProps) {
+  const at = build.started_at ?? build.scheduled_time
+  const failed = (build.n_failed_queries ?? 0) > 0
+
+  return (
+    <Link className="card" to={{ pathname: '/dbt', search }}>
+      <div className="card-top">
+        <span className="name">{build.sport}</span>
+        <DbtStateChip state={build.state} />
+      </div>
+      <div className="lastrun">
+        Last build {at ? relativeTo(at, now) : 'at an unrecorded time'} ·{' '}
+        {duration(build.duration_s) ?? 'no DURATION_S'} ·{' '}
+        {build.n_queries == null ? 'no' : num(build.n_queries)} queries
+        {failed ? <b className="fail"> · {num(build.n_failed_queries)} failed</b> : null}
+      </div>
+    </Link>
+  )
+}
+
 export default function Fleet() {
-  const { sport, setSport } = useSportFilter()
+  const { sport, setSport, search } = useSportFilter()
   const [allSports, setAllSports] = useState<SportSummary[]>([])
   const [overview, setOverview] = useState<OverviewPayload | null>(null)
   const [incidentCount, setIncidentCount] = useState<number | null>(null)
+  const [dbtBuilds, setDbtBuilds] = useState<DbtBuildRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [laneOverrides, setLaneOverrides] = useState<Record<string, boolean>>({})
   const [panelOverrides, setPanelOverrides] = useState<Record<string, boolean>>({})
@@ -137,6 +185,16 @@ export default function Fleet() {
         setIncidentCount(Object.values(payload.counts).reduce((total, n) => total + n, 0)),
       )
       // The strip must still render when only the incident count is unavailable.
+      .catch(() => undefined)
+    return () => control.abort()
+  }, [sport])
+
+  useEffect(() => {
+    const control = new AbortController()
+    setDbtBuilds([])
+    fetchDbtBuilds(sport, DBT_BUILD_LIMIT, control.signal)
+      .then((payload) => setDbtBuilds(payload.builds))
+      // dbt is downstream of ingestion, so this page still stands without it.
       .catch(() => undefined)
     return () => control.abort()
   }, [sport])
@@ -280,6 +338,25 @@ export default function Fleet() {
             }
           />
         ))}
+
+        {dbtBuilds.length > 0 ? (
+          <>
+            <SectionHead
+              title="dbt builds"
+              count="latest event-driven build per sport · these tasks never appear in V_TASK_RUNS"
+            />
+            <div className="grid">
+              {latestPerSport(dbtBuilds).map((build) => (
+                <DbtBuildCard
+                  key={build.sport}
+                  build={build}
+                  now={overview.now}
+                  search={search}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
 
         <AnnotationNote label="Annotation, management by exception:">
           Healthy pipelines never render a card, so the card count is the triage queue length rather

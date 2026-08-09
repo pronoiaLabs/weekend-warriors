@@ -1,4 +1,8 @@
 import type {
+  DbtBuildDetailPayload,
+  DbtBuildQueriesPayload,
+  DbtBuildsPayload,
+  DbtQueryOperatorsPayload,
   IncidentCountsPayload,
   IncidentsPayload,
   LogsPayload,
@@ -101,4 +105,45 @@ export function fetchRunRowCounts(
   signal?: AbortSignal,
 ): Promise<RowCountsPayload> {
   return get<RowCountsPayload>(`/api/runs/${encodeURIComponent(queryId)}/rowcounts`, {}, signal)
+}
+
+/** `limit` is a caller's decision rather than a page constant: the fleet card
+    reads a handful of builds to find the latest per sport, the dbt page reads
+    the window it renders. */
+export function fetchDbtBuilds(
+  sport: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<DbtBuildsPayload> {
+  return get<DbtBuildsPayload>('/api/dbt/builds', { sport, limit: String(limit) }, signal)
+}
+
+export function fetchDbtBuild(
+  buildId: string,
+  signal?: AbortSignal,
+): Promise<DbtBuildDetailPayload> {
+  return get<DbtBuildDetailPayload>(`/api/dbt/builds/${encodeURIComponent(buildId)}`, {}, signal)
+}
+
+export function fetchDbtBuildQueries(
+  buildId: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<DbtBuildQueriesPayload> {
+  return get<DbtBuildQueriesPayload>(
+    `/api/dbt/builds/${encodeURIComponent(buildId)}/queries`,
+    { limit: String(limit) },
+    signal,
+  )
+}
+
+export function fetchDbtQueryOperators(
+  queryId: string,
+  signal?: AbortSignal,
+): Promise<DbtQueryOperatorsPayload> {
+  return get<DbtQueryOperatorsPayload>(
+    `/api/dbt/queries/${encodeURIComponent(queryId)}/operators`,
+    {},
+    signal,
+  )
 }
