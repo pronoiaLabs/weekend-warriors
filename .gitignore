@@ -75,6 +75,7 @@ SPCS-PLAN.md
 WORKFLOW-*.md
 BACKLOG.md
 BACKLOG.html
+OBS-LINEAGE.html
 
 # Vendor reference downloads at the repository root (e.g. Snowflake's Credit
 # Consumption Table PDF): theirs to publish, ours to read locally. Leading
