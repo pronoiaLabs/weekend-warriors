@@ -84,3 +84,7 @@ BACKLOG.html
 # Local working copy of an upstream template: reference material for the
 # maintainer, never part of this codebase.
 /dlt-snowflake-template/
+
+# Build guide for porting the ops layer into the template repo: written here,
+# consumed elsewhere. Not part of this codebase.
+/OPS-PORT.md
