@@ -74,3 +74,21 @@ works as SYSADMIN, listing those builds seconds after completion.
 files applied early, mirroring WORKFLOW-4's early grant slices.
 
 **Open:** none.
+
+## Phase 1 - tag plumbing shipped to all objects
+
+**Ran:** `make -C dbt-pipelines deploy-all` (dev + both sport objects picked
+up env.yml/profiles.yml/macro from Phase 0), then a 1-model prod run on
+CORTEX_LIFECYCLE_NFL as DBT_RUNNER_ROLE with
+`ENV_VARS = ('DBT_BUILD_ID' = 'phase1-prod-tag-check')`.
+
+**Result:** GATE GREEN. The prod CREATE_VIEW query carries the full tag
+(`app/sport/env/build_id/node`) and
+`TRY_PARSE_JSON(QUERY_TAG):build_id` filters it cleanly, which is exactly
+the predicate the harvest will use. Dev was verified in Phase 0/S1.
+
+**Changed from plan:** the SP_DBT_BUILD edit (build_id + ENV_VARS +
+DBT_BUILDS insert) moved to Phase 2 so the 05_dbt_trigger.sql files are
+touched once, alongside the tables and child task the proc references.
+
+**Open:** none.
