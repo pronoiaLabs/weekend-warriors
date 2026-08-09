@@ -6,10 +6,11 @@ This is a complete, working, multi-sport data stack on Snowflake: it pulls leagu
 API on a schedule, models each sport into its own star schema the moment data lands, and puts a
 Cortex Agent on top of each so you can ask things like
 
-> *"How has Detroit's third down and red zone efficiency changed from 2023 to 2025?"*
+> *"How has Detroit's third down and red zone efficiency changed season over season?"*
 
 and get a correct answer with the SQL behind it. Two sports run today, NFL and WNBA, and the whole
-design is built so the third is a scaffold command plus a registry file, not a refactor.
+design is built so the third is a scaffold command plus a registry file, not a refactor. Which
+seasons you load is a registry setting, not a property of the stack.
 
 It is also a worked example. Every layer is small enough to read in an afternoon, and the parts that
 look strange are commented with why they are that way, usually because the obvious version was tried
@@ -32,19 +33,21 @@ first and broke.
 
 ## What is actually in here
 
-Two sports, each with its own database, star schema, semantic views and agent. The NFL side carries
-three seasons (2023 to 2025), about 265,000 raw rows:
+Two sports, each with its own database, star schema, semantic views and agent. The NFL raw layer:
 
-| Table | Rows | Grain |
-|---|---:|---|
-| `PLAYS` | 179,402 | one row per play |
-| `STATS` | 67,191 | one row per player per game |
-| `PLAYERS` | 13,503 | one row per player |
-| `ADVANCED_*` | 7,785 | Next Gen tracking stats, split by discipline |
-| `TEAM_STATS` | 2,000 | one row per team per game |
-| `GAMES` | 1,002 | one row per game |
-| `STANDINGS` | 96 | one row per team per season |
-| `TEAMS` | 32 | one row per team |
+| Table | Grain |
+|---|---|
+| `PLAYS` | one row per play |
+| `STATS` | one row per player per game |
+| `PLAYERS` | one row per player |
+| `ADVANCED_*` | Next Gen tracking stats, split by discipline |
+| `TEAM_STATS` | one row per team per game |
+| `GAMES` | one row per game |
+| `STANDINGS` | one row per team per season |
+| `TEAMS` | one row per team |
+
+How many seasons land in those tables is up to you: season-scoped pipelines load the current season
+on their schedule, and a backfill parameter replays any year the API carries.
 
 The WNBA side follows the same shape with its own registry, model tree and semantic views. Per sport,
 roughly 20 dimensional models and 4 semantic views sit on top of raw, so each agent
