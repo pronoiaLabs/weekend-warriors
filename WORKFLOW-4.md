@@ -66,3 +66,28 @@ write paths); dropped the sandbox and the spike project object.
 DBT_RUNNER_ROLE-owned NFL prod write.
 
 **Open:** none.
+
+## Phase 1 - role and grants as reviewed SQL
+
+**Ran:** wrote `sql/base/04_dbt_runner.sql` (role, DBT_WH, control-plane
+usage, EXECUTE TASK grant) and section 1 of
+`sql/sources/{nfl,wnba}/05_dbt_trigger.sql` (per-sport grants, change
+tracking on _DLT_LOADS as its owner, ownership transfer of
+PREP/CORE/ANALYTICS with COPY CURRENT GRANTS including the semantic-view
+bulk form). Re-applied the base file from disk against the already-live
+objects.
+
+**Result:** GATE GREEN. Idempotent re-apply ("already exists, statement
+succeeded" for role and warehouse, everything else clean); as
+DBT_RUNNER_ROLE both sports' _DLT_LOADS are readable (90 NFL / 9 WNBA
+rows) and CORE tables show owner DBT_RUNNER_ROLE.
+
+**Notes:** the per-sport 05 files carry both sections but their
+GRANT ON DBT PROJECT lines need the Phase-2 project objects, so file
+application order on a fresh account is deploy-sport first; header says so.
+The NFL file runs `dbt run` (not build) with the skip-cascade evidence in
+its comment.
+
+**Changed from plan:** none.
+
+**Open:** none.
