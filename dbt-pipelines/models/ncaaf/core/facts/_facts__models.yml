@@ -1,0 +1,144 @@
+version: 2
+
+models:
+
+  - name: fact_ncaaf_team_game
+    description: >
+      One row per team per COMPLETED game (two per game, ~6,708 rows).
+      Anchored on games, not team_stats: a played game must not vanish from
+      results because its box score is missing, so the yardage block is
+      nullable and has_box_score says whether it arrived. Scheduled games
+      have no rows here; the slate lives on dim_ncaaf_game.
+    columns:
+      - name: team_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_game')", field: game_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: opponent_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: is_home
+        tests: [not_null]
+      - name: points_scored
+        tests: [not_null]
+      - name: result
+        tests:
+          - not_null
+          - accepted_values: {values: ['W', 'L', 'T']}
+      - name: has_box_score
+        tests: [not_null]
+      - name: total_yards
+        description: "NULL when the box score is missing upstream. NULL, not zero: zero yards is a claim."
+
+  - name: fact_ncaaf_player_game
+    description: >
+      One row per player per COMPLETED game, ~173,688 rows. team_key is the
+      stat line's team (season-accurate across transfers). Coverage:
+      passing, rushing, receiving, defense; NO fumbles or special teams
+      anywhere in the source.
+    columns:
+      - name: player_game_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_player')", field: player_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_game')", field: game_key}
+      - name: is_home
+        tests: [not_null]
+
+  - name: fact_ncaaf_player_season
+    description: >
+      One row per player per season, ~17,198 rows (2024-2025). Loaded not
+      modelled: the rate columns carry denominators the game grain cannot
+      always reproduce. team_key is the stat-line team.
+    columns:
+      - name: player_season_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_player')", field: player_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: season
+        tests: [not_null]
+
+  - name: fact_ncaaf_team_season
+    description: >
+      One row per team per season, ~270 rows, FBS ONLY (the source publishes
+      no rollups below FBS). Carries opponent totals that exist nowhere
+      else.
+    columns:
+      - name: team_season_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: season
+        tests: [not_null]
+
+  - name: fact_ncaaf_standing
+    description: >
+      Standings snapshot VERSIONS: one row per team per season per weekly
+      scd2 version; is_current marks the live row and every "the standings"
+      query filters it. Conference rides on the row (season-accurate).
+      Wins NULL on preseason rows by source design.
+    columns:
+      - name: standing_version_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: conference_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_conference')", field: conference_key}
+      - name: season
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: wins
+        description: "NULL on preseason rows. Deliberately untested."
+
+  - name: fact_ncaaf_ranking
+    description: >
+      The AP-style Top 25, one row per season/week/ranked team, weeks 2-16.
+      is_latest_poll marks each season's most recent published week so "the
+      current top 25" is a flag filter. Rank is NOT unique per week (a 2024
+      tie produced a 26-row week); the singular integrity test knows.
+    columns:
+      - name: ranking_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_ncaaf_team')", field: team_key}
+      - name: season
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: poll_rank
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 25}
+      - name: is_latest_poll
+        tests: [not_null]

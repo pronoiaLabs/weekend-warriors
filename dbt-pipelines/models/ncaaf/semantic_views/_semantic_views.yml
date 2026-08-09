@@ -1,0 +1,28 @@
+version: 2
+
+models:
+
+  - name: sv_ncaaf_schedule
+    description: >
+      The full college football slate at game grain, played or not: the only
+      view anchored on dim_ncaaf_game and the only place future games exist.
+      Kickoff times US Eastern; no scores by design. Backs
+      NCAAFScheduleAnalytics.
+
+  - name: sv_ncaaf_team_performance
+    description: >
+      Results and team production for completed games at team-game grain
+      (two rows per game), with role-playing team/opponent joins. FBS filter
+      rules in AI_SQL_GENERATION. Backs NCAAFTeamPerformanceAnalytics.
+
+  - name: sv_ncaaf_player_performance
+    description: >
+      Player box scores (game grain) plus source-published season rollups
+      (season grain) with routing rules between the two. No special-teams
+      coverage exists in the source. Backs NCAAFPlayerPerformanceAnalytics.
+
+  - name: sv_ncaaf_rankings
+    description: >
+      The weekly AP-shaped Top 25: rank, movement, record, first-place
+      votes; is_latest_poll defines "current". Unique to college football.
+      Backs NCAAFRankingsAnalytics.

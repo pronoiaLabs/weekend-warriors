@@ -1,0 +1,211 @@
+version: 2
+
+models:
+
+  - name: stg_ncaaf__conferences
+    description: >
+      One row per conference, 25 rows, FBS and FCS. Subdivision derives from
+      the verified id ranges (1-11 FBS, 12-25 FCS); the source has no
+      subdivision field of its own.
+    columns:
+      - name: conference_key
+        tests: [unique, not_null]
+      - name: conference_id
+        tests: [unique, not_null]
+      - name: conference_name
+        tests: [unique, not_null]
+      - name: subdivision
+        description: "NULL would mean a conference id outside both known ranges: a new conference upstream, caught here."
+        tests:
+          - not_null
+          - accepted_values: {values: ['FBS', 'FCS']}
+      - name: is_fbs
+        tests: [not_null]
+
+  - name: stg_ncaaf__teams
+    description: >
+      One row per team, 536 rows, classified not filtered. Only ~134 are FBS
+      programs; is_fbs is the filter almost every consumer wants. 29 rows
+      have no conference and read team_type 'Unaffiliated'.
+    columns:
+      - name: team_key
+        tests: [unique, not_null]
+      - name: team_id
+        tests: [unique, not_null]
+      - name: college
+        description: "The institution ('Boston College'): what a person means by the team."
+        tests: [not_null]
+      - name: team_full_name
+        tests: [not_null]
+      - name: conference_key
+        description: "Deliberately NULL for the 29 unaffiliated rows (no hashed-NULL fake keys)."
+      - name: team_type
+        tests:
+          - not_null
+          - accepted_values: {values: ['FBS', 'FCS', 'Unaffiliated']}
+      - name: is_fbs
+        description: "~134 rows true."
+        tests: [not_null]
+
+  - name: stg_ncaaf__players
+    description: >
+      One row per player, 124,089 rows, the largest reference table in the
+      account. Current team only; height/weight/jersey are late-added source
+      columns, NULL for early-loaded rows, so none carry not_null. Nine rows
+      are nameless upstream and read 'Unknown player #<id>'.
+    columns:
+      - name: player_key
+        tests: [unique, not_null]
+      - name: player_id
+        tests: [unique, not_null]
+      - name: full_name
+        tests: [not_null]
+      - name: current_team_key
+        tests: [not_null]
+
+  - name: stg_ncaaf__games
+    description: >
+      One row per game, 2024-2026 including the full scheduled 2026 slate.
+      Visitor/away naming normalized to home/away; scores iff-guarded to NULL
+      on non-final rows (the source writes fake 0-0 totals on every scheduled
+      game); is_postseason = week 999; game_datetime_et is the US Eastern
+      display spelling every sport shares.
+    columns:
+      - name: game_key
+        tests: [unique, not_null]
+      - name: game_id
+        tests: [unique, not_null]
+      - name: game_datetime
+        tests: [not_null]
+      - name: game_datetime_et
+        tests: [not_null]
+      - name: season
+        tests:
+          - not_null
+          - accepted_values: {values: [2024, 2025, 2026], quote: false}
+      - name: week
+        tests: [not_null]
+      - name: is_postseason
+        tests: [not_null]
+      - name: game_status
+        description: "Source label ('pre'/'post' observed; a live value could land mid-load). Completedness is derived positively from 'post', so an unexpected new value lands as not-completed rather than breaking."
+        tests: [not_null]
+      - name: is_completed
+        tests: [not_null]
+      - name: went_to_overtime
+        tests: [not_null]
+      - name: home_team_key
+        tests: [not_null]
+      - name: away_team_key
+        tests: [not_null]
+      - name: home_team_score
+        description: "NULL on scheduled rows by construction. No not_null, deliberately."
+      - name: away_team_score
+        description: "NULL on scheduled rows by construction."
+      - name: winner_team_id
+        description: "NULL on scheduled rows; also NULL on a tied final (possible historically)."
+
+  - name: stg_ncaaf__player_stats
+    description: >
+      One row per player per completed game, ~173,688 rows. Repeated game
+      payload stripped to keys + season/week/date context; home/away identity
+      joins from games. Twins folded: tackles_for_loss, passing_qbr, sacks.
+      No fumbles or special teams anywhere in the source.
+    columns:
+      - name: player_game_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+
+  - name: stg_ncaaf__team_stats
+    description: >
+      One row per team per completed game, ~6,698 rows; a handful of
+      completed games lack rows, so fact_ncaaf_team_game anchors on games.
+      Efficiency strings parsed to conversions/attempts pairs; possession
+      parsed to fractional minutes.
+    columns:
+      - name: team_game_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: game_key
+        tests: [not_null]
+      - name: third_down_attempts
+        description: "Parsed from '5-12' text. NULL means the string did not parse: a new upstream shape, not zero attempts."
+      - name: possession_minutes
+        description: "Parsed from '31:24' text into fractional minutes."
+
+  - name: stg_ncaaf__player_season_stats
+    description: >
+      One row per player per season, ~17,198 rows, 2024-2025. Uses the
+      stat-line team, NOT the player's current team (the source carries
+      both and they disagree across transfers). Twin folded:
+      receiving_yards_per_game (integer base column, near-useless alone).
+    columns:
+      - name: player_season_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+
+  - name: stg_ncaaf__team_season_stats
+    description: >
+      One row per team per season, ~270 rows, FBS ONLY (about 135 programs x
+      2 completed seasons). Carries the opponent totals that exist nowhere
+      else. Twin folded: passing_yards_per_game.
+    columns:
+      - name: team_season_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+
+  - name: stg_ncaaf__standings
+    description: >
+      Standings snapshot VERSIONS (scd2 passed through): one row per team per
+      conference per season version, is_current marks the live row. Wins is
+      NULL on preseason rows by source design. Twins folded: win_percentage,
+      games_behind.
+    columns:
+      - name: standing_version_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: conference_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: wins
+        description: "NULL on preseason 0-0 rows. Deliberately not tested not_null."
+
+  - name: stg_ncaaf__rankings
+    description: >
+      The AP-style Top 25, one row per season/week/ranked team, weeks 2-16.
+      One unnamed poll; latest-week-only endpoint accumulated weekly. Trend
+      parsed to a signed integer (NULL for the no-move dash); record parsed
+      tie-capable.
+    columns:
+      - name: ranking_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: poll_rank
+        tests: [not_null]
+      - name: rank_change
+        description: "NULL when trend is the no-move dash or a non-numeric label; that is data, not an error."

@@ -738,9 +738,11 @@ sources:
         description: >
           One row per player per completed game, ~173,688 rows. Embeds the
           full game payload (GAME__* including scores) but NOT the game's
-          team blocks -- home/away identity joins from games. 22 stat fields:
+          team blocks -- home/away identity joins from games. Stat fields:
           passing, rushing, receiving, tackles, sacks; no fumbles, no
-          kicking/punting, no returns (the API does not carry them).
+          kicking/punting, no returns (the API does not carry them), and no
+          receiving_targets column despite the spec (never non-null upstream,
+          and dlt drops all-null columns).
           Variant twins: TACKLES_FOR_LOSS__V_DOUBLE, PASSING_QBR__V_DOUBLE,
           SACKS__V_DOUBLE.
         tests:
