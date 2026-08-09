@@ -1,13 +1,15 @@
 # weekend-warriors
 
-**Ask questions about NFL football in plain English, and get answers from a real data warehouse.**
+**Ask questions about sports in plain English, and get answers from a real data warehouse.**
 
-This is a complete, working data stack on Snowflake: it pulls NFL data from a public API every day,
-models it into a star schema, and puts a Cortex Agent on top so you can ask things like
+This is a complete, working, multi-sport data stack on Snowflake: it pulls league data from a public
+API on a schedule, models each sport into its own star schema the moment data lands, and puts a
+Cortex Agent on top of each so you can ask things like
 
 > *"How has Detroit's third down and red zone efficiency changed from 2023 to 2025?"*
 
-and get a correct answer with the SQL behind it.
+and get a correct answer with the SQL behind it. Two sports run today, NFL and WNBA, and the whole
+design is built so the third is a scaffold command plus a registry file, not a refactor.
 
 It is also a worked example. Every layer is small enough to read in an afternoon, and the parts that
 look strange are commented with why they are that way, usually because the obvious version was tried
@@ -30,7 +32,8 @@ first and broke.
 
 ## What is actually in here
 
-Three seasons of NFL data (2023 to 2025), about 265,000 rows:
+Two sports, each with its own database, star schema, semantic views and agent. The NFL side carries
+three seasons (2023 to 2025), about 265,000 raw rows:
 
 | Table | Rows | Grain |
 |---|---:|---|
@@ -43,12 +46,17 @@ Three seasons of NFL data (2023 to 2025), about 265,000 rows:
 | `STANDINGS` | 96 | one row per team per season |
 | `TEAMS` | 32 | one row per team |
 
-On top of that, 19 dimensional models and 4 semantic views, so the agent can answer team performance,
-player offense, and player defense questions without anybody writing SQL.
+The WNBA side follows the same shape with its own registry, model tree and semantic views. Per sport,
+roughly 20 dimensional models and 4 semantic views sit on top of raw, so each agent
+(`nfl_analyst`, `wnba_analyst`) can answer team performance and player questions without anybody
+writing SQL.
 
 Everything runs **inside** Snowflake. There is no Airflow, no external scheduler, and no compute
 outside the account. Ingestion is a container job on a Snowflake compute pool fired by a Snowflake
-Task; dbt executes as a Snowflake object, not from a laptop or a CI runner.
+Task; dbt executes as a Snowflake object, not from a laptop or a CI runner; and production models
+rebuild **event-driven**, minutes after a load lands, via a stream on the load ledger and a
+triggered task per sport. Every dbt query is tagged with the build and model that ran it, and each
+build's query profiles are harvested into observability tables that a local ops dashboard reads.
 
 ---
 
@@ -58,26 +66,29 @@ Task; dbt executes as a Snowflake object, not from a laptop or a CI runner.
           BallDontLie API  (api.balldontlie.io)
                    |
                    |   dlt, running in Snowpark Container Services
-                   |   7 pipelines, one Snowflake Task each
+                   |   one Snowflake Task per pipeline, per sport
                    v
-   NFL_PROD_DB.RAW          11 tables, loaded as-is, nothing thrown away
+   <SPORT>_PROD_DB.RAW        loaded as-is, nothing thrown away
                    |
-                   |   dbt, via EXECUTE DBT PROJECT
+                   |   stream on the load ledger -> triggered task
+                   |   dbt, via EXECUTE DBT PROJECT, minutes after data lands
                    v
-   NFL_PROD_DB.PREP         11 views   rename, cast, drop dlt bookkeeping
-   NFL_PROD_DB.CORE         6 dims + 13 facts
-   NFL_PROD_DB.ANALYTICS    4 semantic views
+   <SPORT>_PROD_DB.PREP       staging views   rename, cast, drop dlt bookkeeping
+   <SPORT>_PROD_DB.CORE       dims + facts
+   <SPORT>_PROD_DB.ANALYTICS  semantic views
                    |
                    v
-          Cortex Agent  "nfl_analyst"
+          Cortex Agent  ("nfl_analyst", "wnba_analyst")
 ```
 
-Two directories, one for each half:
+`<SPORT>` is `NFL` or `WNBA` today; the registry stores a stem, so a third league reuses every role,
+pool and warehouse. Three directories:
 
 | Path | What it does |
 |---|---|
-| [dlt-pipelines/](dlt-pipelines/) | Gets the data in. Registry-driven [dlt](https://dlthub.com), deployed to SPCS. |
-| [dbt-pipelines/](dbt-pipelines/) | Makes it useful. dbt models, semantic views, Cortex Agents. |
+| [dlt-pipelines/](dlt-pipelines/) | Gets the data in. Registry-driven [dlt](https://dlthub.com), deployed to SPCS, plus the observability SQL. |
+| [dbt-pipelines/](dbt-pipelines/) | Makes it useful. dbt models, semantic views, Cortex Agents, one environment per sport per tier. |
+| [ops-dashboard/](ops-dashboard/) | Watches it. A local FastAPI + React dashboard over the pipeline and dbt observability views. |
 | [.github/workflows/](.github/workflows/) | CI, and a deploy that only ships what changed. |
 
 The BallDontLie API is documented at [docs.balldontlie.io](https://docs.balldontlie.io). Its OpenAPI
@@ -93,6 +104,8 @@ specs are not vendored here; they belong to the provider.
   [models/nfl/](dbt-pipelines/models/nfl/).
 - *I want to know how an agent is built* -> [agents/nfl_analyst.sql](dbt-pipelines/agents/nfl_analyst.sql).
   It is heavily commented and is the most transferable file in the repo.
+- *I want to watch it run* -> [ops-dashboard/README.md](ops-dashboard/README.md) for the local
+  dashboard, or the observability SQL in [dlt-pipelines/sql/ops/](dlt-pipelines/sql/ops/).
 
 ---
 
@@ -166,9 +179,10 @@ The point of the registry design is that this is a YAML entry, not a new script.
 make new-source NAME=nba HOST=https://api.balldontlie.io
 ```
 
-That scaffolds a registry file, the database DDL, the external access integration and the secret,
-with the names already wired together. Fill in the endpoints and you have a pipeline the runner, the
-Task generator and the observability layer all already know about.
+That scaffolds a registry file, the database DDL, the external access integration, the secret, and
+the event-driven dbt trigger, with the names already wired together. Fill in the endpoints and you
+have a pipeline the runner, the Task generator and the observability layer all already know about;
+add a dbt model tree for the sport and its builds trigger themselves.
 
 ---
 
@@ -191,6 +205,19 @@ entry covers both environments. Adding a league does not touch roles, pools or w
 `dbt_project.yml`. Flattening them does not error; the models just quietly build as views in the
 wrong schema.
 
+**One environment per sport per tier, gated hard.** Every dbt environment sets `DBT_SPORT`, and each
+sport's models, sources and tests enable only on their own value, so a run can only ever build its
+own sport into its own database. A forgotten `--select` cannot cross-pollinate leagues.
+
+**Prod dbt is event-driven, and observable per query.** A stream on each sport's load ledger fires a
+triggered task that drains it and runs `EXECUTE DBT PROJECT`; failed loads never insert, so they
+never trigger. Every query the build runs carries a JSON `QUERY_TAG` with the sport, build id and
+model, and a harvest task persists each build's query log and query profiles
+(`GET_QUERY_OPERATOR_STATS`) into observability tables, giving per-model performance history with no
+`ACCOUNT_USAGE` latency. The details, including the several Snowflake sharp edges this tripped over,
+are commented in [dlt-pipelines/sql/ops/](dlt-pipelines/sql/ops/) and the per-sport
+`05_dbt_trigger.sql` files.
+
 **Three models ship disabled on purpose.** `sv_nfl_player_advanced` is off because the Next Gen source
 tracks each player in exactly one discipline: the passing, rushing and receiving endpoints have zero
 player overlap. The view would promise cross-discipline comparisons the data cannot answer. Rushing
@@ -207,9 +234,8 @@ Stated plainly, because a repo that hides these is harder to trust.
   plays are fetched would close it. The reconciliation tests in
   [dbt-pipelines/tests/](dbt-pipelines/tests/) exist to keep the gap visible rather than let it
   propagate silently.
-- **Nothing chains dbt behind the ingestion Tasks.** `dbt build` runs on a code push, not when new
-  rows land in `RAW`.
-- **No alerting on Task failure.** Visible only in `TASK_HISTORY` and `_DLT_RUNS`.
+- **No alerting on Task failure.** Failures are visible in the ops dashboard and the observability
+  views, but only if someone looks; nothing pushes a notification yet.
 - **Two games have no `TEAM_STATS` row, 18 games have no `PLAYS` rows**, and 386 `STATS` rows show
   activity in no phase and therefore land in no phase fact. These are source gaps, encoded as tests.
 
