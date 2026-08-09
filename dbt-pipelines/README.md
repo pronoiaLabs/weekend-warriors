@@ -100,6 +100,21 @@ Both paths land here. From the command bar:
 4. **Pick your environment** (dev/staging/prod) in the environment selector, then **Build** to materialize the models.
 5. **Deploy** it as a DBT PROJECT object: **Connect > Deploy dbt Project**, choose your target database and schema, give it a name (e.g. `CORTEX_LIFECYCLE`), and click **Deploy**.
 
+## Production builds are event-driven
+
+Prod models rebuild automatically when ingestion lands: per sport, a stream on
+`RAW._DLT_LOADS` feeds a triggered task that runs `EXECUTE DBT PROJECT` against
+that sport's project object (`DLT_DB.DEPLOY.CORTEX_LIFECYCLE_<SPORT>`), as
+`DBT_RUNNER_ROLE` on warehouse `DBT_WH`. The machinery lives in
+`../dlt-pipelines/sql/sources/<sport>/05_dbt_trigger.sql`; the repo root
+CLAUDE.md section "Event-driven dbt builds" has the full contract.
+
+The consequence for this directory: **deploying a sport's project object is
+the prod release step.** After merging model changes, run
+`make deploy-sport SPORT=<sport>` (or `make deploy-all`); the next data load
+builds with the new code. `make help` lists the targets. The sport-neutral
+`CORTEX_LIFECYCLE` object serves interactive and dev use only.
+
 ## Working from the Snowflake CLI
 
 > **Requires Snowflake CLI >= 3.21.** The `env.yml` flags (`--default-env`, `--env`) only landed in 3.21. On older CLIs, use the Snowsight Workspace flow above, which resolves `env.yml` natively. Check yours with `snow --version`.

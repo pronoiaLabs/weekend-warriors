@@ -274,11 +274,18 @@ jobs:
   # ---------------------------------------------------------------------------
   # dbt
   # ---------------------------------------------------------------------------
-  # PREREQUISITE NOT YET SATISFIED, see the repo README/CLAUDE.md "Known gaps".
-  # dbt-pipelines/env.yml sets DBT_ROLE: SYSADMIN for prod, but DLT_DEPLOYER only
-  # holds DLT_LOADER_ROLE. Until either a dedicated dbt role exists and env.yml
-  # names it, or that role is granted to the deployer, this job authenticates fine
-  # and then fails on privileges. Decide the role model before enabling it.
+  # PREREQUISITE PARTLY SATISFIED (2026-08-09), see BACKLOG "Enable deploy.yml's
+  # dbt job". The original blocker is gone: DBT_RUNNER_ROLE exists and env.yml's
+  # prod environments use it. Still needed before enabling:
+  #   1. GRANT ROLE DBT_RUNNER_ROLE TO USER DLT_DEPLOYER;
+  #   2. The vars are stale: the project objects are now
+  #      DLT_DB.DEPLOY.CORTEX_LIFECYCLE (dev) plus per-sport _NFL / _WNBA
+  #      siblings, and all three need deploying (make -C dbt-pipelines
+  #      deploy-all).
+  #   3. The build step below is now optional: the per-sport trigger tasks
+  #      (sql/sources/<sport>/05_dbt_trigger.sql) build when data lands, so
+  #      CI's job is really just deploying code to the sport objects, which
+  #      IS the prod release step.
   #
   # `--env` must come BEFORE the project name. Tokens after it are passed through
   # to dbt Core, which has no --env and will reject them.

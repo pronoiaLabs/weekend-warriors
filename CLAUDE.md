@@ -116,6 +116,18 @@ Requires Snowflake CLI **>= 3.21** for the `--env` / `--default-env` flags — s
 
 Raw sources in `models/sources.yml` are deliberately **not** environment-driven: every developer reads the same `<SPORT>_PROD_DB.RAW` tables. dbt must never write to `RAW` or `RAW_STAGING`, which dlt owns.
 
+### Event-driven dbt builds (prod)
+
+**Prod models rebuild automatically when data lands, not on code pushes.** Per sport, four objects in `<SPORT>_PROD_DB.OPS`, owned by `DBT_RUNNER_ROLE` and applied by `sql/sources/<sport>/05_dbt_trigger.sql`: an APPEND_ONLY stream on `RAW._DLT_LOADS` (dlt inserts there only on successful load, so failures never trigger), an audit table `DBT_TRIGGER_LOADS`, a caller's-rights proc `SP_DBT_BUILD()`, and a triggered task `DBT_BUILD_<SPORT>` (no schedule, `WHEN SYSTEM$STREAM_HAS_DATA`, warehouse `DBT_WH`, 900s trigger interval that coalesces bursts). The proc **drains the stream via DML first** — an unconsumed stream keeps the task re-firing every 30s forever — then runs `EXECUTE DBT PROJECT` with an explicit `ENVIRONMENT` (the objects default to dev; omitting it silently builds the wrong target).
+
+Three prod facts that follow:
+
+- **Deploying a sport's project object IS the prod release step.** The triggers run whatever `DLT_DB.DEPLOY.CORTEX_LIFECYCLE_<SPORT>` holds; `make -C dbt-pipelines deploy-sport SPORT=<sport>` after merging model changes ships them. The sport-neutral `CORTEX_LIFECYCLE` object serves interactive/dev only. One object per sport because concurrent `EXECUTE DBT PROJECT` against a single object is unsupported.
+- **Kill switch:** `ALTER TASK <SPORT>_PROD_DB.OPS.DBT_BUILD_<SPORT> SUSPEND;` — ingestion untouched, the stream accumulates and drains on resume (staleness grace ~14 days; recreate the stream after longer suspensions or if dlt ever recreates `_DLT_LOADS`).
+- **These tasks are invisible to `V_TASK_RUNS` by design** (its `DLT_TASK_%` filter): read `SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY` and per-database `TASK_HISTORY` instead. They are also not managed by `generate_tasks.py` or the tasks-suspend/apply/resume flow; each 05 file handles its own suspend-before-alter.
+
+`DBT_RUNNER_ROLE` (created in `sql/base/04_dbt_runner.sql`) owns the PREP/CORE/ANALYTICS schemas and contents (ownership transferred with grants preserved, because dbt's `CREATE OR REPLACE` requires owning the existing object). env.yml's prod environments name it as `DBT_ROLE` on warehouse `DBT_WH`; a task cannot run unless its owner role also has USAGE on the task's schema, and the privilege that lets a role invoke a dbt project object is USAGE on that object.
+
 [WORKING-SESSION.md](dbt-pipelines/WORKING-SESSION.md) is a phase-driven runbook meant to be executed by an agent ("Follow WORKING-SESSION.md"); it gates on user input between phases. The README's "Writing effective semantic views" and "Writing effective agents" sections encode real constraints — notably that semantic-view DDL clause order is enforced (`TABLES → RELATIONSHIPS → FACTS → DIMENSIONS → METRICS → COMMENT → AI_*`, with `AI_VERIFIED_QUERIES` last), and that SQL-generation rules belong in the semantic view's `AI_SQL_GENERATION` clause rather than in agent instructions.
 
 ## CI/CD
@@ -138,7 +150,7 @@ What makes it work is that **network policies override rather than stack**. A po
 
 ## Known gaps
 
-- **Nothing chains dbt behind the ingestion Tasks.** `dbt build` runs on a code push, not when new rows land in `RAW`. A Task graph with dbt as a child of the last dlt Task is the natural shape and is not built.
+- (closed 2026-08-09) ~~Nothing chains dbt behind the ingestion Tasks~~ — prod dbt builds are now event-driven; see "Event-driven dbt builds" under dbt-pipelines.
 - **`stats?seasons[]=<year>` is incomplete.** A 2023 replay returned 47 of 49 games; both missing games have data when fetched by `game_id`. Fetching per game the way `plays` does would close it. The dbt reconciliation tests exist to keep this visible.
 - **No alerting on Task failure.** Nothing reads the telemetry on a schedule. The raw material now exists (see below), but the modelling layer and any alert on top of it do not.
 - **`_DLT_RUNS` under-reports failures, systematically.** `record_run` is called from inside `run_pipeline`, so a spec rejected by `validate()` dies several frames earlier and is never recorded. Measured over one week: 22 Task failures, 17 `_DLT_RUNS` rows. The gap correlates with severity, since the worse the failure the earlier it happens, so anything built on `_DLT_RUNS` alone reads rosier than reality. Use `TASK_HISTORY` as the spine and join `_DLT_RUNS` on.
