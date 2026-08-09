@@ -5,7 +5,12 @@
 }}
 
 /*
-    dim_game -- descriptive context for each game. Grain: game. 1,002 rows.
+    dim_game -- descriptive context for each game. Grain: game.
+
+    THE ONLY PLACE THE FULL NFL SLATE IS READABLE. fact_team_game filters to
+    completed games (an unplayed game has no fact rows), so scheduled games
+    exist solely here, flagged by is_completed. The schedule semantic view
+    anchors on this table for exactly that reason.
 
     Scores live on fact_team_game, not here. dim_game answers "when, where, who
     played, what kind of game was it"; the outcome is a measure and belongs in
@@ -27,8 +32,10 @@ select
     game_key,
     game_id,
 
-    -- when
+    -- when. Both spellings of the same instant: UTC as loaded, and US
+    -- Eastern for display. The schedule semantic view exposes only the ET one.
     game_datetime,
+    game_datetime_et,
     game_date,
     {{ dbt_utils.generate_surrogate_key(['game_date']) }}                     as date_key,
     season,
@@ -49,6 +56,7 @@ select
 
     -- character of the game
     game_status,
+    is_completed,
     went_to_overtime,
     game_summary
 

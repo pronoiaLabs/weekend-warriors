@@ -28,18 +28,22 @@
 {% macro deploy_wnba_analyst(alter=false) %}
 {%- set spec -%}
 models:
-  # claude-opus-5: Anthropic's flagship. 1M token context, 128K output, strongest
-  # on long-horizon agentic work and tool selection, which is what orchestration
-  # is. Public Preview, so not for production-critical use yet.
+  # claude-sonnet-5: cost decision, 2026-08-09. The Cortex Agents rate card
+  # (Credit Consumption Table 6d) prices it at 1.30/6.50 credits per 1M
+  # input/output tokens versus claude-opus-5's 3.25/16.26, roughly 40% of the
+  # cost per question. That price is promotional: it rises 50% on 2026-09-01
+  # to claude-sonnet-4-5's rate (1.95/9.76), still ~60% of opus.
+  # Identifier verified against the Cortex Agents supported-model list.
   #
-  # Verified available in this account. Requires cross-region inference, which is
-  # set to ANY_REGION at the account level.
+  # Requires cross-region inference, which is set to ANY_REGION at the
+  # account level.
   #
-  # Matches nfl_analyst deliberately: routing here is harder, not easier, because
-  # this agent carries four tools split across two different time horizons.
-  # Alternatives: claude-sonnet-5 (lower latency and cost), gemini-3.1-pro, or
-  # 'auto' to let Snowflake choose.
-  orchestration: claude-opus-5
+  # Matches nfl_analyst deliberately. Routing here is the harder job: five
+  # tools split across two time horizons plus a played-versus-scheduled axis,
+  # so if a cheaper model degrades anywhere it will show here first.
+  # Alternatives: claude-opus-5 (prior choice), claude-haiku-4-5,
+  # gemini-3.1-pro, or 'auto' to let Snowflake choose.
+  orchestration: claude-sonnet-5
 
 orchestration:
   budget:
@@ -48,21 +52,31 @@ orchestration:
 
 instructions:
   orchestration: >
-    You answer questions about WNBA team and player performance using four
+    You answer questions about WNBA team and player performance using five
     Cortex Analyst tools. Each tool covers a distinct domain and they cannot be
     joined to each other.
 
-    ROUTE BY TIME FIRST. This is the first axis and it decides three of the four
+    ROUTE BY TIME FIRST. This is the first axis and it decides most of the
     tools before the subject matters. WNBATeamHistoryAnalytics is the ONLY
     multi-season tool: it holds regular season standings for 2008 through 2026,
     so every franchise-history question, every year-over-year trend, every all
     time record and anything naming a season before 2026 goes there. The other
-    three tools cover the 2026 season ONLY. If a question spans seasons and is
+    four tools cover the 2026 season ONLY. If a question spans seasons and is
     not about team standings, the data does not exist; say so rather than
     answering for 2026 and calling it the answer.
 
-    THEN ROUTE BY SUBJECT. Within the 2026 season, route on the SUBJECT of the
-    question, not the statistic.
+    FUTURE GAMES LIVE IN EXACTLY ONE TOOL. WNBAScheduleAnalytics is the only
+    tool that knows a game exists before it is played: every other tool covers
+    played games only. Route every question about the upcoming slate, a team's
+    next game, games remaining, or what is on the calendar for a date to
+    WNBAScheduleAnalytics. The reverse rule matters just as much: the schedule
+    tool holds NO scores, results or records, so never answer a result
+    question from it. A question that needs both, such as "how are the Aces
+    doing and who do they play next", is a multi-tool question: performance
+    for the record, schedule for the next game.
+
+    THEN ROUTE BY SUBJECT. Within the 2026 season's played games, route on the
+    SUBJECT of the question, not the statistic.
     Use WNBATeamPerformanceAnalytics when the subject is a team: results,
     records, team scoring, team shooting efficiency, rebounding, assists,
     steals, blocks, turnovers, fouls, home and away splits, head-to-head and
@@ -253,6 +267,7 @@ instructions:
     - question: "Which players have the highest PIE this season among regulars?"
     - question: "How does Las Vegas perform at home versus on the road this season?"
     - question: "How has Minnesota's win percentage and playoff seed changed from 2015 to 2026?"
+    - question: "Who do the Aces play next?"
 
 tools:
   - tool_spec:
@@ -448,6 +463,44 @@ tools:
         not substitute one for another. There are no league rank columns; any
         ranking is derived by ordering after the floor is applied.
 
+  - tool_spec:
+      type: "cortex_analyst_text_to_sql"
+      name: "WNBAScheduleAnalytics"
+      description: >
+        Answers questions about the WNBA SCHEDULE: the upcoming slate, a
+        team's next game, games remaining, and what is on the calendar. This
+        is the ONLY tool that knows a game exists before it is played.
+
+        Data coverage: one row per game on the 2026 calendar, 333 games: 240
+        played and 93 still scheduled, through 2026-09-25. Grain is game, not
+        team-game, so nothing appears twice. Each row carries date and tip-off
+        time, season phase, completion state, and the home and away teams. The
+        schedule loads nightly, so a game played earlier today may still read
+        as upcoming. No postseason games are listed yet; they appear once the
+        league schedules them.
+
+        Key metrics: games count, completed games, and remaining games, plus
+        the completion and result flags to separate played from upcoming.
+
+        When to use: any question about upcoming, next, remaining or future
+        games, or the schedule as a calendar. Examples: "who do the Aces play
+        next", "what games are on this weekend", "how many games do the
+        Sparks have left", "when do New York and Minnesota meet again", "what
+        is the slate for August 15".
+
+        When NOT to use: do NOT use for scores, results, winners, records or
+        any statistic; it holds none of them, and past games appear only as
+        calendar entries. Results are WNBATeamPerformanceAnalytics; player
+        production is the player tools; anything before 2026 is
+        WNBATeamHistoryAnalytics. Do NOT use for venue, city or broadcast
+        information, which the source does not carry.
+
+        Query guidance: upcoming means the completion flag is false, never a
+        date comparison. A team's schedule needs an OR across the home and
+        away sides, since the team appears in both roles. One completed game
+        is marked postponed and produced no result; it is neither upcoming
+        nor a scoreless draw.
+
 tool_resources:
   WNBATeamPerformanceAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_WNBA_TEAM_PERFORMANCE"
@@ -466,6 +519,11 @@ tool_resources:
       warehouse: <<WAREHOUSE>>
   WNBAPlayerAdvancedAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_WNBA_PLAYER_ADVANCED"
+    execution_environment:
+      type: warehouse
+      warehouse: <<WAREHOUSE>>
+  WNBAScheduleAnalytics:
+    semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_WNBA_SCHEDULE"
     execution_environment:
       type: warehouse
       warehouse: <<WAREHOUSE>>

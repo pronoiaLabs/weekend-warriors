@@ -4,3 +4,14 @@ models:
   # sv_example is disabled in dbt_project.yml until the real NFL semantic views land
   - name: sv_example
     description: "TODO: Describe your semantic view: what business domain does it cover?"
+
+  - name: sv_nfl_schedule
+    description: >
+      The full NFL slate at game grain, played and unplayed alike: completed games for
+      2023-2025 plus the entire 2026 schedule (321 games, one played). The only view
+      anchored on dim_game rather than a fact, because scheduled games have no fact rows
+      and are structurally unreachable everywhere else. Home and away are role-playing
+      joins to dim_team, so a team's schedule is the OR of both sides. Deliberately
+      carries no scores or results; those belong to sv_nfl_team_performance. Scheduled
+      2026 games carry kickoff-time strings or TBD as their status; is_completed is the
+      played-versus-upcoming flag.

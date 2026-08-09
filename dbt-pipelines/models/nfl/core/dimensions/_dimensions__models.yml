@@ -72,14 +72,22 @@ models:
 
   - name: dim_game
     description: >
-      Descriptive context per game. Grain: game. 1,002 rows.
-      Scores are measures and live on fact_team_game, not here.
+      Descriptive context per game. Grain: game. The only place the full
+      slate including unplayed games is readable; fact_team_game holds
+      completed games only. Scores are measures and live on fact_team_game,
+      not here.
     columns:
       - name: game_key
         tests: [unique, not_null]
       - name: game_id
         tests: [unique, not_null]
       - name: game_date
+        tests: [not_null]
+      - name: game_datetime_et
+        description: "Kickoff in US Eastern; what the schedule semantic view exposes."
+        tests: [not_null]
+      - name: is_completed
+        description: "False for scheduled games, which have no fact rows."
         tests: [not_null]
       - name: season_week_key
         description: "Conforms to dim_season_week."

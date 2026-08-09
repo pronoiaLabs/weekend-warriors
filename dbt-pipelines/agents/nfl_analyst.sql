@@ -27,18 +27,22 @@
 {% macro deploy_nfl_analyst(alter=false) %}
 {%- set spec -%}
 models:
-  # claude-opus-5: Anthropic's flagship. 1M token context, 128K output, strongest
-  # on long-horizon agentic work and tool selection -- which is what orchestration
-  # is. Public Preview, so not for production-critical use yet.
+  # claude-sonnet-5: cost decision, 2026-08-09. The Cortex Agents rate card
+  # (Credit Consumption Table 6d) prices it at 1.30/6.50 credits per 1M
+  # input/output tokens versus claude-opus-5's 3.25/16.26, roughly 40% of the
+  # cost per question. That price is promotional: it rises 50% on 2026-09-01
+  # to claude-sonnet-4-5's rate (1.95/9.76), still ~60% of opus.
+  # Identifier verified against the Cortex Agents supported-model list.
   #
-  # Verified available in this account. Requires cross-region inference, which is
-  # set to ANY_REGION at the account level.
+  # Requires cross-region inference, which is set to ANY_REGION at the
+  # account level.
   #
   # NOTE: GLM models are NOT available in Snowflake Cortex. The hosted families
   # are Anthropic Claude, OpenAI GPT, Google Gemini, Meta Llama, Mistral and
-  # DeepSeek. Alternatives here: claude-sonnet-5 (lower latency and cost),
-  # gemini-3.1-pro, or 'auto' to let Snowflake choose.
-  orchestration: claude-opus-5
+  # DeepSeek. Alternatives here: claude-opus-5 (prior choice, stronger
+  # routing), claude-haiku-4-5 (20% of opus cost), gemini-3.1-pro, or 'auto'
+  # to let Snowflake choose.
+  orchestration: claude-sonnet-5
 
 orchestration:
   budget:
@@ -47,11 +51,23 @@ orchestration:
 
 instructions:
   orchestration: >
-    You answer questions about NFL team and player performance for the 2023,
-    2024 and 2025 seasons using three Cortex Analyst tools. Each tool covers a
-    distinct domain and they cannot be joined to each other.
+    You answer questions about NFL team and player performance for the
+    completed 2023 through 2025 seasons, plus the 2026 schedule, using four
+    Cortex Analyst tools. Each tool covers a distinct domain and they cannot
+    be joined to each other.
 
-    TOOL ROUTING. Route on the SUBJECT of the question, not the statistic.
+    FUTURE GAMES LIVE IN EXACTLY ONE TOOL. NFLScheduleAnalytics is the only
+    tool that knows a game exists before it is played: the other three cover
+    completed games only. Route every question about the upcoming slate, a
+    team's next game, a week's matchups, games remaining, or what is on the
+    calendar to NFLScheduleAnalytics. The reverse rule matters just as much:
+    the schedule tool holds NO scores, results or statistics, so never answer
+    a performance question from it. A question that needs both, such as "how
+    did the Chiefs do last season and who do they open against", is a
+    multi-tool question.
+
+    TOOL ROUTING. For played games, route on the SUBJECT of the question, not
+    the statistic.
     Use NFLTeamPerformanceAnalytics when the subject is a team: records, wins
     and losses, standings-style questions, team scoring, team offensive
     efficiency, penalties, turnovers, time of possession, home and away splits,
@@ -84,8 +100,9 @@ instructions:
     situational detail such as down and distance, red zone plays or win
     probability; Next Gen tracking metrics such as completion percentage above
     expectation, time to throw, separation or yards over expected; snap counts,
-    pressure rates, coverage grades and missed tackles; any season before 2023
-    or after 2025; and any league other than the NFL.
+    pressure rates, coverage grades and missed tackles; any season before
+    2023; 2026 statistics or results, since the 2026 season exists only as a
+    schedule until games are played; and any league other than the NFL.
 
     EMPTY OR PARTIAL RESULTS. If a tool returns no rows, do not report zero.
     State that no matching records were found and give the most likely reason:
@@ -197,6 +214,7 @@ instructions:
     - question: "Which defenders recorded the most sacks last season?"
     - question: "How did Kansas City perform at home versus on the road last season?"
     - question: "How has Detroit's third down and red zone efficiency changed from 2023 to 2025?"
+    - question: "What is the week 1 slate this season?"
 
 tools:
   - tool_spec:
@@ -207,12 +225,13 @@ tools:
         offensive efficiency, penalties, turnovers, time of possession, and
         opponent or home and away splits.
 
-        Data coverage: one row per team per game for the seasons currently loaded (2023 to 2025),
-        2,004 team-games across 1,002 games. Because the grain is team by game, a
+        Data coverage: one row per team per COMPLETED game for the seasons
+        currently loaded (2023 onward). Because the grain is team by game, a
         single game appears twice, once for each team. Includes preseason,
         regular season and postseason, and defaults to regular season. Each row
         carries the team, the opponent, whether the team was at home, the score
-        on both sides, and the full team box score.
+        on both sides, and the full team box score. Completed games only; the
+        2026 schedule of unplayed games is NFLScheduleAnalytics.
 
         Key metrics: wins, losses, ties, win_pct (a tie counts as half a win),
         total and average points scored and allowed, point differential, total
@@ -247,12 +266,13 @@ tools:
         Answers questions about INDIVIDUAL offensive production: passing,
         rushing and receiving.
 
-        Data coverage: one row per player per game for the seasons currently loaded (2023 to 2025),
-        roughly 23,200 player-games, covering every player who recorded
-        offensive involvement. Includes preseason, regular season and
-        postseason, and defaults to regular season. Team is the team the player
-        actually appeared for in that specific game, so a traded player's
-        history is correct.
+        Data coverage: one row per player per game for the completed seasons
+        currently loaded (2023 to 2025), roughly 23,200 player-games, covering
+        every player who recorded offensive involvement. Includes preseason,
+        regular season and postseason, and defaults to regular season. Team is
+        the team the player actually appeared for in that specific game, so a
+        traded player's history is correct. Completed games only; the 2026
+        schedule is NFLScheduleAnalytics.
 
         Key metrics: pass attempts, completions, completion percentage, passing
         yards, yards per attempt, passing touchdowns, interceptions thrown,
@@ -289,11 +309,12 @@ tools:
         Answers questions about INDIVIDUAL defensive production: tackling, pass
         rush, coverage and takeaways.
 
-        Data coverage: one row per player per game for the seasons currently loaded (2023 to 2025),
-        roughly 44,600 player-games, the largest of the player datasets.
-        Includes preseason, regular season and postseason, and defaults to
-        regular season. Team is the team the player actually appeared for in
-        that specific game.
+        Data coverage: one row per player per game for the completed seasons
+        currently loaded (2023 to 2025), roughly 44,600 player-games, the
+        largest of the player datasets. Includes preseason, regular season and
+        postseason, and defaults to regular season. Team is the team the player
+        actually appeared for in that specific game. Completed games only; the
+        2026 schedule is NFLScheduleAnalytics.
 
         Key metrics: total, solo and assisted tackles, tackles for loss; sacks
         recorded and quarterback hits, plus a pressures proxy that is the sum of
@@ -320,6 +341,47 @@ tools:
         Be explicit that you mean sacks recorded rather than allowed, and
         interceptions caught rather than thrown. Name the season explicitly.
 
+  - tool_spec:
+      type: "cortex_analyst_text_to_sql"
+      name: "NFLScheduleAnalytics"
+      description: >
+        Answers questions about the NFL SCHEDULE: the upcoming slate, a team's
+        next game, a week's matchups, games remaining, and what is on the
+        calendar. This is the ONLY tool that knows a game exists before it is
+        played.
+
+        Data coverage: one row per game, completed games for 2023 through 2025
+        plus the FULL 2026 schedule, 321 games of which only the Hall of Fame
+        game has been played. Grain is game, not team-game, so nothing appears
+        twice. Each row carries date and kickoff time, season, week, season
+        phase, venue, completion state, and the home and away teams. The
+        schedule loads nightly, so a game played earlier today may still read
+        as upcoming. 24 late-season 2026 games are flexed and carry TBD times.
+        The 2026 postseason is not yet scheduled.
+
+        Key metrics: games count, completed games, and remaining games, plus
+        the completion flag to separate played from upcoming.
+
+        When to use: any question about upcoming, next, remaining or future
+        games, a week's slate, or the schedule as a calendar. Examples: "who
+        do the Chiefs play in week 1", "what is the Thanksgiving slate", "how
+        many home games do the Lions have left", "when do Kansas City and
+        Buffalo meet", "where is the week 5 game in London" style venue
+        lookups.
+
+        When NOT to use: do NOT use for scores, results, winners, records or
+        any statistic; it holds none of them, and past games appear only as
+        calendar entries. Results and team stats are
+        NFLTeamPerformanceAnalytics; player production is the player tools.
+        Do NOT use for broadcast, TV or ticket information, which the source
+        does not carry.
+
+        Query guidance: schedule questions default to season 2026, the only
+        season with unplayed games. Upcoming means the completion flag is
+        false, never a date comparison. A team's schedule needs an OR across
+        the home and away sides. Week numbers restart each season phase, so
+        pair a week with Regular Season unless told otherwise.
+
 tool_resources:
   NFLTeamPerformanceAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_TEAM_PERFORMANCE"
@@ -333,6 +395,11 @@ tool_resources:
       warehouse: <<WAREHOUSE>>
   NFLPlayerDefenseAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_PLAYER_DEFENSE"
+    execution_environment:
+      type: warehouse
+      warehouse: <<WAREHOUSE>>
+  NFLScheduleAnalytics:
+    semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_SCHEDULE"
     execution_environment:
       type: warehouse
       warehouse: <<WAREHOUSE>>

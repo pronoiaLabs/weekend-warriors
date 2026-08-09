@@ -51,8 +51,10 @@ select
     game_key,
     game_id,
 
-    -- when
+    -- when. Both spellings of the same instant: UTC as loaded, and US
+    -- Eastern for display. The schedule semantic view exposes only the ET one.
     game_datetime,
+    game_datetime_et,
     game_date,
     {{ dbt_utils.generate_surrogate_key(['game_date']) }}    as date_key,
     season,

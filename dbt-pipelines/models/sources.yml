@@ -57,9 +57,14 @@ sources:
 
       - name: games
         description: >
-          One row per game, 2023-2025 seasons. Home and away scores sit side by
-          side; the core layer unpivots this to team x game grain.
-          All rows are Final or Final/OT -- no in-progress games to filter.
+          One row per game, 2023 season onward, including the full current
+          season's schedule of unplayed games. Home and away scores sit side by
+          side; the core layer unpivots this to team x game grain. Completed
+          games are STATUS 'Final' or 'Final/OT'; scheduled games carry a
+          kickoff-time string ('9/13 - 1:00 PM EDT') or 'TBD' for late-season
+          flex slots, and a live in-progress value could land mid-load, so
+          status is documented rather than value-tested. Scheduled rows carry
+          NULL scores.
         columns:
           - name: id
             tests: [unique, not_null]
@@ -70,8 +75,12 @@ sources:
             tests:
               - accepted_values: {values: [1, 2, 3], quote: false}
           - name: status
-            tests:
-              - accepted_values: {values: ['Final', 'Final/OT']}
+            description: >
+              'Final' / 'Final/OT' when completed; a kickoff-time string or
+              'TBD' when scheduled. Completedness is derived positively in
+              stg_nfl__games as status in ('Final', 'Final/OT'), so an
+              unexpected new value lands as not-completed rather than breaking.
+            tests: [not_null]
           - name: home_team__id
             tests:
               - not_null
