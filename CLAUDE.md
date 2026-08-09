@@ -88,17 +88,23 @@ A dbt project whose lifecycle runs **inside Snowflake** via `EXECUTE DBT PROJECT
 
 The environment mechanism is the thing to understand first. `profiles.yml` hardcodes nothing — it reads `DBT_DATABASE` / `DBT_SCHEMA` / `DBT_WAREHOUSE` / `DBT_ROLE` through `env_var()` with **no defaults**, and Snowflake injects those by resolving [env.yml](dbt-pipelines/env.yml) at execution time. A run outside that path fails fast rather than silently targeting the wrong database. In `dev`, `DBT_SCHEMA` resolves to `CURRENT_USER()`, giving each developer an isolated schema.
 
+**One project, one environment per sport per tier.** env.yml defines `dev` / `prod` (NFL) and `wnba_dev` / `wnba_prod`, each also setting `DBT_SPORT`. Both sport trees in `dbt_project.yml` (and both sources) gate `+enabled` on it, so a run can only build its own sport into its own database; a forgotten `--select` cannot cross-pollinate. Adding a sport means new env.yml entries, a sibling `models: ... <sport>:` config key, a `<sport>_raw` source block, and a `tests/<sport>/` directory.
+
+The single deployed project object is **`DLT_DB.DEPLOY.CORTEX_LIFECYCLE`** (sport-neutral, in the control-plane schema). An older `NFL_PROD_DB.ANALYTICS.NFL_ANALYTICS` object may still exist pending cleanup; deploy.yml's `DBT_PROJECT_FQN` var still points at it.
+
 ```bash
 # --env must come BEFORE the project name; tokens after it go to dbt Core, which has no --env
-snow dbt deploy cortex_lifecycle --source . --default-env dev \
+snow dbt deploy DLT_DB.DEPLOY.CORTEX_LIFECYCLE --source . --default-env dev \
   --external-access-integration dbt_ext_access --force
-snow dbt execute --env dev DB.SCHEMA.cortex_lifecycle build
-snow dbt execute --env prod DB.SCHEMA.cortex_lifecycle run-operation deploy_example_agent
+snow dbt execute --env wnba_dev DLT_DB.DEPLOY.CORTEX_LIFECYCLE build
+snow dbt execute --env wnba_prod DLT_DB.DEPLOY.CORTEX_LIFECYCLE run-operation deploy_wnba_analyst
 ```
 
 Requires Snowflake CLI **>= 3.21** for the `--env` / `--default-env` flags — satisfied (3.23.0), with the `ENABLE_DBT_PROJECT_ENV_VARS` feature flag enabled as described above. `dbt deps` needs an External Access Integration reaching `hub.getdbt.com` and `codeload.github.com`.
 
-**Model layers** are set per directory in `dbt_project.yml` under `models: cortex_agent_lifecycle: nfl:`. `prep/` builds views into `PREP`, `core/dimensions/` and `core/facts/` build tables into `CORE`, `semantic_views/` and `evaluations/` build into `ANALYTICS`.
+**Model layers** are set per directory in `dbt_project.yml` under `models: cortex_agent_lifecycle: nfl:` and `wnba:`. `prep/` builds views into `PREP`, `core/dimensions/` and `core/facts/` build tables into `CORE`, `semantic_views/` and `evaluations/` build into `ANALYTICS`.
+
+**dbt model names are project-global**, so only one sport gets the generic names: NFL owns `dim_team` / `fact_team_game` style names (first mover) and WNBA core models are sport-qualified (`dim_wnba_team`, `fact_wnba_team_game`), matching the `sv_<sport>_*` semantic-view convention. Prep is prefixed per sport everywhere (`stg_nfl__*`, `stg_wnba__*`).
 
 **The config keys must mirror the folder nesting.** They are directory names, so `models/nfl/prep/` needs `nfl:` then `prep:`. Flattening them does not error: the models still build, just as views in the default target schema with the `+schema` silently dropped.
 
@@ -108,7 +114,7 @@ Requires Snowflake CLI **>= 3.21** for the `--env` / `--default-env` flags — s
 
 **Agents are macros, not models.** `macro-paths` includes `agents/`, and each agent is a `deploy_<name>` wrapper macro holding its spec inline — dbt Projects on Snowflake cannot read a file at runtime. Because the spec is raw text dbt does not render, fully-qualified names use `<<DATABASE>>`, `<<SCHEMA>>`, `<<WAREHOUSE>>` tokens that `create_agent` / `alter_agent` substitute with the active target. Deploy with `dbt run-operation deploy_<name>` (add `--args '{alter: true}'` for a zero-downtime update).
 
-Raw sources in `models/sources.yml` are deliberately **not** environment-driven: every developer reads the same `NFL_PROD_DB.RAW` tables. dbt must never write to `RAW` or `RAW_STAGING`, which dlt owns.
+Raw sources in `models/sources.yml` are deliberately **not** environment-driven: every developer reads the same `<SPORT>_PROD_DB.RAW` tables. dbt must never write to `RAW` or `RAW_STAGING`, which dlt owns.
 
 [WORKING-SESSION.md](dbt-pipelines/WORKING-SESSION.md) is a phase-driven runbook meant to be executed by an agent ("Follow WORKING-SESSION.md"); it gates on user input between phases. The README's "Writing effective semantic views" and "Writing effective agents" sections encode real constraints — notably that semantic-view DDL clause order is enforced (`TABLES → RELATIONSHIPS → FACTS → DIMENSIONS → METRICS → COMMENT → AI_*`, with `AI_VERIFIED_QUERIES` last), and that SQL-generation rules belong in the semantic view's `AI_SQL_GENERATION` clause rather than in agent instructions.
 

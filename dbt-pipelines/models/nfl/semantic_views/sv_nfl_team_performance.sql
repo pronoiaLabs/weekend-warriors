@@ -112,7 +112,7 @@ dimensions (
 
     -- when
     weeks.season as season
-        comment = 'NFL season. A season starting in year N runs through February of N+1, so the 2025 season ends in Feb 2026. Currently covers 2023 to 2025; new seasons are added as they load.'
+        comment = 'NFL season. A season starting in year N runs through February of N+1, so the 2025 season ends in Feb 2026. Currently covers 2023 to 2025; new seasons are added as they load.',
     weeks.week as week
         comment = 'Week within the season phase. Regular season is weeks 1 to 18. Week numbers restart for preseason and postseason, so always pair week with season_type.',
     weeks.season_type as season_type_name

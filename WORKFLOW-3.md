@@ -10,6 +10,50 @@ Ground rules this loop (user-confirmed): dev AND prod dbt writes granted,
 including the prod build and prod agent deploy, plus the one-time EXECUTE TASK
 backfill. Everything else read-only. No push until told.
 
+## HANDOFF
+
+**End state: both sports are fully live in prod.**
+
+- `WNBA_PROD_DB`: PREP (23 views), CORE (15 tables), ANALYTICS (4 semantic
+  views) and agent `WNBA_PROD_DB.ANALYTICS.WNBA_ANALYST`. Full build 629/629
+  green in dev and prod.
+- `NFL_PROD_DB.ANALYTICS`: for the FIRST time carries its 3 semantic views and
+  the `NFL_ANALYST` agent. The loop discovered they had never deployed: all
+  four sv_nfl_* files on main shared an identical missing-comma syntax error
+  introduced in their final commit and never rebuilt since. Fixed here (4
+  one-character edits, your call), models refreshed via `dbt run`, agent
+  created.
+- The dbt project object is now `DLT_DB.DEPLOY.CORTEX_LIFECYCLE` (your call
+  mid-loop). Cleanup when convenient, both yours to run:
+  1. `DROP DBT PROJECT NFL_PROD_DB.ANALYTICS.NFL_ANALYTICS;` (the misnomer
+     object; nothing references it except deploy.yml vars)
+  2. Update the GitHub `deploy` environment vars `DBT_PROJECT_FQN` ->
+     `DLT_DB.DEPLOY.CORTEX_LIFECYCLE` and `DBT_PROJECT_NAME` ->
+     `CORTEX_LIFECYCLE` before ever enabling the deploy.yml dbt job.
+
+**Branch state:** `feat/wnba-dbt`, 6 commits, NOT pushed (your call to make).
+On merge, deploy.yml's dbt job will fire on the `dbt-pipelines/**` filter and
+fail on privileges: pre-existing, documented in deploy.yml itself, and it now
+ALSO needs the var updates above plus a per-sport env matrix when enabled.
+
+**Try the agents:** Snowflake Intelligence against
+`WNBA_PROD_DB.ANALYTICS.WNBA_ANALYST` ("Who leads the league in true shooting
+this season, minimum 500 minutes?", "How have the Aces done since 2019?") and
+`NFL_PROD_DB.ANALYTICS.NFL_ANALYST`.
+
+**Open items, priority order:**
+1. NFL raw drift: NFL `dbt build` is red on three data checks (2 orphan
+   team_stats rows, phase coverage +1, phase measures 12 rows). BACKLOG has
+   the investigation entry. `dbt run` is the clean NFL path until resolved.
+2. wnba_plays pipeline is broken upstream and its Task burns a fire per week
+   doing nothing; BACKLOG entry has options, consider suspending the Task.
+3. Provider quirks logged for awareness: standings omits game 24896 outright
+   (flagship test carries tolerance 2 for it), PLAYER_SEASON_STATS
+   games_played overcounts (18 of 196 rows impossible), postponed game 24935
+   carries a fake 0-0 'post' line.
+4. dbt-behind-ingestion chaining (BACKLOG) is now worth doing: WNBA models go
+   stale a day behind ingestion just like NFL.
+
 ## Phase 0 - branch + prod backfill
 
 **Ran:** `git checkout -b feat/wnba-dbt main`. Fired six backfill tasks
@@ -235,3 +279,28 @@ player stats, shot coordinates, championships, live data.
 **Changed from plan:** none.
 
 **Open:** none new.
+
+## Phase 6 - prod, the NFL discovery, wrap-up
+
+**Ran:** WNBA prod build + prod agent deploy; NFL dev regression; then the
+discovery, the user-approved NFL fix and NFL prod deploy; docs.
+
+**Result:** GATE GREEN with one asterisk. WNBA prod: 629/629, layers fanned
+out (PREP 23 / CORE 15 / ANALYTICS 4 SVs), agent live with all tools bound
+and zero unsubstituted tokens. NFL regression: models all build after the
+fix; 288/290 tests pass; the 2 failures are data-drift reconciliation
+checks, unchanged code, now a BACKLOG item.
+
+**The discovery:** the NFL regression exposed that all four sv_nfl_* files
+carry an identical missing comma after the season dimension's comment
+(copy-pasted block, final commit, never rebuilt), that NFL prod had ZERO
+semantic views and ZERO agents, and that NFL dev's three SV objects predate
+the bug (built 2026-08-01 16:14 from pre-commit code). User approved: fix
+the four commas, deploy NFL SVs and nfl_analyst to prod. Prod NFL ran as
+`dbt run` (models only) because `dbt build` lets the two drifted tests skip
+the semantic views downstream.
+
+**Changed from plan:** NFL prod deploy added by user decision; NFL
+regression closes green-with-documented-drift rather than all-green.
+
+**Open:** all recorded in HANDOFF and BACKLOG.
