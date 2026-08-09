@@ -227,6 +227,10 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
         "wnba_standings", "wnba_season_stats", "wnba_advanced_game",
         "wnba_advanced_season", "wnba_shot_locations", "wnba_injuries",
     }
+    assert by_source["ncaaf"] == {
+        "ncaaf_reference", "ncaaf_games", "ncaaf_stats",
+        "ncaaf_season_stats", "ncaaf_standings", "ncaaf_rankings",
+    }
 
     # `sample` is the guard on the whole mechanism: it exists precisely to be the
     # pipeline that is runnable by hand and never becomes a Task.
