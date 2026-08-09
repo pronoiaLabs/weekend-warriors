@@ -1,104 +1,58 @@
 # weekend-warriors
 
-**Ask questions about NFL football in plain English, and get answers from a real data warehouse.**
+**Build a data pipeline for the sport you love, then talk to it in plain English.**
 
-This is a complete, working data stack on Snowflake: it pulls NFL data from a public API every day,
-models it into a star schema, and puts a Cortex Agent on top so you can ask things like
+This repo is a complete, working example of an end-to-end sports analytics stack. It pulls league
+data from a public API on a schedule, organizes it into clean, analysis-ready tables, and puts an AI
+agent on top so you can ask questions like
 
-> *"How has Detroit's third down and red zone efficiency changed from 2023 to 2025?"*
+> *"How has Detroit's third down and red zone efficiency changed season over season?"*
 
-and get a correct answer with the SQL behind it.
+and get a real answer, computed from a real warehouse, with the SQL shown so you can check its work.
 
-It is also a worked example. Every layer is small enough to read in an afternoon, and the parts that
-look strange are commented with why they are that way, usually because the obvious version was tried
-first and broke.
-
----
-
-## Contents
-
-- [What is actually in here](#what-is-actually-in-here)
-- [How the pieces fit](#how-the-pieces-fit)
-- [Try it locally in five minutes](#try-it-locally-in-five-minutes)
-- [Deploying to your own Snowflake account](#deploying-to-your-own-snowflake-account)
-- [Adding your own data source](#adding-your-own-data-source)
-- [Design decisions worth knowing](#design-decisions-worth-knowing)
-- [Known gaps](#known-gaps)
-- [Provenance and license](#provenance-and-license)
+Two sports run today, NFL and WNBA. The whole design assumes you will want a third: adding your
+sport is a scaffold command and a config file, not a rewrite.
 
 ---
 
-## What is actually in here
+## What you end up with
 
-Three seasons of NFL data (2023 to 2025), about 265,000 rows:
+Once it is set up, the stack runs itself:
 
-| Table | Rows | Grain |
-|---|---:|---|
-| `PLAYS` | 179,402 | one row per play |
-| `STATS` | 67,191 | one row per player per game |
-| `PLAYERS` | 13,503 | one row per player |
-| `ADVANCED_*` | 7,785 | Next Gen tracking stats, split by discipline |
-| `TEAM_STATS` | 2,000 | one row per team per game |
-| `GAMES` | 1,002 | one row per game |
-| `STANDINGS` | 96 | one row per team per season |
-| `TEAMS` | 32 | one row per team |
+- **Fresh data, automatically.** Each pipeline pulls from the sports API on its own schedule. You
+  choose which seasons to load; a backfill can replay any year the API carries.
+- **Models that update themselves.** Minutes after new data lands, the tables your agent reads are
+  rebuilt. There is no nightly job to babysit and no "run this after that" checklist.
+- **An agent per sport.** Ask about teams, players, games, or trends in plain English. The agent
+  writes and runs the SQL, and shows it to you.
+- **A dashboard to keep an eye on things.** A local web app shows every pipeline run, every model
+  build, and what each one did, so "is it working?" is a glance, not an investigation.
 
-On top of that, 19 dimensional models and 4 semantic views, so the agent can answer team performance,
-player offense, and player defense questions without anybody writing SQL.
-
-Everything runs **inside** Snowflake. There is no Airflow, no external scheduler, and no compute
-outside the account. Ingestion is a container job on a Snowflake compute pool fired by a Snowflake
-Task; dbt executes as a Snowflake object, not from a laptop or a CI runner.
+Everything runs inside a Snowflake account. There is no separate orchestrator, no servers of your
+own to patch, and nothing running on your laptop once it is deployed.
 
 ---
 
-## How the pieces fit
+## What is in the box
 
-```
-          BallDontLie API  (api.balldontlie.io)
-                   |
-                   |   dlt, running in Snowpark Container Services
-                   |   7 pipelines, one Snowflake Task each
-                   v
-   NFL_PROD_DB.RAW          11 tables, loaded as-is, nothing thrown away
-                   |
-                   |   dbt, via EXECUTE DBT PROJECT
-                   v
-   NFL_PROD_DB.PREP         11 views   rename, cast, drop dlt bookkeeping
-   NFL_PROD_DB.CORE         6 dims + 13 facts
-   NFL_PROD_DB.ANALYTICS    4 semantic views
-                   |
-                   v
-          Cortex Agent  "nfl_analyst"
-```
-
-Two directories, one for each half:
-
-| Path | What it does |
+| Part | What it does |
 |---|---|
-| [dlt-pipelines/](dlt-pipelines/) | Gets the data in. Registry-driven [dlt](https://dlthub.com), deployed to SPCS. |
-| [dbt-pipelines/](dbt-pipelines/) | Makes it useful. dbt models, semantic views, Cortex Agents. |
-| [.github/workflows/](.github/workflows/) | CI, and a deploy that only ships what changed. |
+| [dlt-pipelines/](dlt-pipelines/) | The collector. Pulls API data on a schedule and lands it, raw and complete. |
+| [dbt-pipelines/](dbt-pipelines/) | The brain. Turns raw tables into clean models, and defines the agents. |
+| [ops-dashboard/](ops-dashboard/) | The window. A local dashboard for watching pipelines and builds run. |
 
-The BallDontLie API is documented at [docs.balldontlie.io](https://docs.balldontlie.io). Its OpenAPI
-specs are not vendored here; they belong to the provider.
-
-**Where to read next**, depending on what you came for:
-
-- *I want to understand the ingestion side* -> [dlt-pipelines/README.md](dlt-pipelines/README.md), then
-  [pipelines/batch/registries/nfl-registry.yml](dlt-pipelines/pipelines/batch/registries/nfl-registry.yml),
-  which is the single source of truth for every pipeline.
-- *I want to run something right now* -> [dlt-pipelines/MAKE-COMMANDS.md](dlt-pipelines/MAKE-COMMANDS.md).
-- *I want to understand the modelling* -> [dbt-pipelines/README.md](dbt-pipelines/README.md), then
-  [models/nfl/](dbt-pipelines/models/nfl/).
-- *I want to know how an agent is built* -> [agents/nfl_analyst.sql](dbt-pipelines/agents/nfl_analyst.sql).
-  It is heavily commented and is the most transferable file in the repo.
+Each part has its own README with the full technical detail. This page stays out of the weeds on
+purpose; if you are an engineer who wants the deep end, start with
+[dlt-pipelines/README.md](dlt-pipelines/README.md) and
+[dbt-pipelines/README.md](dbt-pipelines/README.md), which explain every design decision and the
+sharp edges they route around.
 
 ---
 
-## Try it locally in five minutes
+## Try it in five minutes, no Snowflake needed
 
-You do **not** need Snowflake to see this work. A local run loads into DuckDB.
+You can watch the collector work on your laptop before committing to anything. A local run loads
+into a small on-disk database instead of a warehouse.
 
 **You need:** Python 3.11+, [uv](https://docs.astral.sh/uv/), and a free API key from
 [balldontlie.io](https://www.balldontlie.io).
@@ -107,111 +61,48 @@ You do **not** need Snowflake to see this work. A local run loads into DuckDB.
 git clone https://github.com/pronoiaLabs/weekend-warriors.git
 cd weekend-warriors/dlt-pipelines
 
-make setup                        # installs deps, writes a .dlt/secrets.toml template
+make setup                        # installs everything, tells you where the API key goes
+make run NAME=nfl_reference       # teams + players, about 30 seconds
 ```
 
-Put your API key where `make setup` tells you, then:
-
-```bash
-make list                         # every pipeline declared in the registry
-make run NAME=nfl_reference       # teams + players -> local DuckDB, ~30 seconds
-```
-
-That is the whole loop. `nfl_reference` is the cheapest pipeline; `nfl_plays` is the expensive one at
-roughly 334 requests.
+That is the whole loop in miniature: an API on one side, queryable tables on the other.
 
 ---
 
-## Deploying to your own Snowflake account
+## Setting it up for real
 
-Longer, and deliberately not one command. The account DDL creates roles, compute pools and grants, so
-it is a sequence of **reviewed SQL files you run yourself**, not something a script does behind your
-back.
+Deploying to your own Snowflake account is a sequence of reviewed steps you run yourself, on
+purpose: the setup creates roles and permissions, and you should see what it does before it does it.
+The full walkthrough, with a verification query at each step, is
+[dlt-pipelines/MAKE-COMMANDS-PROD.md](dlt-pipelines/MAKE-COMMANDS-PROD.md).
 
-```bash
-make setup-base   CONFIRM=1       # roles, control plane, registry table
-make setup-dev    CONFIRM=1       # dev database, compute
-make setup-prod   CONFIRM=1       # prod database, compute, service users
-make setup-source SOURCE=nfl CONFIRM=1   # NFL_DEV_DB + NFL_PROD_DB, secret, egress
-make image-push                   # build the container, push to Snowflake
-make deploy                       # sync the registry, create the Tasks
-```
-
-Then resume the Tasks, which is a separate and deliberate act. Full walkthrough with verification
-queries at each step: [MAKE-COMMANDS-PROD.md](dlt-pipelines/MAKE-COMMANDS-PROD.md).
-
-**Watch out for one thing.** `CREATE OR ALTER TASK` resets a Task to suspended. Re-running
-`make tasks-apply` over a live schedule silently stops it: the DDL succeeds, nothing errors, and the
-next scheduled run simply never happens. `generate_tasks.py --resume` emits the matching resume
-statements, and CI applies them automatically. By hand, you have to remember.
-
-### CI/CD
-
-`.github/workflows/deploy.yml` deploys only what a change affects. Edit a registry YAML and it
-resyncs the registry and reapplies Tasks without rebuilding a container; edit Python and it rebuilds
-the image; edit a dbt model and it rebuilds models and leaves ingestion alone.
-
-Auth is keyless, via GitHub OIDC to a Snowflake `TYPE = SERVICE` user. No credentials are stored. If
-your account has an IP allowlist, read
-[sql/prod/03b_service_user_oidc.sql](dlt-pipelines/sql/prod/03b_service_user_oidc.sql) before you
-start: OIDC removes the stored credential but not the network path, and the fix is not obvious.
+The short version: a handful of `make setup-*` commands build the foundations, one command pushes
+the collector container, one creates the schedules, and from then on the stack feeds itself.
 
 ---
 
-## Adding your own data source
+## Adding your sport
 
-The point of the registry design is that this is a YAML entry, not a new script.
+This is the point of the whole design.
 
 ```bash
 make new-source NAME=nba HOST=https://api.balldontlie.io
 ```
 
-That scaffolds a registry file, the database DDL, the external access integration and the secret,
-with the names already wired together. Fill in the endpoints and you have a pipeline the runner, the
-Task generator and the observability layer all already know about.
+That one command scaffolds everything the new sport needs, names already wired together: the
+pipeline config, the databases, the API access, and the trigger that rebuilds models when data
+lands. Fill in which endpoints to pull, add models for what you want to ask about, and your agent
+has a new sport to talk about. The existing sports are the worked examples to copy from.
 
 ---
 
-## Design decisions worth knowing
+## Honesty section
 
-**A Snowflake Task cannot pass arguments,** and that shapes more of this than you would expect. Two
-BallDontLie endpoints return HTTP 400 without a `season` parameter, and two more silently return
-*every* season. So season-scoped resources declare `season: "{current_season}"` and the runner
-substitutes the year at run time, rolling over on 1 August. A literal year would keep reporting
-success while quietly loading a finished season.
-
-**One database per sport, crossed with environment.** A shared control plane (`DLT_DB`) plus
-`NFL_DEV_DB` and `NFL_PROD_DB`. The registry stores a database *stem* (`NFL`), not a full name, so one
-entry covers both environments. Adding a league does not touch roles, pools or warehouses.
-
-**Both halves nest by sport,** `models/nfl/` on one side and `registries/nfl-registry.yml` plus
-`sql/sources/nfl/` on the other. That is what makes a second league a copy rather than a refactor.
-
-**dbt config keys mirror folder names.** `models/nfl/prep/` needs `nfl:` then `prep:` in
-`dbt_project.yml`. Flattening them does not error; the models just quietly build as views in the
-wrong schema.
-
-**Three models ship disabled on purpose.** `sv_nfl_player_advanced` is off because the Next Gen source
-tracks each player in exactly one discipline: the passing, rushing and receiving endpoints have zero
-player overlap. The view would promise cross-discipline comparisons the data cannot answer. Rushing
-production is still available from the box score in `sv_nfl_player_offense`.
-
----
-
-## Known gaps
-
-Stated plainly, because a repo that hides these is harder to trust.
-
-- **`stats?seasons[]=<year>` does not return every game.** Replaying the 2023 regular season returned
-  47 of 49 games, and both missing games had data when fetched by `game_id`. Fetching per game the way
-  plays are fetched would close it. The reconciliation tests in
-  [dbt-pipelines/tests/](dbt-pipelines/tests/) exist to keep the gap visible rather than let it
-  propagate silently.
-- **Nothing chains dbt behind the ingestion Tasks.** `dbt build` runs on a code push, not when new
-  rows land in `RAW`.
-- **No alerting on Task failure.** Visible only in `TASK_HISTORY` and `_DLT_RUNS`.
-- **Two games have no `TEAM_STATS` row, 18 games have no `PLAYS` rows**, and 386 `STATS` rows show
-  activity in no phase and therefore land in no phase fact. These are source gaps, encoded as tests.
+Sports APIs are imperfect, and this repo says so out loud rather than papering over it. Known data
+gaps (a few games missing stats here, an endpoint that under-returns there) are encoded as tests
+that fail visibly instead of letting bad numbers flow quietly into answers. The details live in the
+technical READMEs and the test suites; the principle is simply that an agent you can trust needs a
+pipeline that admits what it does not know.
 
 ---
 
@@ -226,7 +117,5 @@ the commit below and then adapted. Both keep their original Apache 2.0 `LICENSE`
 | `dbt-pipelines/` | [cortex-agents-dbt-project-template](https://github.com/innovation-igloo/cortex-agents-dbt-project-template) | `ae5d195` |
 
 Upstream history is not preserved here. Both templates are public if you want to see what changed.
-The CDC subsystem and documentation site that ship with the dlt template were removed rather than
-adapted; this project is batch only.
 
 Licensed under Apache 2.0. See [LICENSE](LICENSE).
