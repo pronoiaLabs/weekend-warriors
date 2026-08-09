@@ -22,4 +22,10 @@ cortex_agent_lifecycle:
       database: "{{ env_var('DBT_DATABASE') }}"
       schema: "{{ env_var('DBT_SCHEMA') }}"
       warehouse: "{{ env_var('DBT_WAREHOUSE') }}"
+      # Session-level Snowflake QUERY_TAG for every connection dbt opens. The
+      # set_query_tag override in macros/query_tags.sql then swaps in a richer
+      # per-node tag around each materialization; this base tag is what
+      # non-model statements (connection setup, metadata queries) carry. No
+      # default, same fail-fast contract as the variables above.
+      query_tag: "{{ env_var('DBT_QUERY_TAG_BASE') }}"
       threads: 4
