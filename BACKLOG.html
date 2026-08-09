@@ -59,6 +59,27 @@
   }
   .count { font-size: .85rem; color: var(--muted); white-space: nowrap; }
 
+  nav.tabs {
+    display: flex; gap: .25rem; margin: 1.6rem 0 0; flex-wrap: wrap;
+    border-bottom: 1px solid var(--line);
+  }
+  nav.tabs button {
+    font: inherit; font-size: .85rem; color: var(--muted);
+    background: none; border: none; cursor: pointer;
+    padding: .45rem .75rem .55rem; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; letter-spacing: .01em;
+  }
+  nav.tabs button:hover { color: var(--ink); }
+  nav.tabs button[aria-selected="true"] {
+    color: var(--ink); font-weight: 600; border-bottom-color: var(--accent);
+  }
+  nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  nav.tabs .n {
+    font-size: .72rem; color: var(--muted); margin-left: .3rem;
+    font-variant-numeric: tabular-nums;
+  }
+  li.item[hidden] { display: none; }
+
   ol.items { list-style: none; padding: 0; display: flex; flex-direction: column; }
   li.item { border-top: 1px solid var(--line); padding: 1.1rem 0; }
   li.item:last-child { border-bottom: 1px solid var(--line); }
@@ -123,11 +144,12 @@
       <div class="bar"><div id="fill"></div></div>
       <span class="count" id="count"></span>
     </div>
+    <nav class="tabs" role="tablist" aria-label="Backlog categories" id="tabs"></nav>
   </header>
 
   <ol class="items">
 
-    <li class="item" data-key="materialize-ops-views">
+    <li class="item" data-key="materialize-ops-views" data-cat="dashboard">
       <div class="row">
         <input type="checkbox" id="cb-materialize-ops-views">
         <div class="body">
@@ -148,7 +170,7 @@
       </div>
     </li>
 
-    <li class="item" data-key="model-wnba-plays">
+    <li class="item" data-key="model-wnba-plays" data-cat="modeling">
       <div class="row">
         <input type="checkbox" id="cb-model-wnba-plays">
         <div class="body">
@@ -167,7 +189,7 @@
       </div>
     </li>
 
-    <li class="item" data-key="enable-deploy-dbt-job">
+    <li class="item" data-key="enable-deploy-dbt-job" data-cat="cicd">
       <div class="row">
         <input type="checkbox" id="cb-enable-deploy-dbt-job">
         <div class="body">
@@ -186,7 +208,7 @@
       </div>
     </li>
 
-    <li class="item" data-key="dbt-trigger-observability">
+    <li class="item" data-key="dbt-trigger-observability" data-cat="dashboard">
       <div class="row">
         <input type="checkbox" id="cb-dbt-trigger-observability">
         <div class="body">
@@ -205,7 +227,7 @@
       </div>
     </li>
 
-    <li class="item" data-key="nfl-raw-drift">
+    <li class="item" data-key="nfl-raw-drift" data-cat="data">
       <div class="row">
         <input type="checkbox" id="cb-nfl-raw-drift">
         <div class="body">
@@ -224,7 +246,7 @@
       </div>
     </li>
 
-    <li class="item" data-key="slack-alerting">
+    <li class="item" data-key="slack-alerting" data-cat="alerting">
       <div class="row">
         <input type="checkbox" id="cb-slack-alerting">
         <div class="body">
@@ -253,46 +275,88 @@
 
 <script>
   const KEY = 'ww-backlog-v1';
+  const TAB_KEY = 'ww-backlog-tab-v1';
   const items = Array.from(document.querySelectorAll('li.item'));
   const fill = document.getElementById('fill');
   const count = document.getElementById('count');
+  const tabsNav = document.getElementById('tabs');
 
-  function load() {
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { saved = {}; }
-    return saved;
+  const CATS = [
+    ['all', 'All'],
+    ['dashboard', 'Dashboard'],
+    ['modeling', 'Modeling'],
+    ['cicd', 'CI/CD'],
+    ['data', 'Data quality'],
+    ['alerting', 'Alerting'],
+  ];
+
+  function load(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (e) { return fallback; }
   }
-  function save(state) {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode: checks just don't persist */ }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* private mode: state just does not persist */ }
   }
-  function render(state) {
-    let done = 0;
+
+  let state = load(KEY, {});
+  let activeTab = load(TAB_KEY, 'all');
+  if (!CATS.some(([id]) => id === activeTab)) activeTab = 'all';
+
+  function catItems(cat) {
+    return cat === 'all' ? items : items.filter(li => li.dataset.cat === cat);
+  }
+
+  function render() {
+    // checks + visibility
     items.forEach(li => {
       const checked = !!state[li.dataset.key];
       li.querySelector('input').checked = checked;
       li.classList.toggle('done', checked);
-      if (checked) done++;
+      li.hidden = activeTab !== 'all' && li.dataset.cat !== activeTab;
     });
-    fill.style.width = (items.length ? (done / items.length) * 100 : 0) + '%';
-    count.textContent = done + ' of ' + items.length + ' done';
+    // progress reflects the visible tab
+    const scope = catItems(activeTab);
+    const done = scope.filter(li => state[li.dataset.key]).length;
+    fill.style.width = (scope.length ? (done / scope.length) * 100 : 0) + '%';
+    count.textContent = done + ' of ' + scope.length + ' done'
+      + (activeTab === 'all' ? '' : ' in this tab');
+    // tab states + counts
+    Array.from(tabsNav.children).forEach(btn => {
+      const id = btn.dataset.tab;
+      btn.setAttribute('aria-selected', String(id === activeTab));
+      const open = catItems(id).filter(li => !state[li.dataset.key]).length;
+      btn.querySelector('.n').textContent = open;
+    });
   }
 
-  let state = load();
-  render(state);
+  CATS.forEach(([id, label]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.role = 'tab';
+    btn.dataset.tab = id;
+    btn.innerHTML = label + '<span class="n"></span>';
+    btn.addEventListener('click', () => {
+      activeTab = id;
+      save(TAB_KEY, activeTab);
+      render();
+    });
+    tabsNav.appendChild(btn);
+  });
 
   items.forEach(li => {
     li.querySelector('input').addEventListener('change', e => {
       state[li.dataset.key] = e.target.checked;
-      save(state);
-      render(state);
+      save(KEY, state);
+      render();
     });
   });
 
   document.getElementById('reset').addEventListener('click', () => {
     state = {};
-    save(state);
-    render(state);
+    save(KEY, state);
+    render();
   });
+
+  render();
 </script>
 </body>
 </html>
