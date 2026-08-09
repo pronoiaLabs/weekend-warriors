@@ -108,7 +108,7 @@ def test_dbt_trigger_names_agree(scaffold: Path) -> None:
     assert f"DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}" in sql
     assert f"ENVIRONMENT = '{NAME}_prod'" in sql
     # the observability trap: never the generated-task prefix
-    assert f"DLT_TASK_" not in sql.replace("DLT_TASK_ prefix", "")
+    assert "DLT_TASK_" not in sql.replace("DLT_TASK_ prefix", "")
 
 
 def test_host_reaches_both_the_network_rule_and_the_base_url(scaffold: Path) -> None:
