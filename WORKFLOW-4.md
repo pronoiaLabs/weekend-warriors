@@ -91,3 +91,25 @@ its comment.
 **Changed from plan:** none.
 
 **Open:** none.
+
+## Phase 2 - env.yml switch, Makefile, per-sport project objects
+
+**Ran:** finalized the env.yml edit (prod and wnba_prod: DBT_ROLE
+DBT_RUNNER_ROLE, DBT_WAREHOUSE DBT_WH; dev envs untouched). Created
+dbt-pipelines/Makefile (deploy-dev / deploy-sport / deploy-all /
+build-dev / build-sport, dlt-pipelines conventions) and deployed all
+three project objects through it: CORTEX_LIFECYCLE (dev),
+CORTEX_LIFECYCLE_NFL, CORTEX_LIFECYCLE_WNBA. Granted USAGE on the sport
+objects to the role.
+
+**Result:** GATE GREEN. As DBT_RUNNER_ROLE on the sport objects:
+WNBA `build` PASS=629 in 127s, NFL `run` PASS=33 in 13s, both on DBT_WH.
+
+**Notes:** the Makefile encodes the release model: the triggers always run
+whatever the sport object holds, so `make deploy-sport` after merging model
+changes IS the prod release step. NFL's grandfathered env name (`prod`,
+not `nfl_prod`) is a documented case switch in one place.
+
+**Changed from plan:** none.
+
+**Open:** none.
