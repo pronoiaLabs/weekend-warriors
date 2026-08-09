@@ -54,6 +54,25 @@ and make the job deploy all three objects (a matrix or `make deploy-all`).
 Note the job then only needs to DEPLOY: the triggers run the builds when data
 lands, so the CI build step becomes optional-or-removed.
 
+## Isolate the dbt harvest onto its own warehouse
+
+**Problem:** the harvest's 8-wide async profiling saturates `DBT_WH`'s default
+concurrency (MAX_CONCURRENCY_LEVEL 8), so a build arriving mid-harvest queues
+for a few minutes behind it (observed live). Harmless in unattended operation,
+but it delays build completion and makes verification feel slow.
+
+**The fix:** a dedicated `DBT_HARVEST_WH` (XSMALL, AUTO_SUSPEND 60) for the
+`DBT_HARVEST_<SPORT>` tasks: create it in `sql/base/04_dbt_runner.sql` and
+point the two harvest task definitions at it. The harvest can run on any
+warehouse while reading DBT_WH's query history; that privilege is about which
+warehouse ran the queries, not where the harvest executes. Deliberately NOT
+multi-cluster: that is an Enterprise feature priced for concurrent users, and
+it would auto-spin a second cluster (double burn) exactly when every harvest
+runs.
+
+**Why deferred:** the queue delay costs nothing in production; spend the
+extra warehouse only if it bothers in practice.
+
 ## Tag SPCS compute pools for ingestion cost attribution
 
 **Problem:** `sql/ops/08_cost_tags.sql` tags the warehouses and dbt tasks

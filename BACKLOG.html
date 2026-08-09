@@ -208,6 +208,25 @@
       </div>
     </li>
 
+    <li class="item" data-key="harvest-warehouse" data-cat="dashboard">
+      <div class="row">
+        <input type="checkbox" id="cb-harvest-warehouse">
+        <div class="body">
+          <div class="title-line">
+            <label class="title" for="cb-harvest-warehouse">Isolate the dbt harvest onto its own warehouse</label>
+            <span class="chip">dashboard</span>
+          </div>
+          <details>
+            <summary>Problem and fix</summary>
+            <div class="detail">
+              <p><b>Problem:</b> the harvest's 8-wide async profiling saturates <code>DBT_WH</code>'s default concurrency, so a build arriving mid-harvest queues a few minutes behind it (observed live). Harmless unattended, but it delays builds and makes verification feel slow.</p>
+              <p><b>The fix:</b> a dedicated <code>DBT_HARVEST_WH</code> (XSMALL, AUTO_SUSPEND 60) for the harvest tasks, created in <code>sql/base/04_dbt_runner.sql</code>. Deliberately not multi-cluster (Enterprise feature, would double burn on every harvest). Deferred until the queueing bothers in practice.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </li>
+
     <li class="item" data-key="tag-spcs-pools" data-cat="dashboard">
       <div class="row">
         <input type="checkbox" id="cb-tag-spcs-pools">
