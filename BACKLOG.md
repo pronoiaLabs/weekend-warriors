@@ -28,40 +28,56 @@ tables would also decouple parsed-log retention from raw retention).
 window. Live with the dashboard first; only build the stream + task + two table
 swaps if the cold path still hurts in practice.
 
-## Trigger relevant dbt jobs after ingestion jobs complete
+## Model WNBA play-by-play
 
-**Problem:** nothing chains dbt behind the ingestion Tasks (a known gap since the
-CI/CD build): `dbt build` runs on a code push, not when new rows land in `RAW`,
-so models lag ingestion by up to a day.
+**Problem:** `WNBA_PROD_DB.RAW.PLAYS` started landing on 2026-08-09 (98,658
+rows on first successful run; the provider evidently fixed the meta-less
+pagination that had made `wnba_plays` a dead pipeline since setup). Nothing
+models it: no stg/fact, no semantic view exposure, and the wnba_analyst agent
+still declines play-by-play questions with "upstream pipeline broken", which
+is now wrong.
 
-**The fix:** a Task graph with `EXECUTE DBT PROJECT` as a child of the last dlt
-Task per sport, so models rebuild the moment their sport's ingestion finishes.
-Per-sport graphs keep an NFL failure from blocking WNBA models. Needs a decision
-on granularity (one dbt run per sport per day vs per pipeline) and on where the
-graph is generated (`generate_tasks.py` already renders the dlt Tasks and is the
-natural place to add AFTER dependencies).
+**The fix:** mirror NFL's play modeling shape (`stg_nfl__plays` -> `fact_play`
+/ `dim_play_type`) as `stg_wnba__plays` -> `fact_wnba_play`, decide whether a
+semantic view exposes it, and update the agent's not-available list plus the
+registry's stale pagination comments. Add source tests first: the table is
+brand new and its grain and NULL behavior are unprofiled.
 
-## Fix or replace the wnba_plays pipeline
+## Enable deploy.yml's dbt job
 
-**Problem:** the `/plays` WNBA endpoint returns a bare `{data: [...]}` with no
-`meta`, so the cursor paginator cannot walk it; the pipeline has never produced
-a PLAYS table anywhere (dev or prod). WNBA play-by-play is simply absent, and
-the wnba_analyst agent declines those questions.
+**Problem:** the dbt CI job stays disabled. Its original blocker (env.yml
+demanded SYSADMIN) is gone: `DBT_RUNNER_ROLE` now exists and prod envs use it.
+What remains is wiring: `GRANT ROLE DBT_RUNNER_ROLE TO USER DLT_DEPLOYER;`,
+replace the stale `DBT_PROJECT_FQN` / `DBT_PROJECT_NAME` vars (the object is
+now `DLT_DB.DEPLOY.CORTEX_LIFECYCLE` plus per-sport `_NFL` / `_WNBA` siblings),
+and make the job deploy all three objects (a matrix or `make deploy-all`).
+Note the job then only needs to DEPLOY: the triggers run the builds when data
+lands, so the CI build step becomes optional-or-removed.
 
-**The fix:** a per-game fetch loop like NFL `plays` uses (fan out over
-`games_ref`), or a response adapter that tolerates the meta-less shape. The
-registry comments on `wnba_plays` document the pagination problem. Until then
-the scheduled Task is idle spend on every fire; consider suspending it.
+## dbt trigger observability
+
+**Problem:** the `DBT_BUILD_<SPORT>` tasks are invisible to `V_TASK_RUNS` by
+design, and nothing rolls up `DBT_PROJECT_EXECUTION_HISTORY`, the per-sport
+`TASK_HISTORY`, and the `DBT_TRIGGER_LOADS` audit tables into one place. The
+ops dashboard has no dbt panel. Also unset: retention on the audit tables
+(they grow one row per load, forever, which at current volume is years away
+from mattering).
+
+**The fix:** a `V_DBT_RUNS` view per sport (or in DLT_DB.OPS) joining task
+history to execution history and drained loads, a dashboard card on top, and
+a retention task mirroring `sql/ops/05_retention.sql`.
 
 ## Investigate NFL raw drift flagged by the reconciliation tests
 
-**Problem:** as of Aug 8 the NFL dev rebuild fails three data checks that all
-passed when the models were authored: 2 `team_stats` rows reference games
-absent from `GAMES` (source relationship test), `assert_player_game_phase_coverage`
-is 1 row over its documented threshold, and `assert_phase_fact_measures_reconcile`
-returns 12 rows. Code is unchanged; a week of daily loads moved the data. This
-is the `stats?seasons[]` incompleteness gap doing what the tests were built to
-surface.
+**Problem:** NFL data checks that passed at authoring time now fail, and the
+failure set is moving as the 2026 NFL season starts loading. Aug 8: 2 orphan
+`team_stats` rows plus two phase reconciliation failures. Aug 9: the dominant
+failure is `source_accepted_values_nfl_raw_games_status` with 149 rows (the
+2026 season's scheduled games carry status values beyond Final/Final OT), and
+in `dbt build` that single source failure SKIPS 129 downstream nodes, so a
+triggered build would refresh nothing. Code is unchanged; the data moved.
+Partly the `stats?seasons[]` incompleteness gap, partly models authored
+against completed-seasons-only data meeting an in-progress season.
 
 **The fix:** replay the affected games by `game_id` (the known workaround), or
 adjust thresholds if investigation shows benign timing effects. Until then NFL
