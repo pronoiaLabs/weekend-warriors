@@ -28,6 +28,16 @@ models:
       measures, so every per-game metric divides by summed games played rather than by
       row count.
 
+  - name: sv_wnba_schedule
+    description: >
+      The full 2026 slate at game grain, played and unplayed alike: 333 games, 240
+      completed and 93 scheduled through 2026-09-25. The only view anchored on the game
+      dimension rather than a fact, because scheduled games have no fact rows and are
+      structurally unreachable everywhere else. Home and away are role-playing joins to
+      the team dimension, so a team's schedule is the OR of both sides. Deliberately
+      carries no scores or results; those belong to sv_wnba_team_performance, and the one
+      postponed 0-0 game would otherwise read as a scoreless draw.
+
   - name: sv_wnba_player_advanced
     description: >
       Advanced player metrics at player-by-season grain, 2026 regular season, 224 players.
