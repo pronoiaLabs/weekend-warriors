@@ -54,7 +54,9 @@ models:
         tests: [not_null]
 
   - name: stg_nfl__games
-    description: "One row per game, 2023-2025. Grain: game."
+    description: >
+      One row per game, 2023 onward including the current season's unplayed
+      schedule. Grain: game.
     columns:
       - name: game_key
         tests: [unique, not_null]
@@ -65,18 +67,29 @@ models:
       - name: season
         tests:
           - not_null
-          - accepted_values: {values: [2023, 2024, 2025], quote: false}
+          - accepted_values: {values: [2023, 2024, 2025, 2026], quote: false}
       - name: season_type_name
         tests:
           - accepted_values: {values: ['Preseason', 'Regular Season', 'Postseason']}
+      - name: game_status
+        description: >
+          Raw status label: 'Final' / 'Final/OT' when completed, a
+          kickoff-time string or 'TBD' when scheduled. Passed through rather
+          than value-tested; is_completed is the derived, closed form.
+        tests: [not_null]
+      - name: is_completed
+        description: "Derived positively as status in ('Final', 'Final/OT')."
+        tests: [not_null]
       - name: home_team_key
         tests: [not_null]
       - name: away_team_key
         tests: [not_null]
+      # Scores are nullable BY DESIGN: nulled for every game that is not
+      # completed, so scheduled games cannot leak fake results downstream.
       - name: home_team_score
-        tests: [not_null]
+        description: "NULL unless is_completed."
       - name: away_team_score
-        tests: [not_null]
+        description: "NULL unless is_completed."
 
   # ---------------------------------------------------------------------------
   # Fact staging

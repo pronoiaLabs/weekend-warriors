@@ -15,9 +15,28 @@
     Also verifies points_for / points_against, which catches a home/away swap
     that a win-count-only check would miss (a swap preserves the league-wide
     win total but not each team's points).
+
+    Standings seasons are restricted to seasons with at least one completed
+    REGULAR-SEASON game in fact_team_game, via a semi-join rather than a
+    literal year list. The regular-season scope matters: a new season enters
+    the fact through completed preseason games weeks before its first
+    regular-season game, and a standings snapshot for that season (32 teams
+    of 0-0 records) would otherwise have nothing to reconcile against.
+    Known follow-up, deliberately out of scope: once current-season
+    regular-season games start completing while the standings snapshot lags
+    a load behind, this test needs the WNBA version's tolerance rework
+    (see assert_wnba_standings_reconcile_to_team_games).
 */
 
-with from_games as (
+with seasons_with_regular_season_games as (
+
+    select distinct season
+    from {{ ref('fact_team_game') }}
+    where season_type = 2
+
+),
+
+from_games as (
 
     select
         team_id,
@@ -36,14 +55,16 @@ with from_games as (
 from_standings as (
 
     select
-        team_id,
-        season,
-        wins,
-        losses,
-        ties,
-        points_for,
-        points_against
-    from {{ ref('fact_team_season') }}
+        s.team_id,
+        s.season,
+        s.wins,
+        s.losses,
+        s.ties,
+        s.points_for,
+        s.points_against
+    from {{ ref('fact_team_season') }} s
+    inner join seasons_with_regular_season_games w
+        on s.season = w.season
 
 )
 

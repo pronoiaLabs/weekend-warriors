@@ -5,9 +5,15 @@
 }}
 
 /*
-    fact_team_game -- one row per team per game. Grain: team x game.
+    fact_team_game -- one row per team per COMPLETED game. Grain: team x game.
 
-    2,004 rows = 1,002 games x 2 teams.
+    Two rows per completed game, exactly. Scheduled games are filtered out at
+    the games CTE: a fact row asserts "this team played this game and here is
+    what happened", and an unplayed game has no such row. Without the filter,
+    every scheduled game becomes two NULL-score rows that inflate game counts
+    and averages (and would mint fake ties if the provider ever writes 0-0
+    placeholders). The full slate including unplayed games lives on dim_game,
+    which carries is_completed for exactly this reason.
 
     This is the unpivot of stg_nfl__games (which stores home and away side by
     side) into the standard sports-star shape, with the team box score joined on.
@@ -16,10 +22,11 @@
     points_scored / points_allowed rather than home/away scores so that records
     and splits are plain aggregations.
 
-    The unpivot is a UNION ALL of two selects over the same 1,002 rows, not a
-    join, so it cannot fan out: exactly two rows per game by construction.
+    The unpivot is a UNION ALL of two selects over the same completed-games
+    set, not a join, so it cannot fan out: exactly two rows per game by
+    construction.
 
-    Box score coverage: team_stats has 2,000 rows, not 2,004 -- two games have no
+    Box score coverage: team_stats trails the fact by a handful -- some games have no
     team_stats. The join is a LEFT JOIN, so those four team-game rows exist with
     the result populated and every box-score measure NULL. Losing the games
     entirely would be worse than carrying the NULLs.
@@ -31,6 +38,7 @@
 with games as (
 
     select * from {{ ref('stg_nfl__games') }}
+    where is_completed          -- scheduled games have no fact rows, see header
 
 ),
 
