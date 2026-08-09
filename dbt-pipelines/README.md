@@ -115,6 +115,16 @@ the prod release step.** After merging model changes, run
 builds with the new code. `make help` lists the targets. The sport-neutral
 `CORTEX_LIFECYCLE` object serves interactive and dev use only.
 
+Every query a build runs carries a JSON Snowflake `QUERY_TAG`
+(`app`/`sport`/`env`/`build_id`/`node`): the base comes from env.yml's
+`DBT_QUERY_TAG_BASE` through profiles.yml `query_tag`, and
+`macros/query_tags.sql` overrides `snowflake__set_query_tag` to add the
+per-node fields. Both keys are REQUIRED for any new environment (no
+defaults, fail-fast). The tag is the correlation key for the observability
+chain in `../dlt-pipelines/sql/ops/06-08` (query log, operator-stats
+harvest, `V_DBT_RUNS`, cost tags) and the ops dashboard's dbt page; change
+the JSON shape only together with those.
+
 ## Working from the Snowflake CLI
 
 > **Requires Snowflake CLI >= 3.21.** The `env.yml` flags (`--default-env`, `--env`) only landed in 3.21. On older CLIs, use the Snowsight Workspace flow above, which resolves `env.yml` natively. Check yours with `snow --version`.

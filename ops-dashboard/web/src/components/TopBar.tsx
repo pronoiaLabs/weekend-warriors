@@ -26,6 +26,9 @@ export function TopBar({ meta }: Props) {
         <NavLink to={{ pathname: '/pipelines', search }} className={linkClass}>
           Pipelines
         </NavLink>
+        <NavLink to={{ pathname: '/dbt', search }} className={linkClass}>
+          dbt
+        </NavLink>
       </nav>
       <span className="meta">{meta}</span>
     </header>

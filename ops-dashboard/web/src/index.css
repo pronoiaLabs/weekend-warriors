@@ -1818,3 +1818,94 @@ table.data td {
   color: var(--muted, #71717a);
   font-style: italic;
 }
+
+/* ---- dbt builds ---- */
+/* Colour comes from the shared .st-* status vocabulary in tokens.css; this
+   class only carries the shape, so a state never gets a second treatment. */
+.dbt-state {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The build and query tables carry more columns than the page is wide, so the
+   overflow belongs to the table rather than to the document. */
+.table-scroll {
+  overflow-x: auto;
+  margin-bottom: 28px;
+}
+
+.table-scroll > .pipes-table {
+  margin-bottom: 0;
+}
+
+.dbt-table td {
+  vertical-align: top;
+}
+
+.dbt-table td.fail,
+.dbt-table b.fail,
+.dbt-head b.fail {
+  color: var(--red-ink);
+  font-weight: 600;
+}
+
+.dbt-table .nobuild {
+  color: var(--ink-4);
+}
+
+.dbt-table .nobuild em {
+  font-size: 10.5px;
+  color: var(--red-ink);
+  font-style: normal;
+}
+
+.dbt-table .caretcell {
+  width: 26px;
+  padding-right: 0;
+}
+
+.dbt-table .qrow.bad td {
+  background: var(--red-wash);
+}
+
+.dbt-table .qerr {
+  max-width: 460px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--red-ink);
+}
+
+.dbt-table .opsrow > td {
+  background: var(--surface-3);
+  padding: 10px 14px;
+  white-space: normal;
+}
+
+.ops-table td {
+  font-size: 11.5px;
+}
+
+/* The build header line, between the title and the fact grid. */
+.dbt-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--ink-4);
+  margin-bottom: 18px;
+}
+
+.runhead h1 .dim {
+  color: var(--ink-4);
+  font-weight: 400;
+}

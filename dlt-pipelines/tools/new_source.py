@@ -394,8 +394,11 @@ CREATE TABLE IF NOT EXISTS {upper}_PROD_DB.OPS.DBT_TRIGGER_LOADS (
   LOAD_ID             VARCHAR,
   PIPELINE            VARCHAR,
   STATUS              NUMBER,
-  INSERTED_AT         TIMESTAMP_NTZ,
-  DRAINED_AT          TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+  -- TIMESTAMP_TZ matches _DLT_LOADS.INSERTED_AT exactly: the drain INSERT
+  -- selects it straight through, and a TZ->NTZ mismatch fails the INSERT
+  -- (found live; WORKFLOW-4 Phase 3).
+  INSERTED_AT         TIMESTAMP_TZ,
+  DRAINED_AT          TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
 COMMENT = 'Audit: which loads triggered which dbt build. The INSERT that fills this is also the stream consumption that stops re-triggering.';
 
@@ -408,6 +411,13 @@ AS
 $$
 DECLARE
   drained INTEGER;
+  -- The build id ties everything together: it rides into every dbt query's
+  -- QUERY_TAG via ENV_VARS (see dbt-pipelines/macros/query_tags.sql), and
+  -- into DLT_DB.OPS.DBT_BUILDS below, which is what the harvest and the ops
+  -- dashboard join on.
+  build_id VARCHAR DEFAULT UUID_STRING();
+  started_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP();
+  exec_qid VARCHAR;
 BEGIN
   -- Drain FIRST. This is the stream consumption; without it the task
   -- re-fires every interval forever.
@@ -423,15 +433,45 @@ BEGIN
 
   -- Explicit ENVIRONMENT: the project object defaults to dev. A partial dbt
   -- failure raises here, failing the task with the message in TASK_HISTORY.
-  EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}
-    ARGS = 'build'
-    ENVIRONMENT = '{name}_prod';
+  -- EXECUTE IMMEDIATE because ENV_VARS validates its values at CREATE
+  -- PROCEDURE time and rejects a Scripting :bind; the build_id is a
+  -- self-minted UUID, so inlining it is safe.
+  EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}'
+    || ' ARGS = ''build'''
+    || ' ENVIRONMENT = ''{name}_prod'''
+    || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';
 
-  RETURN 'built after ' || drained || ' load(s)';
+  -- A DBT_BUILDS row means the build succeeded: on failure the RAISE above
+  -- skips this, and TASK_HISTORY is the record. LAST_QUERY_ID() here is the
+  -- EXECUTE DBT PROJECT statement, the join key into execution history.
+  exec_qid := LAST_QUERY_ID();
+  INSERT INTO DLT_DB.OPS.DBT_BUILDS
+    (BUILD_ID, SPORT, ENVIRONMENT, PROJECT_FQN, ARGS, DRAINED_LOADS, EXEC_QUERY_ID, STARTED_AT, FINISHED_AT)
+  VALUES
+    (:build_id, '{name}', '{name}_prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}', 'build',
+     :drained, :exec_qid, :started_at, CURRENT_TIMESTAMP());
+
+  -- TASK_HISTORY.RETURN_VALUE comes ONLY from SYSTEM$SET_RETURN_VALUE; a
+  -- proc's RETURN string never reaches it (verified: None). V_DBT_RUNS
+  -- parses build_id out of this. Two traps, both verified: the function
+  -- demands a CONSTANT argument (a :bind or concatenation is a compilation
+  -- error), hence EXECUTE IMMEDIATE assembling a literal; and it errors
+  -- when the proc runs outside a task (manual smoke tests), hence the
+  -- guard.
+  BEGIN
+    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''built after ' || drained || ' load(s), build_id ' || build_id || ''')';
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
+  RETURN 'built after ' || drained || ' load(s), build_id ' || build_id;
 END;
 $$;
 
 -- CREATE OR ALTER TASK refuses to touch a started task; suspend first.
+-- The whole graph (root AND child) must be suspended to alter either.
+ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_HARVEST_{upper} SUSPEND;
 ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_BUILD_{upper} SUSPEND;
 
 CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper}
@@ -443,7 +483,23 @@ CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper}
 AS
   CALL {upper}_PROD_DB.OPS.SP_DBT_BUILD();
 
--- Not redundant: CREATE OR ALTER TASK leaves the task suspended.
+-- Harvest child: runs only after a SUCCESSFUL build (task-graph semantics;
+-- a child AFTER a triggered root fires normally, verified WORKFLOW-5
+-- Phase 0). A harvest failure fails this task's own run, never the build.
+-- The proc it calls lives in sql/ops/06_dbt_harvest.sql -- apply that file
+-- before this one on a fresh account, and add this sport's DBT_TRIGGER_LOADS
+-- DELETE to SP_DBT_OBS_RETENTION there.
+CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_HARVEST_{upper}
+  WAREHOUSE = DBT_WH
+  USER_TASK_TIMEOUT_MS = 1800000
+  COMMENT = 'Query log + operator-stats harvest after each {upper} dbt build. NOT managed by generate_tasks.py.'
+  AFTER {upper}_PROD_DB.OPS.DBT_BUILD_{upper}
+AS
+  CALL DLT_DB.OPS.SP_DBT_HARVEST();
+
+-- Not redundant: CREATE OR ALTER TASK leaves tasks suspended. Children
+-- resume BEFORE the root; a resumed root with a suspended child skips it.
+ALTER TASK {upper}_PROD_DB.OPS.DBT_HARVEST_{upper} RESUME;
 ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper} RESUME;
 """
 
@@ -536,7 +592,12 @@ dbt, once models exist for the sport (see WORKFLOW-3/4 for the pattern):
        the next step's GRANT ON DBT PROJECT can succeed).
   d. Re-run make setup-source SOURCE={name} CONFIRM=1 to apply
        sql/sources/{name}/05_dbt_trigger.sql: after that, every successful
-       load triggers the sport's dbt build automatically.
+       load triggers the sport's dbt build automatically, and the harvest
+       child captures its query log + operator stats.
+  e. env.yml: also add DBT_QUERY_TAG_BASE to both new environments (see the
+       existing sports); sql/ops: add a {name} branch to V_DBT_RUNS in
+       07_dbt_runs.sql and a DBT_TRIGGER_LOADS DELETE to SP_DBT_OBS_RETENTION
+       in 06_dbt_harvest.sql.
 """
     )
     return 0

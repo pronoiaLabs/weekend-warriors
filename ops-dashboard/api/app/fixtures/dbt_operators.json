@@ -1,0 +1,370 @@
+{
+  "01c64669-0107-5e2f-000f-cf02000f2d46": [
+    {
+      "step_id": 1,
+      "operator_id": 0,
+      "parent_operators": null,
+      "operator_type": "Result",
+      "operator_statistics": {
+        "input_rows": 1
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "expressions": [
+          "number of rows inserted",
+          "number of rows updated"
+        ]
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 1,
+      "parent_operators": [
+        0
+      ],
+      "operator_type": "Merge",
+      "operator_statistics": {
+        "dml": {
+          "number_of_rows_updated": 48158
+        },
+        "input_rows": 48158,
+        "io": {
+          "bytes_scanned": 6240968,
+          "bytes_written": 6224384,
+          "percentage_scanned_from_cache": 0.2557
+        },
+        "output_rows": 1
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.1481481481481481,
+        "processing": 0.1111111111111111,
+        "remote_disk_io": 0.03703703703703703
+      },
+      "operator_attributes": {
+        "table_name": "NFL_PROD_DB.CORE.FACT_PLAY"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 2,
+      "parent_operators": [
+        1
+      ],
+      "operator_type": "Join",
+      "operator_statistics": {
+        "input_rows": 49481,
+        "output_rows": 48158
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "equality_join_condition": "(DIM_GAME.GAME_KEY = MD5(TO_CHAR(PLAYS.GAME__ID)))",
+        "join_type": "INNER"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 3,
+      "parent_operators": [
+        2
+      ],
+      "operator_type": "TableScan",
+      "operator_statistics": {
+        "io": {
+          "bytes_scanned": 102400,
+          "percentage_scanned_from_cache": 1,
+          "scan_progress": 1
+        },
+        "output_rows": 1323,
+        "pruning": {
+          "partitions_scanned": 1,
+          "partitions_total": 1
+        }
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "columns": [
+          "GAME_KEY",
+          "DATE_KEY",
+          "SEASON",
+          "WEEK",
+          "SEASON_TYPE",
+          "IS_POSTSEASON",
+          "SEASON_WEEK_KEY",
+          "HOME_TEAM_KEY",
+          "AWAY_TEAM_KEY"
+        ],
+        "table_name": "NFL_PROD_DB.CORE.DIM_GAME"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 4,
+      "parent_operators": [
+        2
+      ],
+      "operator_type": "Join",
+      "operator_statistics": {
+        "input_rows": 97063,
+        "output_rows": 48158
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.07407407407407407,
+        "processing": 0.07407407407407407
+      },
+      "operator_attributes": {
+        "equality_join_condition": "(MD5(PLAYS.ID) = DBT_INTERNAL_DEST.PLAY_KEY)",
+        "join_type": "LEFT OUTER"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 5,
+      "parent_operators": [
+        4
+      ],
+      "operator_type": "Filter",
+      "operator_statistics": {
+        "input_rows": 179402,
+        "output_rows": 48158
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "filter_condition": "((TO_NUMBER(PLAYS._DLT_LOAD_ID, 38, 6)) >= (1785603883.640902)) OR (FACT_PLAY.DLT_LOAD_ID_NUMERIC IS NULL)"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 6,
+      "parent_operators": [
+        5
+      ],
+      "operator_type": "Join",
+      "operator_statistics": {
+        "input_rows": 179411,
+        "output_rows": 179402
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "equality_join_condition": "(FACT_PLAY.DLT_LOAD_ID_NUMERIC = TO_NUMBER(PLAYS._DLT_LOAD_ID, 38, 6))",
+        "join_type": "LEFT OUTER"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 7,
+      "parent_operators": [
+        6
+      ],
+      "operator_type": "Aggregate",
+      "operator_statistics": {
+        "input_rows": 179402,
+        "output_rows": 9
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "functions": [],
+        "grouping_keys": [
+          "FACT_PLAY.DLT_LOAD_ID_NUMERIC"
+        ]
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 8,
+      "parent_operators": [
+        7
+      ],
+      "operator_type": "TableScan",
+      "operator_statistics": {
+        "io": {
+          "bytes_scanned": 131088,
+          "percentage_scanned_from_cache": 0,
+          "scan_progress": 1
+        },
+        "output_rows": 179402,
+        "pruning": {
+          "partitions_scanned": 1,
+          "partitions_total": 2
+        }
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.07407407407407407,
+        "remote_disk_io": 0.01851851851851852,
+        "synchronization": 0.05555555555555555
+      },
+      "operator_attributes": {
+        "columns": [
+          "DLT_LOAD_ID_NUMERIC"
+        ],
+        "table_name": "NFL_PROD_DB.CORE.FACT_PLAY"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 9,
+      "parent_operators": [
+        6
+      ],
+      "operator_type": "JoinFilter",
+      "operator_statistics": {
+        "input_rows": 179402,
+        "output_rows": 179402
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "join_id": "2"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 10,
+      "parent_operators": [
+        9
+      ],
+      "operator_type": "TableScan",
+      "operator_statistics": {
+        "io": {
+          "bytes_scanned": 26803960,
+          "percentage_scanned_from_cache": 0.0586,
+          "scan_progress": 1
+        },
+        "output_rows": 179402,
+        "pruning": {
+          "partitions_scanned": 9,
+          "partitions_total": 9
+        }
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.6481481481481481,
+        "processing": 0.03703703703703703,
+        "remote_disk_io": 0.1666666666666667,
+        "synchronization": 0.4444444444444444
+      },
+      "operator_attributes": {
+        "columns": [
+          "ID",
+          "TYPE_SLUG",
+          "TEXT",
+          "SHORT_TEXT",
+          "AWAY_SCORE",
+          "HOME_SCORE",
+          "SCORING_PLAY",
+          "PERIOD",
+          "CLOCK_DISPLAY",
+          "START_YARD_LINE",
+          "START_YARDS_TO_ENDZONE",
+          "END_YARD_LINE",
+          "END_DOWN",
+          "END_DISTANCE",
+          "END_YARDS_TO_ENDZONE",
+          "END_DOWN_DISTANCE_TEXT",
+          "END_POSSESSION_TEXT",
+          "STAT_YARDAGE",
+          "HOME_WIN_PROBABILITY",
+          "WALLCLOCK",
+          "TEAM__ID",
+          "GAME__ID",
+          "_DLT_LOAD_ID",
+          "START_DOWN",
+          "START_DISTANCE"
+        ],
+        "table_name": "NFL_PROD_DB.RAW.PLAYS"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 11,
+      "parent_operators": [
+        4
+      ],
+      "operator_type": "Filter",
+      "operator_statistics": {
+        "input_rows": 48905,
+        "output_rows": 48905
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "filter_condition": "DBT_INTERNAL_DEST.PLAY_KEY IS NOT NULL"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 12,
+      "parent_operators": [
+        11
+      ],
+      "operator_type": "JoinFilter",
+      "operator_statistics": {
+        "input_rows": 48905,
+        "output_rows": 48905
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.0
+      },
+      "operator_attributes": {
+        "join_id": "4"
+      }
+    },
+    {
+      "step_id": 1,
+      "operator_id": 13,
+      "parent_operators": [
+        12
+      ],
+      "operator_type": "TableScan",
+      "operator_statistics": {
+        "io": {
+          "bytes_scanned": 3709672,
+          "percentage_scanned_from_cache": 0.0045,
+          "scan_progress": 1
+        },
+        "output_rows": 48905,
+        "pruning": {
+          "partitions_scanned": 2,
+          "partitions_total": 2
+        }
+      },
+      "execution_time_breakdown": {
+        "overall_percentage": 0.01851851851851852,
+        "remote_disk_io": 0.01851851851851852
+      },
+      "operator_attributes": {
+        "columns": [
+          "PLAY_KEY"
+        ],
+        "table_alias": "DBT_INTERNAL_DEST",
+        "table_name": "NFL_PROD_DB.CORE.FACT_PLAY"
+      }
+    }
+  ],
+  "01c6466b-0107-5e2f-000f-cf02000f9a76": [
+    {
+      "step_id": 1,
+      "operator_id": 0,
+      "parent_operators": null,
+      "operator_type": "Metadata operation",
+      "operator_statistics": {},
+      "execution_time_breakdown": {
+        "other": 1.0,
+        "overall_percentage": 1.0
+      },
+      "operator_attributes": {}
+    }
+  ]
+}

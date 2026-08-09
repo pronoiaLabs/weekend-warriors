@@ -1,4 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import DbtBuildDetail from './pages/DbtBuildDetail.tsx'
+import DbtBuilds from './pages/DbtBuilds.tsx'
 import Fleet from './pages/Fleet.tsx'
 import Incidents from './pages/Incidents.tsx'
 import Pipelines from './pages/Pipelines.tsx'
@@ -14,6 +16,8 @@ export default function App() {
         <Route path="/pipelines" element={<Pipelines />} />
         <Route path="/pipelines/:sport/:name" element={<PipelineDetail />} />
         <Route path="/runs/:queryId" element={<RunDetail />} />
+        <Route path="/dbt" element={<DbtBuilds />} />
+        <Route path="/dbt/builds/:buildId" element={<DbtBuildDetail />} />
       </Routes>
     </BrowserRouter>
   )

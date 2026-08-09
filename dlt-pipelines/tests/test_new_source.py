@@ -106,7 +106,16 @@ def test_dbt_trigger_names_agree(scaffold: Path) -> None:
     assert f"CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper}" in sql
     assert f"ON TABLE {upper}_PROD_DB.RAW._DLT_LOADS" in sql
     assert f"DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}" in sql
-    assert f"ENVIRONMENT = '{NAME}_prod'" in sql
+    # ENVIRONMENT rides inside the EXECUTE IMMEDIATE string, hence the
+    # doubled quotes; the DBT_BUILDS row carries it plain.
+    assert f"ENVIRONMENT = ''{NAME}_prod''" in sql
+    assert f"'{NAME}', '{NAME}_prod'" in sql
+    # the harvest child follows the build and calls the shared proc
+    assert f"CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_HARVEST_{upper}" in sql
+    assert f"AFTER {upper}_PROD_DB.OPS.DBT_BUILD_{upper}" in sql
+    assert "CALL DLT_DB.OPS.SP_DBT_HARVEST();" in sql
+    # the audit-table type trap: TZ, never NTZ (failed live, WORKFLOW-4)
+    assert "TIMESTAMP_NTZ" not in sql
     # the observability trap: never the generated-task prefix
     assert "DLT_TASK_" not in sql.replace("DLT_TASK_ prefix", "")
 

@@ -60,6 +60,15 @@ export function duration(seconds: number | null | undefined): string | null {
   return seconds == null ? null : `${seconds} s`
 }
 
+/** Query timings arrive in milliseconds while duration() speaks seconds, so
+    anything under a second stays in milliseconds rather than rounding to "0 s"
+    and reading as free. */
+export function elapsedMs(value: number | null | undefined): string {
+  if (value == null) return 'NULL'
+  if (value < 1000) return `${Math.round(value)} ms`
+  return duration(Math.round(value / 1000)) ?? 'NULL'
+}
+
 /** "hh:mm:ss", the log table's timestamp. Milliseconds are dropped: two lines
     of the same second are already adjacent in EVENT_TS order. */
 export function hhmmss(iso: string): string {
