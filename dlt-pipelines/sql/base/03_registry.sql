@@ -192,8 +192,6 @@ CREATE STAGE IF NOT EXISTS DLT_DB.DEPLOY.SPECS
 -- Runtime read: both prod and dev containers SELECT their spec from the table.
 GRANT SELECT ON TABLE DLT_DB.OPS.PIPELINE_REGISTRY TO ROLE DLT_LOADER_ROLE;
 GRANT SELECT ON TABLE DLT_DB.OPS.PIPELINE_REGISTRY TO ROLE DLT_DEV_ROLE;
--- (DBT_RUNNER_ROLE's SELECT on this table is granted in base/04, which
--- creates that role; granting it here would fail on a fresh account.)
 -- registry_sync (run as DLT_LOADER_ROLE from laptop/CI) needs full DML.
 GRANT INSERT, UPDATE, DELETE ON TABLE DLT_DB.OPS.PIPELINE_REGISTRY TO ROLE DLT_LOADER_ROLE;
 

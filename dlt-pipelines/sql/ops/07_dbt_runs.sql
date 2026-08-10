@@ -18,9 +18,10 @@
 -- rollups on every read. Same disease the pipeline-run stack had, same cure:
 -- the joins now run once per data arrival in SP_DBT_RUNS_REFRESH, and reads
 -- are a table scan. It also killed a chore: the view hardcoded one CTE branch
--- per sport ("adding a sport means adding one CTE branch here"); the refresh
--- discovers sports from PIPELINE_REGISTRY at run time, so sport N+1 needs
--- ZERO edits in this file.
+-- per sport ("adding a sport means adding one CTE branch here") -- needlessly,
+-- it turned out, because INFORMATION_SCHEMA.TASK_HISTORY is ACCOUNT-WIDE (see
+-- Step 3's note). The refresh is name-pattern-driven (DBT_BUILD_% in any
+-- *_PROD_DB), so sport N+1 needs ZERO edits in this file.
 --
 -- THE JOIN KEY IS IN THE RETURN VALUE, unchanged: SP_DBT_BUILD returns
 -- 'built after N load(s), build_id <uuid>', TASK_HISTORY keeps that string in
@@ -54,11 +55,6 @@
 -- -----------------------------------------------------------------------------
 
 USE ROLE SYSADMIN;
-
--- Sport discovery at run time. Also recorded in base/04 (which creates the
--- role) for fresh accounts; repeated here so existing accounts pick it up
--- from a setup-ops run alone.
-GRANT SELECT ON TABLE DLT_DB.OPS.PIPELINE_REGISTRY TO ROLE DBT_RUNNER_ROLE;
 
 -- The refresh and sweep tasks run on the observability warehouse, keeping
 -- their cost attributed to ops rather than to dbt builds. Granted here and
@@ -155,20 +151,11 @@ EXECUTE AS CALLER
 AS
 $$
 DECLARE
-  builds_n   INTEGER DEFAULT 0;
-  qlog_n     INTEGER DEFAULT 0;
-  merged_n   INTEGER DEFAULT 0;
-  sports_ok  INTEGER DEFAULT 0;
-  sports_err INTEGER DEFAULT 0;
-  err_note   VARCHAR DEFAULT '';
-  use_hist   BOOLEAN;
-  wm         TIMESTAMP_LTZ;
-  merge_sql  VARCHAR;
-  sports CURSOR FOR
-    SELECT TARGET_DATABASE AS STEM
-    FROM DLT_DB.OPS.PIPELINE_REGISTRY
-    WHERE ENABLED AND TARGET_DATABASE <> 'DLT'
-    GROUP BY TARGET_DATABASE;
+  builds_n INTEGER DEFAULT 0;
+  qlog_n   INTEGER DEFAULT 0;
+  merged_n INTEGER DEFAULT 0;
+  use_hist BOOLEAN;
+  wm       TIMESTAMP_LTZ;
 BEGIN
 
   -- -------------------------------------------------------------------------
@@ -279,93 +266,93 @@ BEGIN
   END IF;
 
   -- -------------------------------------------------------------------------
-  -- Step 3: live arms, one MERGE per sport, sports discovered at run time.
-  -- The per-database TASK_HISTORY function cannot be parameterized over
-  -- databases, hence EXECUTE IMMEDIATE with the name composed per iteration
-  -- (the SP_OBS_REFRESH precedent). Each iteration has its own exception
-  -- handler: a registry-enabled sport whose database or grants do not exist
-  -- yet must not fail the refresh for everyone. Live runs second, so its
-  -- values win any overlap with the ACCOUNT_USAGE arm.
+  -- Step 3: the live arm, ONE merge for every sport.
+  --
+  -- INFORMATION_SCHEMA.TASK_HISTORY IS ACCOUNT-WIDE. The database qualifier
+  -- only chooses which schema resolves the FUNCTION; the result set is task
+  -- history for every task the role can see, account-wide. Found live
+  -- 2026-08-10: a first draft looped one merge per sport database, stamping
+  -- SPORT from the loop variable -- every arm matched ALL rows and the last
+  -- arm relabeled the whole table 'wnba'. (The old view's three per-database
+  -- branches were the same misunderstanding in benign form: three identical
+  -- account-wide scans, deduped -- correct output, 3x the cost.) SPORT must
+  -- derive from the row's own DATABASE_NAME, exactly as the archive arm does.
   --
   -- Source filter is ONLY "QUERY_ID IS NOT NULL" (future SCHEDULED rows have
   -- none). The SKIPPED / no-op filters live in the thin view: filtering them
   -- out of the SOURCE would orphan a row captured mid-EXECUTING that later
   -- completes as a no-op, leaving a phantom running build in the table.
   -- -------------------------------------------------------------------------
-  FOR sp IN sports DO
-    BEGIN
-      merge_sql :=
-        'MERGE INTO DLT_DB.OPS.DBT_RUNS tr USING ('
-     || ' WITH th AS ('
-     || '   SELECT NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,'
-     || '          SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME'
-     || '   FROM TABLE(' || sp.STEM || '_PROD_DB.INFORMATION_SCHEMA.TASK_HISTORY(RESULT_LIMIT => 10000))'
-     || '   WHERE STARTSWITH(NAME, ''DBT_BUILD_'')'
-     || '     AND QUERY_ID IS NOT NULL'
-     || '   QUALIFY ROW_NUMBER() OVER (PARTITION BY QUERY_ID ORDER BY SCHEDULED_TIME DESC) = 1'
-     || ' ),'
-     || ' q AS ('
-     || '   SELECT BUILD_ID,'
-     || '          COUNT(*) AS N_QUERIES,'
-     || '          COUNT_IF(EXECUTION_STATUS <> ''SUCCESS'') AS N_FAILED_QUERIES,'
-     || '          COUNT_IF(NODE IS NOT NULL) AS N_NODE_QUERIES,'
-     || '          SUM(TOTAL_ELAPSED_TIME) AS SUM_ELAPSED_MS,'
-     || '          MAX(TOTAL_ELAPSED_TIME) AS MAX_ELAPSED_MS,'
-     || '          SUM(BYTES_SCANNED) AS SUM_BYTES_SCANNED,'
-     || '          SUM(ROWS_PRODUCED) AS SUM_ROWS_PRODUCED'
-     || '   FROM DLT_DB.OPS.DBT_QUERY_LOG GROUP BY BUILD_ID'
-     || ' )'
-     || ' SELECT'
-     || '   ''' || LOWER(sp.STEM) || ''' AS SPORT,'
-     || '   th.NAME AS TASK_NAME, th.QUERY_ID AS RUN_QUERY_ID,'
-     || '   REGEXP_SUBSTR(th.RETURN_VALUE, ''build_id ([0-9a-f-]+)'', 1, 1, ''e'') AS BUILD_ID,'
-     || '   th.RETURN_VALUE, th.STATE, th.ERROR_MESSAGE,'
-     || '   b.ARGS, b.ENVIRONMENT, b.PROJECT_FQN, b.DRAINED_LOADS, b.EXEC_QUERY_ID,'
-     || '   th.SCHEDULED_TIME, th.QUERY_START_TIME AS STARTED_AT, th.COMPLETED_TIME,'
-     || '   DATEDIFF(''second'', th.QUERY_START_TIME, th.COMPLETED_TIME) AS DURATION_S,'
-     || '   q.N_QUERIES, q.N_FAILED_QUERIES, q.N_NODE_QUERIES,'
-     || '   q.SUM_ELAPSED_MS, q.MAX_ELAPSED_MS, q.SUM_BYTES_SCANNED, q.SUM_ROWS_PRODUCED'
-     || ' FROM th'
-     || ' LEFT JOIN DLT_DB.OPS.DBT_BUILDS b'
-     || '        ON b.BUILD_ID = REGEXP_SUBSTR(th.RETURN_VALUE, ''build_id ([0-9a-f-]+)'', 1, 1, ''e'')'
-     || ' LEFT JOIN q ON q.BUILD_ID = b.BUILD_ID'
-     || ' ) s ON tr.RUN_QUERY_ID = s.RUN_QUERY_ID'
-     || ' WHEN MATCHED THEN UPDATE SET'
-     || '   SPORT = s.SPORT, TASK_NAME = s.TASK_NAME, BUILD_ID = s.BUILD_ID,'
-     || '   RETURN_VALUE = s.RETURN_VALUE, STATE = s.STATE, ERROR_MESSAGE = s.ERROR_MESSAGE,'
-     || '   ARGS = s.ARGS, ENVIRONMENT = s.ENVIRONMENT, PROJECT_FQN = s.PROJECT_FQN,'
-     || '   DRAINED_LOADS = s.DRAINED_LOADS, EXEC_QUERY_ID = s.EXEC_QUERY_ID,'
-     || '   SCHEDULED_TIME = s.SCHEDULED_TIME, STARTED_AT = s.STARTED_AT,'
-     || '   COMPLETED_TIME = s.COMPLETED_TIME, DURATION_S = s.DURATION_S,'
-     || '   N_QUERIES = COALESCE(s.N_QUERIES, tr.N_QUERIES),'
-     || '   N_FAILED_QUERIES = COALESCE(s.N_FAILED_QUERIES, tr.N_FAILED_QUERIES),'
-     || '   N_NODE_QUERIES = COALESCE(s.N_NODE_QUERIES, tr.N_NODE_QUERIES),'
-     || '   SUM_ELAPSED_MS = COALESCE(s.SUM_ELAPSED_MS, tr.SUM_ELAPSED_MS),'
-     || '   MAX_ELAPSED_MS = COALESCE(s.MAX_ELAPSED_MS, tr.MAX_ELAPSED_MS),'
-     || '   SUM_BYTES_SCANNED = COALESCE(s.SUM_BYTES_SCANNED, tr.SUM_BYTES_SCANNED),'
-     || '   SUM_ROWS_PRODUCED = COALESCE(s.SUM_ROWS_PRODUCED, tr.SUM_ROWS_PRODUCED),'
-     || '   REFRESHED_AT = CURRENT_TIMESTAMP()'
-     || ' WHEN NOT MATCHED THEN INSERT'
-     || '   (SPORT, TASK_NAME, RUN_QUERY_ID, BUILD_ID, RETURN_VALUE, STATE, ERROR_MESSAGE,'
-     || '    ARGS, ENVIRONMENT, PROJECT_FQN, DRAINED_LOADS, EXEC_QUERY_ID,'
-     || '    SCHEDULED_TIME, STARTED_AT, COMPLETED_TIME, DURATION_S,'
-     || '    N_QUERIES, N_FAILED_QUERIES, N_NODE_QUERIES, SUM_ELAPSED_MS,'
-     || '    MAX_ELAPSED_MS, SUM_BYTES_SCANNED, SUM_ROWS_PRODUCED, REFRESHED_AT)'
-     || ' VALUES'
-     || '   (s.SPORT, s.TASK_NAME, s.RUN_QUERY_ID, s.BUILD_ID, s.RETURN_VALUE, s.STATE, s.ERROR_MESSAGE,'
-     || '    s.ARGS, s.ENVIRONMENT, s.PROJECT_FQN, s.DRAINED_LOADS, s.EXEC_QUERY_ID,'
-     || '    s.SCHEDULED_TIME, s.STARTED_AT, s.COMPLETED_TIME, s.DURATION_S,'
-     || '    s.N_QUERIES, s.N_FAILED_QUERIES, s.N_NODE_QUERIES, s.SUM_ELAPSED_MS,'
-     || '    s.MAX_ELAPSED_MS, s.SUM_BYTES_SCANNED, s.SUM_ROWS_PRODUCED, CURRENT_TIMESTAMP())';
-      EXECUTE IMMEDIATE :merge_sql;
-      merged_n := merged_n + SQLROWCOUNT;
-      sports_ok := sports_ok + 1;
-    EXCEPTION
-      WHEN OTHER THEN
-        sports_err := sports_err + 1;
-        err_note := ' last_sport_error(' || sp.STEM || '): ' || SQLERRM;
-    END;
-  END FOR;
+  MERGE INTO DLT_DB.OPS.DBT_RUNS tr
+  USING (
+    WITH th AS (
+      SELECT DATABASE_NAME, NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,
+             SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME
+      FROM TABLE(DLT_DB.INFORMATION_SCHEMA.TASK_HISTORY(RESULT_LIMIT => 10000))
+      WHERE STARTSWITH(NAME, 'DBT_BUILD_')
+        AND ENDSWITH(DATABASE_NAME, '_PROD_DB')
+        AND QUERY_ID IS NOT NULL
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY QUERY_ID ORDER BY SCHEDULED_TIME DESC) = 1
+    ),
+    q AS (
+      SELECT BUILD_ID,
+             COUNT(*)                                AS N_QUERIES,
+             COUNT_IF(EXECUTION_STATUS <> 'SUCCESS') AS N_FAILED_QUERIES,
+             COUNT_IF(NODE IS NOT NULL)              AS N_NODE_QUERIES,
+             SUM(TOTAL_ELAPSED_TIME)                 AS SUM_ELAPSED_MS,
+             MAX(TOTAL_ELAPSED_TIME)                 AS MAX_ELAPSED_MS,
+             SUM(BYTES_SCANNED)                      AS SUM_BYTES_SCANNED,
+             SUM(ROWS_PRODUCED)                      AS SUM_ROWS_PRODUCED
+      FROM DLT_DB.OPS.DBT_QUERY_LOG
+      GROUP BY BUILD_ID
+    )
+    SELECT
+      LOWER(REPLACE(th.DATABASE_NAME, '_PROD_DB', ''))                    AS SPORT,
+      th.NAME                                                             AS TASK_NAME,
+      th.QUERY_ID                                                         AS RUN_QUERY_ID,
+      REGEXP_SUBSTR(th.RETURN_VALUE, 'build_id ([0-9a-f-]+)', 1, 1, 'e')  AS BUILD_ID,
+      th.RETURN_VALUE, th.STATE, th.ERROR_MESSAGE,
+      b.ARGS, b.ENVIRONMENT, b.PROJECT_FQN, b.DRAINED_LOADS, b.EXEC_QUERY_ID,
+      th.SCHEDULED_TIME,
+      th.QUERY_START_TIME                                                 AS STARTED_AT,
+      th.COMPLETED_TIME,
+      DATEDIFF('second', th.QUERY_START_TIME, th.COMPLETED_TIME)          AS DURATION_S,
+      q.N_QUERIES, q.N_FAILED_QUERIES, q.N_NODE_QUERIES,
+      q.SUM_ELAPSED_MS, q.MAX_ELAPSED_MS, q.SUM_BYTES_SCANNED, q.SUM_ROWS_PRODUCED
+    FROM th
+    LEFT JOIN DLT_DB.OPS.DBT_BUILDS b
+           ON b.BUILD_ID = REGEXP_SUBSTR(th.RETURN_VALUE, 'build_id ([0-9a-f-]+)', 1, 1, 'e')
+    LEFT JOIN q ON q.BUILD_ID = b.BUILD_ID
+  ) s
+  ON tr.RUN_QUERY_ID = s.RUN_QUERY_ID
+  WHEN MATCHED THEN UPDATE SET
+    SPORT = s.SPORT, TASK_NAME = s.TASK_NAME, BUILD_ID = s.BUILD_ID,
+    RETURN_VALUE = s.RETURN_VALUE, STATE = s.STATE, ERROR_MESSAGE = s.ERROR_MESSAGE,
+    ARGS = s.ARGS, ENVIRONMENT = s.ENVIRONMENT, PROJECT_FQN = s.PROJECT_FQN,
+    DRAINED_LOADS = s.DRAINED_LOADS, EXEC_QUERY_ID = s.EXEC_QUERY_ID,
+    SCHEDULED_TIME = s.SCHEDULED_TIME, STARTED_AT = s.STARTED_AT,
+    COMPLETED_TIME = s.COMPLETED_TIME, DURATION_S = s.DURATION_S,
+    N_QUERIES         = COALESCE(s.N_QUERIES,         tr.N_QUERIES),
+    N_FAILED_QUERIES  = COALESCE(s.N_FAILED_QUERIES,  tr.N_FAILED_QUERIES),
+    N_NODE_QUERIES    = COALESCE(s.N_NODE_QUERIES,    tr.N_NODE_QUERIES),
+    SUM_ELAPSED_MS    = COALESCE(s.SUM_ELAPSED_MS,    tr.SUM_ELAPSED_MS),
+    MAX_ELAPSED_MS    = COALESCE(s.MAX_ELAPSED_MS,    tr.MAX_ELAPSED_MS),
+    SUM_BYTES_SCANNED = COALESCE(s.SUM_BYTES_SCANNED, tr.SUM_BYTES_SCANNED),
+    SUM_ROWS_PRODUCED = COALESCE(s.SUM_ROWS_PRODUCED, tr.SUM_ROWS_PRODUCED),
+    REFRESHED_AT = CURRENT_TIMESTAMP()
+  WHEN NOT MATCHED THEN INSERT
+    (SPORT, TASK_NAME, RUN_QUERY_ID, BUILD_ID, RETURN_VALUE, STATE, ERROR_MESSAGE,
+     ARGS, ENVIRONMENT, PROJECT_FQN, DRAINED_LOADS, EXEC_QUERY_ID,
+     SCHEDULED_TIME, STARTED_AT, COMPLETED_TIME, DURATION_S,
+     N_QUERIES, N_FAILED_QUERIES, N_NODE_QUERIES, SUM_ELAPSED_MS,
+     MAX_ELAPSED_MS, SUM_BYTES_SCANNED, SUM_ROWS_PRODUCED, REFRESHED_AT)
+  VALUES
+    (s.SPORT, s.TASK_NAME, s.RUN_QUERY_ID, s.BUILD_ID, s.RETURN_VALUE, s.STATE, s.ERROR_MESSAGE,
+     s.ARGS, s.ENVIRONMENT, s.PROJECT_FQN, s.DRAINED_LOADS, s.EXEC_QUERY_ID,
+     s.SCHEDULED_TIME, s.STARTED_AT, s.COMPLETED_TIME, s.DURATION_S,
+     s.N_QUERIES, s.N_FAILED_QUERIES, s.N_NODE_QUERIES, s.SUM_ELAPSED_MS,
+     s.MAX_ELAPSED_MS, s.SUM_BYTES_SCANNED, s.SUM_ROWS_PRODUCED, CURRENT_TIMESTAMP());
+  merged_n := SQLROWCOUNT;
 
   -- TASK_HISTORY.RETURN_VALUE comes only from SYSTEM$SET_RETURN_VALUE, which
   -- demands a constant and errors outside a task (both verified on
@@ -373,7 +360,7 @@ BEGIN
   BEGIN
     EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''builds +' || builds_n
       || ', qlog +' || qlog_n || ', merged ' || merged_n
-      || ', sports ' || sports_ok || ' ok/' || sports_err || ' err'')';
+      || IFF(use_hist, ' (account_usage backfill ran)', '') || ''')';
   EXCEPTION
     WHEN OTHER THEN
       NULL;
@@ -381,9 +368,7 @@ BEGIN
 
   RETURN 'builds +' || builds_n || ', qlog +' || qlog_n
       || ', merged ' || merged_n
-      || ', sports ' || sports_ok || ' ok / ' || sports_err || ' err'
-      || IFF(use_hist, ' (account_usage backfill ran)', '')
-      || err_note;
+      || IFF(use_hist, ' (account_usage backfill ran)', '');
 END;
 $$;
 
