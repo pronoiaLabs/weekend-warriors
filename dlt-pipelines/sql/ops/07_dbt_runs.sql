@@ -1,141 +1,473 @@
 -- =============================================================================
 -- ops/07_dbt_runs.sql
 -- =============================================================================
--- Purpose       : V_DBT_RUNS -- one row per event-driven dbt build attempt,
---                 the dbt counterpart of V_TASK_RUNS. Feeds the ops
---                 dashboard's dbt page.
+-- Purpose       : DBT_RUNS -- one row per event-driven dbt build attempt, as a
+--                 REAL TABLE, the dbt counterpart of PIPELINE_RUNS. V_DBT_RUNS
+--                 survives as a thin passthrough; the dashboard's /dbt page
+--                 does not change.
 -- Run as        : DBT_RUNNER_ROLE (owns every underlying object and the
---                 DBT_BUILD_% tasks whose history the view reads)
--- Prerequisites : 06_dbt_harvest.sql (tables + CREATE VIEW grant), the
---                 per-sport 05_dbt_trigger.sql files (tasks + audit tables).
+--                 DBT_BUILD_% tasks whose history the refresh reads), with a
+--                 SYSADMIN + ACCOUNTADMIN grant slice up front.
+-- Prerequisites : 06_dbt_harvest.sql (tables + schema grants incl. CREATE
+--                 STREAM), the per-sport 05_dbt_trigger.sql files.
 -- Apply         : make setup-ops CONFIRM=1  (or snow sql -f directly)
 --
--- WHY THIS VIEW EXISTS: the DBT_BUILD_<SPORT> tasks are deliberately
--- invisible to V_TASK_RUNS (its DLT_TASK_% filter), and their story is
--- scattered across per-database TASK_HISTORY, ACCOUNT_USAGE.TASK_HISTORY,
--- DLT_DB.OPS.DBT_BUILDS and the harvest tables. This is the single joined
--- surface.
+-- WHY A TABLE: the view this file used to hold cost ~6.5s server-side per
+-- cold dashboard query (1.4s compile + 5.2s exec), re-planning three
+-- per-sport TASK_HISTORY() calls, an ACCOUNT_USAGE union and per-build
+-- rollups on every read. Same disease the pipeline-run stack had, same cure:
+-- the joins now run once per data arrival in SP_DBT_RUNS_REFRESH, and reads
+-- are a table scan. It also killed a chore: the view hardcoded one CTE branch
+-- per sport ("adding a sport means adding one CTE branch here"); the refresh
+-- discovers sports from PIPELINE_REGISTRY at run time, so sport N+1 needs
+-- ZERO edits in this file.
 --
--- THE JOIN KEY IS IN THE RETURN VALUE. SP_DBT_BUILD returns
--- 'built after N load(s), build_id <uuid>', and TASK_HISTORY keeps that
--- string in RETURN_VALUE, so a task run maps to its DBT_BUILDS row (and
--- from there to every tagged query) exactly -- no time-window joins. Failed
--- builds have no DBT_BUILDS row and surface here with build columns NULL;
--- 'no-op' runs (false-positive stream evaluations) are excluded, as are
--- SKIPPED evaluations.
+-- THE JOIN KEY IS IN THE RETURN VALUE, unchanged: SP_DBT_BUILD returns
+-- 'built after N load(s), build_id <uuid>', TASK_HISTORY keeps that string in
+-- RETURN_VALUE, and a task run maps to its DBT_BUILDS row (and from there to
+-- every tagged query) exactly -- no time-window joins. Failed builds have no
+-- DBT_BUILDS row and surface with build columns NULL.
 --
--- Sources, like V_TASK_RUNS: the per-database INFORMATION_SCHEMA
--- TASK_HISTORY function (live but 7 days) UNION ACCOUNT_USAGE.TASK_HISTORY
--- (365 days, ~45 min lag), deduped by QUERY_ID preferring the live row.
--- Adding a sport means adding one CTE branch here (the per-database
--- function cannot be parameterized over databases).
+-- THE REFRESH MODEL mirrors OBS_REFRESH (ops/04), including its two verified
+-- traps: EXECUTE TASK does not bypass a triggered task's WHEN (so the sweep
+-- calls the proc directly behind an in-flight check), and a task session runs
+-- the owner's PRIMARY role alone (so the ACCOUNT_USAGE grant below is
+-- explicit; the old view "working" proved nothing, since interactive sessions
+-- carry secondary roles).
+--
+-- WHAT FIRES IT: two APPEND_ONLY streams. DBT_BUILDS gets an INSERT per
+-- successful build (from SP_DBT_BUILD, seconds after the build ends), so the
+-- run row appears within ~a minute of build completion. DBT_QUERY_LOG gets
+-- MERGE-inserted rows when the harvest lands minutes later, firing a second
+-- refresh that fills the rollups. APPEND_ONLY is REQUIRED, not preferred:
+-- the harvest also UPDATEs STATS_CAPTURED on up to 200 DBT_QUERY_LOG rows per
+-- run, and a standard stream would re-fire the refresh on every one of them.
+-- FAILED builds write no row anywhere (SP_DBT_BUILD lets the error propagate)
+-- and never harvest, so they are the zero-event case: DBT_RUNS_SWEEP (every
+-- 4h, staggered :30 from OBS_REFRESH_SWEEP) bounds how long they can sit
+-- unrecorded. A fire can also catch a build mid-EXECUTING with a NULL
+-- RETURN_VALUE; the harvest-triggered second fire self-heals the row.
 -- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Section 1: grant slice
+-- -----------------------------------------------------------------------------
+
+USE ROLE SYSADMIN;
+
+-- Sport discovery at run time. Also recorded in base/04 (which creates the
+-- role) for fresh accounts; repeated here so existing accounts pick it up
+-- from a setup-ops run alone.
+GRANT SELECT ON TABLE DLT_DB.OPS.PIPELINE_REGISTRY TO ROLE DBT_RUNNER_ROLE;
+
+-- The refresh and sweep tasks run on the observability warehouse, keeping
+-- their cost attributed to ops rather than to dbt builds. Granted here and
+-- not in base/04 because DLT_OPS_WH does not exist until ops/01 runs.
+GRANT USAGE ON WAREHOUSE DLT_OPS_WH TO ROLE DBT_RUNNER_ROLE;
+
+-- A task session runs the owner's PRIMARY role alone, so interactive testing
+-- (which carries secondary roles) cannot prove this privilege exists; the
+-- OBS_REFRESH bootstrap failed live on exactly this gap for DLT_LOADER_ROLE
+-- (2026-08-09). IMPORTED PRIVILEGES is the only grantable privilege on a
+-- shared database.
+USE ROLE ACCOUNTADMIN;
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO ROLE DBT_RUNNER_ROLE;
+USE ROLE SYSADMIN;
+
+-- -----------------------------------------------------------------------------
+-- Section 2: tables and streams, owned by DBT_RUNNER_ROLE
+-- -----------------------------------------------------------------------------
 
 USE ROLE DBT_RUNNER_ROLE;
 
-CREATE OR REPLACE VIEW DLT_DB.OPS.V_DBT_RUNS
-    COMMENT = 'One row per event-driven dbt build attempt, joined to its build record and per-query rollups. Spine: task history for DBT_BUILD_% tasks.'
-AS
-WITH
+-- Streams need change tracking on their source, and creating a stream does
+-- not enable it. Explicit, as the table owner (the 05_dbt_trigger precedent).
+ALTER TABLE DLT_DB.OPS.DBT_BUILDS SET CHANGE_TRACKING = TRUE;
+ALTER TABLE DLT_DB.OPS.DBT_QUERY_LOG SET CHANGE_TRACKING = TRUE;
 
--- -----------------------------------------------------------------------------
--- 1. Live task history, one branch per sport database (7-day window, no lag).
--- -----------------------------------------------------------------------------
-live_history AS (
-    SELECT DATABASE_NAME, NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,
-           SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME, 1 AS SOURCE_RANK
-    FROM TABLE(NFL_PROD_DB.INFORMATION_SCHEMA.TASK_HISTORY(RESULT_LIMIT => 10000))
-    WHERE NAME LIKE 'DBT\_BUILD\_%' ESCAPE '\\'
-    UNION ALL
-    SELECT DATABASE_NAME, NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,
-           SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME, 1 AS SOURCE_RANK
-    FROM TABLE(WNBA_PROD_DB.INFORMATION_SCHEMA.TASK_HISTORY(RESULT_LIMIT => 10000))
-    WHERE NAME LIKE 'DBT\_BUILD\_%' ESCAPE '\\'
-    UNION ALL
-    SELECT DATABASE_NAME, NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,
-           SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME, 1 AS SOURCE_RANK
-    FROM TABLE(NCAAF_PROD_DB.INFORMATION_SCHEMA.TASK_HISTORY(RESULT_LIMIT => 10000))
-    WHERE NAME LIKE 'DBT\_BUILD\_%' ESCAPE '\\'
-),
-
--- -----------------------------------------------------------------------------
--- 2. Account-usage task history: 365 days, ~45 min behind. The union with a
---    SOURCE_RANK dedupe means recent runs come from the live branch and old
---    ones survive the 7-day cliff.
--- -----------------------------------------------------------------------------
-archive_history AS (
-    SELECT DATABASE_NAME, NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,
-           SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME, 2 AS SOURCE_RANK
-    FROM SNOWFLAKE.ACCOUNT_USAGE.TASK_HISTORY
-    WHERE NAME LIKE 'DBT\_BUILD\_%' ESCAPE '\\'
-      AND DATABASE_NAME IN ('NFL_PROD_DB', 'WNBA_PROD_DB', 'NCAAF_PROD_DB')
-),
-
-task_runs AS (
-    SELECT *
-    FROM (SELECT * FROM live_history UNION ALL SELECT * FROM archive_history)
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY QUERY_ID ORDER BY SOURCE_RANK) = 1
-),
-
--- -----------------------------------------------------------------------------
--- 3. Per-build query rollups from the harvest. Grouped by BUILD_ID, so a
---    build's numbers appear once the harvest child has run (minutes after
---    the build; NULL rollups on a fresh build just mean "not harvested yet").
--- -----------------------------------------------------------------------------
-query_rollup AS (
-    SELECT
-        BUILD_ID,
-        COUNT(*)                                            AS N_QUERIES,
-        COUNT_IF(EXECUTION_STATUS <> 'SUCCESS')             AS N_FAILED_QUERIES,
-        COUNT_IF(NODE IS NOT NULL)                          AS N_NODE_QUERIES,
-        SUM(TOTAL_ELAPSED_TIME)                             AS SUM_ELAPSED_MS,
-        MAX(TOTAL_ELAPSED_TIME)                             AS MAX_ELAPSED_MS,
-        SUM(BYTES_SCANNED)                                  AS SUM_BYTES_SCANNED,
-        SUM(ROWS_PRODUCED)                                  AS SUM_ROWS_PRODUCED
-    FROM DLT_DB.OPS.DBT_QUERY_LOG
-    GROUP BY BUILD_ID
+-- One row per build attempt. Column set is the old view's output plus
+-- RETURN_VALUE (the thin view's no-op filter needs it) and REFRESHED_AT.
+-- IF NOT EXISTS, never OR REPLACE: this table outlives the 7-day live
+-- task-history window it is built from.
+CREATE TABLE IF NOT EXISTS DLT_DB.OPS.DBT_RUNS (
+    SPORT             VARCHAR,        -- lowercase stem ('nfl'), as the view spelled it
+    TASK_NAME         VARCHAR,
+    RUN_QUERY_ID      VARCHAR,        -- the key
+    BUILD_ID          VARCHAR,
+    RETURN_VALUE      VARCHAR,
+    STATE             VARCHAR,
+    ERROR_MESSAGE     VARCHAR,
+    ARGS              VARCHAR,
+    ENVIRONMENT       VARCHAR,
+    PROJECT_FQN       VARCHAR,
+    DRAINED_LOADS     NUMBER,
+    EXEC_QUERY_ID     VARCHAR,
+    SCHEDULED_TIME    TIMESTAMP_LTZ,
+    STARTED_AT        TIMESTAMP_LTZ,
+    COMPLETED_TIME    TIMESTAMP_LTZ,
+    DURATION_S        NUMBER,
+    N_QUERIES         NUMBER,
+    N_FAILED_QUERIES  NUMBER,
+    N_NODE_QUERIES    NUMBER,
+    SUM_ELAPSED_MS    NUMBER,
+    MAX_ELAPSED_MS    NUMBER,
+    SUM_BYTES_SCANNED NUMBER,
+    SUM_ROWS_PRODUCED NUMBER,
+    REFRESHED_AT      TIMESTAMP_LTZ
 )
+COMMENT = 'One row per event-driven dbt build attempt, incl. EXECUTING and FAILED. Maintained by SP_DBT_RUNS_REFRESH; read through V_DBT_RUNS. Retention 365d (SP_DBT_OBS_RETENTION).';
 
-SELECT
-    -- Identity
-    LOWER(REPLACE(t.DATABASE_NAME, '_PROD_DB', ''))         AS SPORT,
-    t.NAME                                                  AS TASK_NAME,
-    t.QUERY_ID                                              AS RUN_QUERY_ID,
-    REGEXP_SUBSTR(t.RETURN_VALUE, 'build_id ([0-9a-f-]+)', 1, 1, 'e') AS BUILD_ID,
+-- The drain target. Stream consumption requires DML that reads the stream;
+-- the counts are bookkeeping, the consumption is the point.
+CREATE TABLE IF NOT EXISTS DLT_DB.OPS.DBT_RUNS_REFRESH_LOG (
+    FIRED_AT    TIMESTAMP_LTZ,
+    STREAM_NAME VARCHAR,
+    EVENTS      NUMBER
+)
+COMMENT = 'One row per stream per SP_DBT_RUNS_REFRESH fire: how many new events each drain consumed. Retention 365d.';
 
-    -- Outcome
-    t.STATE,
-    t.ERROR_MESSAGE,
-    b.ARGS,
-    b.ENVIRONMENT,
-    b.PROJECT_FQN,
-    b.DRAINED_LOADS,
-    b.EXEC_QUERY_ID,
+-- One stream per consumer (ops/02's rule). SHOW_INITIAL_ROWS is not the data
+-- source here (the merges read task history, not the streams) -- it is the
+-- IGNITION: without it a fresh stream is empty, SYSTEM$STREAM_HAS_DATA is
+-- false, and nothing fires the bootstrap until the next build or sweep tick.
+-- IF NOT EXISTS, never OR REPLACE (replacing re-arms the initial emission).
+CREATE STREAM IF NOT EXISTS DLT_DB.OPS.STREAM_DBT_BUILDS
+    ON TABLE DLT_DB.OPS.DBT_BUILDS
+    APPEND_ONLY = TRUE
+    SHOW_INITIAL_ROWS = TRUE
+    COMMENT = 'Fires DBT_RUNS_REFRESH when a successful build lands. APPEND_ONLY: retention DELETEs must stay invisible.';
 
-    -- Timings
-    t.SCHEDULED_TIME,
-    t.QUERY_START_TIME                                      AS STARTED_AT,
-    t.COMPLETED_TIME,
-    DATEDIFF('second', t.QUERY_START_TIME, t.COMPLETED_TIME) AS DURATION_S,
+CREATE STREAM IF NOT EXISTS DLT_DB.OPS.STREAM_DBT_QUERY_LOG
+    ON TABLE DLT_DB.OPS.DBT_QUERY_LOG
+    APPEND_ONLY = TRUE
+    SHOW_INITIAL_ROWS = TRUE
+    COMMENT = 'Fires DBT_RUNS_REFRESH when a harvest lands (fills rollups). APPEND_ONLY is REQUIRED: the harvest UPDATEs STATS_CAPTURED on up to 200 rows per run.';
 
-    -- Query rollups (NULL until the harvest child lands)
-    q.N_QUERIES,
-    q.N_FAILED_QUERIES,
-    q.N_NODE_QUERIES,
-    q.SUM_ELAPSED_MS,
-    q.MAX_ELAPSED_MS,
-    q.SUM_BYTES_SCANNED,
-    q.SUM_ROWS_PRODUCED
+-- -----------------------------------------------------------------------------
+-- Section 3: the refresh procedure
+-- -----------------------------------------------------------------------------
 
-FROM task_runs t
-LEFT JOIN DLT_DB.OPS.DBT_BUILDS b
-       ON b.BUILD_ID = REGEXP_SUBSTR(t.RETURN_VALUE, 'build_id ([0-9a-f-]+)', 1, 1, 'e')
-LEFT JOIN query_rollup q
-       ON q.BUILD_ID = b.BUILD_ID
--- Evaluations that found nothing (SKIPPED) and false-positive no-op drains
--- are not build attempts; a real run always has a query id.
-WHERE t.STATE NOT IN ('SKIPPED')
-  AND COALESCE(t.RETURN_VALUE, '') NOT LIKE 'no-op%'
-  AND t.QUERY_ID IS NOT NULL;
+CREATE OR REPLACE PROCEDURE DLT_DB.OPS.SP_DBT_RUNS_REFRESH(FULL_REBUILD BOOLEAN DEFAULT FALSE)
+RETURNS VARCHAR
+LANGUAGE SQL
+COMMENT = 'Drain the trigger streams, then re-merge DBT_RUNS from task history (live per sport via the registry; ACCOUNT_USAGE at bootstrap or after a gap) and the harvest rollups.'
+EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  builds_n   INTEGER DEFAULT 0;
+  qlog_n     INTEGER DEFAULT 0;
+  merged_n   INTEGER DEFAULT 0;
+  sports_ok  INTEGER DEFAULT 0;
+  sports_err INTEGER DEFAULT 0;
+  err_note   VARCHAR DEFAULT '';
+  use_hist   BOOLEAN;
+  wm         TIMESTAMP_LTZ;
+  merge_sql  VARCHAR;
+  sports CURSOR FOR
+    SELECT TARGET_DATABASE AS STEM
+    FROM DLT_DB.OPS.PIPELINE_REGISTRY
+    WHERE ENABLED AND TARGET_DATABASE <> 'DLT'
+    GROUP BY TARGET_DATABASE;
+BEGIN
 
+  -- -------------------------------------------------------------------------
+  -- Step 1: consume both streams. A plain SELECT does not advance a stream;
+  -- only DML does, so each INSERT below IS the consumption that stops the
+  -- task re-firing. The pre-counts are read non-consumingly for the return
+  -- string. Empty streams are NOT a no-op: the sweep exists precisely to
+  -- record runs that produced no stream event, so the merges always run.
+  -- -------------------------------------------------------------------------
+  builds_n := (SELECT COUNT(*) FROM DLT_DB.OPS.STREAM_DBT_BUILDS);
+  qlog_n   := (SELECT COUNT(*) FROM DLT_DB.OPS.STREAM_DBT_QUERY_LOG);
+
+  INSERT INTO DLT_DB.OPS.DBT_RUNS_REFRESH_LOG (FIRED_AT, STREAM_NAME, EVENTS)
+    SELECT CURRENT_TIMESTAMP(), 'STREAM_DBT_BUILDS', COUNT(*)
+    FROM DLT_DB.OPS.STREAM_DBT_BUILDS;
+  INSERT INTO DLT_DB.OPS.DBT_RUNS_REFRESH_LOG (FIRED_AT, STREAM_NAME, EVENTS)
+    SELECT CURRENT_TIMESTAMP(), 'STREAM_DBT_QUERY_LOG', COUNT(*)
+    FROM DLT_DB.OPS.STREAM_DBT_QUERY_LOG;
+
+  -- -------------------------------------------------------------------------
+  -- Step 2: ACCOUNT_USAGE arm, bootstrap / gap-healing only (watermark NULL
+  -- or >6 days stale: the refresh tasks were down while builds kept running,
+  -- and runs would otherwise age past the live function's 7-day window).
+  -- Runs FIRST so the live arms win overlap. Window 365d, matching this
+  -- table's retention: a wider window would resurrect rows the weekly sweep
+  -- just deleted.
+  --
+  -- THE ROLLUP COALESCE IS A GUARD, NOT A STYLE CHOICE: DBT_QUERY_LOG keeps
+  -- 90 days but this table keeps 365, so a stale-watermark refire would
+  -- recompute NULL rollups for 90-365d-old builds and overwrite the stored
+  -- numbers. COALESCE keeps the stored value when the recompute comes back
+  -- empty. (Build columns need no guard: DBT_BUILDS retention matches.)
+  -- -------------------------------------------------------------------------
+  wm := (SELECT MAX(STARTED_AT) FROM DLT_DB.OPS.DBT_RUNS);
+  use_hist := (FULL_REBUILD OR wm IS NULL OR wm < DATEADD('day', -6, CURRENT_TIMESTAMP()));
+
+  IF (use_hist) THEN
+    MERGE INTO DLT_DB.OPS.DBT_RUNS tr
+    USING (
+      WITH th AS (
+        SELECT DATABASE_NAME, NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,
+               SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME
+        FROM SNOWFLAKE.ACCOUNT_USAGE.TASK_HISTORY
+        WHERE STARTSWITH(NAME, 'DBT_BUILD_')
+          AND ENDSWITH(DATABASE_NAME, '_PROD_DB')
+          AND QUERY_ID IS NOT NULL
+          AND QUERY_START_TIME >= DATEADD('day', -365, CURRENT_TIMESTAMP())
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY QUERY_ID ORDER BY SCHEDULED_TIME DESC) = 1
+      ),
+      q AS (
+        SELECT BUILD_ID,
+               COUNT(*)                                AS N_QUERIES,
+               COUNT_IF(EXECUTION_STATUS <> 'SUCCESS') AS N_FAILED_QUERIES,
+               COUNT_IF(NODE IS NOT NULL)              AS N_NODE_QUERIES,
+               SUM(TOTAL_ELAPSED_TIME)                 AS SUM_ELAPSED_MS,
+               MAX(TOTAL_ELAPSED_TIME)                 AS MAX_ELAPSED_MS,
+               SUM(BYTES_SCANNED)                      AS SUM_BYTES_SCANNED,
+               SUM(ROWS_PRODUCED)                      AS SUM_ROWS_PRODUCED
+        FROM DLT_DB.OPS.DBT_QUERY_LOG
+        GROUP BY BUILD_ID
+      )
+      SELECT
+        LOWER(REPLACE(th.DATABASE_NAME, '_PROD_DB', ''))                    AS SPORT,
+        th.NAME                                                             AS TASK_NAME,
+        th.QUERY_ID                                                         AS RUN_QUERY_ID,
+        REGEXP_SUBSTR(th.RETURN_VALUE, 'build_id ([0-9a-f-]+)', 1, 1, 'e')  AS BUILD_ID,
+        th.RETURN_VALUE, th.STATE, th.ERROR_MESSAGE,
+        b.ARGS, b.ENVIRONMENT, b.PROJECT_FQN, b.DRAINED_LOADS, b.EXEC_QUERY_ID,
+        th.SCHEDULED_TIME,
+        th.QUERY_START_TIME                                                 AS STARTED_AT,
+        th.COMPLETED_TIME,
+        DATEDIFF('second', th.QUERY_START_TIME, th.COMPLETED_TIME)          AS DURATION_S,
+        q.N_QUERIES, q.N_FAILED_QUERIES, q.N_NODE_QUERIES,
+        q.SUM_ELAPSED_MS, q.MAX_ELAPSED_MS, q.SUM_BYTES_SCANNED, q.SUM_ROWS_PRODUCED
+      FROM th
+      LEFT JOIN DLT_DB.OPS.DBT_BUILDS b
+             ON b.BUILD_ID = REGEXP_SUBSTR(th.RETURN_VALUE, 'build_id ([0-9a-f-]+)', 1, 1, 'e')
+      LEFT JOIN q ON q.BUILD_ID = b.BUILD_ID
+    ) s
+    ON tr.RUN_QUERY_ID = s.RUN_QUERY_ID
+    WHEN MATCHED THEN UPDATE SET
+      SPORT = s.SPORT, TASK_NAME = s.TASK_NAME, BUILD_ID = s.BUILD_ID,
+      RETURN_VALUE = s.RETURN_VALUE, STATE = s.STATE, ERROR_MESSAGE = s.ERROR_MESSAGE,
+      ARGS = s.ARGS, ENVIRONMENT = s.ENVIRONMENT, PROJECT_FQN = s.PROJECT_FQN,
+      DRAINED_LOADS = s.DRAINED_LOADS, EXEC_QUERY_ID = s.EXEC_QUERY_ID,
+      SCHEDULED_TIME = s.SCHEDULED_TIME, STARTED_AT = s.STARTED_AT,
+      COMPLETED_TIME = s.COMPLETED_TIME, DURATION_S = s.DURATION_S,
+      N_QUERIES         = COALESCE(s.N_QUERIES,         tr.N_QUERIES),
+      N_FAILED_QUERIES  = COALESCE(s.N_FAILED_QUERIES,  tr.N_FAILED_QUERIES),
+      N_NODE_QUERIES    = COALESCE(s.N_NODE_QUERIES,    tr.N_NODE_QUERIES),
+      SUM_ELAPSED_MS    = COALESCE(s.SUM_ELAPSED_MS,    tr.SUM_ELAPSED_MS),
+      MAX_ELAPSED_MS    = COALESCE(s.MAX_ELAPSED_MS,    tr.MAX_ELAPSED_MS),
+      SUM_BYTES_SCANNED = COALESCE(s.SUM_BYTES_SCANNED, tr.SUM_BYTES_SCANNED),
+      SUM_ROWS_PRODUCED = COALESCE(s.SUM_ROWS_PRODUCED, tr.SUM_ROWS_PRODUCED),
+      REFRESHED_AT = CURRENT_TIMESTAMP()
+    WHEN NOT MATCHED THEN INSERT
+      (SPORT, TASK_NAME, RUN_QUERY_ID, BUILD_ID, RETURN_VALUE, STATE, ERROR_MESSAGE,
+       ARGS, ENVIRONMENT, PROJECT_FQN, DRAINED_LOADS, EXEC_QUERY_ID,
+       SCHEDULED_TIME, STARTED_AT, COMPLETED_TIME, DURATION_S,
+       N_QUERIES, N_FAILED_QUERIES, N_NODE_QUERIES, SUM_ELAPSED_MS,
+       MAX_ELAPSED_MS, SUM_BYTES_SCANNED, SUM_ROWS_PRODUCED, REFRESHED_AT)
+    VALUES
+      (s.SPORT, s.TASK_NAME, s.RUN_QUERY_ID, s.BUILD_ID, s.RETURN_VALUE, s.STATE, s.ERROR_MESSAGE,
+       s.ARGS, s.ENVIRONMENT, s.PROJECT_FQN, s.DRAINED_LOADS, s.EXEC_QUERY_ID,
+       s.SCHEDULED_TIME, s.STARTED_AT, s.COMPLETED_TIME, s.DURATION_S,
+       s.N_QUERIES, s.N_FAILED_QUERIES, s.N_NODE_QUERIES, s.SUM_ELAPSED_MS,
+       s.MAX_ELAPSED_MS, s.SUM_BYTES_SCANNED, s.SUM_ROWS_PRODUCED, CURRENT_TIMESTAMP());
+  END IF;
+
+  -- -------------------------------------------------------------------------
+  -- Step 3: live arms, one MERGE per sport, sports discovered at run time.
+  -- The per-database TASK_HISTORY function cannot be parameterized over
+  -- databases, hence EXECUTE IMMEDIATE with the name composed per iteration
+  -- (the SP_OBS_REFRESH precedent). Each iteration has its own exception
+  -- handler: a registry-enabled sport whose database or grants do not exist
+  -- yet must not fail the refresh for everyone. Live runs second, so its
+  -- values win any overlap with the ACCOUNT_USAGE arm.
+  --
+  -- Source filter is ONLY "QUERY_ID IS NOT NULL" (future SCHEDULED rows have
+  -- none). The SKIPPED / no-op filters live in the thin view: filtering them
+  -- out of the SOURCE would orphan a row captured mid-EXECUTING that later
+  -- completes as a no-op, leaving a phantom running build in the table.
+  -- -------------------------------------------------------------------------
+  FOR sp IN sports DO
+    BEGIN
+      merge_sql :=
+        'MERGE INTO DLT_DB.OPS.DBT_RUNS tr USING ('
+     || ' WITH th AS ('
+     || '   SELECT NAME, QUERY_ID, STATE, ERROR_MESSAGE, RETURN_VALUE,'
+     || '          SCHEDULED_TIME, QUERY_START_TIME, COMPLETED_TIME'
+     || '   FROM TABLE(' || sp.STEM || '_PROD_DB.INFORMATION_SCHEMA.TASK_HISTORY(RESULT_LIMIT => 10000))'
+     || '   WHERE STARTSWITH(NAME, ''DBT_BUILD_'')'
+     || '     AND QUERY_ID IS NOT NULL'
+     || '   QUALIFY ROW_NUMBER() OVER (PARTITION BY QUERY_ID ORDER BY SCHEDULED_TIME DESC) = 1'
+     || ' ),'
+     || ' q AS ('
+     || '   SELECT BUILD_ID,'
+     || '          COUNT(*) AS N_QUERIES,'
+     || '          COUNT_IF(EXECUTION_STATUS <> ''SUCCESS'') AS N_FAILED_QUERIES,'
+     || '          COUNT_IF(NODE IS NOT NULL) AS N_NODE_QUERIES,'
+     || '          SUM(TOTAL_ELAPSED_TIME) AS SUM_ELAPSED_MS,'
+     || '          MAX(TOTAL_ELAPSED_TIME) AS MAX_ELAPSED_MS,'
+     || '          SUM(BYTES_SCANNED) AS SUM_BYTES_SCANNED,'
+     || '          SUM(ROWS_PRODUCED) AS SUM_ROWS_PRODUCED'
+     || '   FROM DLT_DB.OPS.DBT_QUERY_LOG GROUP BY BUILD_ID'
+     || ' )'
+     || ' SELECT'
+     || '   ''' || LOWER(sp.STEM) || ''' AS SPORT,'
+     || '   th.NAME AS TASK_NAME, th.QUERY_ID AS RUN_QUERY_ID,'
+     || '   REGEXP_SUBSTR(th.RETURN_VALUE, ''build_id ([0-9a-f-]+)'', 1, 1, ''e'') AS BUILD_ID,'
+     || '   th.RETURN_VALUE, th.STATE, th.ERROR_MESSAGE,'
+     || '   b.ARGS, b.ENVIRONMENT, b.PROJECT_FQN, b.DRAINED_LOADS, b.EXEC_QUERY_ID,'
+     || '   th.SCHEDULED_TIME, th.QUERY_START_TIME AS STARTED_AT, th.COMPLETED_TIME,'
+     || '   DATEDIFF(''second'', th.QUERY_START_TIME, th.COMPLETED_TIME) AS DURATION_S,'
+     || '   q.N_QUERIES, q.N_FAILED_QUERIES, q.N_NODE_QUERIES,'
+     || '   q.SUM_ELAPSED_MS, q.MAX_ELAPSED_MS, q.SUM_BYTES_SCANNED, q.SUM_ROWS_PRODUCED'
+     || ' FROM th'
+     || ' LEFT JOIN DLT_DB.OPS.DBT_BUILDS b'
+     || '        ON b.BUILD_ID = REGEXP_SUBSTR(th.RETURN_VALUE, ''build_id ([0-9a-f-]+)'', 1, 1, ''e'')'
+     || ' LEFT JOIN q ON q.BUILD_ID = b.BUILD_ID'
+     || ' ) s ON tr.RUN_QUERY_ID = s.RUN_QUERY_ID'
+     || ' WHEN MATCHED THEN UPDATE SET'
+     || '   SPORT = s.SPORT, TASK_NAME = s.TASK_NAME, BUILD_ID = s.BUILD_ID,'
+     || '   RETURN_VALUE = s.RETURN_VALUE, STATE = s.STATE, ERROR_MESSAGE = s.ERROR_MESSAGE,'
+     || '   ARGS = s.ARGS, ENVIRONMENT = s.ENVIRONMENT, PROJECT_FQN = s.PROJECT_FQN,'
+     || '   DRAINED_LOADS = s.DRAINED_LOADS, EXEC_QUERY_ID = s.EXEC_QUERY_ID,'
+     || '   SCHEDULED_TIME = s.SCHEDULED_TIME, STARTED_AT = s.STARTED_AT,'
+     || '   COMPLETED_TIME = s.COMPLETED_TIME, DURATION_S = s.DURATION_S,'
+     || '   N_QUERIES = COALESCE(s.N_QUERIES, tr.N_QUERIES),'
+     || '   N_FAILED_QUERIES = COALESCE(s.N_FAILED_QUERIES, tr.N_FAILED_QUERIES),'
+     || '   N_NODE_QUERIES = COALESCE(s.N_NODE_QUERIES, tr.N_NODE_QUERIES),'
+     || '   SUM_ELAPSED_MS = COALESCE(s.SUM_ELAPSED_MS, tr.SUM_ELAPSED_MS),'
+     || '   MAX_ELAPSED_MS = COALESCE(s.MAX_ELAPSED_MS, tr.MAX_ELAPSED_MS),'
+     || '   SUM_BYTES_SCANNED = COALESCE(s.SUM_BYTES_SCANNED, tr.SUM_BYTES_SCANNED),'
+     || '   SUM_ROWS_PRODUCED = COALESCE(s.SUM_ROWS_PRODUCED, tr.SUM_ROWS_PRODUCED),'
+     || '   REFRESHED_AT = CURRENT_TIMESTAMP()'
+     || ' WHEN NOT MATCHED THEN INSERT'
+     || '   (SPORT, TASK_NAME, RUN_QUERY_ID, BUILD_ID, RETURN_VALUE, STATE, ERROR_MESSAGE,'
+     || '    ARGS, ENVIRONMENT, PROJECT_FQN, DRAINED_LOADS, EXEC_QUERY_ID,'
+     || '    SCHEDULED_TIME, STARTED_AT, COMPLETED_TIME, DURATION_S,'
+     || '    N_QUERIES, N_FAILED_QUERIES, N_NODE_QUERIES, SUM_ELAPSED_MS,'
+     || '    MAX_ELAPSED_MS, SUM_BYTES_SCANNED, SUM_ROWS_PRODUCED, REFRESHED_AT)'
+     || ' VALUES'
+     || '   (s.SPORT, s.TASK_NAME, s.RUN_QUERY_ID, s.BUILD_ID, s.RETURN_VALUE, s.STATE, s.ERROR_MESSAGE,'
+     || '    s.ARGS, s.ENVIRONMENT, s.PROJECT_FQN, s.DRAINED_LOADS, s.EXEC_QUERY_ID,'
+     || '    s.SCHEDULED_TIME, s.STARTED_AT, s.COMPLETED_TIME, s.DURATION_S,'
+     || '    s.N_QUERIES, s.N_FAILED_QUERIES, s.N_NODE_QUERIES, s.SUM_ELAPSED_MS,'
+     || '    s.MAX_ELAPSED_MS, s.SUM_BYTES_SCANNED, s.SUM_ROWS_PRODUCED, CURRENT_TIMESTAMP())';
+      EXECUTE IMMEDIATE :merge_sql;
+      merged_n := merged_n + SQLROWCOUNT;
+      sports_ok := sports_ok + 1;
+    EXCEPTION
+      WHEN OTHER THEN
+        sports_err := sports_err + 1;
+        err_note := ' last_sport_error(' || sp.STEM || '): ' || SQLERRM;
+    END;
+  END FOR;
+
+  -- TASK_HISTORY.RETURN_VALUE comes only from SYSTEM$SET_RETURN_VALUE, which
+  -- demands a constant and errors outside a task (both verified on
+  -- SP_DBT_BUILD), hence the assembled literal and the guard.
+  BEGIN
+    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''builds +' || builds_n
+      || ', qlog +' || qlog_n || ', merged ' || merged_n
+      || ', sports ' || sports_ok || ' ok/' || sports_err || ' err'')';
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
+  RETURN 'builds +' || builds_n || ', qlog +' || qlog_n
+      || ', merged ' || merged_n
+      || ', sports ' || sports_ok || ' ok / ' || sports_err || ' err'
+      || IFF(use_hist, ' (account_usage backfill ran)', '')
+      || err_note;
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- Section 4: the sweep. Same solved shape as SP_OBS_SWEEP: EXECUTE TASK does
+-- NOT bypass a triggered task's WHEN (verified live 2026-08-09; manual fires
+-- land SKIPPED on empty streams), so the sweep calls the proc directly behind
+-- an in-flight check. Covers the zero-event case: FAILED builds write no
+-- DBT_BUILDS row and never harvest.
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE PROCEDURE DLT_DB.OPS.SP_DBT_RUNS_SWEEP()
+RETURNS VARCHAR
+LANGUAGE SQL
+COMMENT = 'Timed backstop for builds that write no stream event (FAILED builds): runs SP_DBT_RUNS_REFRESH unless a triggered fire is in flight.'
+EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  inflight INTEGER;
+BEGIN
+  inflight := (SELECT COUNT(*)
+               FROM TABLE(DLT_DB.INFORMATION_SCHEMA.TASK_HISTORY(
+                 TASK_NAME => 'DBT_RUNS_REFRESH', RESULT_LIMIT => 10))
+               WHERE STATE IN ('EXECUTING', 'SCHEDULED'));
+  IF (inflight > 0) THEN
+    RETURN 'skipped: DBT_RUNS_REFRESH in flight';
+  END IF;
+  CALL DLT_DB.OPS.SP_DBT_RUNS_REFRESH();
+  RETURN 'swept';
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- Section 5: the thin view. Same name, same columns-plus-two (RETURN_VALUE
+-- and REFRESHED_AT ride along harmlessly), same row filter the old view had:
+-- SKIPPED evaluations and no-op drains are not build attempts. The filters
+-- live HERE and not in the merge source, deliberately -- see Step 3's note.
+-- COPY GRANTS preserves the dashboard role's SELECT.
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW DLT_DB.OPS.V_DBT_RUNS
+    COPY GRANTS
+    COMMENT = 'Thin passthrough over DLT_DB.OPS.DBT_RUNS (materialised 2026-08; refresh logic in SP_DBT_RUNS_REFRESH). Filters out SKIPPED evaluations and no-op drains.'
+AS
+SELECT * FROM DLT_DB.OPS.DBT_RUNS
+WHERE STATE NOT IN ('SKIPPED')
+  AND COALESCE(RETURN_VALUE, '') NOT LIKE 'no-op%';
+
+GRANT SELECT ON TABLE DLT_DB.OPS.DBT_RUNS TO ROLE DLT_DEV_ROLE;
 GRANT SELECT ON VIEW DLT_DB.OPS.V_DBT_RUNS TO ROLE DLT_DEV_ROLE;
+
+-- -----------------------------------------------------------------------------
+-- Section 6: the tasks. Names avoid the DLT_TASK_ prefix (TASK_RUNS filter)
+-- AND the DBT_BUILD_ prefix (this file's own spine filter): no
+-- self-observation loop. Not managed by generate_tasks.py; suspend before
+-- CREATE OR ALTER; the RESUMEs are not redundant.
+--
+-- On a FIRST apply the resumes mean the SHOW_INITIAL_ROWS streams fire the
+-- refresh within about a minute, and the NULL watermark routes that fire
+-- through the ACCOUNT_USAGE arm: applying this file IS the bootstrap.
+-- -----------------------------------------------------------------------------
+
+ALTER TASK IF EXISTS DLT_DB.OPS.DBT_RUNS_SWEEP SUSPEND;
+ALTER TASK IF EXISTS DLT_DB.OPS.DBT_RUNS_REFRESH SUSPEND;
+
+CREATE OR ALTER TASK DLT_DB.OPS.DBT_RUNS_REFRESH
+  WAREHOUSE = DLT_OPS_WH
+  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 60
+  USER_TASK_TIMEOUT_MS = 600000
+  COMMENT = 'Event-driven refresh of DBT_RUNS: fires when a build lands (DBT_BUILDS) or a harvest lands (DBT_QUERY_LOG, fills rollups). NOT managed by generate_tasks.py.'
+  WHEN SYSTEM$STREAM_HAS_DATA('DLT_DB.OPS.STREAM_DBT_BUILDS')
+    OR SYSTEM$STREAM_HAS_DATA('DLT_DB.OPS.STREAM_DBT_QUERY_LOG')
+AS
+  CALL DLT_DB.OPS.SP_DBT_RUNS_REFRESH();
+
+CREATE OR ALTER TASK DLT_DB.OPS.DBT_RUNS_SWEEP
+  WAREHOUSE = DLT_OPS_WH
+  -- :30 offset, staggered from OBS_REFRESH_SWEEP at :00 so the two backstops
+  -- never share a warehouse-resume minute pointlessly.
+  SCHEDULE  = 'USING CRON 30 */4 * * * UTC'
+  COMMENT   = 'Backstop for FAILED builds (no stream event exists for them), every 4h at :30. NOT managed by generate_tasks.py.'
+AS
+  CALL DLT_DB.OPS.SP_DBT_RUNS_SWEEP();
+
+ALTER TASK DLT_DB.OPS.DBT_RUNS_REFRESH RESUME;
+ALTER TASK DLT_DB.OPS.DBT_RUNS_SWEEP RESUME;

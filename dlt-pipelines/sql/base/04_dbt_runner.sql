@@ -55,6 +55,14 @@ GRANT USAGE, OPERATE ON WAREHOUSE DBT_WH TO ROLE DBT_RUNNER_ROLE;
 GRANT USAGE ON DATABASE DLT_DB TO ROLE DBT_RUNNER_ROLE;
 GRANT USAGE ON SCHEMA DLT_DB.DEPLOY TO ROLE DBT_RUNNER_ROLE;
 
+-- SP_DBT_RUNS_REFRESH (ops/07) discovers the sport list from the registry at
+-- run time, which is what makes "a new sport needs zero observability
+-- objects" true. Granted here because this file creates the role (base/03
+-- runs earlier and cannot). Repeated in ops/07's slice for existing accounts.
+GRANT SELECT ON TABLE DLT_DB.OPS.PIPELINE_REGISTRY TO ROLE DBT_RUNNER_ROLE;
+-- (USAGE on DLT_OPS_WH for the ops/07 tasks is granted in ops/07 itself:
+-- that warehouse does not exist until ops/01 runs, which is after this file.)
+
 USE ROLE ACCOUNTADMIN;
 
 -- Warehouse-based tasks owned by the role cannot run without this, exactly
