@@ -62,19 +62,18 @@ def recent_runs(sport: str | None, limit: int) -> list[dict[str, Any]]:
             runs = [r for r in runs if r["sport"] == sport]
         return runs[:limit]
 
-    from app import db, registry
+    from app import db
 
-    wanted = [sport] if sport else registry.sports()
-    # Sport names are validated against the registry by the route, so the
-    # identifier interpolation below only ever sees registry-derived values.
-    branches = [
-        f"SELECT '{s}' AS SPORT, * FROM {registry.runs_view(s)}" for s in wanted
-    ]
-    sql = (
-        "SELECT * FROM (" + " UNION ALL ".join(branches) + ") "
-        "ORDER BY RUN_STARTED_AT DESC LIMIT %(limit)s"
-    )
-    rows = db.query(sql, {"limit": limit})
+    # One table for every sport (DLT_DB.OPS.PIPELINE_RUNS, SPORT column holds
+    # the uppercase registry stem), so sport scoping is a bind, not a UNION of
+    # per-sport views.
+    sql = "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
+    params: dict[str, Any] = {"limit": limit}
+    if sport:
+        sql += "WHERE SPORT = %(sport)s "
+        params["sport"] = sport
+    sql += "ORDER BY RUN_STARTED_AT DESC LIMIT %(limit)s"
+    rows = db.query(sql, params)
     return [_normalize(row) for row in rows]
 
 
@@ -115,16 +114,18 @@ def runs_window(days: int, sport: str | None = None) -> list[dict[str, Any]]:
         runs = _fixture("runs")["runs"]
         return [r for r in runs if sport is None or r["sport"] == sport]
 
-    from app import db, registry
+    from app import db
 
-    wanted = [sport] if sport else registry.sports()
-    branches = [f"SELECT '{s}' AS SPORT, * FROM {registry.runs_view(s)}" for s in wanted]
     sql = (
-        "SELECT * FROM (" + " UNION ALL ".join(branches) + ") "
+        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
         "WHERE RUN_STARTED_AT >= DATEADD('day', -%(days)s, CURRENT_TIMESTAMP()) "
-        "ORDER BY RUN_STARTED_AT DESC"
     )
-    return [_normalize(r) for r in db.query(sql, {"days": days})]
+    params: dict[str, Any] = {"days": days}
+    if sport:
+        sql += "AND SPORT = %(sport)s "
+        params["sport"] = sport
+    sql += "ORDER BY RUN_STARTED_AT DESC"
+    return [_normalize(r) for r in db.query(sql, params)]
 
 
 def run_by_query_id(query_id: str) -> dict[str, Any] | None:
@@ -132,13 +133,12 @@ def run_by_query_id(query_id: str) -> dict[str, Any] | None:
         runs = _fixture("runs")["runs"]
         return next((r for r in runs if r["query_id"] == query_id), None)
 
-    from app import db, registry
+    from app import db
 
-    branches = [
-        f"SELECT '{s}' AS SPORT, * FROM {registry.runs_view(s)} WHERE QUERY_ID = %(qid)s"
-        for s in registry.sports()
-    ]
-    rows = db.query(" UNION ALL ".join(branches), {"qid": query_id})
+    rows = db.query(
+        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS WHERE QUERY_ID = %(qid)s",
+        {"qid": query_id},
+    )
     return _normalize(rows[0]) if rows else None
 
 
@@ -147,15 +147,15 @@ def pipeline_history(sport: str, name: str, days: int) -> list[dict[str, Any]]:
         runs = _fixture("runs")["runs"]
         return [r for r in runs if r["sport"] == sport and r["pipeline"] == name]
 
-    from app import db, registry
+    from app import db
 
     sql = (
-        f"SELECT '{sport}' AS SPORT, * FROM {registry.runs_view(sport)} "
-        "WHERE PIPELINE = %(name)s "
+        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
+        "WHERE SPORT = %(sport)s AND PIPELINE = %(name)s "
         "AND RUN_STARTED_AT >= DATEADD('day', -%(days)s, CURRENT_TIMESTAMP()) "
         "ORDER BY RUN_STARTED_AT DESC"
     )
-    return [_normalize(r) for r in db.query(sql, {"name": name, "days": days})]
+    return [_normalize(r) for r in db.query(sql, {"sport": sport, "name": name, "days": days})]
 
 
 def runs_before(sport: str, name: str, before_iso: str, limit: int) -> list[dict[str, Any]]:
@@ -168,14 +168,17 @@ def runs_before(sport: str, name: str, before_iso: str, limit: int) -> list[dict
         ]
         return runs[: limit + 1]
 
-    from app import db, registry
+    from app import db
 
     sql = (
-        f"SELECT '{sport}' AS SPORT, * FROM {registry.runs_view(sport)} "
-        "WHERE PIPELINE = %(name)s AND RUN_STARTED_AT <= %(before)s "
+        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
+        "WHERE SPORT = %(sport)s AND PIPELINE = %(name)s AND RUN_STARTED_AT <= %(before)s "
         "ORDER BY RUN_STARTED_AT DESC LIMIT %(limit)s"
     )
-    rows = db.query(sql, {"name": name, "before": before_iso.replace("Z", ""), "limit": limit + 1})
+    rows = db.query(
+        sql,
+        {"sport": sport, "name": name, "before": before_iso.replace("Z", ""), "limit": limit + 1},
+    )
     return [_normalize(r) for r in rows]
 
 
