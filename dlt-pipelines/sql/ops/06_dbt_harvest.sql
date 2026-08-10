@@ -48,9 +48,9 @@
 
 USE ROLE SYSADMIN;
 
--- CREATE VIEW is for 07_dbt_runs.sql, granted here so the OPS write access
--- for DBT_RUNNER_ROLE lives in one place.
-GRANT USAGE, CREATE TABLE, CREATE PROCEDURE, CREATE VIEW, CREATE TASK
+-- CREATE VIEW and CREATE STREAM are for 07_dbt_runs.sql, granted here so the
+-- OPS write access for DBT_RUNNER_ROLE lives in one place.
+GRANT USAGE, CREATE TABLE, CREATE PROCEDURE, CREATE VIEW, CREATE TASK, CREATE STREAM
   ON SCHEMA DLT_DB.OPS TO ROLE DBT_RUNNER_ROLE;
 
 -- -----------------------------------------------------------------------------
@@ -309,6 +309,14 @@ BEGIN
     WHERE DRAINED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
   DELETE FROM NCAAF_PROD_DB.OPS.DBT_TRIGGER_LOADS
     WHERE DRAINED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
+  -- The materialised run table and its refresh audit (07_dbt_runs.sql). LAST
+  -- in the body deliberately: on a fresh account this proc can exist before
+  -- 07 has been applied, and the earlier DELETEs autocommit individually, so
+  -- a missing-table failure here loses nothing that already ran.
+  DELETE FROM DLT_DB.OPS.DBT_RUNS
+    WHERE STARTED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
+  DELETE FROM DLT_DB.OPS.DBT_RUNS_REFRESH_LOG
+    WHERE FIRED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
   RETURN 'swept';
 END;
 $$;

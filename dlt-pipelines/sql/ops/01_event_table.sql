@@ -123,18 +123,19 @@ GRANT OPERATE ON WAREHOUSE DLT_OPS_WH TO ROLE DLT_LOADER_ROLE;
 --   left in a file is worse than no rationale, and this one would have justified
 --   never touching a parameter that is in fact free to change.
 --
--- CHANGE_TRACKING IS NOW OPTIONALITY, NOT A REQUIREMENT.
---   Nothing downstream reads the change stream today. It is left on because it costs
---   little and is the one prerequisite that cannot be added retroactively to history
---   already collected: turning it on later starts the stream from that moment. If the
---   modelling layer ever outgrows views, this is what makes the switch cheap.
+-- CHANGE_TRACKING IS LOAD-BEARING AGAIN.
+--   The modelling layer outgrew views: ops/02 and ops/03 now hang APPEND_ONLY
+--   streams (STREAM_OBS_LOGS, STREAM_OBS_METRICS) off this table, and streams
+--   require change tracking on their source. The "left on because it costs little"
+--   era paid off exactly as predicted: it is what made the switch cheap.
 -- ---------------------------------------------------------------------------
 CREATE EVENT TABLE IF NOT EXISTS DLT_DB.OPS.DLT_EVENTS
     DATA_RETENTION_TIME_IN_DAYS = 1
     COMMENT = 'SPCS container logs and platform metrics for dlt job services. Bound to DLT_DB.';
 
 -- Belt and braces. Event tables are created with change tracking already on, but
--- the dynamic table hard-depends on it, so it is asserted rather than assumed.
+-- the ops/02 and ops/03 streams hard-depend on it, so it is asserted rather than
+-- assumed.
 ALTER TABLE DLT_DB.OPS.DLT_EVENTS SET CHANGE_TRACKING = TRUE;
 
 -- ---------------------------------------------------------------------------
@@ -150,15 +151,18 @@ GRANT SELECT ON TABLE DLT_DB.OPS.DLT_EVENTS TO ROLE DLT_LOADER_ROLE;
 GRANT DELETE ON TABLE DLT_DB.OPS.DLT_EVENTS TO ROLE DLT_LOADER_ROLE;
 GRANT SELECT ON TABLE DLT_DB.OPS.DLT_EVENTS TO ROLE DLT_DEV_ROLE;
 
--- The views in ops/02 and ops/03 are created and owned by DLT_LOADER_ROLE, matching
--- every other production object, so the privilege belongs on the schema now.
+-- The observability objects in ops/02 through ops/05 are created and owned by
+-- DLT_LOADER_ROLE, matching every other production object, so the privileges belong
+-- on the schema.
 --
--- CREATE VIEW, not CREATE DYNAMIC TABLE. An earlier draft granted the latter because
--- ops/02 was going to be a dynamic table; the modelling layer is views. Granting the
--- wrong one fails at apply time with `Insufficient privileges to operate on schema
--- 'OPS'`, which names the schema rather than the missing privilege and reads like a
--- role problem. If the layer is ever materialised, add the dynamic table grant then.
+-- The layer IS now materialised (ops/02-04: tables fed by streams and a triggered
+-- task), so the loader role needs the full set. A missing one fails at apply time
+-- with `Insufficient privileges to operate on schema 'OPS'`, which names the schema
+-- rather than the missing privilege and reads like a role problem; it is not.
+-- (CREATE TASK and EXECUTE TASK ON ACCOUNT come from base/02_control_plane.sql.)
 GRANT CREATE VIEW ON SCHEMA DLT_DB.OPS TO ROLE DLT_LOADER_ROLE;
+GRANT CREATE TABLE, CREATE STREAM, CREATE PROCEDURE
+   ON SCHEMA DLT_DB.OPS TO ROLE DLT_LOADER_ROLE;
 
 -- ---------------------------------------------------------------------------
 -- 4. Bind the event table
@@ -173,6 +177,16 @@ GRANT CREATE VIEW ON SCHEMA DLT_DB.OPS TO ROLE DLT_LOADER_ROLE;
 -- ---------------------------------------------------------------------------
 USE ROLE ACCOUNTADMIN;
 ALTER ACCOUNT SET EVENT_TABLE = DLT_DB.OPS.DLT_EVENTS;
+
+-- SP_OBS_REFRESH's ACCOUNT_USAGE arm needs this, and interactive testing CANNOT
+-- prove it: a user session carries secondary roles, so `USE ROLE DLT_LOADER_ROLE`
+-- followed by an ACCOUNT_USAGE query succeeds through a secondary role even when
+-- the loader role itself has nothing. A task session runs the owner's primary
+-- role alone, and the first triggered fire failed with `Schema
+-- 'SNOWFLAKE.ACCOUNT_USAGE' does not exist or not authorized` (found live,
+-- 2026-08-09). IMPORTED PRIVILEGES is the only grantable privilege on a shared
+-- database; it confers read on all its schemas.
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO ROLE DLT_LOADER_ROLE;
 
 -- Belt and braces, and free. Does NOT affect SPCS, which is why it is not on its
 -- own. It points at the same table as the account binding, so the two cannot

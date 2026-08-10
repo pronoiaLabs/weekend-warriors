@@ -1,14 +1,15 @@
 """Sport and pipeline discovery from DLT_DB.OPS.PIPELINE_REGISTRY.
 
 The registry is the only source that knows the sport list, the pipeline-to-sport
-mapping, and the cron schedules. The run views cannot serve any of those: they
-only contain runs that happened, and each one is scoped to a sport it does not
-name. Nothing here is hardcoded to a sport, so a new sport is a registry row,
-not a code change.
+mapping, and the cron schedules. The run table cannot serve any of those: it
+only contains runs that happened. Nothing here is hardcoded to a sport, so a
+new sport is a registry row, not a code change.
 
 Sport identity is TARGET_DATABASE, not SOURCE: SOURCE is 'rest_api' for every
 real pipeline. The 'sample' smoke test (TARGET_DATABASE=DLT, SCHEDULE null) is
-excluded by requiring a schedule.
+excluded by requiring a schedule. DLT_DB.OPS.PIPELINE_RUNS spells SPORT with
+the same uppercase TARGET_DATABASE stems, so registry values compare directly
+against the table with no case folding (unlike V_DBT_RUNS, which is lowercase).
 """
 
 import time
@@ -62,10 +63,6 @@ def sports() -> list[str]:
 
 def pipelines_for(sport: str) -> list[Pipeline]:
     return [p for p in load_registry() if p.sport == sport]
-
-
-def runs_view(sport: str) -> str:
-    return f"{sport}_PROD_DB.OPS.V_PIPELINE_RUNS"
 
 
 def invalidate() -> None:

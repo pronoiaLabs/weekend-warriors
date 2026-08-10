@@ -55,6 +55,9 @@ GRANT USAGE, OPERATE ON WAREHOUSE DBT_WH TO ROLE DBT_RUNNER_ROLE;
 GRANT USAGE ON DATABASE DLT_DB TO ROLE DBT_RUNNER_ROLE;
 GRANT USAGE ON SCHEMA DLT_DB.DEPLOY TO ROLE DBT_RUNNER_ROLE;
 
+-- (USAGE on DLT_OPS_WH for the ops/07 tasks is granted in ops/07 itself:
+-- that warehouse does not exist until ops/01 runs, which is after this file.)
+
 USE ROLE ACCOUNTADMIN;
 
 -- Warehouse-based tasks owned by the role cannot run without this, exactly

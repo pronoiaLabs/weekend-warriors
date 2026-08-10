@@ -18,9 +18,11 @@
 --   that requires per-object GRANT OWNERSHIP surgery.
 --
 -- ADDING A SPORT
---   The per-sport grants at the bottom are the one place this file knows the
---   sport list. A new sport needs its four-line block copied; everything
---   else in the dashboard discovers sports from the registry at runtime.
+--   Run data needs NOTHING per sport: every sport's runs live in
+--   DLT_DB.OPS.PIPELINE_RUNS, maintained by SP_OBS_REFRESH, which discovers
+--   sports from the registry at run time. The per-sport blocks at the bottom
+--   exist only for DBT_TRIGGER_LOADS (the dbt build-detail page); a new sport
+--   copies that three-line block and nothing else.
 -- =============================================================================
 
 USE ROLE USERADMIN;
@@ -37,6 +39,8 @@ GRANT USAGE ON SCHEMA DLT_DB.DEPLOY TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON VIEW DLT_DB.OPS.V_TASK_RUNS TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON VIEW DLT_DB.OPS.V_LOG_LINES TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON VIEW DLT_DB.OPS.V_METRICS TO ROLE OPS_DASHBOARD_ROLE;
+-- The run spine: one table, every sport (SPORT = uppercase registry stem).
+GRANT SELECT ON TABLE DLT_DB.OPS.PIPELINE_RUNS TO ROLE OPS_DASHBOARD_ROLE;
 -- dbt build observability. These three objects and the per-sport
 -- DBT_TRIGGER_LOADS below are owned by DBT_RUNNER_ROLE, which SYSADMIN
 -- inherits; granting as any role outside that hierarchy fails.
@@ -54,20 +58,17 @@ GRANT CREATE SERVICE ON SCHEMA DLT_DB.DEPLOY TO ROLE OPS_DASHBOARD_ROLE;
 -- auto-suspend, created by dlt-pipelines/sql/ops/01_event_table.sql.
 GRANT USAGE ON WAREHOUSE DLT_OPS_WH TO ROLE OPS_DASHBOARD_ROLE;
 
--- Per-sport read access. One block per sport; see header.
+-- Per-sport read access, for DBT_TRIGGER_LOADS only; see header.
 GRANT USAGE ON DATABASE NFL_PROD_DB TO ROLE OPS_DASHBOARD_ROLE;
 GRANT USAGE ON SCHEMA NFL_PROD_DB.OPS TO ROLE OPS_DASHBOARD_ROLE;
-GRANT SELECT ON VIEW NFL_PROD_DB.OPS.V_PIPELINE_RUNS TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON TABLE NFL_PROD_DB.OPS.DBT_TRIGGER_LOADS TO ROLE OPS_DASHBOARD_ROLE;
 
 GRANT USAGE ON DATABASE WNBA_PROD_DB TO ROLE OPS_DASHBOARD_ROLE;
 GRANT USAGE ON SCHEMA WNBA_PROD_DB.OPS TO ROLE OPS_DASHBOARD_ROLE;
-GRANT SELECT ON VIEW WNBA_PROD_DB.OPS.V_PIPELINE_RUNS TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON TABLE WNBA_PROD_DB.OPS.DBT_TRIGGER_LOADS TO ROLE OPS_DASHBOARD_ROLE;
 
 GRANT USAGE ON DATABASE NCAAF_PROD_DB TO ROLE OPS_DASHBOARD_ROLE;
 GRANT USAGE ON SCHEMA NCAAF_PROD_DB.OPS TO ROLE OPS_DASHBOARD_ROLE;
-GRANT SELECT ON VIEW NCAAF_PROD_DB.OPS.V_PIPELINE_RUNS TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON TABLE NCAAF_PROD_DB.OPS.DBT_TRIGGER_LOADS TO ROLE OPS_DASHBOARD_ROLE;
 
 -- A public endpoint requires this account-level privilege on the CREATING

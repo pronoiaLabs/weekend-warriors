@@ -53,10 +53,11 @@ def _connect() -> snowflake.connector.SnowflakeConnection:
 def query(sql: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Run one SELECT, returning rows as dicts with lowercase keys.
 
-    Results are cached for OPS_DASHBOARD_CACHE_SECONDS (default 60): the views
-    change at most once per cron fire, so page navigation should cost warehouse
-    seconds once per TTL, not once per click. Rows are shallow-copied on every
-    hit because datasource normalization rewrites values in place.
+    Results are cached for OPS_DASHBOARD_CACHE_SECONDS (default 60): the run
+    tables change only when OBS_REFRESH fires (event-driven, min 60s apart), so
+    page navigation should cost warehouse seconds once per TTL, not once per
+    click. Total staleness is refresh lag plus this TTL. Rows are shallow-copied
+    on every hit because datasource normalization rewrites values in place.
 
     One cached connection per process; a failed cursor tears it down and retries
     once so an expired session heals instead of poisoning every later request.

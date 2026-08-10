@@ -1,11 +1,12 @@
 -- =============================================================================
 -- ops/05_retention.sql
--- Purpose : Trim DLT_DB.OPS.DLT_EVENTS on a schedule. Event tables are NEVER
---           auto-purged by Snowflake.
--- Run as  : DLT_LOADER_ROLE, which owns the event table and already holds
+-- Purpose : Trim DLT_DB.OPS.DLT_EVENTS on a schedule (event tables are NEVER
+--           auto-purged by Snowflake), and trim the materialised observability
+--           tables on their own, longer, schedules.
+-- Run as  : DLT_LOADER_ROLE, which owns all of it and already holds
 --           EXECUTE TASK ON ACCOUNT and CREATE TASK ON SCHEMA DLT_DB.OPS from
 --           base/02_control_plane.sql.
--- Prerequisites : ops/01_event_table.sql.
+-- Prerequisites : ops/01 through ops/04.
 -- Apply   : make setup-ops CONFIRM=1
 --
 -- DATA_RETENTION_TIME_IN_DAYS DOES NOT DO THIS.
@@ -16,28 +17,39 @@
 --   the point: the cost of this task is negligible and the cost of not having it is
 --   unbounded.
 --
--- WHY THE NAME AVOIDS THE dlt_task_ PREFIX
---   ops/04 builds V_TASK_RUNS by filtering task history on `NAME ILIKE 'DLT_TASK_%'`
---   and turning whatever matches into a pipeline row. A retention task called
---   dlt_task_retention would therefore appear in the run summary forever as a
---   pipeline that loads nothing, and it is not managed by generate_tasks.py either,
---   so `make tasks-suspend` and `make tasks-apply` would not touch it. Two problems
---   from one naming choice, both silent.
+-- THE WEEKLY DELETE IS INVISIBLE TO THE ops/02+03 STREAMS ONLY BECAUSE THEY ARE
+-- APPEND_ONLY. A standard stream would receive ~65,000 delete records every
+--   Sunday and re-fire OBS_REFRESH for nothing. Load-bearing, not stylistic; if
+--   anyone ever recreates those streams without APPEND_ONLY, this DELETE is the
+--   thing that finds out.
 --
--- THE RESUME AT THE BOTTOM IS NOT REDUNDANT
---   CREATE OR ALTER TASK leaves a task suspended, and this file is applied by hand by
---   `make setup-ops` with no `--resume` pass behind it, unlike the generated pipeline
---   Tasks. Without the explicit RESUME this task is created and never runs, and
---   nothing anywhere reports that: the table simply grows.
+-- WHY THE NAMES AVOID THE dlt_task_ PREFIX
+--   ops/04 filters task history on `NAME ILIKE 'DLT_TASK_%'` and turns whatever
+--   matches into a pipeline row. A retention task called dlt_task_retention would
+--   appear in the run summary forever as a pipeline that loads nothing, and it is
+--   not managed by generate_tasks.py either, so `make tasks-suspend` and
+--   `make tasks-apply` would not touch it. Two problems from one naming choice,
+--   both silent.
+--
+-- THE RESUMES AT THE BOTTOM ARE NOT REDUNDANT
+--   CREATE OR ALTER TASK leaves a task suspended, and this file is applied by hand
+--   by `make setup-ops` with no `--resume` pass behind it. Without the explicit
+--   RESUME a task is created and never runs, and nothing anywhere reports that:
+--   the tables simply grow.
 -- =============================================================================
 
 USE ROLE DLT_LOADER_ROLE;
 
+-- CREATE OR ALTER TASK refuses to touch a started task; suspend first, always,
+-- so this file stays re-applyable (the same three-step dance the pipeline fleet
+-- and the dbt trigger files do).
+ALTER TASK IF EXISTS DLT_DB.OPS.DLT_EVENTS_RETENTION SUSPEND;
+
 CREATE OR ALTER TASK DLT_DB.OPS.DLT_EVENTS_RETENTION
     WAREHOUSE = DLT_OPS_WH
-    -- Sunday 04:30 UTC. Every pipeline cron sits between 08:00 and 23:00 UTC, so this
-    -- is more than three hours clear of the nearest one. The DELETE therefore never
-    -- contends with a load, and the rewrite it causes lands in a quiet window.
+    -- Sunday 04:30 UTC. Every pipeline cron sits between 02:00 and 23:00 UTC, so
+    -- this window is as quiet as the calendar gets; ops/06's retention runs at
+    -- 04:45 and OBS_RETENTION below at 05:00, deliberately staggered.
     SCHEDULE  = 'USING CRON 30 4 * * 0 UTC'
     COMMENT   = 'Delete DLT_EVENTS rows older than 30 days. Event tables never auto-purge.'
 AS
@@ -47,19 +59,72 @@ AS
 ALTER TASK DLT_DB.OPS.DLT_EVENTS_RETENTION RESUME;
 
 -- ---------------------------------------------------------------------------
--- WHAT THIRTY DAYS COSTS YOU DOWNSTREAM, STATED SO IT IS A DECISION AND NOT A
--- DISCOVERY.
+-- Retention for the materialised layer. This is the decoupling the old closing
+-- note of this file promised: parsed lines outlive their raw rows 3x (90d vs
+-- 30d), and the run-summary tables keep a full year to match what
+-- ACCOUNT_USAGE.TASK_HISTORY could reconstruct anyway.
 --
---   ops/02 and ops/03 are views over this table, so they see exactly what it holds.
---   Deleting here deletes there, immediately and with no warning.
+-- A proc rather than four tasks: one task per statement would buy nothing but
+-- scheduling noise, and the SP_DBT_OBS_RETENTION precedent (ops/06) already
+-- established the shape.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE DLT_DB.OPS.SP_OBS_RETENTION()
+RETURNS VARCHAR
+LANGUAGE SQL
+COMMENT = 'Weekly trim of the materialised observability tables: 90d parsed logs/metrics, 365d run summaries.'
+EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  logs_n    INTEGER DEFAULT 0;
+  metrics_n INTEGER DEFAULT 0;
+  tr_n      INTEGER DEFAULT 0;
+  pr_n      INTEGER DEFAULT 0;
+BEGIN
+  DELETE FROM DLT_DB.OPS.LOG_LINES
+   WHERE EVENT_TS < DATEADD('day', -90, CONVERT_TIMEZONE('UTC', CURRENT_TIMESTAMP())::TIMESTAMP_NTZ);
+  logs_n := SQLROWCOUNT;
+
+  DELETE FROM DLT_DB.OPS.METRIC_SAMPLES
+   WHERE EVENT_TS < DATEADD('day', -90, CONVERT_TIMEZONE('UTC', CURRENT_TIMESTAMP())::TIMESTAMP_NTZ);
+  metrics_n := SQLROWCOUNT;
+
+  DELETE FROM DLT_DB.OPS.TASK_RUNS
+   WHERE RUN_STARTED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
+  tr_n := SQLROWCOUNT;
+
+  DELETE FROM DLT_DB.OPS.PIPELINE_RUNS
+   WHERE RUN_STARTED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
+  pr_n := SQLROWCOUNT;
+
+  RETURN 'trimmed: log_lines ' || logs_n || ', metric_samples ' || metrics_n
+      || ', task_runs ' || tr_n || ', pipeline_runs ' || pr_n;
+END;
+$$;
+
+ALTER TASK IF EXISTS DLT_DB.OPS.OBS_RETENTION SUSPEND;
+
+CREATE OR ALTER TASK DLT_DB.OPS.OBS_RETENTION
+    WAREHOUSE = DLT_OPS_WH
+    -- Sunday 05:00 UTC: 04:30 (raw events) and 04:45 (dbt observability) are
+    -- taken; staggered so the three trims never contend.
+    SCHEDULE  = 'USING CRON 0 5 * * 0 UTC'
+    COMMENT   = 'Weekly trim of LOG_LINES / METRIC_SAMPLES (90d) and TASK_RUNS / PIPELINE_RUNS (365d). NOT managed by generate_tasks.py.'
+AS
+    CALL DLT_DB.OPS.SP_OBS_RETENTION();
+
+ALTER TASK DLT_DB.OPS.OBS_RETENTION RESUME;
+
+-- ---------------------------------------------------------------------------
+-- THE RETENTION ASYMMETRY, STATED SO IT IS A DECISION AND NOT A DISCOVERY.
 --
---   ops/04 is different, and the asymmetry matters: it reads task history from
---   ACCOUNT_USAGE, which retains 365 days. So a run older than thirty days keeps its
---   outcome, its duration and its error message, and loses its logs and its resource
---   samples. That is the right trade for an ops view. It is also why ops/04 carries
---   TELEMETRY_AVAILABLE rather than reporting those runs as crashed containers.
+--   Raw DLT_EVENTS keeps 30 days; the parsed LOG_LINES / METRIC_SAMPLES keep 90.
+--   Between day 30 and day 90 a run's lines exist ONLY in the parsed tables: the
+--   raw row is gone, and a FULL rebuild (SP_OBS_REFRESH(TRUE)) can only recover
+--   what raw still holds. Rebuilds are therefore lossy beyond 30 days, which is
+--   accepted: the parsed copy IS the archive.
 --
---   To keep parsed logs longer than raw ones, ops/02 would have to become a real
---   table fed by a task from an APPEND_ONLY stream on this table. Until someone wants
---   that, these two retentions are necessarily the same number.
+--   TASK_RUNS and PIPELINE_RUNS keep 365 days, matching ACCOUNT_USAGE, so a run
+--   older than 90 days keeps its outcome, duration and error and loses its log
+--   detail. Same trade the view stack made, now with a wider window.
 -- ---------------------------------------------------------------------------
