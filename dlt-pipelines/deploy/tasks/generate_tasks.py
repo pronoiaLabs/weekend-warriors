@@ -10,6 +10,9 @@ Adding a pipeline still needs no image rebuild: an INSERT (registry_sync) plus t
 Task this script emits. Changing the image or the container env now means re-running
 `make tasks-apply`, because the spec lives in the Task rather than on a stage.
 
+Each emitted Task block also carries an `ALTER TASK ... SET TAG` binding the
+COST_CENTER = 'ingestion' cost tag (see COST_CENTER_TAG below).
+
 CONTENTS
     1. Spec template ........ SPEC_TEMPLATE_PATH, _PLACEHOLDER
     2. Emission ............. render_spec, task_sql, resume_sql, main
@@ -122,6 +125,11 @@ _PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 TASKS_SCHEMA = "DLT_DB.OPS"
 JOBS_SCHEMA = "DLT_DB.DEPLOY"
 
+# The cost-attribution object tag, created and documented in sql/ops/08_cost_tags.sql.
+# Every ingestion Task is tagged 'ingestion' here rather than in that file, because
+# the standing rule is that nothing touches DLT_TASK_% outside this generator.
+COST_CENTER_TAG = "DLT_DB.OPS.COST_CENTER"
+
 
 # ---------------------------------------------------------------------------
 # 2. Emission
@@ -229,6 +237,13 @@ AS
     COMMENT = '{spec.name}'{eai}
     FROM SPECIFICATION $$
 {rendered}$$;
+
+-- CREATE OR ALTER TASK cannot carry a TAG clause (and preserves existing tags), so
+-- the tag is a trailing ALTER: idempotent on re-apply, and it tags a brand-new
+-- pipeline's Task on its first apply. SET TAG works regardless of task state, so it
+-- needs no place in the suspend/resume sandwich. Requires APPLY on the tag, granted
+-- to DLT_LOADER_ROLE in sql/ops/08_cost_tags.sql.
+ALTER TASK {task_name} SET TAG {COST_CENTER_TAG} = 'ingestion';
 
 -- ALTER TASK {task_name} RESUME;   -- uncomment to start scheduling
 """
