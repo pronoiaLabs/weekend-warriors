@@ -40,6 +40,11 @@
 
 USE ROLE DLT_LOADER_ROLE;
 
+-- CREATE OR ALTER TASK refuses to touch a started task; suspend first, always,
+-- so this file stays re-applyable (the same three-step dance the pipeline fleet
+-- and the dbt trigger files do).
+ALTER TASK IF EXISTS DLT_DB.OPS.DLT_EVENTS_RETENTION SUSPEND;
+
 CREATE OR ALTER TASK DLT_DB.OPS.DLT_EVENTS_RETENTION
     WAREHOUSE = DLT_OPS_WH
     -- Sunday 04:30 UTC. Every pipeline cron sits between 02:00 and 23:00 UTC, so
@@ -96,6 +101,8 @@ BEGIN
       || ', task_runs ' || tr_n || ', pipeline_runs ' || pr_n;
 END;
 $$;
+
+ALTER TASK IF EXISTS DLT_DB.OPS.OBS_RETENTION SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.OBS_RETENTION
     WAREHOUSE = DLT_OPS_WH

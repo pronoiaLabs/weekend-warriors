@@ -631,7 +631,12 @@ BEGIN
      || '   t.STATE AS TASK_STATE, d.STATUS AS DLT_STATUS,'
      || '   (t.STATE = ''SUCCEEDED'' AND d.STATUS IS DISTINCT FROM ''ok'') AS OUTCOME_DISAGREES,'
      || '   (d._DLT_ID IS NULL AND t.RUN_STARTED_AT >= dw.DLT_RUNS_FROM) AS DLT_RECORD_MISSING,'
-     || '   d.ROWS_LOADED, d.ROW_COUNTS, d.LOAD_ID, d.RESOURCES,'
+     -- _DLT_RUNS.RESOURCES is a VARCHAR holding JSON (found live: a bare
+     -- d.RESOURCES fails the INSERT arm with "expecting VARIANT but got
+     -- VARCHAR"). ROW_COUNTS by contrast IS a VARIANT. The COALESCE keeps a
+     -- hypothetical non-JSON string rather than dropping it to NULL.
+     || '   d.ROWS_LOADED, d.ROW_COUNTS, d.LOAD_ID,'
+     || '   COALESCE(TRY_PARSE_JSON(d.RESOURCES), TO_VARIANT(d.RESOURCES)) AS RESOURCES,'
      || '   COALESCE(d.ERROR, t.TASK_ERROR_MESSAGE) AS ERROR_TEXT, t.EXIT_STATUS,'
      || '   t.LOG_LINES, t.ERROR_LINES, t.WARNING_LINES, t.UNPARSED_LINES,'
      || '   t.METRIC_SAMPLES, t.CPU_CORES_MAX, t.CPU_SAMPLES, t.CPU_CORES_LIMIT,'
@@ -716,26 +721,38 @@ END;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 4. The sweep helper. EXECUTE TASK is the documented way to fire a triggered
--- task manually, and routing the sweep THROUGH the task (rather than calling
--- SP_OBS_REFRESH directly) makes Snowflake's no-self-overlap guarantee the
--- mutex: there is exactly one writer. An in-flight run makes EXECUTE TASK
--- error, which is benign here and must not count toward task failure limits,
--- hence the swallow.
+-- 4. The sweep helper. THE OBVIOUS DESIGN DOES NOT WORK AND WAS TRIED:
+-- `EXECUTE TASK OBS_REFRESH` does NOT bypass a triggered task's WHEN clause.
+-- With drained streams the manual fire lands in task history as SKIPPED
+-- ("Conditional expression for task evaluated to false") -- which is exactly
+-- the zero-event case the sweep exists for. Found live, 2026-08-09.
+--
+-- So the sweep calls SP_OBS_REFRESH directly, and the single-writer guarantee
+-- is replaced by an in-flight check: skip if OBS_REFRESH is EXECUTING or has a
+-- pending SCHEDULED fire (verified: no SCHEDULED row lingers at rest for a
+-- triggered task with empty streams). The residual race -- stream data arriving
+-- in the instant between check and call -- needs the sweep's 4-hour tick to
+-- coincide with an event flush to the second; accepted.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE DLT_DB.OPS.SP_OBS_SWEEP()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Poke OBS_REFRESH on a timer: the backstop for runs that write no events (container never started; final verdict after the last flush).'
+COMMENT = 'Timed backstop for runs that write no events (container never started; final verdict after the last flush): runs SP_OBS_REFRESH unless a triggered fire is already in flight.'
 EXECUTE AS CALLER
 AS
 $$
+DECLARE
+  inflight INTEGER;
 BEGIN
-  EXECUTE IMMEDIATE 'EXECUTE TASK DLT_DB.OPS.OBS_REFRESH';
-  RETURN 'poked OBS_REFRESH';
-EXCEPTION
-  WHEN OTHER THEN
-    RETURN 'skipped: ' || SQLERRM;
+  inflight := (SELECT COUNT(*)
+               FROM TABLE(DLT_DB.INFORMATION_SCHEMA.TASK_HISTORY(
+                 TASK_NAME => 'OBS_REFRESH', RESULT_LIMIT => 10))
+               WHERE STATE IN ('EXECUTING', 'SCHEDULED'));
+  IF (inflight > 0) THEN
+    RETURN 'skipped: OBS_REFRESH in flight';
+  END IF;
+  CALL DLT_DB.OPS.SP_OBS_REFRESH();
+  RETURN 'swept';
 END;
 $$;
 

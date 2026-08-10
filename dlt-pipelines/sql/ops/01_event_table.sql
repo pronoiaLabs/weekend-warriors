@@ -178,6 +178,16 @@ GRANT CREATE TABLE, CREATE STREAM, CREATE PROCEDURE
 USE ROLE ACCOUNTADMIN;
 ALTER ACCOUNT SET EVENT_TABLE = DLT_DB.OPS.DLT_EVENTS;
 
+-- SP_OBS_REFRESH's ACCOUNT_USAGE arm needs this, and interactive testing CANNOT
+-- prove it: a user session carries secondary roles, so `USE ROLE DLT_LOADER_ROLE`
+-- followed by an ACCOUNT_USAGE query succeeds through a secondary role even when
+-- the loader role itself has nothing. A task session runs the owner's primary
+-- role alone, and the first triggered fire failed with `Schema
+-- 'SNOWFLAKE.ACCOUNT_USAGE' does not exist or not authorized` (found live,
+-- 2026-08-09). IMPORTED PRIVILEGES is the only grantable privilege on a shared
+-- database; it confers read on all its schemas.
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO ROLE DLT_LOADER_ROLE;
+
 -- Belt and braces, and free. Does NOT affect SPCS, which is why it is not on its
 -- own. It points at the same table as the account binding, so the two cannot
 -- disagree, and it covers any UDF or stored procedure created in DLT_DB later.
