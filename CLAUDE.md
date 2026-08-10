@@ -68,7 +68,7 @@ Run a single test the usual pytest way: `uv run --extra dev pytest tests/test_re
 
 Deployment is a 7-phase flow (`sql/base` → `sql/dev` → `sql/prod`, then image push, then task generation) documented in [dlt-pipelines/README.md](dlt-pipelines/README.md). The `setup-*` targets are guarded by `CONFIRM=1`.
 
-**The account model is one database per sport, crossed with environment.** A shared control plane (`DLT_DB`: registry table, spec stage, image repo, secrets) plus per-sport storage: `<SPORT>_DEV_DB` (per-developer `DEV_<user>` schemas) and `<SPORT>_PROD_DB` (`RAW` and `RAW_STAGING` for dlt, `PREP` / `CORE` / `ANALYTICS` for dbt). Three sports today: NFL, WNBA, and NCAAF, each with the full stack (ingestion, dbt tree, triggered prod builds, agent). Adding a sport means `make new-source`, hand-copying `04_run_summary.sql` (the scaffolder skips it), and authoring the registry entry; roles, compute pools and warehouses are all shared. `DLT_DEV_DB` / `DLT_PROD_DB` remain only for the sport-less `sample` smoke test.
+**The account model is one database per sport, crossed with environment.** A shared control plane (`DLT_DB`: registry table, spec stage, image repo, secrets) plus per-sport storage: `<SPORT>_DEV_DB` (per-developer `DEV_<user>` schemas) and `<SPORT>_PROD_DB` (`RAW` and `RAW_STAGING` for dlt, `PREP` / `CORE` / `ANALYTICS` for dbt). Three sports today: NFL, WNBA, and NCAAF, each with the full stack (ingestion, dbt tree, triggered prod builds, agent). Adding a sport means `make new-source` and authoring the registry entry; roles, compute pools and warehouses are all shared, and observability needs nothing per sport (runs flow into `DLT_DB.OPS.PIPELINE_RUNS` registry-driven). `DLT_DEV_DB` / `DLT_PROD_DB` remain only for the sport-less `sample` smoke test.
 
 The registry stores a **stem** (`database: NFL`), not a full name. `models.resolve_database()` composes `<stem>_<env>_DB`, so one entry covers both environments and no caller has to name a database by hand. `make setup-source SOURCE=nfl CONFIRM=1` creates a source's databases, and `make new-source NAME= HOST=` scaffolds one via `tools/new_source.py`.
 
@@ -159,12 +159,16 @@ What makes it work is that **network policies override rather than stack**. A po
 
 ## Telemetry
 
-SPCS job containers write logs and platform metrics to **`DLT_DB.OPS.DLT_EVENTS`**, a dedicated event table created by `make setup-ops CONFIRM=1` from [sql/ops/](dlt-pipelines/sql/ops/). It exists rather than using the shared `SNOWFLAKE.TELEMETRY.EVENTS` because a dynamic table cannot source the `SNOWFLAKE` database, which forecloses incremental refresh.
+SPCS job containers write logs and platform metrics to **`DLT_DB.OPS.DLT_EVENTS`**, a dedicated event table created by `make setup-ops CONFIRM=1` from [sql/ops/](dlt-pipelines/sql/ops/). It exists rather than using the shared `SNOWFLAKE.TELEMETRY.EVENTS` because change tracking cannot be set on objects in the `SNOWFLAKE` database, and the observability layer hangs streams off it.
 
-Two things about the binding are undocumented and cost a failed verification each:
+**The observability layer is materialized, event-driven** (2026-08). Two APPEND_ONLY streams on `DLT_EVENTS` fire the triggered task `DLT_DB.OPS.OBS_REFRESH` (min 60s between fires), whose proc `SP_OBS_REFRESH` drains them through the regex parse into `LOG_LINES` / `METRIC_SAMPLES`, MERGEs task history into `TASK_RUNS` (live `TASK_HISTORY()` every fire; ACCOUNT_USAGE only at bootstrap or after a >6-day gap, self-healing), then loops sports from `PIPELINE_REGISTRY` and MERGEs into **one `DLT_DB.OPS.PIPELINE_RUNS` table** (`SPORT` = uppercase registry stem). The dashboard API reads that table directly; the per-sport `V_PIPELINE_RUNS` views are gone, and `V_LOG_LINES` / `V_METRICS` / `V_TASK_RUNS` are thin passthroughs. **A new sport needs zero observability objects.** A run appears in the table with its logs while still EXECUTING (~1 min after container start); `OBS_REFRESH_SWEEP` (every 4h) bounds the two zero-event cases (container never started; final verdict after the last event flush). Retention decoupled in ops/05: raw 30d, parsed 90d, run tables 365d. Full rebuild: suspend `OBS_REFRESH`, `CALL SP_OBS_REFRESH(TRUE)` (recreates streams with `SHOW_INITIAL_ROWS`), resume; required if the streams ever go stale (>14d suspension). Baseline before materializing: 4.6-6.0s per uncached dashboard query; now ~110ms.
+
+Hard-won facts about the plumbing, each costing a failed verification:
 
 - **SPCS reads the ACCOUNT-level `EVENT_TABLE` parameter and ignores a database-level one**, contrary to the general event-table documentation but consistent with the SPCS monitoring page. A database binding reads back as `level=DATABASE` while doing nothing.
 - **A compute pool node resolves its event table when the node starts.** Changing the parameter does not affect a pool with live nodes; `ALTER COMPUTE POOL ... SUSPEND` and let it auto-resume. Recreating the service is not sufficient.
+- **A task session runs the owner's PRIMARY role alone**, so interactive testing (which carries secondary roles) cannot prove a task-context privilege; `DLT_LOADER_ROLE` needed an explicit `GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE`.
+- **`EXECUTE TASK` does not bypass a triggered task's WHEN clause** (manual fires land SKIPPED on empty streams), which is why the sweep calls the proc directly behind an in-flight check.
 
 ### dbt observability
 
