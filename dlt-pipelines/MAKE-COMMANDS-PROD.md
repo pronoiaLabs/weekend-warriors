@@ -147,9 +147,11 @@ make tasks-sql           # review build/tasks.sql
 make tasks-apply         # Tasks created SUSPENDED, applied as DLT_LOADER_ROLE
 ```
 
-**Read `build/tasks.sql` before applying it.** Seven `CREATE OR ALTER TASK` statements, each
-carrying its full container spec inline. `make deploy` does sync and apply in one step once you
-trust it.
+**Read `build/tasks.sql` before applying it.** One `CREATE OR ALTER TASK` per scheduled pipeline,
+each carrying its full container spec inline and followed by an `ALTER TASK ... SET TAG
+COST_CENTER = 'ingestion'` (the tag itself lives in `sql/ops/08_cost_tags.sql`, which must have
+been applied first: the ALTER needs APPLY on the tag). `make deploy` does sync and apply in one
+step once you trust it.
 
 **The spec is inlined rather than staged.** `SPECIFICATION_TEMPLATE_FILE` looked tidier, but every
 Task failed two seconds after firing with `Unable to render service spec from given template:

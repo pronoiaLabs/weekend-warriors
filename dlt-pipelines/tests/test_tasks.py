@@ -94,6 +94,13 @@ def test_every_scheduled_task_is_runnable(spec) -> None:
 
     assert f"SCHEDULE = 'USING CRON {spec.schedule} UTC'" in sql
 
+    # The cost tag rides in the task block because CREATE OR ALTER TASK cannot carry
+    # one inline; a new pipeline's Task must be tagged on its very first apply.
+    assert (
+        f"ALTER TASK DLT_DB.OPS.dlt_task_{spec.name} "
+        "SET TAG DLT_DB.OPS.COST_CENTER = 'ingestion';"
+    ) in sql
+
 
 @pytest.mark.parametrize("spec", _scheduled(), ids=lambda s: s.name)
 def test_inlined_spec_is_valid_yaml_with_the_right_bindings(spec) -> None:
@@ -149,10 +156,13 @@ def test_external_access_precedes_from(spec) -> None:
 def test_tasks_are_emitted_suspended() -> None:
     # CREATE OR ALTER TASK leaves a task suspended, and the resume is a commented
     # suggestion rather than a statement. Generating a schedule and starting one are
-    # different decisions.
+    # different decisions. The SET TAG ALTER is the one uncommented ALTER allowed in
+    # the block; nothing that RESUMES may run from tasks.sql.
     sql = _sql("nfl_reference")
-    assert "RESUME" in sql
-    assert "-- ALTER TASK" in sql, "resume must stay commented out"
+    assert "-- ALTER TASK DLT_DB.OPS.dlt_task_nfl_reference RESUME" in sql
+    assert not any(
+        line.startswith("ALTER TASK") and "RESUME" in line for line in sql.splitlines()
+    ), "resume must stay commented out"
 
 
 def test_suspend_and_resume_cover_the_same_pipelines_as_tasks() -> None:
