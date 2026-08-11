@@ -57,6 +57,10 @@ def test_pipelines_index(client: TestClient) -> None:
     assert ref["schedule"] == "daily 08:00 UTC"
     assert ref["latest"]["state"] == "succeeded"
     assert ref["succeeded"] > 0
+    # The 14-day strip rides on every index row, same day states as the detail
+    # heatmap (shared _day_states), so the two can never disagree.
+    assert len(ref["days"]) == 14
+    assert all(c["state"] for c in ref["days"])
     # A pipeline that never ran still gets a row, with latest None.
     never_ran = [p for p in body["pipelines"] if p["latest"] is None]
     assert all(p["runs_in_window"] == 0 for p in never_ran)
