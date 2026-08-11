@@ -1246,52 +1246,144 @@ h1 {
   border-radius: 3px;
 }
 
-/* ---- run history rows ---- */
-.runrow {
+/* ---- run history: master-detail split ---- */
+/* The run list scrolls in its own window and the evidence pane stays pinned
+   beside it, so history depth grows the list, never the page. Selecting a run
+   swaps the pane in place; only the selected run's evidence is mounted. */
+.runsplit {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.runlist {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  max-height: 640px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.runitem {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 3px solid transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink-3);
+}
+
+.runitem:last-child {
+  border-bottom: none;
+}
+
+.runitem:hover {
+  background: var(--surface-3);
+}
+
+.runitem.on {
+  background: var(--surface-2);
+  border-left-color: var(--ink);
+}
+
+/* After .on so a selected failure keeps the red rail: failure outranks
+   selection on the edge, the background still marks the selection. */
+.runitem.bad {
+  border-left-color: var(--red);
+}
+
+.runitem .outcome {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--ink-2);
+  min-width: 86px;
+}
+
+.runitem .outcome.fail {
+  color: var(--red-ink);
+}
+
+.runitem .ts {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.runitem .dur {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+/* Compact stand-ins for the flag chips; the full chips live in the pane head. */
+.runitem .flagdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  align-self: center;
+  flex: none;
+}
+
+.runitem .flagdot.missing {
+  background: var(--red);
+}
+
+.runitem .flagdot.disagrees {
+  background: var(--line-soft);
+  border: 1px solid var(--line-strong);
+}
+
+.runpane {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  margin-bottom: 10px;
   overflow: hidden;
 }
 
-.runrow.bad {
+.runpane.bad {
   border-left: 3px solid var(--red);
 }
 
-.runrow-head {
+.runpane-head {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 10px 18px;
   flex-wrap: wrap;
-  cursor: pointer;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.runrow-head:hover {
-  background: var(--surface-2);
-}
-
-.runrow-head .outcome {
+.runpane-head .outcome {
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.03em;
   color: var(--ink-2);
-  min-width: 92px;
 }
 
-.runrow-head .outcome.fail {
+.runpane-head .outcome.fail {
   color: var(--red-ink);
 }
 
-.runrow-head .ts {
+.runpane-head .ts {
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink-3);
-  min-width: 140px;
 }
 
-.runrow-head .flag {
+.runpane-head .flag {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1299,19 +1391,19 @@ h1 {
   border-radius: var(--r-sm);
 }
 
-.runrow-head .flag.missing {
+.runpane-head .flag.missing {
   background: var(--red);
   color: #ffffff;
 }
 
 /* A disagreement is a finding, not a failure, so its chip stays neutral. */
-.runrow-head .flag.disagrees {
+.runpane-head .flag.disagrees {
   background: var(--line-soft);
   border: 1px solid var(--line-strong);
   color: var(--ink-2);
 }
 
-.runrow-head .cells {
+.runpane-head .cells {
   display: flex;
   gap: 18px;
   font-size: 12px;
@@ -1320,23 +1412,16 @@ h1 {
   flex-wrap: wrap;
 }
 
-.runrow-head .cells b {
+.runpane-head .cells b {
   color: var(--ink-2);
   font-weight: 600;
 }
 
-/* On the wide page the right-anchored trio would go ragged run to run; a
-   floor per cell keeps DURATION_S / ROWS_LOADED / LOG_LINES in columns. */
-.runrow-head .cells > span {
-  min-width: 110px;
-}
-
-.runrow-body {
-  border-top: 1px solid var(--line-soft);
+.runpane-body {
   padding: 16px 18px;
 }
 
-.runrow-foot {
+.runpane-foot {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
@@ -1345,7 +1430,7 @@ h1 {
   color: var(--ink-5);
 }
 
-.runrow-foot a {
+.runpane-foot a {
   color: var(--ink-3);
 }
 
@@ -1510,7 +1595,7 @@ h1 {
 /* Fixed-height scroll window so a 1,000-line run stays one screen tall.
    Carries its own border and background because it renders in two contexts:
    inside RunDetail's bordered .tabpane card and inside PipelineDetail's
-   borderless .runrow-body (the card selector at .wrap.detail > .tabset is
+   borderless .runpane-body (the card selector at .wrap.detail > .tabset is
    direct-child and does not reach the nested tabset). */
 .logwindow {
   max-height: 420px;
