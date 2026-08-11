@@ -378,7 +378,7 @@ export default function RunDetail() {
       <main className="wrap detail">
         <div className="crumb">
           <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}
-          <Link to={{ pathname: `/pipelines/${run.sport}/${run.pipeline}`, search }}>
+          <Link to={{ pathname: `/ingestion/${run.sport}/${run.pipeline}`, search }}>
             {run.pipeline}
           </Link>{' '}
           / run {dayHhmm(run.run_started_at)}
@@ -457,7 +457,7 @@ export default function RunDetail() {
           itself exited nonzero, so it never explains a failure on its own: the reason always
           resolves through ERROR_TEXT. · <Link to={{ pathname: '/', search }}>Back to the board</Link>{' '}
           ·{' '}
-          <Link to={{ pathname: `/pipelines/${run.sport}/${run.pipeline}`, search }}>
+          <Link to={{ pathname: `/ingestion/${run.sport}/${run.pipeline}`, search }}>
             Pipeline detail
           </Link>{' '}
           · <Link to={{ pathname: '/incidents', search }}>Incidents</Link>

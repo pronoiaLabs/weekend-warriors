@@ -28,7 +28,7 @@ function Row({ row, now }: { row: PipelineIndexRow; now: string }) {
       <td>
         <Link
           className="pipe-link"
-          to={{ pathname: `/pipelines/${row.sport}/${row.pipeline}`, search }}
+          to={{ pathname: `/ingestion/${row.sport}/${row.pipeline}`, search }}
         >
           {row.pipeline}
         </Link>
@@ -79,10 +79,10 @@ export default function Pipelines() {
         meta={payload ? `${payload.pipelines.length} pipelines · last ${payload.window_days} days` : null}
       />
       <main className="wrap">
-        <h1>Pipelines</h1>
+        <h1>Ingestion</h1>
         <p className="subtitle">
-          Every registered pipeline, including ones that never ran. Sport list and schedules
-          come from DLT_DB.OPS.PIPELINE_REGISTRY.
+          Every registered ingestion pipeline, including ones that never ran. Sport list and
+          schedules come from DLT_DB.OPS.PIPELINE_REGISTRY.
         </p>
         {error && <p className="load-error">{error}</p>}
         {!payload && !error && <p className="loading">Loading pipelines...</p>}

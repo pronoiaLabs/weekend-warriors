@@ -206,7 +206,7 @@ function IncidentArticle({ entry, now, search }: ArticleProps) {
         <SeverityBadge kind={entry.kind} />
         <Link
           className="pipe"
-          to={{ pathname: `/pipelines/${entry.sport}/${entry.pipeline}`, search }}
+          to={{ pathname: `/ingestion/${entry.sport}/${entry.pipeline}`, search }}
         >
           {entry.pipeline}
         </Link>

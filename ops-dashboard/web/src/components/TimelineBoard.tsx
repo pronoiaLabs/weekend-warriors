@@ -209,7 +209,7 @@ export function TimelineBoard({ window: boardWindow, now, sports, isExpanded, on
                   <div className="lane" key={lane.pipeline}>
                     <div className="lane-label">
                       <div className="name">
-                        <Link to={`/pipelines/${sport.sport}/${lane.pipeline}`}>
+                        <Link to={`/ingestion/${sport.sport}/${lane.pipeline}`}>
                           {lane.pipeline}
                         </Link>
                       </div>
