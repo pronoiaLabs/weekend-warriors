@@ -21,7 +21,10 @@ import { VerdictPair } from '../components/VerdictPair.tsx'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { bytes, dayDate, dayHhmm, hhmmss, metricValue, num } from '../utils/format.ts'
 
-const LOG_LIMIT = 200
+// The whole run's story: the log window scrolls in place, so page length no
+// longer prices the limit. The API caps at 2000; container runs log a few
+// hundred lines.
+const LOG_LIMIT = 1000
 
 function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError'

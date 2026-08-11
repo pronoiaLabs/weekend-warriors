@@ -1063,9 +1063,10 @@ h1 {
 }
 
 /* ---- detail pages: pipeline and run ---- */
-/* Narrower than the board: both pages are one column of evidence. */
+/* Wider than the board: the evidence column earns the room, and the elements
+   that would stretch badly (facts grid, heat strip) carry their own caps. */
 .wrap.detail {
-  max-width: 960px;
+  max-width: 1500px;
 }
 
 .crumb {
@@ -1109,7 +1110,9 @@ h1 {
 
 .headcard .facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  /* Capped track max: on the wide detail page auto-fit would otherwise
+     spread seven facts across one sparse full-width row. */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
   gap: 14px 24px;
   margin-top: 18px;
   padding-top: 18px;
@@ -1164,6 +1167,10 @@ h1 {
   display: flex;
   gap: 4px;
   min-width: 620px;
+  /* Cap so the flex:1 day cells keep board proportions on the wide page
+     instead of becoming ~100px slabs; overflow-x on .heatcard still covers
+     the narrow end. */
+  max-width: 940px;
 }
 
 .hcell {
@@ -1316,6 +1323,12 @@ h1 {
 .runrow-head .cells b {
   color: var(--ink-2);
   font-weight: 600;
+}
+
+/* On the wide page the right-anchored trio would go ragged run to run; a
+   floor per cell keeps DURATION_S / ROWS_LOADED / LOG_LINES in columns. */
+.runrow-head .cells > span {
+  min-width: 110px;
 }
 
 .runrow-body {
@@ -1494,58 +1507,122 @@ h1 {
   padding: 3px 10px;
 }
 
+/* Fixed-height scroll window so a 1,000-line run stays one screen tall.
+   Carries its own border and background because it renders in two contexts:
+   inside RunDetail's bordered .tabpane card and inside PipelineDetail's
+   borderless .runrow-body (the card selector at .wrap.detail > .tabset is
+   direct-child and does not reach the nested tabset). */
+.logwindow {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
 .logtable {
   width: 100%;
-  border-collapse: collapse;
+  /* separate, not collapse: collapsed borders detach from position:sticky
+     cells in Chrome, so the header would scroll away from its own rule. */
+  border-collapse: separate;
+  border-spacing: 0;
   font-family: var(--mono);
   font-size: 11px;
   table-layout: fixed;
 }
 
 .logtable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  /* box-shadow, not border-bottom: a th border leaves a 1px see-through
+     seam as rows pass beneath the sticky edge. */
+  box-shadow: 0 1px 0 var(--line);
   text-align: left;
   font-size: 10px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-5);
   font-weight: 700;
-  padding: 4px 10px 4px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 6px 10px;
   font-family: var(--font);
 }
 
 .logtable th:nth-child(1) {
-  width: 74px;
+  width: 84px;
 }
 
 .logtable th:nth-child(2) {
-  width: 70px;
+  width: 86px;
 }
 
 .logtable th:nth-child(3) {
-  width: 190px;
+  width: 200px;
 }
 
 .logtable td {
-  padding: 4px 10px 4px 0;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--line-soft);
   vertical-align: top;
   color: var(--ink-3);
   word-break: break-word;
 }
 
-.logtable .sev-ERROR {
+.logtable tbody tr:last-child > td {
+  border-bottom: none;
+}
+
+.logtable tbody tr:nth-child(even) > td {
+  background: var(--surface-2);
+}
+
+.logtable tbody tr:hover > td {
+  background: var(--surface-3);
+}
+
+/* Severity reads from a rail on the row edge plus the tag itself; the class
+   lives on the <tr>. Red stays reserved for ERROR and worse; WARNING is bold
+   ink, matching the status-vocabulary rule in tokens.css. sev-NONE gets no
+   rule on purpose: a transparent rail and a quiet tag. */
+.logrow > td:first-child {
+  border-left: 3px solid transparent;
+}
+
+.logrow.sev-WARNING > td:first-child {
+  border-left-color: var(--ink-3);
+}
+
+.logrow.sev-ERROR > td:first-child,
+.logrow.sev-CRITICAL > td:first-child,
+.logrow.sev-FATAL > td:first-child {
+  border-left-color: var(--red);
+}
+
+.logrow .sevtag {
+  color: var(--ink-5);
+}
+
+.logrow.sev-WARNING .sevtag {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.logrow.sev-ERROR .sevtag,
+.logrow.sev-CRITICAL .sevtag,
+.logrow.sev-FATAL .sevtag {
   color: var(--red-ink);
   font-weight: 700;
 }
 
-.logtable .sev-WARNING {
-  color: var(--ink-3);
-  font-weight: 700;
-}
-
-.logtable .sev-INFO {
-  color: var(--ink-5);
+/* Error rows carry the wash (precedent: .dbt-table .qrow.bad); the compound
+   row selector outweighs the zebra and hover rules, so the tint holds. */
+.logrow.sev-ERROR > td,
+.logrow.sev-CRITICAL > td,
+.logrow.sev-FATAL > td {
+  background: var(--red-wash);
 }
 
 /* ---- metric cards and dot strips ---- */
@@ -1776,12 +1853,12 @@ table.data td {
   font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--muted, #71717a);
-  border-bottom: 1px solid var(--border, #e4e4e7);
+  color: var(--ink-4);
+  border-bottom: 1px solid var(--line);
   padding: 6px 10px;
 }
 .pipes-table td {
-  border-bottom: 1px solid var(--border-soft, #f0f0f2);
+  border-bottom: 1px solid var(--line-soft);
   padding: 8px 10px;
   white-space: nowrap;
 }
@@ -1815,7 +1892,7 @@ table.data td {
   border-radius: 2px;
 }
 .pipes-table .muted {
-  color: var(--muted, #71717a);
+  color: var(--ink-4);
   font-style: italic;
 }
 

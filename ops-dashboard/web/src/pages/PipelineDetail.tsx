@@ -20,7 +20,10 @@ import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { bytes, cores, dayHhmm, hhmm, num, relativeTo, shortDate } from '../utils/format.ts'
 
 const RUN_LIMIT = 8
-const LOG_LIMIT = 50
+// The whole run's story: the log window scrolls in place, so page length no
+// longer prices the limit. The API caps at 2000; container runs log a few
+// hundred lines.
+const LOG_LIMIT = 1000
 
 const PILL_STATE: Record<string, AnomalyKind> = {
   succeeded: 'ok',
