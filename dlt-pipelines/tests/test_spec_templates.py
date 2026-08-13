@@ -176,6 +176,25 @@ def test_prod_template_binds_a_secret() -> None:
     assert bound["secretKeyRef"] == "secret_string"
 
 
+def test_only_the_prod_template_enables_alerts() -> None:
+    """DLT_ALERTS gates pipelines/common/alerts.py, and prod-only is the design.
+
+    The dev templates and laptop runs never set it, so a developer breaking a
+    pipeline on purpose cannot page the alert channel. If a dev template ever
+    grows this variable, that is a policy change, not a copy-paste fix.
+    """
+
+    def env_of(filename: str) -> dict:
+        text = (SPECS / filename).read_text()
+        return yaml.safe_load(_env().from_string(text).render(**SUBSTITUTIONS))["spec"][
+            "containers"
+        ][0]["env"]
+
+    assert env_of("dlt_job.tmpl.yaml")["DLT_ALERTS"] == "1"
+    assert "DLT_ALERTS" not in env_of("dlt_dev_job.tmpl.yaml")
+    assert "DLT_ALERTS" not in env_of("dlt_dev_job_nosecret.tmpl.yaml")
+
+
 def test_only_the_secret_template_binds_a_secret() -> None:
     # The pairing the Makefile relies on: SECRET set picks the secret template, unset
     # picks the other. If both grew a secrets block, `sample` would need a credential.

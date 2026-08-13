@@ -78,6 +78,11 @@ spec:
         SNOWFLAKE_DATABASE: DLT_DB
         DLT_REGISTRY_SOURCE: auto
         LOG_LEVEL: INFO
+        # Slack transition pings (pipelines/common/alerts.py). Prod-only on
+        # purpose: the dev templates and laptop runs never set this, so a dev
+        # failure cannot page anyone. Spec change, not an image change -- needs
+        # the suspend / tasks-apply / resume cycle to reach the fleet.
+        DLT_ALERTS: "1"
       secrets:
         - snowflakeSecret: {{ secret }}
           secretKeyRef: secret_string

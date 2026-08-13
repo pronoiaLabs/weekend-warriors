@@ -60,6 +60,7 @@ from typing import Any, Iterator
 import dlt
 
 from pipelines.batch.models import PipelineSpec, current_season, load_registry
+from pipelines.common import alerts
 from pipelines.common.observability import configure_logging, record_run
 
 # Module-level logger used before a per-pipeline adapter is available (e.g. in main).
@@ -713,7 +714,17 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = _parse_args(sys.argv[1:] if argv is None else argv)
-    specs = resolve_specs(args)
+
+    # A spec the registry rejects (or a registry that cannot be read) raises HERE,
+    # before any pipeline exists to be recorded: _DLT_RUNS never sees this class of
+    # death, which is exactly why it gets its own alert scope. Only the resolution
+    # is wrapped -- everything after either handles its own failures per spec or
+    # returns a usage error that no Task can produce.
+    try:
+        specs = resolve_specs(args)
+    except Exception as exc:
+        alerts.report("runner", ok=False, error=str(exc))
+        raise
 
     if args.list:
         for p in specs:
@@ -752,9 +763,15 @@ def main(argv: list[str] | None = None) -> int:
     for spec in specs:
         try:
             run_pipeline(spec, resources=args.resource, params=params)
-        except Exception:  # noqa: BLE001, one bad pipeline must not kill the batch
+        except Exception as exc:  # noqa: BLE001, one bad pipeline must not kill the batch
             log.exception("pipeline '%s' failed", spec.name)
             failures += 1
+            alerts.report(spec.name, ok=False, error=str(exc))
+        else:
+            # The success side is what turns a red scope green again: without it
+            # a recovered pipeline would stay 'failing' in ALERT_STATE forever
+            # and the recovery ping would never fire.
+            alerts.report(spec.name, ok=True)
 
     return 1 if failures else 0
 
