@@ -107,8 +107,14 @@ defaults:
 # capacity constraint, but one pipeline per hour keeps a failed run trivial to attribute
 # and keeps SHOW SERVICES readable.
 #
-# Note the WNBA offseason: from October to April the daily pipelines still fire and find
-# nothing new. Cheap no-ops rather than errors, and nothing suspends them.
+# PAUSED 2026-08-12: every schedule below is commented out and the 12 WNBA tasks
+# (10 ingestion + DBT_BUILD_WNBA/DBT_HARVEST_WNBA) are SUSPENDED in the account.
+# Unscheduled means: no Task emitted by generate_tasks, no dashboard row, no
+# missed-slot expectations. The pipelines stay registered and runnable by hand
+# (make run-local / run-snowflake). To revive: uncomment the schedules, run
+# make sync-apply + make deploy, and resume the two dbt trigger tasks (root
+# DBT_BUILD_WNBA first is not needed for RESUME, but recreate the RAW._DLT_LOADS
+# stream if the pause exceeded ~14 days; see CLAUDE.md's kill-switch note).
 pipelines:
 
   # --- Reference data: teams + players -------------------------------------
@@ -119,7 +125,7 @@ pipelines:
   # CURRENT team, which is why per-game affiliation has to come off the facts instead.
   - name: wnba_reference
     source: rest_api
-    schedule: "0 14 * * *"
+    # schedule: "0 14 * * *"
     config:
       client: *wnba_client
       resource_defaults:
@@ -151,7 +157,7 @@ pipelines:
   # everything.
   - name: wnba_games
     source: rest_api
-    schedule: "0 15 * * *"
+    # schedule: "0 15 * * *"
     config:
       client: *wnba_client
       resources:
@@ -174,7 +180,7 @@ pipelines:
   # So there is no game__home_team__id here, and anything needing it joins to `games`.
   - name: wnba_stats
     source: rest_api
-    schedule: "0 16 * * *"
+    # schedule: "0 16 * * *"
     config:
       client: *wnba_client
       resource_defaults:
@@ -210,7 +216,7 @@ pipelines:
   # by the game it was handed.
   - name: wnba_plays
     source: rest_api
-    schedule: "0 17 * * 2"
+    # schedule: "0 17 * * 2"
     config:
       client: *wnba_client
       resources:
@@ -254,7 +260,7 @@ pipelines:
   # condition partition mode assumes.
   - name: wnba_standings
     source: rest_api
-    schedule: "0 18 * * 2"
+    # schedule: "0 18 * * 2"
     config:
       client: *wnba_client
       resources:
@@ -278,7 +284,7 @@ pipelines:
   # covers the common case.
   - name: wnba_season_stats
     source: rest_api
-    schedule: "0 19 * * 2"
+    # schedule: "0 19 * * 2"
     config:
       client: *wnba_client
       resource_defaults:
@@ -307,7 +313,7 @@ pipelines:
   # Fanning out would multiply the request count for identical data.
   - name: wnba_advanced_game
     source: rest_api
-    schedule: "0 20 * * 2"
+    # schedule: "0 20 * * 2"
     config:
       client: *wnba_client
       resource_defaults:
@@ -370,7 +376,7 @@ pipelines:
   # here would 404.
   - name: wnba_advanced_season
     source: rest_api
-    schedule: "0 21 * * 2"
+    # schedule: "0 21 * * 2"
     config:
       client: *wnba_client
       resource_defaults:
@@ -436,7 +442,7 @@ pipelines:
   # different zone names, so one table would be the sparse union of both.
   - name: wnba_shot_locations
     source: rest_api
-    schedule: "0 1 * * 3"
+    # schedule: "0 1 * * 3"
     config:
       client: *wnba_client
       resource_defaults:
@@ -484,7 +490,7 @@ pipelines:
   # No season token: this endpoint has no season parameter at all.
   - name: wnba_injuries
     source: rest_api
-    schedule: "0 23 * * *"
+    # schedule: "0 23 * * *"
     config:
       client: *wnba_client
       resources:

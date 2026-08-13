@@ -232,11 +232,11 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
         "nfl_reference", "nfl_games", "nfl_stats", "nfl_plays",
         "nfl_standings", "nfl_advanced_stats", "nfl_injuries",
     }
-    assert by_source["wnba"] == {
-        "wnba_reference", "wnba_games", "wnba_stats", "wnba_plays",
-        "wnba_standings", "wnba_season_stats", "wnba_advanced_game",
-        "wnba_advanced_season", "wnba_shot_locations", "wnba_injuries",
-    }
+    # WNBA is PAUSED (2026-08-12): schedules commented out in wnba-registry.yml,
+    # account tasks suspended. The pipelines stay registered and hand-runnable;
+    # they must simply emit no Task. Reviving WNBA means restoring the ten-name
+    # set assertion here.
+    assert "wnba" not in by_source
     assert by_source["ncaaf"] == {
         "ncaaf_reference", "ncaaf_games", "ncaaf_stats",
         "ncaaf_season_stats", "ncaaf_standings", "ncaaf_rankings",
