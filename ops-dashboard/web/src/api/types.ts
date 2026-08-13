@@ -338,6 +338,8 @@ export interface PipelineIndexRow {
   succeeded: number
   runs_in_window: number
   window_days: number
+  /** Worst state per day, oldest first — the same cells as the detail heatmap. */
+  days: HeatCell[]
 }
 
 export interface PipelinesIndexPayload {

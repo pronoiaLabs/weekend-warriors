@@ -100,26 +100,33 @@ export function LogTable({ queryId, limit }: Props) {
               row.
             </p>
           ) : (
-            <table className="logtable">
-              <thead>
-                <tr>
-                  <th>EVENT_TS</th>
-                  <th>SEVERITY</th>
-                  <th>LOGGER_NAME</th>
-                  <th>MESSAGE</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line, index) => (
-                  <tr key={`${line.event_ts}-${index}`}>
-                    <td>{hhmmss(line.event_ts)}</td>
-                    <td className={`sev-${line.severity ?? 'NONE'}`}>{line.severity ?? 'none'}</td>
-                    <td>{line.logger_name ?? 'none'}</td>
-                    <td>{line.message}</td>
+            <div className="logwindow">
+              <table className="logtable">
+                <thead>
+                  <tr>
+                    <th>EVENT_TS</th>
+                    <th>SEVERITY</th>
+                    <th>LOGGER_NAME</th>
+                    <th>MESSAGE</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {lines.map((line, index) => (
+                    <tr
+                      key={`${line.event_ts}-${index}`}
+                      className={`logrow sev-${line.severity ?? 'NONE'}`}
+                    >
+                      <td>{hhmmss(line.event_ts)}</td>
+                      <td>
+                        <span className="sevtag">{line.severity ?? 'none'}</span>
+                      </td>
+                      <td>{line.logger_name ?? 'none'}</td>
+                      <td>{line.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           <p className="pane-src after">
             {num(lines.length)} of {num(payload.total_log_lines)} lines shown · ERROR_LINES{' '}
@@ -127,6 +134,7 @@ export function LogTable({ queryId, limit }: Props) {
             {severity === WARNING_PLUS
               ? ` · WARNING+ narrows the ${num(payload.lines.length)} fetched lines, since the API filters on one exact SEVERITY`
               : ''}
+            {payload.lines.length >= limit ? ` · first ${num(limit)} lines by EVENT_TS` : ''}
           </p>
         </>
       ) : null}

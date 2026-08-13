@@ -24,6 +24,11 @@
   --red-lite: #f87171;
   --red-wash: #fef2f2;
 
+  /* Warning tier for the rolled-up "degraded" health (succeeding now, but
+     under 80% over the window). Deliberately a second accent: red stays
+     reserved for real failure, and folding degraded into red would dilute it. */
+  --amber: #d97706;
+
   --fill-ok: #d4d4d8;
   --hatch: repeating-linear-gradient(45deg, #dc2626 0 3px, #ffffff 3px 6px);
 

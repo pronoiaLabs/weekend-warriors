@@ -4,7 +4,6 @@ import { fetchPipelineDetail, fetchRunMetrics } from '../api/client.ts'
 import type { AnomalyKind, MetricsPayload, PipelineDetailPayload, RunRow } from '../api/types.ts'
 import { AnnotationNote } from '../components/AnnotationNote.tsx'
 import { AnomalyBadge } from '../components/AnomalyBadge.tsx'
-import { Expander } from '../components/Expander.tsx'
 import { HeatLegend, HeatStrip } from '../components/HeatStrip.tsx'
 import { LogTable } from '../components/LogTable.tsx'
 import { MetricDotStrip } from '../components/MetricDotStrip.tsx'
@@ -19,8 +18,13 @@ import { VerdictPair } from '../components/VerdictPair.tsx'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { bytes, cores, dayHhmm, hhmm, num, relativeTo, shortDate } from '../utils/format.ts'
 
-const RUN_LIMIT = 8
-const LOG_LIMIT = 50
+// The list scrolls in its own window and only the selected run mounts its
+// evidence, so depth costs neither page length nor fetches. The API caps at 50.
+const RUN_LIMIT = 30
+// The whole run's story: the log window scrolls in place, so page length no
+// longer prices the limit. The API caps at 2000; container runs log a few
+// hundred lines.
+const LOG_LIMIT = 1000
 
 const PILL_STATE: Record<string, AnomalyKind> = {
   succeeded: 'ok',
@@ -169,7 +173,37 @@ function MetricsPanel({ run }: { run: RunRow }) {
   )
 }
 
-function RunRowItem({ run, open, onToggle }: { run: RunRow; open: boolean; onToggle: () => void }) {
+function RunListItem({
+  run,
+  selected,
+  onSelect,
+}: {
+  run: RunRow
+  selected: boolean
+  onSelect: () => void
+}) {
+  const failed = run.state === 'failure' || run.state === 'missing'
+  const classes = ['runitem', selected ? 'on' : '', failed ? 'bad' : ''].filter(Boolean).join(' ')
+  return (
+    <button
+      type="button"
+      className={classes}
+      aria-pressed={selected}
+      aria-label={`Show evidence for the run at ${dayHhmm(run.run_started_at)} UTC`}
+      onClick={onSelect}
+    >
+      <span className={failed ? 'outcome fail' : 'outcome'}>{run.task_state ?? 'NO STATE'}</span>
+      <span className="ts">
+        {shortDate(run.run_started_at)} · {hhmm(run.run_started_at)}
+      </span>
+      {run.dlt_record_missing ? <span className="flagdot missing" title="RECORD MISSING" /> : null}
+      {run.outcome_disagrees ? <span className="flagdot disagrees" title="DISAGREES" /> : null}
+      <span className="dur">{run.duration_s == null ? 'NULL' : `${run.duration_s}s`}</span>
+    </button>
+  )
+}
+
+function RunEvidence({ run }: { run: RunRow }) {
   const failed = run.state === 'failure' || run.state === 'missing'
   const scrapes = (run.cpu_samples ?? 0) + (run.mem_samples ?? 0)
 
@@ -188,15 +222,8 @@ function RunRowItem({ run, open, onToggle }: { run: RunRow; open: boolean; onTog
   ]
 
   return (
-    <section className={failed ? 'runrow bad' : 'runrow'}>
-      {/* Clicking the row is a mouse convenience; the caret button is the
-          accessible control, as on the fleet panels. */}
-      <div className="runrow-head" onClick={onToggle}>
-        <Expander
-          open={open}
-          onToggle={onToggle}
-          label={`${open ? 'Collapse' : 'Expand'} the run at ${dayHhmm(run.run_started_at)} UTC`}
-        />
+    <section className={failed ? 'runpane bad' : 'runpane'}>
+      <div className="runpane-head">
         <span className={failed ? 'outcome fail' : 'outcome'}>{run.task_state ?? 'NO STATE'}</span>
         <span className="ts">
           {shortDate(run.run_started_at)} · {hhmm(run.run_started_at)} UTC
@@ -219,21 +246,19 @@ function RunRowItem({ run, open, onToggle }: { run: RunRow; open: boolean; onTog
         </span>
       </div>
 
-      {open ? (
-        <div className="runrow-body">
-          <SegmentedDurationBar
-            durationS={run.duration_s}
-            startupOverheadS={run.startup_overhead_s}
-            containerSpanS={run.container_span_s}
-            failed={failed}
-          />
-          <Tabs tabs={tabs} defaultTab={failed ? 'error' : 'logs'} scope={run.query_id} />
-          <div className="runrow-foot">
-            <Link to={`/runs/${run.query_id}`}>Open full run detail</Link>
-            <span>QUERY_ID {run.query_id}</span>
-          </div>
+      <div className="runpane-body">
+        <SegmentedDurationBar
+          durationS={run.duration_s}
+          startupOverheadS={run.startup_overhead_s}
+          containerSpanS={run.container_span_s}
+          failed={failed}
+        />
+        <Tabs tabs={tabs} defaultTab={failed ? 'error' : 'logs'} scope={run.query_id} />
+        <div className="runpane-foot">
+          <Link to={`/runs/${run.query_id}`}>Open full run detail</Link>
+          <span>QUERY_ID {run.query_id}</span>
         </div>
-      ) : null}
+      </div>
     </section>
   )
 }
@@ -243,13 +268,13 @@ export default function PipelineDetail() {
   const { search } = useSportFilter()
   const [detail, setDetail] = useState<PipelineDetailPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [openRuns, setOpenRuns] = useState<Record<string, boolean>>({})
+  const [selectedRun, setSelectedRun] = useState<string | null>(null)
 
   useEffect(() => {
     const control = new AbortController()
     setError(null)
     setDetail(null)
-    setOpenRuns({})
+    setSelectedRun(null)
     fetchPipelineDetail(sport, name, RUN_LIMIT, control.signal)
       .then(setDetail)
       .catch((cause: unknown) => {
@@ -283,6 +308,9 @@ export default function PipelineDetail() {
   const now = reference(detail)
   const latest = detail.runs[0] ?? null
   const state = latest ? (PILL_STATE[latest.state] ?? 'ok') : 'ok'
+  // The newest run is selected until the user picks another; only the selected
+  // run's evidence is mounted, so the list can hold many runs at no fetch cost.
+  const currentRun = detail.runs.find((run) => run.query_id === selectedRun) ?? latest
 
   // Day counts for the red states, because the heatmap is exactly one cell per
   // day of the window; a disagreement never becomes a day's worst state, so it
@@ -379,27 +407,25 @@ export default function PipelineDetail() {
 
         <SectionHead
           title="Run history"
-          count={`last ${detail.runs.length} of ${detail.runs_in_window} runs in the window · expand for evidence`}
+          count={`last ${detail.runs.length} of ${detail.runs_in_window} runs in the window · select a run for its evidence`}
         />
 
-        {detail.runs.length === 0 ? (
+        {currentRun == null ? (
           <EmptyState message={`No run row in the last ${detail.window_days} days.`} />
         ) : (
-          detail.runs.map((run, index) => (
-            <RunRowItem
-              key={run.query_id}
-              run={run}
-              // The newest run opens by default; the rest stay collapsed so the
-              // page does not fetch eight runs' logs and metrics at once.
-              open={openRuns[run.query_id] ?? index === 0}
-              onToggle={() =>
-                setOpenRuns((current) => ({
-                  ...current,
-                  [run.query_id]: !(current[run.query_id] ?? index === 0),
-                }))
-              }
-            />
-          ))
+          <div className="runsplit">
+            <div className="runlist" role="group" aria-label="Runs in the window">
+              {detail.runs.map((run) => (
+                <RunListItem
+                  key={run.query_id}
+                  run={run}
+                  selected={run.query_id === currentRun.query_id}
+                  onSelect={() => setSelectedRun(run.query_id)}
+                />
+              ))}
+            </div>
+            <RunEvidence run={currentRun} />
+          </div>
         )}
 
         <AnnotationNote label="Annotation, two zoom levels:">

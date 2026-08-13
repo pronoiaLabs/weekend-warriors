@@ -292,12 +292,56 @@ def incidents(
     return {"days": days, "now": _iso(now), "counts": counts, "incidents": entries}
 
 
+def _day_states(cron: str, history: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
+    """Worst state per day over the window, oldest first.
+
+    `history` must be sorted newest-first. Shared by the detail heatmap and the
+    index strips so the two can never disagree about what a day looked like.
+    """
+    today = now.date()
+    cells: list[dict[str, Any]] = []
+    for offset in range(WINDOW_DAYS - 1, -1, -1):
+        day = today - timedelta(days=offset)
+        day_start = datetime.combine(day, datetime.min.time(), tzinfo=UTC)
+        day_runs = [
+            r
+            for r in history
+            if day_start <= _parse_ts(r["run_started_at"]) < day_start + timedelta(days=1)
+        ]
+        slots = schedule.day_slots(cron, day)
+        _, missed, pending = _match_slots(slots, day_runs, now)
+        states = [_run_state(r) for r in day_runs] + ["missed"] * len(missed)
+        if states:
+            state = derive.worst([s if s in derive.SEVERITY_ORDER else "ok" for s in states])
+            if state == "ok":
+                state = "succeeded" if "succeeded" in states else states[0]
+        elif pending:
+            state = "scheduled"
+        elif slots:
+            state = "missed"
+        else:
+            state = "none"
+        cells.append(
+            {
+                "date": day.isoformat(),
+                "state": state,
+                "query_id": day_runs[0]["query_id"] if day_runs else None,
+            }
+        )
+    return cells
+
+
 def pipelines_index(
     pipelines: list[dict[str, Any]],
     runs_window: list[dict[str, Any]],
     now: datetime,
 ) -> dict[str, Any]:
-    """One row per registered pipeline, including ones that never ran."""
+    """One row per registered pipeline, including ones that never ran.
+
+    The per-row `days` strip costs no extra I/O: `runs_window` is already the
+    whole fleet's window in one query, so each pipeline's day states are a pure
+    re-bucketing of rows this function was grouping anyway.
+    """
     by_pipeline: dict[str, list[dict[str, Any]]] = {}
     for run in runs_window:
         by_pipeline.setdefault(run["pipeline"], []).append(run)
@@ -320,6 +364,7 @@ def pipelines_index(
                 "succeeded": sum(1 for r in history if r.get("task_state") == "SUCCEEDED"),
                 "runs_in_window": len(history),
                 "window_days": WINDOW_DAYS,
+                "days": _day_states(pipe["schedule"], history, now),
             }
         )
     return {"now": _iso(now), "window_days": WINDOW_DAYS, "pipelines": rows}
@@ -334,41 +379,12 @@ def pipeline_detail(
     """Header facts, 14-day heatmap, and run history for one pipeline."""
     history = sorted(history, key=lambda r: r["run_started_at"], reverse=True)
     cron = pipe["schedule"]
-    today = now.date()
 
     succeeded = [r for r in history if r.get("task_state") == "SUCCEEDED"]
     durations = sorted(r["duration_s"] for r in succeeded if r.get("duration_s") is not None)
     median = durations[len(durations) // 2] if durations else None
 
-    heatmap: list[dict[str, Any]] = []
-    for offset in range(WINDOW_DAYS - 1, -1, -1):
-        day = today - timedelta(days=offset)
-        day_start = datetime.combine(day, datetime.min.time(), tzinfo=UTC)
-        day_runs = [
-            r
-            for r in history
-            if day_start <= _parse_ts(r["run_started_at"]) < day_start + timedelta(days=1)
-        ]
-        slots = schedule.day_slots(cron, day)
-        _, missed, pending = _match_slots(slots, day_runs, now)
-        states = [_run_state(r) for r in day_runs] + ["missed"] * len(missed)
-        if states:
-            state = derive.worst([s if s in derive.SEVERITY_ORDER else "ok" for s in states])
-            if state == "ok":
-                state = "succeeded" if "succeeded" in states else states[0]
-        elif pending:
-            state = "scheduled"
-        elif slots:
-            state = "missed"
-        else:
-            state = "none"
-        heatmap.append(
-            {
-                "date": day.isoformat(),
-                "state": state,
-                "query_id": day_runs[0]["query_id"] if day_runs else None,
-            }
-        )
+    heatmap = _day_states(cron, history, now)
 
     latest = history[0] if history else None
     runs_out = []

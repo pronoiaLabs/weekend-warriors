@@ -60,7 +60,7 @@ export function HealthCard({ sport, card }: Props) {
   return (
     <Link
       className={HARD_STATES.has(card.state) ? 'card attention' : 'card'}
-      to={`/pipelines/${sport}/${card.pipeline}`}
+      to={`/ingestion/${sport}/${card.pipeline}`}
     >
       <div className="card-top">
         <span className="name">{card.pipeline}</span>

@@ -21,7 +21,10 @@ import { VerdictPair } from '../components/VerdictPair.tsx'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { bytes, dayDate, dayHhmm, hhmmss, metricValue, num } from '../utils/format.ts'
 
-const LOG_LIMIT = 200
+// The whole run's story: the log window scrolls in place, so page length no
+// longer prices the limit. The API caps at 2000; container runs log a few
+// hundred lines.
+const LOG_LIMIT = 1000
 
 function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError'
@@ -375,7 +378,7 @@ export default function RunDetail() {
       <main className="wrap detail">
         <div className="crumb">
           <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}
-          <Link to={{ pathname: `/pipelines/${run.sport}/${run.pipeline}`, search }}>
+          <Link to={{ pathname: `/ingestion/${run.sport}/${run.pipeline}`, search }}>
             {run.pipeline}
           </Link>{' '}
           / run {dayHhmm(run.run_started_at)}
@@ -454,7 +457,7 @@ export default function RunDetail() {
           itself exited nonzero, so it never explains a failure on its own: the reason always
           resolves through ERROR_TEXT. · <Link to={{ pathname: '/', search }}>Back to the board</Link>{' '}
           ·{' '}
-          <Link to={{ pathname: `/pipelines/${run.sport}/${run.pipeline}`, search }}>
+          <Link to={{ pathname: `/ingestion/${run.sport}/${run.pipeline}`, search }}>
             Pipeline detail
           </Link>{' '}
           · <Link to={{ pathname: '/incidents', search }}>Incidents</Link>
