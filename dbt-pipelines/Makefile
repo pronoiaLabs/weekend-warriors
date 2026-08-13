@@ -50,11 +50,19 @@ deploy-dev: ## Upload the source tree to the shared dev object
 	$(SNOW_DBT) deploy $(DEV_FQN) -c $(CONN) --source . \
 		--default-env dev --external-access-integration $(EAI) --force
 
-deploy-sport: ## Upload the source tree to a sport's prod object (SPORT=nfl|wnba)
-	@test -n "$(SPORT)" || { echo "usage: make deploy-sport SPORT=nfl|wnba"; exit 1; }
+# The trailing GRANT is load-bearing, not belt-and-suspenders: `snow dbt
+# deploy --force` is a CREATE OR REPLACE, and replacing the object DROPS its
+# grants. The DBT_BUILD_<SPORT> trigger task runs as DBT_RUNNER_ROLE (primary
+# role alone), so without USAGE re-granted here every triggered build fails
+# with "does not exist or not authorized" until the task auto-suspends after
+# the consecutive-failure threshold. Cost one two-day prod outage (Aug 2026)
+# to learn.
+deploy-sport: ## Upload the source tree to a sport's prod object (SPORT=nfl|wnba|ncaaf)
+	@test -n "$(SPORT)" || { echo "usage: make deploy-sport SPORT=nfl|wnba|ncaaf"; exit 1; }
 	@$(call hdr,deploy $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z))
 	$(SNOW_DBT) deploy $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) -c $(CONN) --source . \
 		--default-env $(call sport_env,$(SPORT)) --external-access-integration $(EAI) --force
+	$(SNOW) sql -c $(CONN) -q "GRANT USAGE ON DBT PROJECT $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) TO ROLE DBT_RUNNER_ROLE"
 
 deploy-all: deploy-dev ## Deploy dev + every sport object
 	@$(MAKE) deploy-sport SPORT=nfl
