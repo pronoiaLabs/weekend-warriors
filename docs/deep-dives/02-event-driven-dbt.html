@@ -33,7 +33,7 @@
     <h2><span class="no">§ 3.</span> A task with no schedule</h2>
     <p>The consumer is a Snowflake task that has no <code>SCHEDULE</code> clause at all. Instead it declares a <code>WHEN</code> condition on the stream, which turns it into a triggered task: it runs when the stream has data and sits idle otherwise, at zero cost. No cron expression is guessing at when games finish.</p>
     <div class="listing">
-      <p class="listing-label">Listing 1 — The stream and the triggered task, trimmed</p>
+      <p class="listing-label">Listing 1 · The stream and the triggered task, trimmed</p>
       <pre><code>CREATE STREAM IF NOT EXISTS NFL_PROD_DB.OPS.DBT_LOADS_STREAM
   ON TABLE NFL_PROD_DB.RAW._DLT_LOADS APPEND_ONLY = TRUE;
 
@@ -59,7 +59,7 @@ AS
       <p>Drain-first is mandatory, not an audit nicety. A stream that is only read keeps <code>SYSTEM$STREAM_HAS_DATA</code> returning true, so the triggered task re-fires every interval forever, billing the warehouse each time. Measured during development: 4 fires in 90 seconds before the DML drain went in.</p>
     </div>
     <div class="listing">
-      <p class="listing-label">Listing 2 — Drain, then build, trimmed from SP_DBT_BUILD</p>
+      <p class="listing-label">Listing 2 · Drain, then build, trimmed from SP_DBT_BUILD</p>
       <pre><code>-- Drain FIRST. This INSERT is the stream consumption; without it
 -- the task re-fires every interval forever.
 INSERT INTO NFL_PROD_DB.OPS.DBT_TRIGGER_LOADS
@@ -90,7 +90,7 @@ EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL'
     </div>
     <p>On failure, the procedure does something better than handling the error: it lets it raise. A partial dbt failure surfaces as a real SQL error, the task run fails, <code>TASK_HISTORY.ERROR_MESSAGE</code> carries the message, and the failure counts toward Snowflake's automatic suspend-after-N-failures threshold, so a persistently broken build eventually stops billing the warehouse on its own. What happens next, turning that failure into a message a human actually sees, is Chapter 3's story.</p>
     <div class="listing">
-      <p class="listing-label">Listing 3 — The harvest child, gated on build success</p>
+      <p class="listing-label">Listing 3 · The harvest child, gated on build success</p>
       <pre><code>CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL
   WAREHOUSE = DBT_WH
   AFTER NFL_PROD_DB.OPS.DBT_BUILD_NFL

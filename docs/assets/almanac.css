@@ -1,5 +1,5 @@
 /* ============================================================
-   weekend-warriors — the almanac design system
+   weekend-warriors · the almanac design system
    Warm cream paper, near-black ink, one varsity-maroon accent.
    The conceit is structural: numbered tables, figures and
    plates, hairline rules, small-caps headings, dateline, drop
@@ -195,7 +195,7 @@ section { margin-top: 64px; }
 .footnotes .fn-mark { padding-right: 4px; }
 
 /* ============================================================
-   FIGURES — architecture as a printed figure
+   FIGURES · architecture as a printed figure
    ============================================================ */
 
 figure.printed {
@@ -391,7 +391,7 @@ table.almanac .num {
 }
 
 /* ============================================================
-   PLATES — dashboard screenshots
+   PLATES · dashboard screenshots
    ============================================================ */
 
 .plates {
@@ -440,7 +440,7 @@ table.almanac .num {
 }
 
 /* ============================================================
-   DEEP DIVES — contents-page style (landing)
+   DEEP DIVES · contents-page style (landing)
    ============================================================ */
 
 .dives { list-style: none; border-top: 1px solid var(--hairline); }

@@ -37,7 +37,7 @@
     <p>This entire platform runs inside one Snowflake account, and I was not going to break that rule for alerting. No Lambda, no cron box, no container with Slack egress. Snowflake has native webhook notification integrations, and they are enough.</p>
     <p>Three objects, all in <code>dlt-pipelines/sql/ops/09_alerting.sql</code>: a secret, an integration, and a latch table. The secret holds the Slack webhook path, and only the path. Snowflake allowlists webhook hosts per provider, so for Slack the integration's URL must literally start with <code>https://hooks.slack.com/services/</code>, and the <code>SNOWFLAKE_WEBHOOK_SECRET</code> placeholder substitutes the bound secret into it at send time. The secret's value is therefore only the part after <code>/services/</code>, never a full URL, and it never leaves the account: no container carries it, and no container needs network access to Slack at all.</p>
     <div class="listing">
-      <p class="listing-label">Listing 1 — The secret and the integration, trimmed from sql/ops/09_alerting.sql</p>
+      <p class="listing-label">Listing 1 · The secret and the integration, trimmed from sql/ops/09_alerting.sql</p>
       <pre><code>CREATE SECRET IF NOT EXISTS DLT_DB.OPS.SLACK_ALERTS_WEBHOOK
   TYPE = GENERIC_STRING
   SECRET_STRING = 'T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX';
@@ -54,7 +54,7 @@ CREATE OR REPLACE NOTIFICATION INTEGRATION SLACK_ALERTS_INT
     </div>
     <p>Sending is one function call over a session the sender already has. The dlt container is already connected to Snowflake to load data; the dbt trigger procedure is already running inside one. Both just call:</p>
     <div class="listing">
-      <p class="listing-label">Listing 2 — The send call</p>
+      <p class="listing-label">Listing 2 · The send call</p>
       <pre><code>CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
   SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
     SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT(
@@ -75,7 +75,7 @@ CREATE OR REPLACE NOTIFICATION INTEGRATION SLACK_ALERTS_INT
     <p>A channel that pings on every failure of a repeating schedule trains you to mute it, and a muted channel recreates the silent outage with extra steps. So the third object in ops/09 is <code>DLT_DB.OPS.ALERT_STATE</code>: one row per alert scope, latest status only. A scope is a pipeline name, a <code>dbt_build_&lt;sport&gt;</code>, or <code>runner</code> for deaths before a pipeline is even resolved. It is a dedup latch, not a history; <code>TASK_HISTORY</code> already holds the history.</p>
     <p>The rule both senders implement is the same and is small enough to be a pure function. This is the Python side, unit-testable without a connection:</p>
     <div class="listing">
-      <p class="listing-label">Listing 3 — The transition rule, from pipelines/common/alerts.py</p>
+      <p class="listing-label">Listing 3 · The transition rule, from pipelines/common/alerts.py</p>
       <pre><code>def decide(prev_status: str | None, ok: bool) -&gt; str | None:
     """The transition rule: 'fail', 'recover', or None (stay silent)."""
     if not ok:
@@ -90,7 +90,7 @@ CREATE OR REPLACE NOTIFICATION INTEGRATION SLACK_ALERTS_INT
     <p>The alert path must never mask the error it reports, and it must never fail a run that succeeded. Both senders treat alerting as strictly best-effort. In Python, every exit from <code>report()</code> is caught and logged as a warning, and the send happens before the latch write: if the write then fails, the worst case is a duplicate ping next run, which beats a latch claiming "alerted" about a ping that never left.</p>
     <p>The SQL side is where this gets structural. The EXCEPTION handler captures <code>SQLERRM</code> first (the nested block's own statements can replace the active exception context), wraps the entire ping-and-latch sequence in a nested block that swallows everything, and only then re-raises the original error:</p>
     <div class="listing">
-      <p class="listing-label">Listing 4 — SP_DBT_BUILD's handler, trimmed from sql/sources/nfl/05_dbt_trigger.sql</p>
+      <p class="listing-label">Listing 4 · SP_DBT_BUILD's handler, trimmed from sql/sources/nfl/05_dbt_trigger.sql</p>
       <pre><code>EXCEPTION
   WHEN OTHER THEN
     LET err VARCHAR := LEFT(COALESCE(SQLERRM, 'unknown error'), 400);

@@ -30,7 +30,7 @@
     <h2><span class="no">§ 2.</span> One image, config-agnostic</h2>
     <p>The Dockerfile at <code>dlt-pipelines/deploy/spcs/Dockerfile</code> is deliberately boring. It ships the <code>pipelines</code> package and its dependencies, and its entrypoint is the same module you run locally. The pipeline name arrives as the container argument.</p>
     <div class="listing">
-      <p class="listing-label">Listing 1 — the whole runtime image</p>
+      <p class="listing-label">Listing 1 · the whole runtime image</p>
       <pre><code>FROM python:3.11-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /bin/
@@ -51,7 +51,7 @@ ENTRYPOINT ["python", "-m", "pipelines.batch.run"]</code></pre>
     <h2><span class="no">§ 3.</span> The job spec template</h2>
     <p>Between the image and a running job sits a small YAML spec, <code>dlt-pipelines/deploy/spcs/dlt_job.tmpl.yaml</code>. It is a Jinja template with a handful of placeholders filled per pipeline: the pipeline name, the destination database, and the secret binding. One template plus one image drives every pipeline in the fleet.</p>
     <div class="listing">
-      <p class="listing-label">Listing 2 — the env and secrets block of the job spec</p>
+      <p class="listing-label">Listing 2 · the env and secrets block of the job spec</p>
       <pre><code>spec:
   containers:
     - name: dlt
@@ -84,7 +84,7 @@ ENTRYPOINT ["python", "-m", "pipelines.batch.run"]</code></pre>
     <h2><span class="no">§ 4.</span> Egress is opt-in</h2>
     <p>An SPCS container has no network egress by default. None. It can talk to Snowflake through the ambient session, and that is it. Reaching an external API takes two objects: a NETWORK RULE naming the exact host and port, and an EXTERNAL ACCESS INTEGRATION wrapping that rule, granted to the roles that launch jobs. One pair per source API, kept in that source's own SQL directory.</p>
     <div class="listing">
-      <p class="listing-label">Listing 3 — granting exactly one host</p>
+      <p class="listing-label">Listing 3 · granting exactly one host</p>
       <pre><code>CREATE OR REPLACE NETWORK RULE DLT_DB.OPS.NFL_API_EGRESS
     MODE       = EGRESS
     TYPE       = HOST_PORT
@@ -107,7 +107,7 @@ GRANT USAGE ON INTEGRATION NFL_API_EAI TO ROLE DLT_LOADER_ROLE;</code></pre>
     <h2><span class="no">§ 5.</span> The deploy flow</h2>
     <p>With those pieces in place, deploying is three ships and one statement. Build the image and push it to the account's image repository. Sync the registry YAML into the control-plane table. Upload the spec template to a Snowflake stage (<code>@DLT_DB.DEPLOY.SPECS</code>). After that, launching any pipeline is a single SQL statement.</p>
     <div class="listing">
-      <p class="listing-label">Listing 4 — one statement to run a pipeline</p>
+      <p class="listing-label">Listing 4 · one statement to run a pipeline</p>
       <pre><code>EXECUTE JOB SERVICE
   IN COMPUTE POOL DLT_POOL
   NAME = dlt_job_nfl_reference

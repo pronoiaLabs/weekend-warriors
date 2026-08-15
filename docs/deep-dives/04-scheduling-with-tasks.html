@@ -26,7 +26,7 @@
     <p>There is no command line at 09:00 UTC. When a Task fires, it runs the SQL in its own body and that is all it can do. No <code>--resource</code>, no <code>--param</code>, no season flag, nobody watching. Everything a run needs must either be written into the Task's DDL ahead of time or be discoverable by the container once it is up.</p>
     <p>You can fight that constraint with wrapper procedures and config tables full of overrides, or you can lean into it. I leaned in. The design is a registry: one YAML entry per pipeline in <code>dlt-pipelines/pipelines/batch/registries/</code>, merged into a single registry and synced to a control-plane table that the container reads at runtime. The runner, the Task generator, and the observability layer all read the same record. A registry entry that carries a <code>schedule</code> field becomes a Task; one that does not is skipped with a comment, which is how the smoke-test pipeline stays runnable by hand without ever becoming a production schedule. Not scheduled is expressed by omission, never by a flag.</p>
     <div class="listing">
-      <p class="listing-label">Listing 1 — a registry entry, trimmed to what scheduling reads</p>
+      <p class="listing-label">Listing 1 · a registry entry, trimmed to what scheduling reads</p>
       <pre><code>defaults:
   database: NFL                       # a stem: resolves to NFL_PROD_DB when scheduled
   load_warehouse: DLT_WH
@@ -50,7 +50,7 @@ pipelines:
     <h2><span class="no">§ 2.</span> What the generator emits</h2>
     <p>The generator, <code>dlt-pipelines/deploy/tasks/generate_tasks.py</code>, emits one <code>CREATE OR ALTER TASK</code> per scheduled pipeline. It prints SQL rather than applying it: Task DDL is reviewable, diffable and re-runnable only if it exists as text first, and a generator that also executed would make every dry run a production change. Each Task carries a cron schedule and wraps <code>EXECUTE JOB SERVICE</code> with the container spec rendered locally and inlined into the DDL. There is no stage read at run time; the emitted SQL states exactly what will run.</p>
     <div class="listing">
-      <p class="listing-label">Listing 2 — one emitted Task, trimmed</p>
+      <p class="listing-label">Listing 2 · one emitted Task, trimmed</p>
       <pre><code>CREATE OR ALTER TASK DLT_DB.OPS.dlt_task_nfl_games
   WAREHOUSE = DLT_WH
   SCHEDULE = 'USING CRON 0 9 * * * UTC'
@@ -93,7 +93,7 @@ $$;
     <h2><span class="no">§ 4.</span> The reapply dance</h2>
     <p><code>CREATE OR ALTER TASK</code> has two behaviors that matter here, and they bite at different moments. It refuses to touch a Task that is started, failing with error 091421 and changing nothing. And once it can apply, it leaves the Task suspended, so a successful reapply silently stops the schedule. Together they mean applying changes to a running fleet is always three steps, never one.</p>
     <div class="listing">
-      <p class="listing-label">Listing 3 — the three generator outputs, applied in order</p>
+      <p class="listing-label">Listing 3 · the three generator outputs, applied in order</p>
       <pre><code>python -m deploy.tasks.generate_tasks --suspend
   # ALTER TASK IF EXISTS DLT_DB.OPS.dlt_task_nfl_games SUSPEND;
 
