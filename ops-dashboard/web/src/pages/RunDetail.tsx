@@ -16,8 +16,8 @@ import { SectionHead } from '../components/SectionHead.tsx'
 import { SegmentedDurationBar } from '../components/SegmentedDurationBar.tsx'
 import type { TabSpec } from '../components/Tabs.tsx'
 import { Tabs } from '../components/Tabs.tsx'
-import { TopBar } from '../components/TopBar.tsx'
 import { VerdictPair } from '../components/VerdictPair.tsx'
+import { Chrome } from '../components/slate/Chrome.tsx'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { bytes, dayDate, dayHhmm, hhmmss, metricValue, num } from '../utils/format.ts'
 
@@ -328,7 +328,7 @@ export default function RunDetail() {
   if (error) {
     return (
       <>
-        <TopBar />
+        <Chrome />
         <main className="wrap detail">
           <EmptyState message="Could not load this run" detail={error} bad />
         </main>
@@ -339,7 +339,7 @@ export default function RunDetail() {
   if (!run) {
     return (
       <>
-        <TopBar />
+        <Chrome />
         <main className="wrap detail">
           <EmptyState message="Loading run" detail={queryId} />
         </main>
@@ -374,7 +374,9 @@ export default function RunDetail() {
 
   return (
     <>
-      <TopBar meta="V_PIPELINE_RUNS · one row, fully unpacked" />
+      {/* No `now`: a run payload has no clock, and the header below already
+          says when this one ran. */}
+      <Chrome />
       <main className="wrap detail">
         <div className="crumb">
           <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}
@@ -455,12 +457,11 @@ export default function RunDetail() {
         <p className="foot">
           EXIT_STATUS reads NULL for a failure at infrastructure level and FAILED when the container
           itself exited nonzero, so it never explains a failure on its own: the reason always
-          resolves through ERROR_TEXT. · <Link to={{ pathname: '/', search }}>Back to the board</Link>{' '}
-          ·{' '}
+          resolves through ERROR_TEXT. ·{' '}
+          <Link to={{ pathname: '/', search }}>Back to the dashboard</Link> ·{' '}
           <Link to={{ pathname: `/ingestion/${run.sport}/${run.pipeline}`, search }}>
             Pipeline detail
-          </Link>{' '}
-          · <Link to={{ pathname: '/incidents', search }}>Incidents</Link>
+          </Link>
         </p>
       </main>
     </>

@@ -4,11 +4,8 @@ import type {
   DbtBuildsPayload,
   DbtQueryOperatorsPayload,
   HeadlinesPayload,
-  IncidentCountsPayload,
-  IncidentsPayload,
   LogsPayload,
   MetricsPayload,
-  OverviewPayload,
   PipelineDetailPayload,
   PipelinesIndexPayload,
   RowCountsPayload,
@@ -37,28 +34,6 @@ async function get<T>(
 
 export function fetchSports(signal?: AbortSignal): Promise<SportsPayload> {
   return get<SportsPayload>('/api/sports', {}, signal)
-}
-
-export function fetchOverview(sport: string, signal?: AbortSignal): Promise<OverviewPayload> {
-  return get<OverviewPayload>('/api/overview', { sport }, signal)
-}
-
-export function fetchIncidentCounts(
-  sport: string,
-  days: number,
-  signal?: AbortSignal,
-): Promise<IncidentCountsPayload> {
-  return get<IncidentCountsPayload>('/api/incidents', { sport, days: String(days) }, signal)
-}
-
-/** The whole feed, unfiltered by kind: the chip counts have to describe the
-    window rather than the current selection, so the kind filter stays local. */
-export function fetchIncidents(
-  sport: string,
-  days: number,
-  signal?: AbortSignal,
-): Promise<IncidentsPayload> {
-  return get<IncidentsPayload>('/api/incidents', { sport, days: String(days) }, signal)
 }
 
 /** `date` is omitted rather than sent empty when the caller means today: the API
@@ -131,9 +106,9 @@ export function fetchRunRowCounts(
   return get<RowCountsPayload>(`/api/runs/${encodeURIComponent(queryId)}/rowcounts`, {}, signal)
 }
 
-/** `limit` is a caller's decision rather than a page constant: the fleet card
-    reads a handful of builds to find the latest per sport, the dbt page reads
-    the window it renders. */
+/** `limit` is a caller's decision rather than a page constant: the dashboard
+    reads a handful of builds for the day's slate, the builds page reads the
+    window it renders. */
 export function fetchDbtBuilds(
   sport: string,
   limit: number,

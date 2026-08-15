@@ -120,28 +120,6 @@ def create_app() -> FastAPI:
             ]
         }
 
-    @app.get("/api/overview")
-    def overview(sport: str = Query("all"), date: str | None = Query(None)) -> dict[str, Any]:
-        wanted = _check_sport(sport)
-        now = _now()
-        day = dt.date.fromisoformat(date) if date else now.date()
-        pipes = [p for p in datasource.pipelines() if wanted is None or p["sport"] == wanted]
-        runs_window = datasource.runs_window(assemble.WINDOW_DAYS, wanted)
-        return assemble.overview(pipes, runs_window, now, day)
-
-    @app.get("/api/incidents")
-    def incidents(
-        sport: str = Query("all"),
-        days: int = Query(7, ge=1, le=assemble.WINDOW_DAYS),
-        kind: str = Query("all"),
-    ) -> dict[str, Any]:
-        wanted = _check_sport(sport)
-        pipes = [p for p in datasource.pipelines() if wanted is None or p["sport"] == wanted]
-        payload = assemble.incidents(pipes, datasource.runs_window(days, wanted), _now(), days)
-        if kind != "all":
-            payload["incidents"] = [e for e in payload["incidents"] if e["kind"] == kind]
-        return payload
-
     @app.get("/api/headlines")
     def headlines(date: str | None = Query(None)) -> dict[str, Any]:
         # Sport-agnostic on purpose: the wire is one editorial voice over the
@@ -175,8 +153,14 @@ def create_app() -> FastAPI:
     @app.get("/api/pipelines")
     def pipelines_index(sport: str = Query("all")) -> dict[str, Any]:
         wanted = _check_sport(sport)
+        now = _now()
         pipes = [p for p in datasource.pipelines() if wanted is None or p["sport"] == wanted]
-        return assemble.pipelines_index(pipes, datasource.runs_window(assemble.WINDOW_DAYS, wanted), _now())
+        # Explicit bounds rather than a now-anchored day count: runs_between
+        # applies the SAME window in fixture mode, which a days argument did
+        # not. The trailing minute keeps a run started this instant in scope.
+        start = now - dt.timedelta(days=assemble.WINDOW_DAYS)
+        end = now + dt.timedelta(minutes=1)
+        return assemble.pipelines_index(pipes, datasource.runs_between(start, end, wanted), now)
 
     @app.get("/api/pipelines/{sport}/{name}")
     def pipeline(sport: str, name: str, limit: int = Query(8, ge=1, le=50)) -> dict[str, Any]:

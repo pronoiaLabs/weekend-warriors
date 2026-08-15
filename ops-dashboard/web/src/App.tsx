@@ -2,8 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from '
 import Builds from './pages/Builds.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import DbtBuildDetail from './pages/DbtBuildDetail.tsx'
-import Incidents from './pages/Incidents.tsx'
-import Pipelines from './pages/Pipelines.tsx'
 import PipelinesRecords from './pages/PipelinesRecords.tsx'
 import PipelineDetail from './pages/PipelineDetail.tsx'
 import RunDetail from './pages/RunDetail.tsx'
@@ -13,6 +11,14 @@ import RunDetail from './pages/RunDetail.tsx'
 function LegacyDbtRedirect() {
   const { search } = useLocation()
   return <Navigate to={{ pathname: '/builds', search }} replace />
+}
+
+/** The ingestion index is gone; /pipelines is the one pipeline list now. Only
+    the index moves: the /ingestion/:sport/:name detail pages stay where they
+    are, which is why this redirect is bound to the exact path. */
+function LegacyIngestionIndexRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: '/pipelines', search }} replace />
 }
 
 /** The pipeline detail pages renamed /pipelines/... -> /ingestion/...; old
@@ -28,9 +34,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/ingestion" element={<Pipelines />} />
+        <Route path="/ingestion" element={<LegacyIngestionIndexRedirect />} />
         <Route path="/ingestion/:sport/:name" element={<PipelineDetail />} />
-        <Route path="/incidents" element={<Incidents />} />
         <Route path="/runs/:queryId" element={<RunDetail />} />
         <Route path="/builds" element={<Builds />} />
         <Route path="/dbt" element={<LegacyDbtRedirect />} />

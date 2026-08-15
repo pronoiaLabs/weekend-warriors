@@ -13,7 +13,7 @@ import { DbtStateChip } from '../components/DbtStateChip.tsx'
 import { Expander } from '../components/Expander.tsx'
 import { EmptyState } from '../components/QuietNote.tsx'
 import { SectionHead } from '../components/SectionHead.tsx'
-import { TopBar } from '../components/TopBar.tsx'
+import { Chrome } from '../components/slate/Chrome.tsx'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { bytes, dayHhmm, duration, elapsedMs, hhmmss, num } from '../utils/format.ts'
 
@@ -339,7 +339,7 @@ export default function DbtBuildDetail() {
   if (error) {
     return (
       <>
-        <TopBar />
+        <Chrome />
         <main className="wrap detail">
           <EmptyState message="Could not load this dbt build" detail={error} bad />
         </main>
@@ -350,7 +350,7 @@ export default function DbtBuildDetail() {
   if (!payload) {
     return (
       <>
-        <TopBar />
+        <Chrome />
         <main className="wrap detail">
           <EmptyState message="Loading dbt build" detail={buildId} />
         </main>
@@ -363,7 +363,9 @@ export default function DbtBuildDetail() {
 
   return (
     <>
-      <TopBar meta="DBT_PROJECT_EXECUTION_HISTORY · one build, fully unpacked" />
+      {/* No `now`: a build payload has no clock, and the header below already
+          says when this one ran. */}
+      <Chrome />
       <main className="wrap detail">
         <div className="crumb">
           <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}

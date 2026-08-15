@@ -14,35 +14,6 @@ def test_sports(client: TestClient) -> None:
     assert all(s["pipelines"] > 0 for s in body["sports"])
 
 
-def test_overview_shape(client: TestClient) -> None:
-    body = client.get("/api/overview?date=2026-08-08").json()
-    assert body["summary"]["pipelines"] == 17
-    assert body["summary"]["sports"] == 2
-    assert {s["sport"] for s in body["sports"]} == {"NFL", "WNBA"}
-    board = body["board"]
-    assert board["window"]["start"] < board["window"]["end"]
-    for sport in body["sports"]:
-        assert sport["anomaly_count"] + sport["healthy_count"] == sport["pipelines"]
-
-
-def test_overview_sport_filter(client: TestClient) -> None:
-    body = client.get("/api/overview?sport=WNBA&date=2026-08-08").json()
-    assert [s["sport"] for s in body["sports"]] == ["WNBA"]
-
-
-def test_incidents_counts_match_entries(client: TestClient) -> None:
-    body = client.get("/api/incidents?days=7").json()
-    assert sum(body["counts"].values()) == len(body["incidents"])
-    kinds = {e["kind"] for e in body["incidents"]}
-    assert kinds <= {"failure", "missing", "disagree", "missed"}
-
-
-def test_incidents_kind_filter(client: TestClient) -> None:
-    body = client.get("/api/incidents?days=7&kind=missing").json()
-    assert body["incidents"]
-    assert all(e["kind"] == "missing" for e in body["incidents"])
-
-
 def test_pipelines_index(client: TestClient) -> None:
     body = client.get("/api/pipelines").json()
     assert len(body["pipelines"]) == 17

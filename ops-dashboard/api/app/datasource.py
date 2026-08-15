@@ -108,26 +108,6 @@ def pipelines() -> list[dict[str, Any]]:
     ]
 
 
-def runs_window(days: int, sport: str | None = None) -> list[dict[str, Any]]:
-    """All runs in the last `days` days, every column, tagged with sport."""
-    if _mode() == "fixtures":
-        runs = _fixture("runs")["runs"]
-        return [r for r in runs if sport is None or r["sport"] == sport]
-
-    from app import db
-
-    sql = (
-        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
-        "WHERE RUN_STARTED_AT >= DATEADD('day', -%(days)s, CURRENT_TIMESTAMP()) "
-    )
-    params: dict[str, Any] = {"days": days}
-    if sport:
-        sql += "AND SPORT = %(sport)s "
-        params["sport"] = sport
-    sql += "ORDER BY RUN_STARTED_AT DESC"
-    return [_normalize(r) for r in db.query(sql, params)]
-
-
 def run_by_query_id(query_id: str) -> dict[str, Any] | None:
     if _mode() == "fixtures":
         runs = _fixture("runs")["runs"]
@@ -397,12 +377,12 @@ def headlines_for_day(day: date) -> list[dict[str, Any]]:
 def runs_between(start: datetime, end: datetime, sport: str | None) -> list[dict[str, Any]]:
     """Runs with start <= RUN_STARTED_AT < end, newest first.
 
-    Bounds are explicit UTC datetimes rather than a now-anchored window so the
-    slate can be rewound to any day. Fixture mode applies the SAME bounds:
-    runs_window's fixture path ignores its days argument entirely, a trap this
-    function exists to avoid. Bound strings carry milliseconds so the
-    lexicographic compare against the fixtures' .SSSZ timestamps is exact at
-    day edges.
+    Bounds are explicit UTC datetimes rather than a now-anchored day count so
+    the slate can be rewound to any day, and so fixture mode applies the SAME
+    window as live: the day-count predecessor ignored its argument in fixture
+    mode entirely, which is the trap this function exists to avoid. Bound
+    strings carry milliseconds so the lexicographic compare against the
+    fixtures' .SSSZ timestamps is exact at day edges.
     """
     start_iso = start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
     end_iso = end.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"

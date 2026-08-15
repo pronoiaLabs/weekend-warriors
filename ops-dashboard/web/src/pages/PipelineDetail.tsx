@@ -13,8 +13,8 @@ import { SegmentedDurationBar } from '../components/SegmentedDurationBar.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import type { TabSpec } from '../components/Tabs.tsx'
 import { Tabs } from '../components/Tabs.tsx'
-import { TopBar } from '../components/TopBar.tsx'
 import { VerdictPair } from '../components/VerdictPair.tsx'
+import { Chrome } from '../components/slate/Chrome.tsx'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { bytes, cores, dayHhmm, hhmm, num, relativeTo, shortDate } from '../utils/format.ts'
 
@@ -286,7 +286,7 @@ export default function PipelineDetail() {
   if (error) {
     return (
       <>
-        <TopBar />
+        <Chrome />
         <main className="wrap detail">
           <EmptyState message={`Could not load ${sport}/${name}`} detail={error} bad />
         </main>
@@ -297,7 +297,7 @@ export default function PipelineDetail() {
   if (!detail) {
     return (
       <>
-        <TopBar />
+        <Chrome />
         <main className="wrap detail">
           <EmptyState message={`Loading ${name}`} />
         </main>
@@ -320,7 +320,11 @@ export default function PipelineDetail() {
 
   return (
     <>
-      <TopBar meta={`${detail.sport} · V_PIPELINE_RUNS · V_LOG_LINES · V_METRICS`} />
+      {/* No `now`: this payload carries no clock of its own, and `reference()`
+          below is the newest thing described rather than a refresh time, so
+          feeding it to Chrome would date the page wrongly. The old top bar's
+          source list moved nowhere; the sections already name their views. */}
+      <Chrome />
       <main className="wrap detail">
         <div className="crumb">
           <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}
