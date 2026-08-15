@@ -254,6 +254,51 @@ observability write, so look at layer 3.
 
 ---
 
+## Alerting
+
+Failure pings go to Slack from inside the failing run itself — the runner
+(`pipelines/common/alerts.py`, gated on `DLT_ALERTS=1` which only the prod
+job template sets) and each sport's `SP_DBT_BUILD` exception handler. Both
+send through the account's `SLACK_ALERTS_INT` webhook integration
+(`sql/ops/09_alerting.sql`). Noise policy is transitions + recovery via the
+`DLT_DB.OPS.ALERT_STATE` latch: first failure of a streak pings, the first
+success after pings RECOVERED, everything between is silent.
+
+What silence means: healthy, OR one of the two designed blind spots — a
+container that never started, or a schedule that is dead without failing
+(all tasks suspended). The dashboard still shows both; only the ping is
+absent.
+
+```sql
+-- Pause all pings (senders keep working; their errors are swallowed):
+ALTER NOTIFICATION INTEGRATION SLACK_ALERTS_INT SET ENABLED = FALSE;
+
+-- Smoke the delivery path (run as the WORKER role, not SYSADMIN --
+-- task sessions carry the owner's primary role alone):
+CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+  SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+    SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('smoke')),
+  SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+
+-- "Enqueued notifications" proves nothing: delivery is async. Verify with
+SELECT * FROM TABLE(DLT_DB.INFORMATION_SCHEMA.NOTIFICATION_HISTORY(
+  RESULT_LIMIT => 20)) ORDER BY CREATED DESC;   -- 14-day lookback
+
+-- What has alerted, and what is currently latched failing:
+SELECT * FROM DLT_DB.OPS.ALERT_STATE ORDER BY UPDATED_AT DESC;
+```
+
+Rotating the webhook (Slack app rebuilt, URL leaked): create the new Slack
+webhook, then `ALTER SECRET DLT_DB.OPS.SLACK_ALERTS_WEBHOOK SET
+SECRET_STRING = '<part after /services/>'`. No integration or code change;
+the secret substitutes at send time. A stuck `failing` row alongside a green
+dashboard self-heals on the scope's next successful run (the success hook
+sends a late RECOVERED and clears it); only a scope that will never run
+again — a paused sport, a retired pipeline — needs a manual `UPDATE` of its
+`STATUS` to `'ok'`, or just `DELETE` the row.
+
+---
+
 ## Checking a season rollover
 
 The one scheduled behaviour that changes without anyone editing anything. On 1 August the token
