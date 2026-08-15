@@ -379,7 +379,7 @@ export default function RunDetail() {
       <Chrome />
       <main className="wrap detail">
         <div className="crumb">
-          <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}
+          <Link to={{ pathname: '/', search }}>Dashboard</Link> /{' '}
           <Link to={{ pathname: `/ingestion/${run.sport}/${run.pipeline}`, search }}>
             {run.pipeline}
           </Link>{' '}

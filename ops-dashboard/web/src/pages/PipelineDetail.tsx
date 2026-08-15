@@ -327,9 +327,14 @@ export default function PipelineDetail() {
       <Chrome />
       <main className="wrap detail">
         <div className="crumb">
-          <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}
-          <Link to={{ pathname: '/', search: `?sport=${detail.sport}` }}>{detail.sport}</Link> /{' '}
-          {detail.pipeline}
+          <Link to={{ pathname: '/', search }}>Dashboard</Link> /{' '}
+          {/* The sport segment goes to the records table scoped to that league,
+              never to the dashboard with a silently stamped filter: that exact
+              surprise is why this crumb was rewritten. */}
+          <Link to={{ pathname: '/pipelines', search: `?sport=${detail.sport}` }}>
+            {detail.sport}
+          </Link>{' '}
+          / {detail.pipeline}
         </div>
 
         <section className={state === 'ok' ? 'headcard' : 'headcard attn'}>

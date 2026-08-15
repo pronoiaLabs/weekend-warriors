@@ -755,3 +755,27 @@ body {
   color: var(--sl-mute);
   margin-top: 3px;
 }
+
+/* the global sport filter chips: the ?sport= param's visible face */
+.sl-chips {
+  display: flex;
+  gap: 4px;
+  margin-right: 16px;
+}
+.sl-chips button {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sl-mute);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+}
+.sl-chips button:hover {
+  color: var(--sl-ink);
+  background: var(--sl-canvas-2);
+}
+.sl-chips button.on {
+  color: var(--sl-accent);
+  border-color: var(--sl-accent);
+  background: var(--sl-card);
+}

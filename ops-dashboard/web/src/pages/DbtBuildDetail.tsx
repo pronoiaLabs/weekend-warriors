@@ -368,8 +368,8 @@ export default function DbtBuildDetail() {
       <Chrome />
       <main className="wrap detail">
         <div className="crumb">
-          <Link to={{ pathname: '/', search }}>Overview</Link> /{' '}
-          <Link to={{ pathname: '/dbt', search }}>dbt builds</Link> /{' '}
+          <Link to={{ pathname: '/', search }}>Dashboard</Link> /{' '}
+          <Link to={{ pathname: '/builds', search }}>builds</Link> /{' '}
           {at ? `build ${dayHhmm(at)}` : 'build'}
         </div>
 

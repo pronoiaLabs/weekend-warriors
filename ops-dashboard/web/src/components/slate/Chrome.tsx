@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { fetchSports } from '../../api/client.ts'
 import type { SlateDay } from '../../api/types.ts'
 import { useOpsSearch } from '../../hooks/useDayParam.ts'
+import { ALL_SPORTS, useSportFilter } from '../../hooks/useSportFilter.ts'
 import { hhmm } from '../../utils/format.ts'
 
 interface ChromeProps {
@@ -14,6 +17,42 @@ interface ChromeProps {
 
 function linkClass({ isActive }: { isActive: boolean }): string {
   return isActive ? 'on' : ''
+}
+
+/** The global sport filter, made visible.
+
+    The ?sport= param deliberately survives navigation so views stay
+    deep-linkable, and an invisible sticky filter is a trap: a dashboard
+    quietly scoped to one league reads as missing pipelines. These chips are
+    the filter's face on every page, always showing what is active and one
+    click from clearing it. */
+function SportChips() {
+  const { sport, setSport } = useSportFilter()
+  const [sports, setSports] = useState<string[]>([])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchSports(controller.signal)
+      .then((payload) => setSports(payload.sports.map((s) => s.sport)))
+      .catch(() => setSports([]))
+    return () => controller.abort()
+  }, [])
+
+  if (sports.length === 0) return null
+  return (
+    <span className="sl-chips">
+      {[ALL_SPORTS, ...sports].map((value) => (
+        <button
+          key={value}
+          type="button"
+          className={value === sport ? 'on' : ''}
+          onClick={() => setSport(value)}
+        >
+          {value === ALL_SPORTS ? 'All' : value}
+        </button>
+      ))}
+    </span>
+  )
 }
 
 /** What a day tab says under its date.
@@ -54,6 +93,7 @@ export function Chrome({ now, days, selected, onSelect }: ChromeProps) {
           </NavLink>
         </nav>
         <span className="sl-spacer" />
+        <SportChips />
         {now ? (
           <span className="sl-fresh">
             <span className="live" />
