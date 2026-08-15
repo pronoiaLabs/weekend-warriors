@@ -9,6 +9,8 @@ from app.main import create_app
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("OPS_DASHBOARD_DATA", "fixtures")
+    # Clock pinned to the fixture snapshot's era; see test_endpoints.py.
+    monkeypatch.setenv("OPS_DASHBOARD_NOW", "2026-08-09T18:00:00+00:00")
     return TestClient(create_app())
 
 
