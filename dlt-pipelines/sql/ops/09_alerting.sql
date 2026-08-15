@@ -34,7 +34,7 @@
 -- real one out-of-band (never in a file that reaches git):
 --
 --   ALTER SECRET DLT_DB.OPS.SLACK_ALERTS_WEBHOOK
---     SET SECRET_STRING = 'T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX';
+--     SET SECRET_STRING = '<Txxx/Bxxx/xxxx from the real webhook URL>';
 --
 -- TASK SESSIONS RUN THE OWNER'S PRIMARY ROLE ALONE (the lesson ops/01 paid
 -- for), so the USAGE grants below are load-bearing: proving a send works as
@@ -64,10 +64,15 @@
 USE ROLE SYSADMIN;
 
 -- IF NOT EXISTS so a re-apply never clobbers the real value back to the
--- placeholder (03_secrets.sql precedent).
+-- placeholder (03_secrets.sql precedent). The placeholder MUST be shaped like
+-- a real Slack path (T.../B.../x...): CREATE NOTIFICATION INTEGRATION below
+-- validates the URL WITH the secret substituted, and a free-text placeholder
+-- fails it with "WEBHOOK_URL ... is invalid. Verify whether secret
+-- replacement makes it invalid" (found live, 2026-08-15 -- this is why the
+-- Snowflake docs' example secret uses exactly this dummy shape).
 CREATE SECRET IF NOT EXISTS DLT_DB.OPS.SLACK_ALERTS_WEBHOOK
   TYPE = GENERIC_STRING
-  SECRET_STRING = 'UNSET-RUN-THE-ALTER-IN-THE-HEADER'
+  SECRET_STRING = 'T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX'
   COMMENT = 'Slack incoming-webhook path (the part after /services/), substituted into SLACK_ALERTS_INT via SNOWFLAKE_WEBHOOK_SECRET. Value set out-of-band by ALTER SECRET.';
 
 -- READ is what SYSTEM$SEND_SNOWFLAKE_NOTIFICATION needs on the bound secret;
