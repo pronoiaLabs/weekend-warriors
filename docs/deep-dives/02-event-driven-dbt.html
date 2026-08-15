@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch. 2 · dbt builds that fire when data lands · weekend-warriors</title>
+<meta name="description" content="How a Snowflake stream on dlt's load table plus a triggered task rebuilds dbt models within minutes of new data, with no orchestrator anywhere in the picture.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>">
+<link rel="stylesheet" href="../assets/almanac.css">
+</head>
+<body>
+<div class="page">
+  <p class="crumb"><a href="../index.html">weekend-warriors</a><span class="dot">·</span>Hear Me Out<span class="dot">·</span>Deep Dives</p>
+  <header class="chapter">
+    <div class="inner">
+      <p class="ch-no">Chapter 2</p>
+      <h1>dbt builds that fire when data lands</h1>
+      <p class="ch-sub">streams + triggered tasks, no orchestrator</p>
+      <div class="ch-rule"></div>
+    </div>
+  </header>
+  <article class="chapter-body">
+    <p class="lede">Ask how to run dbt right after ingestion finishes and the answer you will get, almost every time, is an orchestrator. Airflow, Dagster, Prefect: a scheduler that lives outside the warehouse, watches the load job, and kicks off the build when it goes green. I want to make the opposite case. In this project, dbt rebuilds the NFL models within a couple of minutes of new data landing, and there is no orchestrator anywhere. The warehouse watches itself. The whole mechanism is one stream, one triggered task, one stored procedure, and it lives in a single SQL file: <code>dlt-pipelines/sql/sources/nfl/05_dbt_trigger.sql</code>.</p>
+
+    <h2><span class="no">§ 1.</span> The usual answer is an orchestrator</h2>
+    <p>The standard architecture puts a third system between ingestion and modeling. The loader finishes, tells the orchestrator, and the orchestrator tells dbt. That works, but now you own a scheduler: its hosting, its credentials into the warehouse, its retry semantics, its opinion about what "done" means. For a stack whose whole premise is that everything runs inside the Snowflake account (Chapter 1 covered getting dlt itself in there), bolting an external brain on the side just to say "data arrived, go" felt like giving up the premise at the last step.</p>
+    <p>The unexpected answer is that Snowflake already has both halves of the problem solved as native objects. Streams answer "did new data arrive?" and triggered tasks answer "run this when it does." What is left is wiring them together carefully, and the care is the interesting part.</p>
+
+    <h2><span class="no">§ 2.</span> The signal is free, and structurally correct</h2>
+    <p>Every dlt pipeline that loads <code>NFL_PROD_DB.RAW</code> finishes a successful load the same way: it inserts one row into <code>RAW._DLT_LOADS</code>, dlt's own bookkeeping table. The crucial property is when that insert does <em>not</em> happen. A failed load never writes to <code>_DLT_LOADS</code>. So an append-only stream on that table is a perfect "new good data" signal, for free. Failed loads can never trigger a rebuild, and not because anyone wrote a filter that checks a status column. The event simply does not exist. Correctness by construction beats correctness by filtering every time, because there is no predicate to get wrong later.</p>
+    <p>The stream is append-only deliberately: I only care about inserts, and dlt only inserts. One wrinkle worth knowing: streams need change tracking enabled on the source table, and creating a stream as a non-owner does not enable it. The file sets <code>CHANGE_TRACKING = TRUE</code> explicitly, as the table's owner role, before the stream exists.</p>
+
+    <h2><span class="no">§ 3.</span> A task with no schedule</h2>
+    <p>The consumer is a Snowflake task that has no <code>SCHEDULE</code> clause at all. Instead it declares a <code>WHEN</code> condition on the stream, which turns it into a triggered task: it runs when the stream has data and sits idle otherwise, at zero cost. No cron expression is guessing at when games finish.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 1 — The stream and the triggered task, trimmed</p>
+      <pre><code>CREATE STREAM IF NOT EXISTS NFL_PROD_DB.OPS.DBT_LOADS_STREAM
+  ON TABLE NFL_PROD_DB.RAW._DLT_LOADS APPEND_ONLY = TRUE;
+
+CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL
+  WAREHOUSE = DBT_WH
+  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 900
+  USER_TASK_TIMEOUT_MS = 3600000
+  WHEN SYSTEM$STREAM_HAS_DATA('NFL_PROD_DB.OPS.DBT_LOADS_STREAM')
+AS
+  CALL NFL_PROD_DB.OPS.SP_DBT_BUILD();</code></pre>
+      <p class="caption">No schedule anywhere: the task exists to react, not to poll on my behalf.</p>
+    </div>
+    <p>The minimum trigger interval is doing quiet load-shaping work. On a Sunday afternoon, several pipelines land within minutes of each other: games, then stats, then standings. Without the interval, each landing could start its own dbt build. With a 900-second floor, everything that arrives inside the window accumulates in the stream, and the next fire drains all of it into one build. A load that lands mid-build is not lost either; the stream holds it and the task simply re-triggers after the current run finishes.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>The 900-second minimum trigger interval turns a burst of loads inside the window into one build that drains all of them. Verified directly: three inserts into <code>_DLT_LOADS</code> within the window produced exactly one task run, and its audit table showed all three loads drained by that run.</p>
+    </div>
+
+    <h2><span class="no">§ 4.</span> The procedure: drain first, always</h2>
+    <p>The procedure the task calls does exactly two things, in an order that matters more than anything else in this chapter. First it drains the stream, then it builds. The drain is a plain <code>INSERT ... SELECT</code> from the stream into an audit table, <code>DBT_TRIGGER_LOADS</code>, which records which loads triggered which build. That looks like bookkeeping. It is not. In Snowflake, a stream only advances its offset when it is consumed by DML. Merely selecting from it changes nothing.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>Drain-first is mandatory, not an audit nicety. A stream that is only read keeps <code>SYSTEM$STREAM_HAS_DATA</code> returning true, so the triggered task re-fires every interval forever, billing the warehouse each time. Measured during development: 4 fires in 90 seconds before the DML drain went in.</p>
+    </div>
+    <div class="listing">
+      <p class="listing-label">Listing 2 — Drain, then build, trimmed from SP_DBT_BUILD</p>
+      <pre><code>-- Drain FIRST. This INSERT is the stream consumption; without it
+-- the task re-fires every interval forever.
+INSERT INTO NFL_PROD_DB.OPS.DBT_TRIGGER_LOADS
+    (LOAD_ID, PIPELINE, STATUS, INSERTED_AT, DRAINED_AT)
+  SELECT LOAD_ID, SCHEMA_NAME, STATUS, INSERTED_AT, CURRENT_TIMESTAMP()
+  FROM NFL_PROD_DB.OPS.DBT_LOADS_STREAM;
+drained := SQLROWCOUNT;
+
+-- SYSTEM$STREAM_HAS_DATA tolerates false positives; don't build on one.
+IF (drained = 0) THEN
+  RETURN 'no-op: stream was empty';
+END IF;
+
+EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL'
+  || ' ARGS = ''run'''
+  || ' ENVIRONMENT = ''prod'''
+  || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';</code></pre>
+      <p class="caption">The zero-row guard exists because SYSTEM$STREAM_HAS_DATA is documented to allow false positives.</p>
+    </div>
+    <p>Three details in those few lines each earned their place. The <code>ENVIRONMENT = 'prod'</code> is explicit because the dbt project object defaults to dev; omit it and the task happily, silently, builds the wrong target with no error to tell you so. The <code>build_id</code> is a UUID minted at the top of the procedure and passed through <code>ENV_VARS</code>, from where a dbt macro folds it into every query's <code>QUERY_TAG</code>, so every warehouse query of every build is attributable afterward. And the whole statement goes through <code>EXECUTE IMMEDIATE</code> because the <code>ENV_VARS</code> clause validates its values at <code>CREATE PROCEDURE</code> time and rejects a Scripting bind variable; assembling the literal is the workaround, and it is safe here because the value being inlined is a self-minted UUID.</p>
+    <p>One more constraint hides off-screen: <code>EXECUTE DBT PROJECT</code> requires a caller's-rights procedure, and concurrent executions against a single project object are unsupported. Since each sport's trigger can fire at the same time, each sport gets its own project object (<code>CORTEX_LIFECYCLE_NFL</code>, <code>CORTEX_LIFECYCLE_WNBA</code>, and so on), all deployed from one source tree. Deploying a sport's object <em>is</em> the release step: the trigger always runs whatever that object holds.</p>
+
+    <h2><span class="no">§ 5.</span> Both outcomes land somewhere useful</h2>
+    <p>On success, the procedure writes one row to <code>DLT_DB.OPS.DBT_BUILDS</code> (build id, environment, how many loads were drained, the query id of the <code>EXECUTE DBT PROJECT</code> statement) and then stamps the task's history row via <code>SYSTEM$SET_RETURN_VALUE</code>, so the build id is readable straight out of <code>TASK_HISTORY</code>.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>A procedure's <code>RETURN</code> string never reaches <code>TASK_HISTORY.RETURN_VALUE</code>; it reads back as null. Only <code>SYSTEM$SET_RETURN_VALUE</code> populates it, and that function demands a constant argument: pass it a bind or a concatenation and you get a compilation error, so the call is assembled as a literal via <code>EXECUTE IMMEDIATE</code>. It also errors when the procedure runs outside a task, which is why the call sits inside its own guard for manual smoke tests.</p>
+    </div>
+    <p>On failure, the procedure does something better than handling the error: it lets it raise. A partial dbt failure surfaces as a real SQL error, the task run fails, <code>TASK_HISTORY.ERROR_MESSAGE</code> carries the message, and the failure counts toward Snowflake's automatic suspend-after-N-failures threshold, so a persistently broken build eventually stops billing the warehouse on its own. What happens next, turning that failure into a message a human actually sees, is Chapter 3's story.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 3 — The harvest child, gated on build success</p>
+      <pre><code>CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL
+  WAREHOUSE = DBT_WH
+  AFTER NFL_PROD_DB.OPS.DBT_BUILD_NFL
+AS
+  CALL DLT_DB.OPS.SP_DBT_HARVEST();</code></pre>
+      <p class="caption">Task-graph semantics do the gating: a child AFTER a root runs only when the root run succeeded.</p>
+    </div>
+    <p>That child task harvests query-level telemetry (the tagged queries and their operator stats) after each build. Making it a child rather than a second trigger buys the gating for free: it never runs after a failed build, and a harvest failure fails its own task run, never the build. One footgun in this shape: <code>CREATE OR ALTER TASK</code> leaves tasks suspended, and a resumed root with a suspended child silently skips the child, so the file resumes the child before the root, every time.</p>
+
+    <h2><span class="no">§ 6.</span> No scheduler knows dbt exists</h2>
+    <p>Step back and look at the chain: a container loads the API into <code>RAW</code>, dlt records the success, the stream sees the insert, the task fires, the procedure drains and builds, models refresh in <code>PREP</code>, <code>CORE</code>, and <code>ANALYTICS</code>. End to end, that typically completes within a minute or two of the load landing, and every link is a Snowflake object owned by a role, versioned in one SQL file, applied idempotently. There is no cron expression estimating when data arrives, no orchestrator holding warehouse credentials, no scheduler anywhere that knows dbt exists.</p>
+    <p>The operational surface is correspondingly small. The kill switch is one statement, <code>ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND</code>: ingestion continues untouched, the stream accumulates, and everything drains into one build on resume. Adding a sport is the same file with the names changed. I am not arguing orchestrators are never worth it; cross-system DAGs with fan-in from a dozen sources are a different problem. But "run dbt when the load succeeds" is not that problem, and the warehouse turns out to be the right tool for watching itself.</p>
+  </article>
+  <nav class="chapter-nav">
+    <a href="01-dlt-on-spcs.html"><span class="dir">Previous · Ch. 1</span><span class="t">Deploying dlt to Snowpark Container Services</span></a>
+    <a class="next" href="03-slack-alerts.html"><span class="dir">Next · Ch. 3</span><span class="t">Slack alerts with zero external infrastructure</span></a>
+  </nav>
+  <footer class="colophon">
+    <div class="inner-rule">
+      <p class="stack">Snowflake (SPCS · Tasks · Streams · Cortex) + dlt + dbt</p>
+      <p class="meta">Data: balldontlie.io<span class="sep">·</span><a class="repo" href="https://github.com/pronoiaLabs/weekend-warriors">github.com/pronoiaLabs/weekend-warriors</a><span class="sep">·</span>Apache-2.0</p>
+      <p class="end-mark">&#10045;</p>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

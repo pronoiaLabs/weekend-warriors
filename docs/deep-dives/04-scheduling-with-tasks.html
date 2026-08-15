@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch. 4 · Scheduling containers with nothing but Snowflake Tasks · weekend-warriors</title>
+<meta name="description" content="How a registry of YAML entries becomes a fleet of Snowflake Tasks that launch SPCS job containers on cron, with no orchestrator anywhere in sight.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>">
+<link rel="stylesheet" href="../assets/almanac.css">
+</head>
+<body>
+<div class="page">
+  <p class="crumb"><a href="../index.html">weekend-warriors</a><span class="dot">·</span>Hear Me Out<span class="dot">·</span>Deep Dives</p>
+  <header class="chapter">
+    <div class="inner">
+      <p class="ch-no">Chapter 4</p>
+      <h1>Scheduling containers with nothing but Snowflake Tasks</h1>
+      <p class="ch-sub">the registry-driven ingestion pattern</p>
+      <div class="ch-rule"></div>
+    </div>
+  </header>
+  <article class="chapter-body">
+    <p class="lede">Every pipeline in this project runs on a schedule with no Airflow, no cron box, no GitHub Actions timer, nothing outside the Snowflake account. The scheduler is the humble Snowflake Task, and the whole design of the ingestion layer falls out of one property of that object that sounds like a footnote until you build against it: a Task passes no arguments.</p>
+
+    <h2><span class="no">§ 1.</span> The constraint that shapes everything</h2>
+    <p>There is no command line at 09:00 UTC. When a Task fires, it runs the SQL in its own body and that is all it can do. No <code>--resource</code>, no <code>--param</code>, no season flag, nobody watching. Everything a run needs must either be written into the Task's DDL ahead of time or be discoverable by the container once it is up.</p>
+    <p>You can fight that constraint with wrapper procedures and config tables full of overrides, or you can lean into it. I leaned in. The design is a registry: one YAML entry per pipeline in <code>dlt-pipelines/pipelines/batch/registries/</code>, merged into a single registry and synced to a control-plane table that the container reads at runtime. The runner, the Task generator, and the observability layer all read the same record. A registry entry that carries a <code>schedule</code> field becomes a Task; one that does not is skipped with a comment, which is how the smoke-test pipeline stays runnable by hand without ever becoming a production schedule. Not scheduled is expressed by omission, never by a flag.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 1 — a registry entry, trimmed to what scheduling reads</p>
+      <pre><code>defaults:
+  database: NFL                       # a stem: resolves to NFL_PROD_DB when scheduled
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  secret: DLT_DB.OPS.NFL_API_KEY      # Snowflake SECRET holding the API key
+  env_var: SOURCES__NFL__API_KEY      # env var the container reads it through
+  external_access: NFL_API_EAI        # egress to the source API
+
+pipelines:
+  - name: nfl_games
+    schedule: "0 9 * * *"             # daily, after Monday Night Football ends
+    config:
+      resource_defaults:
+        endpoint:
+          params:
+            seasons[]: "{current_season}"   # resolved at run time, see § 3</code></pre>
+      <p class="caption">From <code>dlt-pipelines/pipelines/batch/registries/nfl-registry.yml</code>: the schedule, the credential binding, and the egress path all live on the same record.</p>
+    </div>
+    <p>The validation is deliberately strict about the combination: a registry entry declaring a <code>schedule</code> without <code>secret</code>, <code>env_var</code> and <code>external_access</code> fails the test suite, because the alternative is a container dying at 09:00 UTC looking for a credential nobody bound. (How the image, spec and secrets themselves work is Chapter 1's story; this chapter is about who pulls the trigger.)</p>
+
+    <h2><span class="no">§ 2.</span> What the generator emits</h2>
+    <p>The generator, <code>dlt-pipelines/deploy/tasks/generate_tasks.py</code>, emits one <code>CREATE OR ALTER TASK</code> per scheduled pipeline. It prints SQL rather than applying it: Task DDL is reviewable, diffable and re-runnable only if it exists as text first, and a generator that also executed would make every dry run a production change. Each Task carries a cron schedule and wraps <code>EXECUTE JOB SERVICE</code> with the container spec rendered locally and inlined into the DDL. There is no stage read at run time; the emitted SQL states exactly what will run.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 2 — one emitted Task, trimmed</p>
+      <pre><code>CREATE OR ALTER TASK DLT_DB.OPS.dlt_task_nfl_games
+  WAREHOUSE = DLT_WH
+  SCHEDULE = 'USING CRON 0 9 * * * UTC'
+AS
+  EXECUTE JOB SERVICE
+    IN COMPUTE POOL DLT_POOL
+    COMMENT = 'nfl_games'
+    EXTERNAL_ACCESS_INTEGRATIONS = (NFL_API_EAI)
+    FROM SPECIFICATION $$
+spec:
+  containers:
+    - name: dlt
+      image: /DLT_DB/DEPLOY/IMAGES/dlt-pipeline:latest
+      args:
+        - nfl_games
+      env:
+        DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE: NFL_PROD_DB
+        SNOWFLAKE_DATABASE: DLT_DB
+      secrets:
+        - snowflakeSecret: DLT_DB.OPS.NFL_API_KEY
+          secretKeyRef: secret_string
+          envVarName: SOURCES__NFL__API_KEY
+$$;
+
+-- ALTER TASK DLT_DB.OPS.dlt_task_nfl_games RESUME;   -- uncomment to start</code></pre>
+      <p class="caption">Cron, compute pool, egress, secret binding and target database, all derived from the one registry entry in Listing 1.</p>
+    </div>
+    <p>Two details in that listing cost me real debugging time. First, there is no <code>NAME =</code> on the job service, and that is deliberate. Second, the <code>EXTERNAL_ACCESS_INTEGRATIONS</code> clause sits before <code>FROM</code>, and it has to: <code>EXECUTE JOB SERVICE</code> fixes its clause order, and putting the integration after the specification is a SQL compilation error, not a warning. Worse, the error only fires for pipelines that pass an integration at all, so a source needing no egress hides the mistake entirely. There is a test in <code>dlt-pipelines/tests/test_tasks.py</code> that asserts the ordering on every emitted Task, because this is exactly the kind of thing that is cheap to check as text and expensive to discover in <code>TASK_HISTORY</code>.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>A fixed job-service NAME collides on the second run. A completed job service persists for 30 days so its logs stay readable, and there is no OR REPLACE on EXECUTE JOB SERVICE. A daily Task with a fixed name succeeds on the first morning and fails with "Object already exists" every morning after. Omit NAME, let Snowflake generate a unique one per run, and put the pipeline name in COMMENT so SHOW SERVICES can still tell you what each job was.</p>
+    </div>
+    <p>The Task name itself is fully qualified (<code>DLT_DB.OPS.dlt_task_&lt;pipeline&gt;</code>) because the grant is <code>CREATE TASK</code> on that specific schema and nothing guarantees the applying session has a current schema at all. And the target database is always the prod one: a Task is the production schedule, so the generator simply cannot emit a dev target. The tests enforce that too, with a literal <code>assert "_DEV_DB" not in sql</code>.</p>
+
+    <h2><span class="no">§ 3.</span> What a Task cannot pass, and the season problem</h2>
+    <p>The sharpest edge of the no-arguments rule is the season parameter. The source API is inconsistent about it in the worst way: <code>/standings</code> and the advanced-stats endpoints return HTTP 400 without a season, while <code>/games</code> and <code>/stats</code> silently return every season the API holds. So a scheduled run without a season is either a loud failure or, much worse, a green run that quietly re-fetched years of history it did not need.</p>
+    <p>Since no argv exists, the season goes into the registry as a token: <code>season: "{current_season}"</code>. The runner substitutes the real year before dlt ever sees the config, using a rule that rolls over on 1 August when preseason opens, so January stays on the season still being played. A hardcoded year would work until the August nobody remembers it, and then every nightly load would report success while fetching a season that ended months ago. The token fails toward the correct behavior instead.</p>
+    <p>Backfills are unaffected, because manual runs do have a command line: a <code>--param season=2023</code> merges in after the token resolves and wins. Nothing about scheduling changes how you load history, which is precisely what you want from a scheduling layer.</p>
+
+    <h2><span class="no">§ 4.</span> The reapply dance</h2>
+    <p><code>CREATE OR ALTER TASK</code> has two behaviors that matter here, and they bite at different moments. It refuses to touch a Task that is started, failing with error 091421 and changing nothing. And once it can apply, it leaves the Task suspended, so a successful reapply silently stops the schedule. Together they mean applying changes to a running fleet is always three steps, never one.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 3 — the three generator outputs, applied in order</p>
+      <pre><code>python -m deploy.tasks.generate_tasks --suspend
+  # ALTER TASK IF EXISTS DLT_DB.OPS.dlt_task_nfl_games SUSPEND;
+
+python -m deploy.tasks.generate_tasks
+  # CREATE OR ALTER TASK ... (Listing 2, once per scheduled pipeline)
+
+python -m deploy.tasks.generate_tasks --resume
+  # ALTER TASK DLT_DB.OPS.dlt_task_nfl_games RESUME;   -- no IF EXISTS</code></pre>
+      <p class="caption">Suspend, apply, resume: all three gate on the same <code>spec.schedule</code> field, so they can never disagree about which pipelines are Tasks.</p>
+    </div>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>snow sql -f stops at the first error. Apply task DDL to a fleet whose first Task is started and the file aborts before the rest are attempted: some Tasks carry the new spec, some the old, and nothing in the output says which half is which. Measured against a live 17-Task fleet. The suspend pass exists so this state cannot be reached.</p>
+    </div>
+    <p>The asymmetry between the two ALTER passes is deliberate. Suspend uses <code>IF EXISTS</code> because it runs before the apply, when absence is expected: on a first deploy no Task exists yet, and a bare <code>ALTER TASK</code> would abort the suspend pass on the first missing name and leave the rest started, reproducing the exact problem it prevents. Resume does not use <code>IF EXISTS</code>, on purpose. It runs after the apply created every Task, so a missing Task at resume time means the apply failed partway, and the error is the only signal that would ever say so.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>Tasks are emitted suspended, and the resume is a separate, deliberate step: generating a schedule and starting one are different decisions. That default is right for a human reviewing DDL and a trap for CI, which reapplies on every registry change and would stop the fleet each time. Hence --resume as a second output CI applies immediately after. And verify with SHOW TASKS, never the exit code, because a suspended fleet looks exactly like a successful deploy.</p>
+    </div>
+
+    <h2><span class="no">§ 5.</span> The punchline</h2>
+    <p>Here is what all of this buys. Adding a pipeline is one YAML entry. The same record tells the runner what to fetch, tells the generator what Task to emit (cron, pool, warehouse, egress, secret binding, target database), and tells the observability layer what to attribute the run to. There is no second config file to update, no DAG to edit, no deploy manifest to keep in sync with the registry, because there is only the registry. The constraint that started this chapter, a Task passes no arguments, is what forced everything onto one record, and the one record is why the whole thing holds together.</p>
+  </article>
+  <nav class="chapter-nav">
+    <a href="03-slack-alerts.html"><span class="dir">Previous · Ch. 3</span><span class="t">Slack alerts with zero external infrastructure</span></a>
+    <a class="next" href="../index.html"><span class="dir">Contents</span><span class="t">weekend-warriors, 2026 edition</span></a>
+  </nav>
+  <footer class="colophon">
+    <div class="inner-rule">
+      <p class="stack">Snowflake (SPCS · Tasks · Streams · Cortex) + dlt + dbt</p>
+      <p class="meta">Data: balldontlie.io<span class="sep">·</span><a class="repo" href="https://github.com/pronoiaLabs/weekend-warriors">github.com/pronoiaLabs/weekend-warriors</a><span class="sep">·</span>Apache-2.0</p>
+      <p class="end-mark">&#10045;</p>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
