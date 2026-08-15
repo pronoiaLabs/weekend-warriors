@@ -79,7 +79,7 @@ export function RecordsPanel({ rows }: RecordsPanelProps) {
       )}
 
       <div className="sl-panel-foot">
-        <Link to={{ pathname: '/ingestion', search }}>full records →</Link>
+        <Link to={{ pathname: '/pipelines', search }}>full records →</Link>
       </div>
     </div>
   )

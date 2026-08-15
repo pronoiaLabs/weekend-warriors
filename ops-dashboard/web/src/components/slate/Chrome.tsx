@@ -46,10 +46,10 @@ export function Chrome({ now, days, selected, onSelect }: ChromeProps) {
           <NavLink to={{ pathname: '/', search }} end className={linkClass}>
             Dashboard
           </NavLink>
-          <NavLink to={{ pathname: '/ingestion', search }} className={linkClass}>
+          <NavLink to={{ pathname: '/pipelines', search }} className={linkClass}>
             Pipelines
           </NavLink>
-          <NavLink to={{ pathname: '/dbt', search }} className={linkClass}>
+          <NavLink to={{ pathname: '/builds', search }} className={linkClass}>
             Builds
           </NavLink>
         </nav>

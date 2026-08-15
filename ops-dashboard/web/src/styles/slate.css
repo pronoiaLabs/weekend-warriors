@@ -596,3 +596,162 @@ body {
   text-align: left;
   background: var(--sl-canvas-2);
 }
+
+/* Numbers read right-aligned, but a strip and a free-text argument read left:
+   the class carries that exception rather than an inline style. */
+.sl-standings .lt {
+  text-align: left;
+}
+
+.sl-standings .misc.bad {
+  color: var(--sl-fail);
+  font-weight: 600;
+}
+
+.sl-standings tbody tr.click {
+  cursor: pointer;
+}
+
+/* A failed build gets an edge rather than a wash, so a run of them reads as a
+   margin down the table without drowning the numbers. Inset shadow, not a
+   border: a border would shift every other row's first column by 3px. */
+.sl-standings tbody tr.fail td:first-child {
+  box-shadow: inset 3px 0 0 var(--sl-fail);
+}
+
+.sl-standings .pname a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sl-standings .pname a:hover {
+  color: var(--sl-accent);
+  text-decoration: underline;
+}
+
+.sl-standings em {
+  font-style: normal;
+  color: var(--sl-fail);
+  font-size: 11px;
+}
+
+/* ============================================================ records table */
+
+/* The standalone table is a card of its own, unlike the rail panel's, and it
+   scrolls sideways rather than crushing the form strip on a narrow window. */
+.sl-records-wrap {
+  background: var(--sl-card);
+  border: 1px solid var(--sl-hair);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.sl-records-wrap .sl-standings td,
+.sl-records-wrap .sl-standings th {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.sl-records-wrap .sl-standings th {
+  padding-bottom: 6px;
+  font-size: 10px;
+}
+
+.sl-records-wrap .sl-standings td:first-child,
+.sl-records-wrap .sl-standings th:first-child {
+  padding-left: 14px;
+}
+
+/* ============================================================ form strip */
+
+.sl-form {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.sl-form i,
+.sl-form a {
+  display: block;
+  box-sizing: border-box;
+  width: 6px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--sl-hair);
+}
+
+.sl-form a:hover {
+  outline: 1px solid var(--sl-ash);
+  outline-offset: 1px;
+}
+
+.sl-form a:focus-visible {
+  outline: 2px solid var(--sl-accent);
+  outline-offset: 1px;
+}
+
+.sl-form .w {
+  background: var(--sl-ok);
+  opacity: 0.45;
+}
+
+.sl-form .l {
+  background: var(--sl-fail);
+}
+
+/* A missed slot occupies its place in the strip without claiming a result, so
+   it is drawn as an outline rather than filled. */
+.sl-form .m {
+  background: transparent;
+  border: 1px dashed var(--sl-fail);
+}
+
+/* ============================================================ rollups */
+
+.sl-roll-row {
+  display: flex;
+  gap: 64px;
+  padding: 8px 0 24px;
+  flex-wrap: wrap;
+}
+
+.sl-roll {
+  min-width: 170px;
+}
+
+/* An out-of-season sport still has a record worth showing, just not one worth
+   reading first. */
+.sl-roll.paused {
+  opacity: 0.5;
+}
+
+.sl-roll .who {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sl-mute);
+  margin-bottom: 6px;
+}
+
+.sl-roll .big {
+  font-family: var(--sl-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--sl-ink);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.sl-roll .big .of {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--sl-ash);
+  margin-left: 5px;
+}
+
+.sl-roll .lbl {
+  font-size: 12.5px;
+  color: var(--sl-mute);
+  margin-top: 3px;
+}
