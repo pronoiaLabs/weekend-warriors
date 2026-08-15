@@ -182,15 +182,17 @@ body {
 /* ============================================================ layout */
 
 .sl-page {
-  max-width: 1280px;
+  /* Fluid with a wide cap, matching the detail pages' width discipline:
+     the carousels and tables are the product, dead margin is not. */
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 24px 24px 64px;
+  padding: 24px 32px 64px;
 }
 
 .sl-page.split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 40px;
   align-items: start;
 }
 
