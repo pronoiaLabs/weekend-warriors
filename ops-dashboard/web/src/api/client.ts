@@ -3,6 +3,7 @@ import type {
   DbtBuildQueriesPayload,
   DbtBuildsPayload,
   DbtQueryOperatorsPayload,
+  HeadlinesPayload,
   IncidentCountsPayload,
   IncidentsPayload,
   LogsPayload,
@@ -12,6 +13,7 @@ import type {
   PipelinesIndexPayload,
   RowCountsPayload,
   RunDetailPayload,
+  SlatePayload,
   SportsPayload,
 } from './types.ts'
 
@@ -57,6 +59,28 @@ export function fetchIncidents(
   signal?: AbortSignal,
 ): Promise<IncidentsPayload> {
   return get<IncidentsPayload>('/api/incidents', { sport, days: String(days) }, signal)
+}
+
+/** `date` is omitted rather than sent empty when the caller means today: the API
+    resolves the missing parameter against its own clock, which is the one the
+    OPS_DASHBOARD_NOW pin moves. */
+export function fetchSlate(
+  sport: string,
+  date: string | null,
+  signal?: AbortSignal,
+): Promise<SlatePayload> {
+  const params: Record<string, string> = { sport }
+  if (date) params.date = date
+  return get<SlatePayload>('/api/slate', params, signal)
+}
+
+export function fetchHeadlines(
+  date: string | null,
+  signal?: AbortSignal,
+): Promise<HeadlinesPayload> {
+  const params: Record<string, string> = {}
+  if (date) params.date = date
+  return get<HeadlinesPayload>('/api/headlines', params, signal)
 }
 
 export function fetchPipelinesIndex(

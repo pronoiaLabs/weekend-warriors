@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import Dashboard from './pages/Dashboard.tsx'
 import DbtBuildDetail from './pages/DbtBuildDetail.tsx'
 import DbtBuilds from './pages/DbtBuilds.tsx'
-import Fleet from './pages/Fleet.tsx'
 import Incidents from './pages/Incidents.tsx'
 import Pipelines from './pages/Pipelines.tsx'
 import PipelineDetail from './pages/PipelineDetail.tsx'
@@ -24,7 +24,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Fleet />} />
+        <Route path="/" element={<Dashboard />} />
         <Route path="/ingestion" element={<Pipelines />} />
         <Route path="/ingestion/:sport/:name" element={<PipelineDetail />} />
         <Route path="/incidents" element={<Incidents />} />

@@ -327,6 +327,23 @@ export interface RowCountsPayload {
   prev_row_counts: Record<string, number> | null
 }
 
+/** Last-14 record over decisive task states. `pct` and `streak` are null for a
+    pipeline the window never decided, which is not the same as 0. */
+export interface PipelineRecord {
+  wins: number
+  losses: number
+  pct: number | null
+  streak: string | null
+}
+
+/** One cell of the form strip, oldest first. "M" is a missed slot: it occupies
+    space but stays out of the record and the streak. */
+export interface FormCell {
+  at: string
+  result: 'W' | 'L' | 'M'
+  query_id: string | null
+}
+
 export interface PipelineIndexRow {
   pipeline: string
   sport: string
@@ -338,8 +355,13 @@ export interface PipelineIndexRow {
   succeeded: number
   runs_in_window: number
   window_days: number
-  /** Worst state per day, oldest first — the same cells as the detail heatmap. */
+  /** Worst state per day, oldest first, the same cells as the detail heatmap. */
   days: HeatCell[]
+  record: PipelineRecord
+  /** Chronological, at most one cell per run or missed slot in the window. */
+  form: FormCell[]
+  /** Mean duration over successful runs only, so a fast failure cannot flatter it. */
+  avg_duration_s: number | null
 }
 
 export interface PipelinesIndexPayload {
@@ -439,4 +461,120 @@ export interface DbtQueryOperator {
 export interface DbtQueryOperatorsPayload {
   query_id: string
   operators: DbtQueryOperator[]
+}
+
+/** ---- the slate ----
+    One day of the schedule read as a scoreboard: score cards grouped by league,
+    plus the surrounding week as a day strip. */
+
+/** The same pipeline's previous run, carried on a card so a failure or a waiting
+    slot can say what normal looked like. */
+export interface SlatePrevRun {
+  at: string
+  state: BlockState
+  rows_loaded: number | null
+  duration_s: number | null
+}
+
+/** A cron slot that produced a run row: succeeded, failure or missing. */
+export interface SlateRunCard {
+  kind: 'run'
+  state: BlockState
+  pipeline: string
+  at: string
+  duration_s: number | null
+  rows_loaded: number | null
+  query_id: string | null
+  error_excerpt: string | null
+  schedule: string
+  cron: string
+  prev: SlatePrevRun | null
+}
+
+/** A cron slot with no run row: already passed (missed) or still ahead
+    (upcoming). The fields a run would carry are null by construction. */
+export interface SlateSlotCard {
+  kind: 'missed' | 'upcoming'
+  state: 'missed' | 'upcoming'
+  pipeline: string
+  at: string
+  duration_s: null
+  rows_loaded: null
+  query_id: null
+  error_excerpt: null
+  schedule: string
+  cron: string
+  prev: SlatePrevRun | null
+}
+
+/** One event-driven dbt build, which has no slot: it fired when data landed. */
+export interface SlateBuildCard {
+  kind: 'build'
+  state: 'succeeded' | 'failure'
+  sport: string
+  args: string
+  build_id: string | null
+  at: string
+  duration_s: number | null
+  n_queries: number | null
+  n_failed_queries: number | null
+  drained_loads: number | null
+}
+
+export type SlateCard = SlateRunCard | SlateSlotCard | SlateBuildCard
+
+export interface SlateDay {
+  date: string
+  dow: string
+  is_today: boolean
+  ran: number
+  failed: number
+  missed: number
+  upcoming: number
+  slots: number
+}
+
+/** Tallies and rows ride on ingestion leagues only: a dbt league has neither a
+    cron slot nor a row count, so those keys are absent rather than zero. */
+export interface SlateLeague {
+  sport: string
+  kind: 'ingestion' | 'dbt'
+  ran?: number
+  failed?: number
+  missed?: number
+  upcoming?: number
+  slots?: number
+  rows_loaded?: number
+  cards: SlateCard[]
+}
+
+export interface SlatePayload {
+  date: string
+  now: string
+  window_days: number
+  /** Seven entries with the requested day centred. */
+  days: SlateDay[]
+  leagues: SlateLeague[]
+}
+
+export type HeadlineSeverity = 'fail' | 'warn' | 'ok' | 'info'
+
+export interface Headline {
+  seq: number
+  severity: HeadlineSeverity
+  kind: string
+  entity: string
+  headline: string
+  detail: string
+}
+
+/** The AI wire. `stale` is informational, never an error: the wire regenerates
+    once a day, so a morning request legitimately serves yesterday's edition. */
+export interface HeadlinesPayload {
+  requested_date: string
+  served_date: string | null
+  stale: boolean
+  generated_at: string | null
+  model: string | null
+  headlines: Headline[]
 }
