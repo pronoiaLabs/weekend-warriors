@@ -21,7 +21,7 @@ export type BlockState =
   | 'upcoming'
   | (string & {})
 
-/** Severity classes shared by card state, panel worst and badge kind. */
+/** Severity classes shared by a run's derived state and a badge's kind. */
 export type AnomalyKind = 'missing' | 'missed' | 'failure' | 'disagree' | 'ok'
 
 export interface Block {
@@ -35,147 +35,13 @@ export interface Block {
   error_excerpt?: string | null
 }
 
-export interface Sublane {
-  pipeline: string
-  schedule: string
-  cron: string
-  not_scheduled_today: boolean
-  next_fire: string
-  last_duration_s: number | null
-  last_rows_loaded: number | null
-  blocks: Block[]
-}
-
-export interface BoardSport {
-  sport: string
-  blocks: Block[]
-  sublanes: Sublane[]
-}
-
-export interface BoardWindow {
-  start: string
-  end: string
-}
-
-export interface Board {
-  window: BoardWindow
-  sports: BoardSport[]
-}
-
-export interface OverviewSummary {
-  pipelines: number
-  sports: number
-  slots_today: number
-  succeeded_today: number
-  failed_today: number
-  missing_today: number
-  missed_today: number
-  upcoming_today: number
-}
-
-export interface Badge {
-  kind: AnomalyKind
-  count: number
-  window_days: number
-  last_at?: string
-}
-
-export interface PipelineCard {
-  pipeline: string
-  state: AnomalyKind
-  last_run: Block | null
-  task_state: string | null
-  dlt_status: string | null
-  missed_slots_today: number
-  badges: Badge[]
-}
-
-export interface SportPanel {
-  sport: string
-  pipelines: number
-  worst: AnomalyKind
-  missed_slots_today: number
-  rows_today: number
-  anomaly_count: number
-  healthy_count: number
-  cards: PipelineCard[]
-}
-
-export interface OverviewPayload {
-  date: string
-  now: string
-  summary: OverviewSummary
-  board: Board
-  sports: SportPanel[]
-}
-
-export interface IncidentCounts {
-  failure: number
-  missing: number
-  disagree: number
-  missed: number
-}
-
-/** The header of /api/incidents on its own, for callers that only need totals. */
-export interface IncidentCountsPayload {
-  days: number
-  now: string
-  counts: IncidentCounts
-}
-
-/** Every incident kind except "ok", which is the absence of one. */
+/** Severity classes a badge can name. The incident feed is gone; the badge
+    component still speaks this vocabulary. */
 export type IncidentKind = 'failure' | 'missing' | 'disagree' | 'missed'
-
-/** The run that followed this one on the same pipeline, when there is one. */
-export interface NextOutcome {
-  task_state: string | null
-  at: string
-}
-
-/** An incident carried by a V_PIPELINE_RUNS row. */
-export interface RunIncident {
-  kind: 'failure' | 'missing' | 'disagree'
-  sport: string
-  pipeline: string
-  at: string
-  query_id: string | null
-  duration_s: number | null
-  rows_loaded: number | null
-  load_id: string | null
-  task_state: string | null
-  dlt_status: string | null
-  error_text: string | null
-  error_provenance: string | null
-  error_lines: number | null
-  log_lines: number | null
-  container_never_started: boolean | null
-  next_outcome: NextOutcome | null
-}
 
 export interface SlotSample {
   at: string
   state: BlockState
-}
-
-/** An incident with no run row behind it: a cron slot that fired nothing. The
-    fields a run would carry are absent rather than null-filled. */
-export interface MissedIncident {
-  kind: 'missed'
-  sport: string
-  pipeline: string
-  at: string
-  noticed: string
-  query_id: null
-  schedule: string
-  slot_strip: SlotSample[]
-}
-
-export type Incident = RunIncident | MissedIncident
-
-export interface IncidentsPayload extends IncidentCountsPayload {
-  /** Newest first. `counts` covers the whole window regardless of any kind
-      filter applied to this list. */
-  incidents: Incident[]
 }
 
 /** One V_PIPELINE_RUNS row, every column, exactly as the detail endpoints
@@ -327,6 +193,23 @@ export interface RowCountsPayload {
   prev_row_counts: Record<string, number> | null
 }
 
+/** Last-14 record over decisive task states. `pct` and `streak` are null for a
+    pipeline the window never decided, which is not the same as 0. */
+export interface PipelineRecord {
+  wins: number
+  losses: number
+  pct: number | null
+  streak: string | null
+}
+
+/** One cell of the form strip, oldest first. "M" is a missed slot: it occupies
+    space but stays out of the record and the streak. */
+export interface FormCell {
+  at: string
+  result: 'W' | 'L' | 'M'
+  query_id: string | null
+}
+
 export interface PipelineIndexRow {
   pipeline: string
   sport: string
@@ -338,8 +221,13 @@ export interface PipelineIndexRow {
   succeeded: number
   runs_in_window: number
   window_days: number
-  /** Worst state per day, oldest first — the same cells as the detail heatmap. */
+  /** Worst state per day, oldest first, the same cells as the detail heatmap. */
   days: HeatCell[]
+  record: PipelineRecord
+  /** Chronological, at most one cell per run or missed slot in the window. */
+  form: FormCell[]
+  /** Mean duration over successful runs only, so a fast failure cannot flatter it. */
+  avg_duration_s: number | null
 }
 
 export interface PipelinesIndexPayload {
@@ -439,4 +327,120 @@ export interface DbtQueryOperator {
 export interface DbtQueryOperatorsPayload {
   query_id: string
   operators: DbtQueryOperator[]
+}
+
+/** ---- the slate ----
+    One day of the schedule read as a scoreboard: score cards grouped by league,
+    plus the surrounding week as a day strip. */
+
+/** The same pipeline's previous run, carried on a card so a failure or a waiting
+    slot can say what normal looked like. */
+export interface SlatePrevRun {
+  at: string
+  state: BlockState
+  rows_loaded: number | null
+  duration_s: number | null
+}
+
+/** A cron slot that produced a run row: succeeded, failure or missing. */
+export interface SlateRunCard {
+  kind: 'run'
+  state: BlockState
+  pipeline: string
+  at: string
+  duration_s: number | null
+  rows_loaded: number | null
+  query_id: string | null
+  error_excerpt: string | null
+  schedule: string
+  cron: string
+  prev: SlatePrevRun | null
+}
+
+/** A cron slot with no run row: already passed (missed) or still ahead
+    (upcoming). The fields a run would carry are null by construction. */
+export interface SlateSlotCard {
+  kind: 'missed' | 'upcoming'
+  state: 'missed' | 'upcoming'
+  pipeline: string
+  at: string
+  duration_s: null
+  rows_loaded: null
+  query_id: null
+  error_excerpt: null
+  schedule: string
+  cron: string
+  prev: SlatePrevRun | null
+}
+
+/** One event-driven dbt build, which has no slot: it fired when data landed. */
+export interface SlateBuildCard {
+  kind: 'build'
+  state: 'succeeded' | 'failure'
+  sport: string
+  args: string
+  build_id: string | null
+  at: string
+  duration_s: number | null
+  n_queries: number | null
+  n_failed_queries: number | null
+  drained_loads: number | null
+}
+
+export type SlateCard = SlateRunCard | SlateSlotCard | SlateBuildCard
+
+export interface SlateDay {
+  date: string
+  dow: string
+  is_today: boolean
+  ran: number
+  failed: number
+  missed: number
+  upcoming: number
+  slots: number
+}
+
+/** Tallies and rows ride on ingestion leagues only: a dbt league has neither a
+    cron slot nor a row count, so those keys are absent rather than zero. */
+export interface SlateLeague {
+  sport: string
+  kind: 'ingestion' | 'dbt'
+  ran?: number
+  failed?: number
+  missed?: number
+  upcoming?: number
+  slots?: number
+  rows_loaded?: number
+  cards: SlateCard[]
+}
+
+export interface SlatePayload {
+  date: string
+  now: string
+  window_days: number
+  /** Seven entries with the requested day centred. */
+  days: SlateDay[]
+  leagues: SlateLeague[]
+}
+
+export type HeadlineSeverity = 'fail' | 'warn' | 'ok' | 'info'
+
+export interface Headline {
+  seq: number
+  severity: HeadlineSeverity
+  kind: string
+  entity: string
+  headline: string
+  detail: string
+}
+
+/** The AI wire. `stale` is informational, never an error: the wire regenerates
+    once a day, so a morning request legitimately serves yesterday's edition. */
+export interface HeadlinesPayload {
+  requested_date: string
+  served_date: string | null
+  stale: boolean
+  generated_at: string | null
+  model: string | null
+  headlines: Headline[]
 }

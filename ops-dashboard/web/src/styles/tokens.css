@@ -30,7 +30,7 @@
   --amber: #d97706;
 
   --fill-ok: #d4d4d8;
-  --hatch: repeating-linear-gradient(45deg, #dc2626 0 3px, #ffffff 3px 6px);
+  --hatch: repeating-linear-gradient(45deg, var(--red) 0 3px, #ffffff 3px 6px);
 
   --font: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;

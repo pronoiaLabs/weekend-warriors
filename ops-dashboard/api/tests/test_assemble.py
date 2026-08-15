@@ -38,50 +38,23 @@ PIPES = [
 ]
 
 
-def test_healthy_pipeline_renders_no_card() -> None:
-    runs = [
-        _run("nfl_a", "2026-08-08T10:00:30.000Z"),
-        _run("nfl_b", "2026-08-08T12:00:30.000Z"),
-    ]
-    out = assemble.overview(PIPES, runs, NOW, DAY)
-    panel = out["sports"][0]
-    assert panel["anomaly_count"] == 0
-    assert panel["healthy_count"] == 2
-    assert panel["worst"] == "ok"
-
-
-def test_failed_latest_run_renders_card_and_worst() -> None:
-    runs = [
-        _run("nfl_a", "2026-08-08T10:00:30.000Z", task_state="FAILED", dlt_status="failed"),
-        _run("nfl_b", "2026-08-08T12:00:30.000Z"),
-    ]
-    panel = assemble.overview(PIPES, runs, NOW, DAY)["sports"][0]
-    assert panel["anomaly_count"] == 1
-    assert panel["cards"][0]["pipeline"] == "nfl_a"
-    assert panel["worst"] == "failure"
-
-
-def test_missed_slot_counts_and_files_incident() -> None:
-    # nfl_b never ran; its 12:00 slot passed the grace period hours ago.
+def test_missed_slot_counts_and_renders_a_missed_card() -> None:
+    # nfl_b never ran; its 12:00 slot passed the grace period hours ago. The
+    # slate is the surviving reader of _match_slots, so the slot rule is
+    # asserted through it rather than through the retired incident feed.
     runs = [_run("nfl_a", "2026-08-08T10:00:30.000Z")]
-    out = assemble.overview(PIPES, runs, NOW, DAY)
-    assert out["summary"]["missed_today"] == 1
-    inc = assemble.incidents(PIPES, runs, NOW, days=1)
-    missed = [e for e in inc["incidents"] if e["kind"] == "missed"]
+    out = assemble.slate(PIPES, runs, [], NOW, DAY, radius=0)
+
+    today = out["days"][0]
+    assert today["date"] == DAY.isoformat()
+    assert today["ran"] == 1
+    assert today["missed"] == 1
+
+    cards = out["leagues"][0]["cards"]
+    missed = [c for c in cards if c["kind"] == "missed"]
     assert len(missed) == 1
     assert missed[0]["pipeline"] == "nfl_b"
     assert missed[0]["query_id"] is None
-
-
-def test_disagreement_is_a_card_even_when_task_succeeded() -> None:
-    runs = [
-        _run("nfl_a", "2026-08-08T10:00:30.000Z", outcome_disagrees=True, dlt_status="failed"),
-        _run("nfl_b", "2026-08-08T12:00:30.000Z"),
-    ]
-    panel = assemble.overview(PIPES, runs, NOW, DAY)["sports"][0]
-    assert panel["cards"][0]["pipeline"] == "nfl_a"
-    assert panel["cards"][0]["task_state"] == "SUCCEEDED"
-    assert panel["cards"][0]["dlt_status"] == "failed"
 
 
 def test_record_missing_outranks_failure() -> None:
@@ -90,24 +63,25 @@ def test_record_missing_outranks_failure() -> None:
     assert derive.worst([]) == "ok"
 
 
-def test_record_missing_run_files_missing_incident_not_failure() -> None:
-    runs = [
-        _run(
-            "nfl_a",
-            "2026-08-08T10:00:30.000Z",
-            task_state="FAILED",
-            dlt_status=None,
-            dlt_record_missing=True,
-            rows_loaded=None,
-            row_counts=None,
-            error_text="Job JOB_X failed to complete. Exited with status: FAILED.",
-        )
-    ]
-    inc = assemble.incidents([PIPES[0]], runs, NOW, days=1)
-    kinds = [e["kind"] for e in inc["incidents"] if e["query_id"]]
-    assert kinds == ["missing"]
-    entry = inc["incidents"][0]
-    assert entry["error_provenance"] == "TASK_HISTORY.ERROR_MESSAGE"
+def test_record_missing_run_reads_missing_not_failure() -> None:
+    # A FAILED task whose dlt row never landed is classified "missing", not
+    # "failure", and its ERROR_TEXT can only have come from TASK_HISTORY. The
+    # incident feed used to be where this was read; run_detail carries the same
+    # two derived fields, so the rule is asserted there now.
+    run = _run(
+        "nfl_a",
+        "2026-08-08T10:00:30.000Z",
+        task_state="FAILED",
+        dlt_status=None,
+        dlt_record_missing=True,
+        rows_loaded=None,
+        row_counts=None,
+        error_text="Job JOB_X failed to complete. Exited with status: FAILED.",
+    )
+    detail = assemble.run_detail(run, [run])
+    assert detail["anomalies"] == ["missing"]
+    assert detail["state"] == "missing"
+    assert detail["error_provenance"] == "TASK_HISTORY.ERROR_MESSAGE"
 
 
 def test_run_detail_prev_row_counts_skips_null_runs() -> None:

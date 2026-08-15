@@ -8,7 +8,7 @@ lets tests and offline dev run with zero network.
 
 import json
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -106,26 +106,6 @@ def pipelines() -> list[dict[str, Any]]:
         {"name": p.name, "sport": p.sport, "schedule": p.schedule, "enabled": p.enabled}
         for p in registry.load_registry()
     ]
-
-
-def runs_window(days: int, sport: str | None = None) -> list[dict[str, Any]]:
-    """All runs in the last `days` days, every column, tagged with sport."""
-    if _mode() == "fixtures":
-        runs = _fixture("runs")["runs"]
-        return [r for r in runs if sport is None or r["sport"] == sport]
-
-    from app import db
-
-    sql = (
-        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
-        "WHERE RUN_STARTED_AT >= DATEADD('day', -%(days)s, CURRENT_TIMESTAMP()) "
-    )
-    params: dict[str, Any] = {"days": days}
-    if sport:
-        sql += "AND SPORT = %(sport)s "
-        params["sport"] = sport
-    sql += "ORDER BY RUN_STARTED_AT DESC"
-    return [_normalize(r) for r in db.query(sql, params)]
 
 
 def run_by_query_id(query_id: str) -> dict[str, Any] | None:
@@ -361,3 +341,70 @@ def metrics(query_id: str) -> list[dict[str, Any]]:
     for row in rows:
         row["event_ts"] = _iso_utc(row.get("event_ts"))
     return rows
+
+
+def headlines_for_day(day: date) -> list[dict[str, Any]]:
+    """The AI wire: rows of the newest DAY at or before *day*, in SEQ order.
+
+    Upstream is best-effort (SP_HEADLINES swallows its own failures), so days
+    with no rows are a normal state, not an error. The fallback lives HERE, in
+    one place with identical semantics in both modes, so fixture and live can
+    never drift: newest day <= requested, else nothing.
+    """
+    if _mode() == "fixtures":
+        rows = [r for r in _fixture("headlines") if r["day"] <= day.isoformat()]
+        if not rows:
+            return []
+        served = max(r["day"] for r in rows)
+        return sorted((r for r in rows if r["day"] == served), key=lambda r: r["seq"])
+
+    from app import db
+
+    sql = (
+        "SELECT GENERATED_AT, DAY, SEQ, SEVERITY, KIND, ENTITY, HEADLINE, DETAIL, MODEL "
+        "FROM DLT_DB.OPS.HEADLINES "
+        "WHERE DAY = (SELECT MAX(DAY) FROM DLT_DB.OPS.HEADLINES WHERE DAY <= %(day)s) "
+        "ORDER BY SEQ"
+    )
+    rows = db.query(sql, {"day": day.isoformat()})
+    for row in rows:
+        row["generated_at"] = _iso_utc(row.get("generated_at"))
+        d = row.get("day")
+        row["day"] = d.isoformat() if hasattr(d, "isoformat") else d
+    return rows
+
+
+def runs_between(start: datetime, end: datetime, sport: str | None) -> list[dict[str, Any]]:
+    """Runs with start <= RUN_STARTED_AT < end, newest first.
+
+    Bounds are explicit UTC datetimes rather than a now-anchored day count so
+    the slate can be rewound to any day, and so fixture mode applies the SAME
+    window as live: the day-count predecessor ignored its argument in fixture
+    mode entirely, which is the trap this function exists to avoid. Bound
+    strings carry milliseconds so the lexicographic compare against the
+    fixtures' .SSSZ timestamps is exact at day edges.
+    """
+    start_iso = start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
+    end_iso = end.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
+
+    if _mode() == "fixtures":
+        runs = [r for r in _fixture("runs")["runs"] if start_iso <= r["run_started_at"] < end_iso]
+        if sport:
+            runs = [r for r in runs if r["sport"] == sport]
+        return sorted(runs, key=lambda r: r["run_started_at"], reverse=True)
+
+    from app import db
+
+    sql = (
+        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
+        "WHERE RUN_STARTED_AT >= %(start)s AND RUN_STARTED_AT < %(end)s "
+    )
+    params: dict[str, Any] = {
+        "start": start_iso.replace("Z", ""),
+        "end": end_iso.replace("Z", ""),
+    }
+    if sport:
+        sql += "AND SPORT = %(sport)s "
+        params["sport"] = sport
+    sql += "ORDER BY RUN_STARTED_AT DESC"
+    return [_normalize(r) for r in db.query(sql, params)]

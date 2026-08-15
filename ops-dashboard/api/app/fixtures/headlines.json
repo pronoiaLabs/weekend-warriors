@@ -1,0 +1,90 @@
+[
+  {
+    "day": "2026-08-09",
+    "seq": 0,
+    "severity": "fail",
+    "kind": "ingestion",
+    "entity": "nfl_advanced_stats",
+    "headline": "nfl_advanced_stats drops one on an HTTP 500 from the provider",
+    "detail": "The Tuesday slot failed after 3 retries in 2.1 seconds. Previous run loaded 4,312 rows.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-09T12:00:23.000Z"
+  },
+  {
+    "day": "2026-08-09",
+    "seq": 1,
+    "severity": "warn",
+    "kind": "ingestion",
+    "entity": "wnba_plays",
+    "headline": "wnba_plays run succeeded but wrote no run record",
+    "detail": "TASK_HISTORY shows success in 74 seconds; _DLT_RUNS has no row. Rows loaded are unverified.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-09T12:00:23.000Z"
+  },
+  {
+    "day": "2026-08-09",
+    "seq": 2,
+    "severity": "ok",
+    "kind": "ingestion",
+    "entity": "nfl_games",
+    "headline": "nfl_games extends its win streak to six",
+    "detail": "321 rows in 61 seconds this morning. The streak dates to last Sunday's recovery.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-09T12:00:23.000Z"
+  },
+  {
+    "day": "2026-08-09",
+    "seq": 3,
+    "severity": "info",
+    "kind": "dbt",
+    "entity": "dbt_build_nfl",
+    "headline": "NFL models rebuilt twice before noon",
+    "detail": "Both builds drained one load each and finished in 47 and 49 seconds, 75 queries apiece.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-09T12:00:23.000Z"
+  },
+  {
+    "day": "2026-08-09",
+    "seq": 4,
+    "severity": "info",
+    "kind": "platform",
+    "entity": "platform",
+    "headline": "17,441 rows landed across both leagues by the noon wire",
+    "detail": "NFL contributed 14,882 rows across four pipelines, WNBA 2,559 across three.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-09T12:00:23.000Z"
+  },
+  {
+    "day": "2026-08-07",
+    "seq": 0,
+    "severity": "ok",
+    "kind": "platform",
+    "entity": "platform",
+    "headline": "All-quiet Friday: every slot filled, every build green",
+    "detail": "Nine ingestion runs succeeded and two dbt builds completed. No alerts fired.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-07T12:00:19.000Z"
+  },
+  {
+    "day": "2026-08-07",
+    "seq": 1,
+    "severity": "info",
+    "kind": "ingestion",
+    "entity": "wnba_games",
+    "headline": "wnba_games posts its biggest load of the week",
+    "detail": "1,207 rows in 68 seconds at the 14:00 UTC slot.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-07T12:00:19.000Z"
+  },
+  {
+    "day": "2026-08-07",
+    "seq": 2,
+    "severity": "info",
+    "kind": "dbt",
+    "entity": "dbt_build_wnba",
+    "headline": "WNBA build drains nine loads in one pass",
+    "detail": "206 seconds, 1,269 queries. The burst came from the afternoon backfill.",
+    "model": "claude-haiku-4-5",
+    "generated_at": "2026-08-07T12:00:19.000Z"
+  }
+]

@@ -1,22 +1,11 @@
 """Fixture-mode cover over the dbt build endpoints. No network."""
 
-import pytest
 from fastapi.testclient import TestClient
-
-from app.main import create_app
 
 # A wnba build with a drained load, per-node queries and one profiled query.
 BUILD = "ec4edb49-8ac2-4de1-8c8d-eec69407e91e"
 NFL_BUILD = "368a08ac-6de0-4922-b2d2-4359fc123f1a"
 PROFILED_QID = "01c64669-0107-5e2f-000f-cf02000f2d46"
-
-
-@pytest.fixture()
-def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("OPS_DASHBOARD_DATA", "fixtures")
-    # Clock pinned to the fixture snapshot's era; see test_endpoints.py.
-    monkeypatch.setenv("OPS_DASHBOARD_NOW", "2026-08-09T18:00:00+00:00")
-    return TestClient(create_app())
 
 
 def test_builds_ordered_and_filtered(client: TestClient) -> None:
