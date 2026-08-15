@@ -11,6 +11,10 @@ QID = "01c6418f-0107-5e62-000f-cf02000b054e"
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("OPS_DASHBOARD_DATA", "fixtures")
+    # Pin the clock to the fixture snapshot's era: every "last N days" window
+    # otherwise empties as real time drifts past the frozen data (first bit us
+    # when the 7-day incidents window aged out of the Aug-9 snapshot).
+    monkeypatch.setenv("OPS_DASHBOARD_NOW", "2026-08-09T18:00:00+00:00")
     return TestClient(create_app())
 
 

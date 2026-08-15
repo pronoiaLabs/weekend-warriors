@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch. 3 · Slack alerts with zero external infrastructure · weekend-warriors</title>
+<meta name="description" content="How a two-day silent outage led to in-process Slack alerting built entirely from Snowflake primitives: a webhook notification integration, a secret, and a one-row-per-scope latch table.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>">
+<link rel="stylesheet" href="../assets/almanac.css">
+</head>
+<body>
+<div class="page">
+  <p class="crumb"><a href="../index.html">weekend-warriors</a><span class="dot">·</span>Hear Me Out<span class="dot">·</span>Deep Dives</p>
+  <header class="chapter">
+    <div class="inner">
+      <p class="ch-no">Chapter 3</p>
+      <h1>Slack alerts with zero external infrastructure</h1>
+      <p class="ch-sub">and the two-day silent outage that demanded them</p>
+      <div class="ch-rule"></div>
+    </div>
+  </header>
+  <article class="chapter-body">
+    <p class="lede">The outage that motivates this chapter started as routine work: I redeployed the dbt project object for one of the sports. Models had changed, the triggers run whatever the object holds, so you deploy and move on. What I did not appreciate at the time is that <code>snow dbt deploy --force</code> is a <code>CREATE OR REPLACE</code> under the hood, and replacing an object in Snowflake drops the grants on it. The triggered task that runs the prod builds executes as <code>DBT_RUNNER_ROLE</code>, and that role's USAGE grant on the project object had just quietly ceased to exist.</p>
+    <p>So every triggered build failed. Not slowly, not partially: each one died in two or three seconds with "does not exist or not authorized". Data kept landing in RAW, the stream kept firing the task, the task kept failing. This happened eleven times over two days, and then Snowflake did exactly what it is configured to do and auto-suspended the task after the consecutive-failure threshold. From that point the prod models were frozen, and nothing anywhere said anything.</p>
+    <p>The ops dashboard showed it, in the sense that a graveyard shows things. Every failure was sitting right there in <code>TASK_HISTORY</code> with a clear error message, but a dashboard only tells you what you ask it, and for two days nobody asked. The fix, when I finally looked, took two GRANT statements and a resume. The lesson took longer, and this chapter is that lesson: the platform needed a way to speak first.</p>
+
+    <h2><span class="no">§ 1.</span> What the outage actually taught</h2>
+    <p>The obvious patch went in first: the deploy target in <code>dbt-pipelines/Makefile</code> now re-grants USAGE to <code>DBT_RUNNER_ROLE</code> immediately after every <code>snow dbt deploy</code>, so a bare deploy can no longer disarm the triggers. That closes this specific hole. It does nothing about the shape of the failure, which is the part worth generalizing.</p>
+    <p>The shape was: a fully instrumented system failed loudly into its own telemetry and no human heard it, because reading telemetry was a pull. Eleven recorded failures, a rich error message on every one, an auto-suspension at the end, and total silence. Any failure mode I have not imagined yet will follow the same script unless something pushes.</p>
+
+    <h2><span class="no">§ 2.</span> In-process, not a sweep</h2>
+    <p>The standard answer is a sweep: a scheduled job that reads <code>TASK_HISTORY</code> every ten minutes and pages on anything red. I went the other way. In this platform, the thing that fails is the thing that pings.</p>
+    <p>The reasoning is about the cascade. An auto-suspension is never the first event; it is preceded by a run of individual failures (eleven, in my case) that each had a live session and a full error message in hand at the moment they died. Alerting at the failure level means the channel hears about the problem at failure #1, within seconds, not at the bottom of the cascade or at the next tick of a polling job. It also means zero new scheduled infrastructure: no sweep task, no sweep warehouse, no sweep that can itself die silently.</p>
+    <p>There are exactly two senders, one per failure domain. On the ingestion side, <code>dlt-pipelines/pipelines/common/alerts.py</code> is a small module the batch runner wraps around every pipeline run, and also around registry resolution, because a spec that fails validation dies before any run record is written and would otherwise vanish. On the dbt side, the trigger procedure <code>SP_DBT_BUILD()</code> in <code>dlt-pipelines/sql/sources/nfl/05_dbt_trigger.sql</code> (and its siblings per sport) grew an EXCEPTION handler that pings and then re-raises, so <code>TASK_HISTORY</code> and the auto-suspend counter see exactly what they saw before the handler existed. The alert is a side effect, never a change in behavior.</p>
+
+    <h2><span class="no">§ 3.</span> Delivery with zero infrastructure</h2>
+    <p>This entire platform runs inside one Snowflake account, and I was not going to break that rule for alerting. No Lambda, no cron box, no container with Slack egress. Snowflake has native webhook notification integrations, and they are enough.</p>
+    <p>Three objects, all in <code>dlt-pipelines/sql/ops/09_alerting.sql</code>: a secret, an integration, and a latch table. The secret holds the Slack webhook path, and only the path. Snowflake allowlists webhook hosts per provider, so for Slack the integration's URL must literally start with <code>https://hooks.slack.com/services/</code>, and the <code>SNOWFLAKE_WEBHOOK_SECRET</code> placeholder substitutes the bound secret into it at send time. The secret's value is therefore only the part after <code>/services/</code>, never a full URL, and it never leaves the account: no container carries it, and no container needs network access to Slack at all.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 1 · The secret and the integration, trimmed from sql/ops/09_alerting.sql</p>
+      <pre><code>CREATE SECRET IF NOT EXISTS DLT_DB.OPS.SLACK_ALERTS_WEBHOOK
+  TYPE = GENERIC_STRING
+  SECRET_STRING = 'T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX';
+  -- real value set out-of-band via ALTER SECRET, never in a file
+
+CREATE OR REPLACE NOTIFICATION INTEGRATION SLACK_ALERTS_INT
+  TYPE = WEBHOOK
+  ENABLED = TRUE
+  WEBHOOK_URL = 'https://hooks.slack.com/services/SNOWFLAKE_WEBHOOK_SECRET'
+  WEBHOOK_SECRET = DLT_DB.OPS.SLACK_ALERTS_WEBHOOK
+  WEBHOOK_BODY_TEMPLATE = '{"text": "SNOWFLAKE_WEBHOOK_MESSAGE"}'
+  WEBHOOK_HEADERS = ('Content-Type' = 'application/json');</code></pre>
+      <p class="caption">The secret is only the path after /services/; the integration substitutes it into the URL at send time.</p>
+    </div>
+    <p>Sending is one function call over a session the sender already has. The dlt container is already connected to Snowflake to load data; the dbt trigger procedure is already running inside one. Both just call:</p>
+    <div class="listing">
+      <p class="listing-label">Listing 2 · The send call</p>
+      <pre><code>CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+  SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+    SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT(
+      'FAILED nfl_stats: ...error snippet...')),
+  SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));</code></pre>
+      <p class="caption">SANITIZE_WEBHOOK_CONTENT strips placeholder tokens server-side, so error text cannot smuggle the secret out through the message body.</p>
+    </div>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p><code>CREATE NOTIFICATION INTEGRATION</code> validates the webhook URL <em>with the secret substituted</em>. A free-text placeholder like "set-me-later" fails the create with "WEBHOOK_URL ... is invalid. Verify whether secret replacement makes it invalid". The placeholder must be shaped like a real Slack path (<code>T.../B.../x...</code>), which is why Snowflake's own docs example secret looks like <code>T00000000/B00000000/XXX</code>. That dummy shape is load-bearing.</p>
+    </div>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>The call returning "Enqueued notifications" proves nothing reached Slack. Delivery is async, and a bad secret or a revoked webhook fails silently after the enqueue. Verify in the channel, and confirm with <code>INFORMATION_SCHEMA.NOTIFICATION_HISTORY()</code>, which keeps a 14-day lookback of actual delivery outcomes.</p>
+    </div>
+
+    <h2><span class="no">§ 4.</span> The noise policy: transitions plus recovery</h2>
+    <p>A channel that pings on every failure of a repeating schedule trains you to mute it, and a muted channel recreates the silent outage with extra steps. So the third object in ops/09 is <code>DLT_DB.OPS.ALERT_STATE</code>: one row per alert scope, latest status only. A scope is a pipeline name, a <code>dbt_build_&lt;sport&gt;</code>, or <code>runner</code> for deaths before a pipeline is even resolved. It is a dedup latch, not a history; <code>TASK_HISTORY</code> already holds the history.</p>
+    <p>The rule both senders implement is the same and is small enough to be a pure function. This is the Python side, unit-testable without a connection:</p>
+    <div class="listing">
+      <p class="listing-label">Listing 3 · The transition rule, from pipelines/common/alerts.py</p>
+      <pre><code>def decide(prev_status: str | None, ok: bool) -&gt; str | None:
+    """The transition rule: 'fail', 'recover', or None (stay silent)."""
+    if not ok:
+        return None if prev_status == "failing" else "fail"
+    return "recover" if prev_status == "failing" else None</code></pre>
+      <p class="caption">An unseen scope that fails does ping: "first failure ever" is exactly a healthy-to-failing transition.</p>
+    </div>
+    <p>The first failure of a streak pings <code>FAILED &lt;scope&gt;</code> with a flattened, truncated error snippet. Repeats update the latch silently. The first success after a failing streak pings <code>RECOVERED &lt;scope&gt;</code>, which matters as much as the failure ping: it closes the incident without anyone querying anything. A daily pipeline failing for a week costs one ping, not seven. A healthy week costs zero, and a channel that only speaks when something changes is a channel you keep unmuted.</p>
+    <p>One more piece of noise discipline: the Python sender is a no-op unless <code>DLT_ALERTS=1</code>, which only the prod job template sets. Laptop runs, dev containers, and CI cannot page the channel, and they do not even know the module exists.</p>
+
+    <h2><span class="no">§ 5.</span> Best-effort, enforced</h2>
+    <p>The alert path must never mask the error it reports, and it must never fail a run that succeeded. Both senders treat alerting as strictly best-effort. In Python, every exit from <code>report()</code> is caught and logged as a warning, and the send happens before the latch write: if the write then fails, the worst case is a duplicate ping next run, which beats a latch claiming "alerted" about a ping that never left.</p>
+    <p>The SQL side is where this gets structural. The EXCEPTION handler captures <code>SQLERRM</code> first (the nested block's own statements can replace the active exception context), wraps the entire ping-and-latch sequence in a nested block that swallows everything, and only then re-raises the original error:</p>
+    <div class="listing">
+      <p class="listing-label">Listing 4 · SP_DBT_BUILD's handler, trimmed from sql/sources/nfl/05_dbt_trigger.sql</p>
+      <pre><code>EXCEPTION
+  WHEN OTHER THEN
+    LET err VARCHAR := LEFT(COALESCE(SQLERRM, 'unknown error'), 400);
+    BEGIN
+      LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE
+                           WHERE SCOPE = 'dbt_build_nfl');
+      IF (prev IS NULL OR prev &lt;&gt; 'failing') THEN
+        CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+          SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+            SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT(
+              'FAILED dbt_build_nfl: ' || :err)),
+          SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+      END IF;
+      MERGE INTO DLT_DB.OPS.ALERT_STATE ...   -- latch to 'failing'
+    EXCEPTION
+      WHEN OTHER THEN
+        NULL;   -- broken alert plumbing must never mask the dbt error
+    END;
+    RAISE;      -- TASK_HISTORY and auto-suspend see the original failure</code></pre>
+      <p class="caption">Ping on the transition, swallow anything the alert path itself throws, then re-raise the real error unchanged.</p>
+    </div>
+    <p>That final <code>RAISE</code> is the contract with the rest of the platform. The task still fails, the failure still lands in <code>TASK_HISTORY</code> with its error message, and the consecutive-failure counter still ticks toward auto-suspension. If the alerting objects were dropped tomorrow, the builds would behave identically; they would just go back to failing quietly.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>A task session runs its owner's PRIMARY role alone. Interactive testing carries secondary roles, so proving the send works from your own session proves nothing about whether it works from a task. Smoke-test the send as each worker role itself (<code>USE ROLE ...</code>, then the bare <code>SYSTEM$SEND_SNOWFLAKE_NOTIFICATION</code> call) before shipping code that depends on the USAGE grants being right. This is the same lesson the event-table plumbing paid for earlier, learned again here on purpose rather than by accident.</p>
+    </div>
+
+    <h2><span class="no">§ 6.</span> The blind spots, stated plainly</h2>
+    <p>In-process alerting has a boundary, and I would rather name it than pretend it away. A container that never starts sends nothing, because the code that would ping never ran. A schedule that is dead without failing (a suspended task, a stream gone stale) also sends nothing, for the same reason: no failure event means no process, and no process means no ping. Both are known, both are accepted for now, and both belong to a future sweep that reads the telemetry and asks "did the things that should have run actually run?" That sweep can be lazy and infrequent, because it only has to catch absence.</p>
+    <p>Everything else, which is to say every failure that involves code actually failing, pages the channel within seconds of the first occurrence, recovers with a second ping, and stays silent in between. The outage ran two days on eleven failures without a word. The same outage today would be one Slack message, about three seconds after the first build died.</p>
+  </article>
+  <nav class="chapter-nav">
+    <a href="02-event-driven-dbt.html"><span class="dir">Previous · Ch. 2</span><span class="t">dbt builds that fire when data lands</span></a>
+    <a class="next" href="04-scheduling-with-tasks.html"><span class="dir">Next · Ch. 4</span><span class="t">Scheduling containers with nothing but Snowflake Tasks</span></a>
+  </nav>
+  <footer class="colophon">
+    <div class="inner-rule">
+      <p class="stack">Snowflake (SPCS · Tasks · Streams · Cortex) + dlt + dbt</p>
+      <p class="meta">Data: balldontlie.io<span class="sep">·</span><a class="repo" href="https://github.com/pronoiaLabs/weekend-warriors">github.com/pronoiaLabs/weekend-warriors</a><span class="sep">·</span>Apache-2.0</p>
+      <p class="end-mark">&#10045;</p>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

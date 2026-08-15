@@ -12,6 +12,12 @@ from app import assemble, datasource
 
 
 def _now() -> dt.datetime:
+    # OPS_DASHBOARD_NOW pins the clock (ISO-8601). The fixture data is a frozen
+    # snapshot, so any window measured from the real clock silently empties as
+    # wall time drifts past it; the tests pin "now" to the snapshot's era.
+    pinned = os.environ.get("OPS_DASHBOARD_NOW")
+    if pinned:
+        return dt.datetime.fromisoformat(pinned)
     return dt.datetime.now(dt.UTC)
 
 

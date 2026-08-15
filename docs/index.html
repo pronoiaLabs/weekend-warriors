@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>weekend-warriors · a football data platform inside Snowflake</title>
+<meta name="description" content="Hear me out: you can run an entire football data platform inside Snowflake. NFL and college football data, loaded on schedule, modeled, queryable in plain English. Zero servers outside one account.">
+<meta property="og:title" content="You can run an entire football data platform inside Snowflake">
+<meta property="og:description" content="NFL and college football data, loaded on schedule, modeled, queryable in plain English, for fantasy football, betting analysis, and sports data tinkerers. Zero servers outside one Snowflake account.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>">
+<link rel="stylesheet" href="assets/almanac.css">
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ==================== HERO / MASTHEAD ==================== -->
+  <header class="masthead">
+    <p class="kicker">Hear Me Out <span class="dot">·</span> a series on building unexpected things on Snowflake</p>
+    <div class="masthead-rules"></div>
+    <h1 class="headline">You can run an entire football data platform <span class="accent">inside Snowflake.</span></h1>
+    <p class="subline">NFL and college football data, loaded on schedule, modeled, queryable in plain English, for fantasy football, betting analysis, and sports data tinkerers. Zero servers outside one Snowflake account.</p>
+    <div class="masthead-rules bottom"></div>
+  </header>
+
+  <!-- ==================== I. THE ARGUMENT ==================== -->
+  <section id="argument">
+    <div class="section-head">
+      <span class="no">§ I.</span>
+      <h2>The Argument</h2>
+      <span class="rule-fill"></span>
+      <span class="folio">five substitutions, no bench</span>
+    </div>
+
+    <p class="opener">Every piece of infrastructure a small data platform usually demands (a VPS, a cron box, a dbt runner, a chatbot backend, an alerting service) has a counterpart already sitting inside the warehouse.<span class="fn-mark">a</span> The whole platform is the sum of five substitutions.</p>
+
+    <div class="argument">
+      <div class="entry">
+        <span class="n">No. 1</span>
+        <span class="from">Snowpark Container Services</span>
+        <span class="arrow">&#8594;</span>
+        <span class="to">your compute, no VPS</span>
+      </div>
+      <div class="entry">
+        <span class="n">No. 2</span>
+        <span class="from">Tasks</span>
+        <span class="arrow">&#8594;</span>
+        <span class="to">your scheduler, no cron box</span>
+      </div>
+      <div class="entry">
+        <span class="n">No. 3</span>
+        <span class="from">dbt runs INSIDE the warehouse</span>
+        <span class="arrow">&#8594;</span>
+        <span class="to">no runner to host</span>
+      </div>
+      <div class="entry">
+        <span class="n">No. 4</span>
+        <span class="from">Cortex Agents</span>
+        <span class="arrow">&#8594;</span>
+        <span class="to">ask your data questions, no chatbot to build</span>
+      </div>
+      <div class="entry">
+        <span class="n">No. 5</span>
+        <span class="from">Native webhook notifications</span>
+        <span class="arrow">&#8594;</span>
+        <span class="to">Slack alerts, no alerting stack</span>
+      </div>
+    </div>
+
+    <div class="footnotes">
+      <p><span class="fn-mark">a</span>&nbsp;"Inside" is meant literally: one Snowflake account holds the containers, the schedule, the models, the agents, and the alerting. Nothing else is deployed anywhere.</p>
+    </div>
+  </section>
+
+  <!-- ==================== II. ARCHITECTURE ==================== -->
+  <section id="architecture">
+    <div class="section-head">
+      <span class="no">§ II.</span>
+      <h2>Architecture</h2>
+      <span class="rule-fill"></span>
+      <span class="folio">the field diagram</span>
+    </div>
+
+    <figure class="printed">
+      <div class="fig-label">Figure 1 · The Platform, End to End</div>
+
+      <div class="flow">
+        <div class="fbox"><span class="t">BallDontLie API</span><span class="d">source</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox stress"><span class="t">dlt pipeline</span><span class="d">scheduled SPCS container</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox"><span class="t">RAW</span><span class="d">one database per league</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox stress"><span class="t">stream &#8594; triggered task</span><span class="d">fires when data lands</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox"><span class="t">dbt builds</span><span class="d">PREP / CORE / ANALYTICS</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox"><span class="t">Semantic views</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox stress"><span class="t">Analyst agents</span><span class="d">plain-English queries</span></div>
+      </div>
+
+      <div class="fig-divider">The Spine</div>
+
+      <div class="flow spine">
+        <div class="fbox"><span class="t">Event table</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox"><span class="t">Materialized observability</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox"><span class="t">Ops dashboard</span></div>
+        <span class="farrow" style="padding-left:14px;">&#8942;</span>
+        <div class="fbox"><span class="t">Failures</span></div>
+        <span class="farrow">&#8594;</span>
+        <div class="fbox stress"><span class="t">Slack</span></div>
+      </div>
+
+      <figcaption><b>Fig. 1.</b> Ingestion runs in a scheduled container; a stream on the landing table fires the dbt build the moment data arrives. The observability spine runs beneath everything.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ==================== III. WHAT'S IN THE BOX ==================== -->
+  <section id="in-the-box">
+    <div class="section-head">
+      <span class="no">§ III.</span>
+      <h2>What's in the Box</h2>
+      <span class="rule-fill"></span>
+      <span class="folio">the roster</span>
+    </div>
+
+    <p class="table-label">Table 1 · Scheduled Pipelines <span style="color:var(--ink-faint); letter-spacing:normal; text-transform:none;">(all times UTC)</span></p>
+    <div class="table-wrap">
+      <table class="almanac">
+        <thead>
+          <tr>
+            <th style="width:44px;">No.</th>
+            <th>Pipeline</th>
+            <th>Cadence</th>
+            <th class="num">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="league-row"><td colspan="4">National Football League · seven pipelines</td></tr>
+          <tr><td class="num">1</td><td class="mono-ish">nfl_reference</td><td>daily · 08:00</td><td class="num">NFL</td></tr>
+          <tr><td class="num">2</td><td class="mono-ish">nfl_games</td><td>daily · 09:00</td><td class="num">NFL</td></tr>
+          <tr><td class="num">3</td><td class="mono-ish">nfl_stats</td><td>daily · 10:00</td><td class="num">NFL</td></tr>
+          <tr><td class="num">4</td><td class="mono-ish">nfl_plays</td><td>Tuesdays · 11:00</td><td class="num">NFL</td></tr>
+          <tr><td class="num">5</td><td class="mono-ish">nfl_standings</td><td>Tuesdays · 12:00</td><td class="num">NFL</td></tr>
+          <tr><td class="num">6</td><td class="mono-ish">nfl_advanced_stats</td><td>Tuesdays · 13:00</td><td class="num">NFL</td></tr>
+          <tr><td class="num">7</td><td class="mono-ish">nfl_injuries</td><td>daily · 22:00</td><td class="num">NFL</td></tr>
+          <tr class="league-row"><td colspan="4">College Football · six pipelines</td></tr>
+          <tr><td class="num">8</td><td class="mono-ish">ncaaf_reference</td><td>Wednesdays · 02:00</td><td class="num">NCAAF</td></tr>
+          <tr><td class="num">9</td><td class="mono-ish">ncaaf_games</td><td>daily · 06:00</td><td class="num">NCAAF</td></tr>
+          <tr><td class="num">10</td><td class="mono-ish">ncaaf_stats</td><td>daily · 07:00</td><td class="num">NCAAF</td></tr>
+          <tr><td class="num">11</td><td class="mono-ish">ncaaf_season_stats</td><td>Mondays · 03:00</td><td class="num">NCAAF</td></tr>
+          <tr><td class="num">12</td><td class="mono-ish">ncaaf_standings</td><td>Mondays · 02:00</td><td class="num">NCAAF</td></tr>
+          <tr><td class="num">13</td><td class="mono-ish">ncaaf_rankings</td><td>Mondays · 04:00</td><td class="num">NCAAF</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ul class="in-the-box">
+      <li>Per-league dbt model trees · staging &#8594; dimensions/facts &#8594; semantic views</li>
+      <li>An analyst agent per league</li>
+      <li>An ops dashboard</li>
+      <li>Transition-based Slack alerts</li>
+      <li>Cost tags on every compute component</li>
+      <li>Adding a league = one YAML entry + a scaffold command</li>
+    </ul>
+  </section>
+
+  <!-- ==================== QUICK FACTS ==================== -->
+  <div class="quick-facts">
+    <p class="qf-title">Quick Facts</p>
+    <div class="qf-grid">
+      <div class="qf-cell">
+        <div class="big">2</div>
+        <div class="lbl">leagues</div>
+      </div>
+      <div class="qf-cell">
+        <div class="big">13</div>
+        <div class="lbl">scheduled pipelines</div>
+      </div>
+      <div class="qf-cell">
+        <div class="big">~110<span style="font-size:0.55em;">ms</span></div>
+        <div class="lbl">dashboard queries</div>
+      </div>
+      <div class="qf-cell">
+        <div class="big">0</div>
+        <div class="lbl">servers outside Snowflake</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== IV. OPS DASHBOARD ==================== -->
+  <section id="ops">
+    <div class="section-head">
+      <span class="no">§ IV.</span>
+      <h2>The Ops Dashboard</h2>
+      <span class="rule-fill"></span>
+      <span class="folio">plates i–iii</span>
+    </div>
+
+    <div class="plates">
+      <div class="plate">
+        <div class="frame">[ screenshot ]</div>
+        <div class="plate-no">Plate I</div>
+        <div class="plate-cap">Ingestion fleet · 14-day health strips</div>
+      </div>
+      <div class="plate">
+        <div class="frame">[ screenshot ]</div>
+        <div class="plate-no">Plate II</div>
+        <div class="plate-cap">Run evidence · logs, metrics, duration</div>
+      </div>
+      <div class="plate">
+        <div class="frame">[ screenshot ]</div>
+        <div class="plate-no">Plate III</div>
+        <div class="plate-cap">dbt builds · event-driven, per build</div>
+      </div>
+    </div>
+
+    <p class="plates-note">Every pipeline run streams its logs and metrics into an event table; a triggered task materializes them into one table the dashboard reads in ~110ms. The dashboard itself is part of the repo.</p>
+  </section>
+
+  <!-- ==================== V. DEEP DIVES ==================== -->
+  <section id="dives">
+    <div class="section-head">
+      <span class="no">§ V.</span>
+      <h2>Deep Dives</h2>
+      <span class="rule-fill"></span>
+      <span class="folio">selected chapters</span>
+    </div>
+
+    <ul class="dives">
+      <li>
+        <a href="deep-dives/01-dlt-on-spcs.html">
+          <span class="ch">Ch. 1</span>
+          <span class="title">Deploying dlt to Snowpark Container Services
+            <span class="sub">how a Python pipeline becomes a container Snowflake runs</span>
+          </span>
+          <span class="pg">read</span>
+        </a>
+      </li>
+      <li>
+        <a href="deep-dives/02-event-driven-dbt.html">
+          <span class="ch">Ch. 2</span>
+          <span class="title">dbt builds that fire when data lands
+            <span class="sub">streams + triggered tasks, no orchestrator</span>
+          </span>
+          <span class="pg">read</span>
+        </a>
+      </li>
+      <li>
+        <a href="deep-dives/03-slack-alerts.html">
+          <span class="ch">Ch. 3</span>
+          <span class="title">Slack alerts with zero external infrastructure
+            <span class="sub">and the two-day silent outage that demanded them</span>
+          </span>
+          <span class="pg">read</span>
+        </a>
+      </li>
+      <li>
+        <a href="deep-dives/04-scheduling-with-tasks.html">
+          <span class="ch">Ch. 4</span>
+          <span class="title">Scheduling containers with nothing but Snowflake Tasks
+            <span class="sub">the registry-driven ingestion pattern</span>
+          </span>
+          <span class="pg">read</span>
+        </a>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ==================== COLOPHON ==================== -->
+  <footer class="colophon">
+    <div class="inner-rule">
+      <p class="stack">Snowflake (SPCS · Tasks · Streams · Cortex) + dlt + dbt</p>
+      <p class="meta">
+        Data: balldontlie.io
+        <span class="sep">·</span>
+        <a class="repo" href="https://github.com/pronoiaLabs/weekend-warriors">github.com/pronoiaLabs/weekend-warriors</a>
+        <span class="sep">·</span>
+        Apache-2.0
+      </p>
+      <p class="end-mark">&#10045;</p>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch. 1 · Deploying dlt to Snowpark Container Services · weekend-warriors</title>
+<meta name="description" content="How a plain Python dlt pipeline becomes a run-to-completion container that Snowflake itself builds, secures, and executes, with no VPS and no baked-in credentials.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>">
+<link rel="stylesheet" href="../assets/almanac.css">
+</head>
+<body>
+<div class="page">
+  <p class="crumb"><a href="../index.html">weekend-warriors</a><span class="dot">·</span>Hear Me Out<span class="dot">·</span>Deep Dives</p>
+  <header class="chapter">
+    <div class="inner">
+      <p class="ch-no">Chapter 1</p>
+      <h1>Deploying dlt to Snowpark Container Services</h1>
+      <p class="ch-sub">how a Python pipeline becomes a container Snowflake runs</p>
+      <div class="ch-rule"></div>
+    </div>
+  </header>
+  <article class="chapter-body">
+    <p class="lede">Hear me out: the place your data lands can also be the place your ingestion code runs. This project loads football data with dlt, and every scheduled run happens inside the Snowflake account itself, as a container on Snowpark Container Services. No VPS, no Lambda, no cron box that everyone forgets exists. If you have a side project with Python jobs and a Snowflake account, this chapter is the case that you may already own all the infrastructure you need.</p>
+
+    <h2><span class="no">§ 1.</span> The shape of the problem</h2>
+    <p>A dlt pipeline is just Python. It calls a REST API, normalizes what comes back, and loads it into a destination. The hard part was never the code, it was always the question of where the code runs at 09:00 UTC when your laptop is closed. The usual answers are a VPS you now administer, or a serverless function with its own packaging format, its own secrets manager, and its own way of authenticating back to the warehouse.</p>
+    <p>The answer I did not expect is that the warehouse runs containers. Snowpark Container Services (SPCS) has two modes: long-lived services, and <em>job</em> services that start, run to completion, and exit. A batch pipeline is exactly the second shape. There is no service to babysit, no health check to write, and compute is billed while the job runs on its pool. You launch a job, the container does its work, the container goes away. That is the whole operational model, and it maps onto a scheduled load with nothing left over.</p>
+    <p>The rest of this chapter is the path from <code>python -m pipelines.batch.run</code> on a laptop to that same module running as a container Snowflake launches. Four pieces: one image, one job spec template, one egress grant per source API, and a short deploy flow.</p>
+
+    <h2><span class="no">§ 2.</span> One image, config-agnostic</h2>
+    <p>The Dockerfile at <code>dlt-pipelines/deploy/spcs/Dockerfile</code> is deliberately boring. It ships the <code>pipelines</code> package and its dependencies, and its entrypoint is the same module you run locally. The pipeline name arrives as the container argument.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 1 · the whole runtime image</p>
+      <pre><code>FROM python:3.11-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /bin/
+
+WORKDIR /app
+COPY pyproject.toml ./
+COPY pipelines/ ./pipelines/
+RUN uv pip install --system --no-cache "."
+
+COPY .dlt/config.toml ./.dlt/config.toml
+
+ENTRYPOINT ["python", "-m", "pipelines.batch.run"]</code></pre>
+      <p class="caption">deploy/spcs/Dockerfile, trimmed to the statements: same entrypoint as a laptop run, pipeline name passed as the argument.</p>
+    </div>
+    <p>The important design decision is what the image does <em>not</em> contain: pipeline definitions. At run time the container reads its spec (endpoints, pagination, write disposition, target database stem) from a registry table in the account's control plane, <code>DLT_DB.OPS.PIPELINE_REGISTRY</code>. The YAML files under <code>dlt-pipelines/pipelines/batch/registries/</code> are the source of truth in git and the local-dev fallback, and a sync step pushes them into that table. So adding or editing a pipeline is an INSERT, not an image rebuild. I rebuild the image only when code or dependencies change, which in practice is rarely.</p>
+    <p>The image itself lives in an image repository inside the same Snowflake account (<code>DLT_DB.DEPLOY.IMAGES</code>). One detail that will bite an Apple Silicon laptop: SPCS compute pools are x86_64, so the image must be built <code>linux/amd64</code>. Building it emulated under QEMU works but is painfully slow, which is a good excuse to let CI do it on an amd64 runner.</p>
+
+    <h2><span class="no">§ 3.</span> The job spec template</h2>
+    <p>Between the image and a running job sits a small YAML spec, <code>dlt-pipelines/deploy/spcs/dlt_job.tmpl.yaml</code>. It is a Jinja template with a handful of placeholders filled per pipeline: the pipeline name, the destination database, and the secret binding. One template plus one image drives every pipeline in the fleet.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 2 · the env and secrets block of the job spec</p>
+      <pre><code>spec:
+  containers:
+    - name: dlt
+      image: /DLT_DB/DEPLOY/IMAGES/dlt-pipeline:latest
+      args:
+        - {{ pipeline }}
+      env:
+        DESTINATION__SNOWFLAKE__CREDENTIALS__AUTHENTICATOR: oauth
+        DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE: {{ database }}
+        DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE: DLT_WH
+        SNOWFLAKE_DATABASE: DLT_DB
+        DLT_REGISTRY_SOURCE: auto
+      secrets:
+        - snowflakeSecret: {{ secret }}
+          secretKeyRef: secret_string
+          envVarName: {{ env_var }}</code></pre>
+      <p class="caption">deploy/spcs/dlt_job.tmpl.yaml, trimmed: the authenticator is oauth with no token anywhere in sight, and the API key arrives through the secrets block.</p>
+    </div>
+    <p>Two things in that listing carry most of the security story. First, notice there is no Snowflake credential at all. The authenticator says <code>oauth</code>, and the token comes from Snowflake itself: SPCS mounts a short-lived OAuth session token into every container at <code>/snowflake/session/token</code>. The code in <code>dlt-pipelines/pipelines/common/snowflake_session.py</code> decides which world it is in by checking whether that file exists. If it does, connect with the mounted token; if not, fall back to the usual env vars a laptop or CI would set. The signal is the file, deliberately, because a file at that path is something only the SPCS runtime can produce.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>SPCS detection keys on the token <em>file</em>, never an env var. An environment variable like <code>RUNNING_IN_SPCS=1</code> is one <code>export</code> away from being faked on any laptop; the mounted token at <code>/snowflake/session/token</code> cannot be conjured outside a real container. Detecting the platform by the one artifact only the platform can produce means the oauth code path is unreachable from anywhere else.</p>
+    </div>
+    <p>Second, the source API key. It is never in the image, never in git, never in the registry YAML. It lives as a Snowflake SECRET object (<code>sql/sources/nfl/03_secrets.sql</code> creates it, an ALTER sets the real value), and the spec's <code>secrets:</code> block mounts it into the container as whatever env var the pipeline's config expects. dlt resolves a <code>secret:sources.nfl.api_key</code> reference from the env var <code>SOURCES__NFL__API_KEY</code>, so the binding is three lines of spec, not a line of code.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>Because the secret binds at the spec layer, the container image is credential-free by construction. The same image runs the NFL pipelines, the WNBA pipelines, or any future league's, and the only thing that changes is which SECRET object the spec names. There is nothing to rotate in an image, nothing to scrub from a layer, and a leaked image leaks no keys.</p>
+    </div>
+
+    <h2><span class="no">§ 4.</span> Egress is opt-in</h2>
+    <p>An SPCS container has no network egress by default. None. It can talk to Snowflake through the ambient session, and that is it. Reaching an external API takes two objects: a NETWORK RULE naming the exact host and port, and an EXTERNAL ACCESS INTEGRATION wrapping that rule, granted to the roles that launch jobs. One pair per source API, kept in that source's own SQL directory.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 3 · granting exactly one host</p>
+      <pre><code>CREATE OR REPLACE NETWORK RULE DLT_DB.OPS.NFL_API_EGRESS
+    MODE       = EGRESS
+    TYPE       = HOST_PORT
+    VALUE_LIST = ('api.balldontlie.io:443');
+
+CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION NFL_API_EAI
+    ALLOWED_NETWORK_RULES = (DLT_DB.OPS.NFL_API_EGRESS)
+    ENABLED = TRUE;
+
+GRANT USAGE ON INTEGRATION NFL_API_EAI TO ROLE DLT_DEV_ROLE;
+GRANT USAGE ON INTEGRATION NFL_API_EAI TO ROLE DLT_LOADER_ROLE;</code></pre>
+      <p class="caption">sql/sources/nfl/02_external_access.sql, trimmed: the port is required in VALUE_LIST, and a bare hostname is not enough.</p>
+    </div>
+    <p>I have come to like this inversion. On a VPS the default is everything and you subtract; here the default is nothing and you add one host. The integration is then named on each job launch, so the grant travels with the pipeline rather than with the machine. The failure mode, though, took me a while to read correctly the first time.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>Egress denied looks exactly like the API being down. A container missing its external access integration does not get a crisp permission error: the connection just times out, which surfaces as retries and eventually a request failure that reads like a provider outage. Before blaming the API's status page, check that the job was launched with the EAI attached. The registry here requires every scheduled pipeline to declare its <code>external_access</code> up front for exactly this reason.</p>
+    </div>
+
+    <h2><span class="no">§ 5.</span> The deploy flow</h2>
+    <p>With those pieces in place, deploying is three ships and one statement. Build the image and push it to the account's image repository. Sync the registry YAML into the control-plane table. Upload the spec template to a Snowflake stage (<code>@DLT_DB.DEPLOY.SPECS</code>). After that, launching any pipeline is a single SQL statement.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 4 · one statement to run a pipeline</p>
+      <pre><code>EXECUTE JOB SERVICE
+  IN COMPUTE POOL DLT_POOL
+  NAME = dlt_job_nfl_reference
+  EXTERNAL_ACCESS_INTEGRATIONS = (NFL_API_EAI)
+  FROM @DLT_DB.DEPLOY.SPECS
+    SPECIFICATION_TEMPLATE_FILE = 'dlt_job.tmpl.yaml'
+    USING (
+      pipeline =&gt; 'nfl_reference',
+      database =&gt; 'NFL_PROD_DB',
+      secret   =&gt; 'DLT_DB.OPS.NFL_API_KEY',
+      env_var  =&gt; 'SOURCES__NFL__API_KEY'
+    );</code></pre>
+      <p class="caption">The USING clause fills the template's placeholders; note EXTERNAL_ACCESS_INTEGRATIONS must come before FROM, which is a SQL compilation error the other way around.</p>
+    </div>
+    <p>That statement pulls the image from the account's repository, renders the spec with the USING values, mounts the session token and the secret, attaches the egress grant, runs the container to completion on the pool, and releases it. Wiring that statement onto a schedule is a Snowflake Task, and Tasks have their own sharp edges, which is the next chapter's story.</p>
+    <p>Here is the payoff, and the reason I think this pattern deserves a look for any side project already sitting on Snowflake: the laptop only ever ships artifacts. It pushes an image, uploads a spec, syncs a table. Execution, credentials, network policy, and scheduling all live inside the account, and nothing outside it ever runs the code.</p>
+  </article>
+  <nav class="chapter-nav">
+    <a href="../index.html"><span class="dir">Contents</span><span class="t">weekend-warriors</span></a>
+    <a class="next" href="02-event-driven-dbt.html"><span class="dir">Next · Ch. 2</span><span class="t">dbt builds that fire when data lands</span></a>
+  </nav>
+  <footer class="colophon">
+    <div class="inner-rule">
+      <p class="stack">Snowflake (SPCS · Tasks · Streams · Cortex) + dlt + dbt</p>
+      <p class="meta">Data: balldontlie.io<span class="sep">·</span><a class="repo" href="https://github.com/pronoiaLabs/weekend-warriors">github.com/pronoiaLabs/weekend-warriors</a><span class="sep">·</span>Apache-2.0</p>
+      <p class="end-mark">&#10045;</p>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
