@@ -137,7 +137,11 @@ renamed as (
         coalesce(yards_per_punt_return::float, yards_per_punt_return__v_double)
                                                                           as yards_per_punt_return,
         long_punt_return,
-        punt_return_touchdowns
+        punt_return_touchdowns,
+
+        -- carried through so the fact_player_game_* phase facts can build
+        -- incrementally
+        _dlt_load_id
 
     from source
 

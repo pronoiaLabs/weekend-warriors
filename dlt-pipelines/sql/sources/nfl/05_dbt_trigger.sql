@@ -116,7 +116,7 @@ COMMENT = 'Audit: which loads triggered which dbt build. The INSERT that fills t
 CREATE OR REPLACE PROCEDURE NFL_PROD_DB.OPS.SP_DBT_BUILD()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Drain DBT_LOADS_STREAM, then dbt run for NFL. Caller''s rights: EXECUTE DBT PROJECT requires it.'
+COMMENT = 'Drain DBT_LOADS_STREAM, then dbt build for NFL. Caller''s rights: EXECUTE DBT PROJECT requires it.'
 EXECUTE AS CALLER
 AS
 $$
@@ -144,17 +144,11 @@ BEGIN
 
   -- Explicit ENVIRONMENT: the project object defaults to dev. A partial dbt
   -- failure raises here, failing the task with the message in TASK_HISTORY.
-  -- 'run', not 'build', deliberately: NFL raw drift keeps data tests red
-  -- (see BACKLOG "Investigate NFL raw drift"), and in dbt build a failed
-  -- source test SKIPS every downstream model (measured: 1 failure skipped
-  -- 129 nodes), so build would mean no models refresh at all and a task
-  -- that is red every day. Flip to 'build' when the drift item closes.
   -- EXECUTE IMMEDIATE because ENV_VARS validates its values at CREATE
-  -- PROCEDURE time and rejects a Scripting :bind ("must be a single-quoted
-  -- string literal, a session variable, or a bind placeholder (?)"); the
-  -- build_id is a self-minted UUID, so inlining it is safe.
+  -- PROCEDURE time and rejects a Scripting :bind; the build_id is a
+  -- self-minted UUID, so inlining it is safe.
   EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL'
-    || ' ARGS = ''run'''
+    || ' ARGS = ''build'''
     || ' ENVIRONMENT = ''prod'''
     || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';
 
@@ -165,7 +159,7 @@ BEGIN
   INSERT INTO DLT_DB.OPS.DBT_BUILDS
     (BUILD_ID, SPORT, ENVIRONMENT, PROJECT_FQN, ARGS, DRAINED_LOADS, EXEC_QUERY_ID, STARTED_AT, FINISHED_AT)
   VALUES
-    (:build_id, 'nfl', 'prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL', 'run',
+    (:build_id, 'nfl', 'prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL', 'build',
      :drained, :exec_qid, :started_at, CURRENT_TIMESTAMP());
 
   -- TASK_HISTORY.RETURN_VALUE comes ONLY from SYSTEM$SET_RETURN_VALUE; a
@@ -245,7 +239,7 @@ CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL
   WAREHOUSE = DBT_WH
   USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 900
   USER_TASK_TIMEOUT_MS = 3600000
-  COMMENT = 'dbt run for NFL on new RAW loads. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
+  COMMENT = 'dbt build for NFL on new RAW loads. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
   WHEN SYSTEM$STREAM_HAS_DATA('NFL_PROD_DB.OPS.DBT_LOADS_STREAM')
 AS
   CALL NFL_PROD_DB.OPS.SP_DBT_BUILD();

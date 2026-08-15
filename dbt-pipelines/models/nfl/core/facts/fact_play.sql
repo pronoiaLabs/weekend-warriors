@@ -10,9 +10,10 @@
 /*
     fact_play -- play-by-play. Grain: play. 179,402 rows.
 
-    The only incremental model in the project. Everything else is small enough to
-    rebuild; this one is 33 MB in the source and grows every week, so it merges
-    on new dlt loads instead.
+    The template for the project's incremental models: fact_ncaaf_player_game
+    and the three fact_player_game_* phase facts follow this pattern. This one
+    is 33 MB in the source and grows every week, so it merges on new dlt loads
+    instead of rebuilding; everything not converted is small enough to rebuild.
 
     Incremental logic: dlt writes an epoch-seconds value as _dlt_load_id on every
     row, so "newer than anything I already have" is a numeric comparison. The

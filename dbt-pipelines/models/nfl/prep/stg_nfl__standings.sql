@@ -73,17 +73,24 @@ renamed as (
         -- postseason position.
         --
         -- The source column is named playoff_seed but it is NOT a playoff seed:
-        -- it is a conference standing rank running 1-16 and populated for EVERY
-        -- team (verified 16 ranks x 6 team-seasons = 96 rows, no NULLs). Renamed
-        -- to conference_rank so it cannot be mistaken for a seed.
+        -- it is a conference standing rank running 1-16 and populated for every
+        -- team once the provider assigns ranks (verified 16 ranks x 6
+        -- team-seasons = 96 rows, no NULLs). Renamed to conference_rank so it
+        -- cannot be mistaken for a seed.
         --
-        -- Playoff qualification is therefore rank <= 7, since seven teams per
-        -- conference make the postseason. Deriving it from NULLability -- the
-        -- obvious reading of the source name -- would mark all 32 teams as
-        -- playoff qualifiers.
-        playoff_seed                                                  as conference_rank,
-        (playoff_seed <= 7)                                           as made_playoffs,
-        iff(playoff_seed <= 7, playoff_seed, null)                    as playoff_seed,
+        -- ZERO MEANS UNRANKED, NOT RANK ZERO. The preseason snapshot of a new
+        -- season carries 0 for teams the provider has not ranked yet, and an
+        -- un-nulled 0 satisfies `<= 7`, silently marking every unranked team
+        -- as a playoff qualifier. nullif keeps the columns NULL until a real
+        -- rank exists.
+        --
+        -- Playoff qualification is rank <= 7, since seven teams per conference
+        -- make the postseason. Deriving it from NULLability -- the obvious
+        -- reading of the source name -- would mark all 32 teams as playoff
+        -- qualifiers.
+        nullif(playoff_seed, 0)                                       as conference_rank,
+        (nullif(playoff_seed, 0) <= 7)                                as made_playoffs,
+        iff(playoff_seed between 1 and 7, playoff_seed, null)         as playoff_seed,
         win_streak,
 
         -- source text retained for audit

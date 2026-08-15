@@ -79,4 +79,4 @@ build-sport: ## Prod build on a sport's object, as the connection's role (SPORT=
 	@test -n "$(SPORT)" || { echo "usage: make build-sport SPORT=nfl|wnba"; exit 1; }
 	@$(call hdr,build $(call sport_env,$(SPORT)) on $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z))
 	$(SNOW_DBT) execute -c $(CONN) --env $(call sport_env,$(SPORT)) \
-		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) $(if $(filter nfl,$(SPORT)),run,build)
+		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) build
