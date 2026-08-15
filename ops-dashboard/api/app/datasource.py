@@ -8,7 +8,7 @@ lets tests and offline dev run with zero network.
 
 import json
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -360,4 +360,35 @@ def metrics(query_id: str) -> list[dict[str, Any]]:
     )
     for row in rows:
         row["event_ts"] = _iso_utc(row.get("event_ts"))
+    return rows
+
+
+def headlines_for_day(day: date) -> list[dict[str, Any]]:
+    """The AI wire: rows of the newest DAY at or before *day*, in SEQ order.
+
+    Upstream is best-effort (SP_HEADLINES swallows its own failures), so days
+    with no rows are a normal state, not an error. The fallback lives HERE, in
+    one place with identical semantics in both modes, so fixture and live can
+    never drift: newest day <= requested, else nothing.
+    """
+    if _mode() == "fixtures":
+        rows = [r for r in _fixture("headlines") if r["day"] <= day.isoformat()]
+        if not rows:
+            return []
+        served = max(r["day"] for r in rows)
+        return sorted((r for r in rows if r["day"] == served), key=lambda r: r["seq"])
+
+    from app import db
+
+    sql = (
+        "SELECT GENERATED_AT, DAY, SEQ, SEVERITY, KIND, ENTITY, HEADLINE, DETAIL, MODEL "
+        "FROM DLT_DB.OPS.HEADLINES "
+        "WHERE DAY = (SELECT MAX(DAY) FROM DLT_DB.OPS.HEADLINES WHERE DAY <= %(day)s) "
+        "ORDER BY SEQ"
+    )
+    rows = db.query(sql, {"day": day.isoformat()})
+    for row in rows:
+        row["generated_at"] = _iso_utc(row.get("generated_at"))
+        d = row.get("day")
+        row["day"] = d.isoformat() if hasattr(d, "isoformat") else d
     return rows

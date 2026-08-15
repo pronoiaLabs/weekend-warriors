@@ -430,3 +430,32 @@ def run_detail(run: dict[str, Any], history: list[dict[str, Any]]) -> dict[str, 
         for r in prior[:WINDOW_DAYS]
     ]
     return out
+
+
+def headlines(rows: list[dict[str, Any]], requested_day: date) -> dict[str, Any]:
+    """Shape the AI wire payload from the day's HEADLINES rows.
+
+    `stale` is informational, never an error: the wire regenerates at 12:00
+    UTC, so a morning request legitimately serves yesterday's edition, and a
+    day the proc skipped serves the newest one before it. The panel renders
+    the fact; nothing downstream should branch on it.
+    """
+    served = rows[0]["day"] if rows else None
+    return {
+        "requested_date": requested_day.isoformat(),
+        "served_date": served,
+        "stale": served != requested_day.isoformat(),
+        "generated_at": rows[0].get("generated_at") if rows else None,
+        "model": rows[0].get("model") if rows else None,
+        "headlines": [
+            {
+                "seq": r["seq"],
+                "severity": r["severity"],
+                "kind": r["kind"],
+                "entity": r["entity"],
+                "headline": r["headline"],
+                "detail": r["detail"],
+            }
+            for r in rows
+        ],
+    }

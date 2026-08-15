@@ -142,6 +142,16 @@ def create_app() -> FastAPI:
             payload["incidents"] = [e for e in payload["incidents"] if e["kind"] == kind]
         return payload
 
+    @app.get("/api/headlines")
+    def headlines(date: str | None = Query(None)) -> dict[str, Any]:
+        # Sport-agnostic on purpose: the wire is one editorial voice over the
+        # whole platform, and HEADLINES.ENTITY is free text, not a sport key.
+        try:
+            day = dt.date.fromisoformat(date) if date else _now().date()
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"invalid date {date!r}") from exc
+        return assemble.headlines(datasource.headlines_for_day(day), day)
+
     @app.get("/api/pipelines")
     def pipelines_index(sport: str = Query("all")) -> dict[str, Any]:
         wanted = _check_sport(sport)
