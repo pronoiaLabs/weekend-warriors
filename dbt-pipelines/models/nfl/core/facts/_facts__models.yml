@@ -64,6 +64,7 @@ models:
   - name: fact_player_game_offense
     description: >
       Passing, rushing and receiving. Grain: player x game. ~21,700 rows.
+      Incremental (merge on player_game_key).
       Filtered to rows with offensive volume, not by position -- position is
       'Unknown' for 801 players who appear in box scores.
     columns:
@@ -92,10 +93,14 @@ models:
         tests: [not_null]
       - name: touches
         tests: [not_null]
+      - name: dlt_load_id_numeric
+        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
+        tests: [not_null]
 
   - name: fact_player_game_defense
     description: >
       Tackles, pressure and coverage. Grain: player x game. ~42,300 rows.
+      Incremental (merge on player_game_key).
       defensive_sacks is FLOAT -- half-sacks are real.
     columns:
       - name: player_game_key
@@ -122,10 +127,14 @@ models:
           - dbt_utils.accepted_range: {min_value: 0}
       - name: takeaways
         tests: [not_null]
+      - name: dlt_load_id_numeric
+        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
+        tests: [not_null]
 
   - name: fact_player_game_special
     description: >
       Kicking, punting and returns. Grain: player x game. ~7,700 rows.
+      Incremental (merge on player_game_key).
       Three sub-disciplines sharing one fact; use has_kicking / has_punting /
       has_returns to isolate them.
     columns:
@@ -151,6 +160,9 @@ models:
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
       - name: total_returns
+        tests: [not_null]
+      - name: dlt_load_id_numeric
+        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
         tests: [not_null]
 
   # ---------------------------------------------------------------------------
@@ -323,18 +335,27 @@ models:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 18}
       - name: conference_rank
         description: >
-          Conference standing rank 1-16, populated for EVERY team. This is the
-          column the source mislabels as playoff_seed.
+          Conference standing rank 1-16. NULL until the provider assigns
+          ranks -- a new season's preseason snapshot carries 0 upstream,
+          nulled in prep. This is the column the source mislabels as
+          playoff_seed. not_null is scoped to team-seasons with a
+          regular-season result, where a missing rank is a real defect.
         tests:
-          - not_null
+          - not_null:
+              config: {where: "wins + losses + ties > 0"}
           - dbt_utils.accepted_range: {min_value: 1, max_value: 16}
       - name: playoff_seed
         description: "The real seed: conference_rank where <= 7, else NULL. 7 teams per conference qualify."
         tests:
           - dbt_utils.accepted_range: {min_value: 1, max_value: 7}
       - name: made_playoffs
-        description: "Derived as conference_rank <= 7, NOT from NULLability of the source's playoff_seed."
-        tests: [not_null]
+        description: >
+          Derived as conference_rank <= 7, NOT from NULLability of the
+          source's playoff_seed. NULL while the team is unranked, same
+          scope as conference_rank.
+        tests:
+          - not_null:
+              config: {where: "wins + losses + ties > 0"}
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [team_id, season]
@@ -354,6 +375,12 @@ models:
         tests:
           - relationships: {to: "ref('dim_team')", field: team_key}
       - name: reported_date
-        tests: [not_null]
+        description: >
+          NULL when the provider omits the date, which it does on a minority
+          of reports (first observed Aug 2026, 101 of 642 rows). warn, not
+          error: the injuries are real and the date is genuinely unknown,
+          but a sudden jump to all-NULL should stay visible.
+        tests:
+          - not_null: {config: {severity: warn}}
       - name: is_current
         tests: [not_null]

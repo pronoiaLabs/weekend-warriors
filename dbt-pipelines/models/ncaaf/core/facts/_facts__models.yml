@@ -39,7 +39,8 @@ models:
 
   - name: fact_ncaaf_player_game
     description: >
-      One row per player per COMPLETED game, ~173,688 rows. team_key is the
+      One row per player per COMPLETED game, ~173,688 rows. Incremental
+      (merge on player_game_key), clustered on season, week. team_key is the
       stat line's team (season-accurate across transfers). Coverage:
       passing, rushing, receiving, defense; NO fumbles or special teams
       anywhere in the source.
@@ -59,6 +60,9 @@ models:
           - not_null
           - relationships: {to: "ref('dim_ncaaf_game')", field: game_key}
       - name: is_home
+        tests: [not_null]
+      - name: dlt_load_id_numeric
+        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
         tests: [not_null]
 
   - name: fact_ncaaf_player_season

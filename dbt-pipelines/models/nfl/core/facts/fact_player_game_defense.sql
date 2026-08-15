@@ -1,12 +1,18 @@
 {{
     config(
-        materialized='table'
+        materialized='incremental',
+        unique_key='player_game_key',
+        incremental_strategy='merge'
     )
 }}
 
 /*
     fact_player_game_defense -- tackles, pressure and coverage.
     Grain: player x game. ~42,300 rows, the largest of the three phase facts.
+
+    Incremental (merge on player_game_key); see fact_play for the watermark
+    pattern and its traps, and fact_player_game_offense for the phase-fact
+    watermark wrinkle all three share.
 
     See fact_player_game_offense for the full explanation of the phase split and
     the deliberate cross-fact key overlap. Short version: measure sets are
@@ -27,6 +33,19 @@
 with stats as (
 
     select * from {{ ref('stg_nfl__player_stats') }}
+
+    {% if is_incremental() %}
+    -- Pick up rows from any load this table has not already fully absorbed.
+    -- Two conditions, both needed; see fact_play for the full rationale
+    -- (>= max catches a partially-landed load; not in catches an
+    -- out-of-order load id). Re-reads are free: the merge is idempotent.
+    where _dlt_load_id::number(38, 6) >= (
+              select coalesce(max(dlt_load_id_numeric), 0) from {{ this }}
+          )
+       or _dlt_load_id::number(38, 6) not in (
+              select distinct dlt_load_id_numeric from {{ this }}
+          )
+    {% endif %}
 
 ),
 
@@ -127,7 +146,11 @@ select
         when d.total_tackles is not null and d.solo_tackles is not null
              and d.total_tackles >= d.solo_tackles
         then d.total_tackles - d.solo_tackles
-    end                                                 as assisted_tackles
+    end                                                 as assisted_tackles,
+
+    -- exact numeric watermark for the next incremental run. NOT float: a float
+    -- cast loses precision on a 17-digit load id and breaks the comparison.
+    d._dlt_load_id::number(38, 6)                       as dlt_load_id_numeric
 
 from defense d
 inner join games g

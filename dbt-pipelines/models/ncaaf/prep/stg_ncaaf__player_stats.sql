@@ -75,7 +75,10 @@ renamed as (
         {{ ncaaf_coalesce_variant('tackles_for_loss') }}    as tackles_for_loss,
         {{ ncaaf_coalesce_variant('sacks') }}               as sacks,
         interceptions,
-        passes_defended
+        passes_defended,
+
+        -- carried through so fact_ncaaf_player_game can build incrementally
+        _dlt_load_id
 
     from source
 

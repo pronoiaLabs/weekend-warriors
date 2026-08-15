@@ -1,12 +1,23 @@
 {{
     config(
-        materialized='table'
+        materialized='incremental',
+        unique_key='player_game_key',
+        incremental_strategy='merge'
     )
 }}
 
 /*
     fact_player_game_offense -- passing, rushing and receiving.
     Grain: player x game. ~21,700 rows.
+
+    Incremental (merge on player_game_key); see fact_play for the watermark
+    pattern and its two traps (NUMBER(38,6), the two-condition filter). One
+    phase-fact wrinkle, shared by all three and accepted: a load id none of
+    whose rows pass this fact's phase filter never enters its watermark set,
+    so the `not in` arm re-reads that load's rows on every run, filters them
+    out again, and merges nothing. Idempotent and cheap -- every real weekly
+    load has all three phases in practice -- but no-op runs show nonzero
+    scanned rows.
 
     One of three phase facts split out of the 116-column STATS source. The split
     exists because a single wide fact would be ~100 measures, almost all NULL for
@@ -40,6 +51,28 @@
 with stats as (
 
     select * from {{ ref('stg_nfl__player_stats') }}
+
+    {% if is_incremental() %}
+    -- Pick up rows from any load this table has not already fully absorbed.
+    --
+    -- Two conditions, both needed:
+    --   >= max   catches a load that landed only partially on a previous run.
+    --            Strict > would exclude the rest of that batch forever, since
+    --            those rows are EQUAL to the watermark, not greater.
+    --   not in   catches an out-of-order load. dlt stamps _dlt_load_id when the
+    --            load package is created, not when it commits, so a resource
+    --            that started earlier but committed later carries a LOWER id
+    --            and would never exceed the max.
+    --
+    -- Both re-read rows that may already be present, which is free here because
+    -- the merge on player_game_key is idempotent.
+    where _dlt_load_id::number(38, 6) >= (
+              select coalesce(max(dlt_load_id_numeric), 0) from {{ this }}
+          )
+       or _dlt_load_id::number(38, 6) not in (
+              select distinct dlt_load_id_numeric from {{ this }}
+          )
+    {% endif %}
 
 ),
 
@@ -150,7 +183,11 @@ select
     -- null-checking a measure
     (o.passing_attempts  is not null)                   as has_passing,
     (o.rushing_attempts  is not null)                   as has_rushing,
-    (o.receiving_targets is not null)                   as has_receiving
+    (o.receiving_targets is not null)                   as has_receiving,
+
+    -- exact numeric watermark for the next incremental run. NOT float: a float
+    -- cast loses precision on a 17-digit load id and breaks the comparison.
+    o._dlt_load_id::number(38, 6)                       as dlt_load_id_numeric
 
 from offense o
 inner join games g
