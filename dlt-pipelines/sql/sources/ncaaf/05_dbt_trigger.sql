@@ -176,7 +176,57 @@ BEGIN
       NULL;
   END;
 
+  -- Recovery ping. The latch (DLT_DB.OPS.ALERT_STATE, sql/ops/09_alerting.sql)
+  -- is written by the EXCEPTION handler below on failure; only the FIRST
+  -- success after that pings, so a healthy week is silent. Nested swallow-all
+  -- because alert plumbing must never fail a build that succeeded.
+  BEGIN
+    LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE WHERE SCOPE = 'dbt_build_ncaaf');
+    IF (prev = 'failing') THEN
+      CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+        SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+          SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('RECOVERED dbt_build_ncaaf')),
+        SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+      UPDATE DLT_DB.OPS.ALERT_STATE
+        SET STATUS = 'ok', UPDATED_AT = CURRENT_TIMESTAMP(),
+            LAST_ALERTED_AT = CURRENT_TIMESTAMP(), LAST_ERROR = NULL
+        WHERE SCOPE = 'dbt_build_ncaaf';
+    END IF;
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
   RETURN 'built after ' || drained || ' load(s), build_id ' || build_id;
+EXCEPTION
+  -- Failure ping, then RAISE so TASK_HISTORY and the auto-suspend counter see
+  -- exactly what they saw before this handler existed. Only a transition
+  -- pings: the first failure of a streak alerts, the rest just refresh the
+  -- latch. SQLERRM is captured before the nested block because the block's
+  -- own statements can replace the active exception context; the nested
+  -- swallow-all guarantees broken alert plumbing (missing integration,
+  -- revoked grant) can never mask the real dbt error.
+  WHEN OTHER THEN
+    LET err VARCHAR := LEFT(COALESCE(SQLERRM, 'unknown error'), 400);
+    BEGIN
+      LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE WHERE SCOPE = 'dbt_build_ncaaf');
+      IF (prev IS NULL OR prev <> 'failing') THEN
+        CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+          SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+            SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('FAILED dbt_build_ncaaf: ' || :err)),
+          SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+      END IF;
+      MERGE INTO DLT_DB.OPS.ALERT_STATE t USING (SELECT 'dbt_build_ncaaf' AS SCOPE) s ON t.SCOPE = s.SCOPE
+        WHEN MATCHED THEN UPDATE SET STATUS = 'failing', UPDATED_AT = CURRENT_TIMESTAMP(),
+          LAST_ALERTED_AT = IFF(t.STATUS <> 'failing', CURRENT_TIMESTAMP(), t.LAST_ALERTED_AT),
+          LAST_ERROR = :err
+        WHEN NOT MATCHED THEN INSERT (SCOPE, STATUS, UPDATED_AT, LAST_ALERTED_AT, LAST_ERROR)
+          VALUES ('dbt_build_ncaaf', 'failing', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), :err);
+    EXCEPTION
+      WHEN OTHER THEN
+        NULL;
+    END;
+    RAISE;
 END;
 $$;
 

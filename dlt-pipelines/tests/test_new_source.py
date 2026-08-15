@@ -120,6 +120,25 @@ def test_dbt_trigger_names_agree(scaffold: Path) -> None:
     assert "DLT_TASK_" not in sql.replace("DLT_TASK_ prefix", "")
 
 
+def test_dbt_trigger_alerts_and_reraises(scaffold: Path) -> None:
+    # The scaffold's proc must carry the Slack transition alerting the live
+    # sports have (sql/ops/09_alerting.sql): a failure handler that pings the
+    # FIRST failure of a streak and then RAISEs so TASK_HISTORY and the
+    # auto-suspend counter are untouched, plus the recovery ping on the first
+    # success after. A scaffold without the handler would give the next sport
+    # exactly the two-day-silent outage this exists to prevent.
+    sql = (scaffold / "sql" / "sources" / NAME / "05_dbt_trigger.sql").read_text()
+
+    assert f"'dbt_build_{NAME}'" in sql, "alert scope must carry the sport name"
+    assert "DLT_DB.OPS.ALERT_STATE" in sql
+    assert "SLACK_ALERTS_INT" in sql
+    assert "SANITIZE_WEBHOOK_CONTENT" in sql
+    assert "RECOVERED dbt_build_" in sql
+    # the handler must re-raise, not swallow: a swallowed dbt failure would
+    # mark the task successful and fire the harvest child on a broken build
+    assert "RAISE;" in sql
+
+
 def test_host_reaches_both_the_network_rule_and_the_base_url(scaffold: Path) -> None:
     # A network rule that does not cover base_url is a timeout, not an auth error,
     # so it gets misread as the API being down.
