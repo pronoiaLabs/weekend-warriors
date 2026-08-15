@@ -27,9 +27,9 @@ def test_slot_state_grace() -> None:
 
 
 def test_prose() -> None:
-    assert schedule.prose("0 10 * * *") == "daily 10:00 UTC"
-    assert schedule.prose("0 13 * * 2") == "weekly Tue 13:00 UTC"
-    assert schedule.prose("0 1 * * 3") == "weekly Wed 01:00 UTC"
+    assert schedule.prose("0 10 * * *") == "daily 10:00 AM UTC"
+    assert schedule.prose("0 13 * * 2") == "weekly Tue 1:00 PM UTC"
+    assert schedule.prose("0 1 * * 3") == "weekly Wed 1:00 AM UTC"
 
 
 def test_next_fire_is_tz_aware_and_future() -> None:

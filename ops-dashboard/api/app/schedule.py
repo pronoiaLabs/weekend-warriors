@@ -57,8 +57,9 @@ def slot_state(slot: datetime, has_run: bool, now: datetime) -> str:
 
 
 def prose(schedule: str) -> str:
-    """Cron to a human string, e.g. 'daily 10:00 UTC' or 'weekly Tue 13:00 UTC'.
+    """Cron to a human string, e.g. 'daily 10:00 AM UTC' or 'weekly Tue 1:00 PM UTC'.
 
+    12-hour clock to match the web formatters (utils/format.ts), zone still UTC.
     Only the shapes the registry actually uses (fixed minute/hour, * or single
     day-of-week); anything else falls back to the raw cron string.
     """
@@ -68,7 +69,8 @@ def prose(schedule: str) -> str:
     minute, hour, dom, month, dow = parts
     if not (minute.isdigit() and hour.isdigit() and dom == "*" and month == "*"):
         return schedule
-    at = f"{int(hour):02d}:{int(minute):02d} UTC"
+    h24 = int(hour)
+    at = f"{h24 % 12 or 12}:{int(minute):02d} {'AM' if h24 < 12 else 'PM'} UTC"
     if dow == "*":
         return f"daily {at}"
     if dow.isdigit():
