@@ -89,3 +89,4 @@ OBS-LINEAGE.html
 # Build guide for porting the ops layer into the template repo: written here,
 # consumed elsewhere. Not part of this codebase.
 /OPS-PORT.md
+.brainstorm/
