@@ -19,6 +19,20 @@ function linkClass({ isActive }: { isActive: boolean }): string {
   return isActive ? 'on' : ''
 }
 
+/** The strip's reference day: the explicit selection, else its center. */
+function anchor(days: SlateDay[], selected?: string): string {
+  return selected ?? days[Math.floor(days.length / 2)].date
+}
+
+/** ISO date arithmetic in UTC. `toToday` asks for the browser's UTC today,
+    used only when today has scrolled out of the fetched window entirely. */
+function shiftDay(iso: string, delta: number, toToday = false): string {
+  if (toToday) return new Date().toISOString().slice(0, 10)
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + delta)
+  return d.toISOString().slice(0, 10)
+}
+
 /** The global sport filter, made visible.
 
     The ?sport= param deliberately survives navigation so views stay
@@ -104,6 +118,14 @@ export function Chrome({ now, days, selected, onSelect }: ChromeProps) {
 
       {days && days.length > 0 ? (
         <div className="sl-daystrip">
+          <button
+            type="button"
+            className="sl-daynav"
+            title="previous day"
+            onClick={() => onSelect?.(shiftDay(anchor(days, selected), -1))}
+          >
+            &#8249;
+          </button>
           {days.map((day) => {
             const { text, bad } = tally(day)
             const classes = ['sl-tab']
@@ -122,6 +144,26 @@ export function Chrome({ now, days, selected, onSelect }: ChromeProps) {
               </button>
             )
           })}
+          <button
+            type="button"
+            className="sl-daynav"
+            title="next day"
+            onClick={() => onSelect?.(shiftDay(anchor(days, selected), 1))}
+          >
+            &#8250;
+          </button>
+          {!days.some((d) => d.is_today && d.date === anchor(days, selected)) ? (
+            <button
+              type="button"
+              className="sl-daynav today"
+              onClick={() => {
+                const today = days.find((d) => d.is_today)
+                onSelect?.(today ? today.date : shiftDay(anchor(days, selected), 0, true))
+              }}
+            >
+              today
+            </button>
+          ) : null}
         </div>
       ) : null}
     </>
