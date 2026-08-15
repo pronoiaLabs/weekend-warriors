@@ -1,10 +1,19 @@
 /** Everything on this dashboard is UTC: the Tasks are scheduled in UTC and the
     views record UTC, so no formatter here reads the browser time zone. */
 
-const HHMM = new Intl.DateTimeFormat('en-GB', {
-  hour: '2-digit',
+/** 12-hour clock everywhere times are shown; the zone stays UTC. */
+const HHMM = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
   minute: '2-digit',
-  hour12: false,
+  hour12: true,
+  timeZone: 'UTC',
+})
+
+const HHMMSS = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true,
   timeZone: 'UTC',
 })
 
@@ -30,7 +39,7 @@ export function weekday(iso: string): string {
   return WEEKDAY.format(new Date(iso))
 }
 
-/** "Tue 08-11 13:00", the shape the wireframe uses for a next fire. */
+/** "Tue 08-11 1:00 PM", the shape the wireframe uses for a next fire. */
 export function dayHhmm(iso: string): string {
   const at = new Date(iso)
   return `${WEEKDAY.format(at)} ${at.toISOString().slice(5, 10)} ${HHMM.format(at)}`
@@ -69,10 +78,10 @@ export function elapsedMs(value: number | null | undefined): string {
   return duration(Math.round(value / 1000)) ?? 'NULL'
 }
 
-/** "hh:mm:ss", the log table's timestamp. Milliseconds are dropped: two lines
-    of the same second are already adjacent in EVENT_TS order. */
+/** "8:14:23 PM", the log table's timestamp. Milliseconds are dropped: two
+    lines of the same second are already adjacent in EVENT_TS order. */
 export function hhmmss(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 19)
+  return HHMMSS.format(new Date(iso))
 }
 
 /** "Sat 2026-08-08", the run detail header's day. */
