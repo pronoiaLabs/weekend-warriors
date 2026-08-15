@@ -392,3 +392,39 @@ def headlines_for_day(day: date) -> list[dict[str, Any]]:
         d = row.get("day")
         row["day"] = d.isoformat() if hasattr(d, "isoformat") else d
     return rows
+
+
+def runs_between(start: datetime, end: datetime, sport: str | None) -> list[dict[str, Any]]:
+    """Runs with start <= RUN_STARTED_AT < end, newest first.
+
+    Bounds are explicit UTC datetimes rather than a now-anchored window so the
+    slate can be rewound to any day. Fixture mode applies the SAME bounds:
+    runs_window's fixture path ignores its days argument entirely, a trap this
+    function exists to avoid. Bound strings carry milliseconds so the
+    lexicographic compare against the fixtures' .SSSZ timestamps is exact at
+    day edges.
+    """
+    start_iso = start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
+    end_iso = end.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
+
+    if _mode() == "fixtures":
+        runs = [r for r in _fixture("runs")["runs"] if start_iso <= r["run_started_at"] < end_iso]
+        if sport:
+            runs = [r for r in runs if r["sport"] == sport]
+        return sorted(runs, key=lambda r: r["run_started_at"], reverse=True)
+
+    from app import db
+
+    sql = (
+        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
+        "WHERE RUN_STARTED_AT >= %(start)s AND RUN_STARTED_AT < %(end)s "
+    )
+    params: dict[str, Any] = {
+        "start": start_iso.replace("Z", ""),
+        "end": end_iso.replace("Z", ""),
+    }
+    if sport:
+        sql += "AND SPORT = %(sport)s "
+        params["sport"] = sport
+    sql += "ORDER BY RUN_STARTED_AT DESC"
+    return [_normalize(r) for r in db.query(sql, params)]

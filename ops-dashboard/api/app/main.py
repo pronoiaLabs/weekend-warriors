@@ -152,6 +152,26 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=f"invalid date {date!r}") from exc
         return assemble.headlines(datasource.headlines_for_day(day), day)
 
+    @app.get("/api/slate")
+    def slate(sport: str = Query("all"), date: str | None = Query(None)) -> dict[str, Any]:
+        wanted = _check_sport(sport)
+        now = _now()
+        try:
+            day = dt.date.fromisoformat(date) if date else now.date()
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"invalid date {date!r}") from exc
+        pipes = [p for p in datasource.pipelines() if wanted is None or p["sport"] == wanted]
+        # Window: the strip needs +/-3 days of runs; prev-run context on the
+        # oldest strip day needs WINDOW_DAYS of lookback behind it.
+        radius = 3
+        start = dt.datetime.combine(
+            day - dt.timedelta(days=radius + assemble.WINDOW_DAYS), dt.time.min, dt.UTC
+        )
+        end = dt.datetime.combine(day + dt.timedelta(days=radius + 1), dt.time.min, dt.UTC)
+        runs = datasource.runs_between(start, end, wanted)
+        builds = datasource.dbt_builds(wanted.lower() if wanted else None, 50)
+        return assemble.slate(pipes, runs, builds, now, day, radius)
+
     @app.get("/api/pipelines")
     def pipelines_index(sport: str = Query("all")) -> dict[str, Any]:
         wanted = _check_sport(sport)
