@@ -116,11 +116,11 @@ function buildFacts(build: DbtBuildRow): FactSpec[] {
     { k: 'EXEC_QUERY_ID', v: build.exec_query_id ?? 'NULL' },
     { k: 'DRAINED_LOADS', v: build.drained_loads == null ? 'NULL' : num(build.drained_loads) },
     { k: 'DURATION_S', v: String(build.duration_s ?? 'NULL') },
-    { k: 'SCHEDULED_TIME', v: build.scheduled_time ? `${hhmmss(build.scheduled_time)} UTC` : 'NULL' },
-    { k: 'STARTED_AT', v: build.started_at ? `${hhmmss(build.started_at)} UTC` : 'NULL' },
+    { k: 'SCHEDULED_TIME', v: build.scheduled_time ? hhmmss(build.scheduled_time) : 'NULL' },
+    { k: 'STARTED_AT', v: build.started_at ? hhmmss(build.started_at) : 'NULL' },
     {
       k: 'COMPLETED_TIME',
-      v: build.completed_time ? `${hhmmss(build.completed_time)} UTC` : 'NULL',
+      v: build.completed_time ? hhmmss(build.completed_time) : 'NULL',
     },
     { k: 'N_QUERIES', v: build.n_queries == null ? 'NULL' : num(build.n_queries) },
     {
@@ -379,7 +379,7 @@ export default function DbtBuildDetail() {
           </h1>
           <span className="when">
             {at ? `STARTED_AT ${hhmmss(at)}` : 'no STARTED_AT'} to{' '}
-            {build.completed_time ? `COMPLETED_TIME ${hhmmss(build.completed_time)}` : 'NULL'} UTC ·{' '}
+            {build.completed_time ? `COMPLETED_TIME ${hhmmss(build.completed_time)}` : 'NULL'} ·{' '}
             {duration(build.duration_s) ?? 'no DURATION_S'}
           </span>
         </header>
@@ -433,8 +433,8 @@ export default function DbtBuildDetail() {
                     <td>{load.load_id}</td>
                     <td>{load.pipeline}</td>
                     <td>{load.status}</td>
-                    <td>{dayHhmm(load.inserted_at)} UTC</td>
-                    <td>{dayHhmm(load.drained_at)} UTC</td>
+                    <td>{dayHhmm(load.inserted_at)}</td>
+                    <td>{dayHhmm(load.drained_at)}</td>
                   </tr>
                 ))}
               </tbody>

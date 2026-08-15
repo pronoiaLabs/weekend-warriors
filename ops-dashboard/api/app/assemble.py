@@ -141,7 +141,7 @@ def pipelines_index(
                 "pipeline": pipe["name"],
                 "sport": pipe["sport"],
                 "enabled": pipe["enabled"],
-                "schedule": schedule.prose(pipe["schedule"]),
+                "schedule": pipe["schedule"],
                 "cron": pipe["schedule"],
                 "next_fire": _iso(schedule.next_fire(pipe["schedule"], now)),
                 "latest": _block_for_run(latest) if latest else None,
@@ -187,7 +187,7 @@ def pipeline_detail(
     return {
         "pipeline": pipe["name"],
         "sport": pipe["sport"],
-        "schedule": schedule.prose(cron),
+        "schedule": cron,
         "cron": cron,
         "next_fire": _iso(schedule.next_fire(cron, now)),
         "task_name": latest.get("task_name") if latest else None,
@@ -286,7 +286,7 @@ def _slate_day(
             run = matched.get(slot)
             if run is not None:
                 card = _block_for_run(run)
-                card["schedule"] = schedule.prose(cron)
+                card["schedule"] = cron
                 card["cron"] = cron
                 card["prev"] = _prev(pipe["name"], run["run_started_at"])
                 cards.append(card)
@@ -308,7 +308,7 @@ def _slate_day(
                     "rows_loaded": None,
                     "query_id": None,
                     "error_excerpt": None,
-                    "schedule": schedule.prose(cron),
+                    "schedule": cron,
                     "cron": cron,
                     "prev": _prev(pipe["name"], slot_iso),
                 }

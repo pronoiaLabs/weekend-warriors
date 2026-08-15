@@ -19,7 +19,7 @@ def test_pipelines_index(client: TestClient) -> None:
     assert len(body["pipelines"]) == 17
     by_name = {p["pipeline"]: p for p in body["pipelines"]}
     ref = by_name["nfl_reference"]
-    assert ref["schedule"] == "daily 8:00 AM UTC"
+    assert ref["schedule"] == "0 8 * * *"
     assert ref["latest"]["state"] == "succeeded"
     assert ref["succeeded"] > 0
     # The 14-day strip rides on every index row, same day states as the detail
@@ -35,7 +35,7 @@ def test_pipelines_index(client: TestClient) -> None:
 
 def test_pipeline_detail(client: TestClient) -> None:
     body = client.get("/api/pipelines/NFL/nfl_stats").json()
-    assert body["schedule"] == "daily 10:00 AM UTC"
+    assert body["schedule"] == "0 10 * * *"
     assert len(body["heatmap"]) == 14
     assert body["runs"]
     assert client.get("/api/pipelines/NFL/nope").status_code == 404

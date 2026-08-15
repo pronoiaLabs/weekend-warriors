@@ -111,7 +111,7 @@ export function Chrome({ now, days, selected, onSelect }: ChromeProps) {
         {now ? (
           <span className="sl-fresh">
             <span className="live" />
-            refreshed {hhmm(now)} UTC · event-driven
+            refreshed {hhmm(now)} · event-driven
           </span>
         ) : null}
       </header>

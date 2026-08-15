@@ -50,7 +50,7 @@ export function HeadlinesPanel({ wire }: HeadlinesPanelProps) {
 
       {wire?.generated_at ? (
         <div className="sl-panel-foot">
-          ✳ compiled {hhmm(wire.generated_at)} UTC · AI_COMPLETE over the day's runs
+          ✳ compiled {hhmm(wire.generated_at)} · AI_COMPLETE over the day's runs
         </div>
       ) : null}
     </div>
