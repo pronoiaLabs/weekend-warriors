@@ -251,16 +251,13 @@ up when done: `DROP SCHEMA IF EXISTS NFL_DEV_DB.DEV_<user>;`.
 Two workflows ship in `.github/workflows/`:
 
 - **`ci.yml`** — offline checks on every push/PR: lint, import/compile, `run --list`, and the DuckDB smoke + unit tests. No Snowflake connection.
-- **`deploy.yml`** — the repeatable deploy. **Manual only** (run it from the Actions tab / `workflow_dispatch`) so it never fails before Snowflake auth is configured. Gated to the `deploy` GitHub environment, it authenticates with a **GitHub OIDC token** (no stored keys) via the official [`snowflakedb/snowflake-actions`](https://github.com/snowflakedb/snowflake-actions) action, then:
-  1. `snow connection test -x`
-  2. `registry_sync --emit-sql --prune` → `snow sql -f` (syncs `registries/*.yml` into `OPS.PIPELINE_REGISTRY`)
-  3. `generate_tasks` → `snow sql -f` (creates/updates the per-pipeline Tasks, each carrying its container spec inline)
+- **`deploy.yml`** — the repeatable deploy, on every merge to `main` plus `workflow_dispatch` (a dispatch deploys everything; a push deploys only what its path filters matched). Gated to the `deploy` GitHub environment, it authenticates with a **GitHub OIDC token** (no stored keys) via the SHA-pinned `snowflake-cli` action inside the repo's [`snowflake-setup`](../.github/actions/snowflake-setup/action.yml) composite (install + auth + `snow connection test -x` preflight), then per filter: image rebuild, `registry_sync --emit-sql --prune` → `snow sql -f`, `generate_tasks` suspend/apply/resume with a started-state assertion, dev spec upload, per-sport dbt object deploys (`make -C dbt-pipelines deploy-sport`), agent redeploys, and the ops-dashboard image + service roll.
 
-Because the sync and task generation emit plain SQL, the whole deploy runs on the OIDC `snow` auth alone — the runner needs **no Python-connector credentials**.
+Because the sync and task generation emit plain SQL, the dlt side of the deploy runs on the OIDC `snow` auth alone — the runner needs **no Python-connector credentials**.
 
 **Setup:**
 
-1. Run `sql/prod/optional/03b_service_user_oidc.sql` to create the keyless `DLT_DEPLOYER` service user. Set its `WORKLOAD_IDENTITY` subject to match your repo/environment (e.g. `repo:<owner>/<repo>:environment:deploy`).
+1. Run `sql/prod/03b_service_user_oidc.sql` to create the keyless `DLT_DEPLOYER` service user and its role grants. Set its `WORKLOAD_IDENTITY` subject to match your repo/environment (e.g. `repo:<owner>/<repo>:environment:deploy`).
 2. In repo settings, add secret `SNOWFLAKE_ACCOUNT` and variables `SNOWFLAKE_USER` (`DLT_DEPLOYER`), `SNOWFLAKE_ROLE` (`DLT_LOADER_ROLE`), `SNOWFLAKE_WAREHOUSE` (`DLT_WH`).
 3. Create a `deploy` environment (add required reviewers to gate production).
 

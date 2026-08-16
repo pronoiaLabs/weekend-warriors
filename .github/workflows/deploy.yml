@@ -11,6 +11,9 @@ name: deploy
 # WORKLOAD_IDENTITY. No credential is stored anywhere. The only repo secret is the
 # account identifier. See dlt-pipelines/sql/prod/03b_service_user_oidc.sql, which
 # also covers the network policy override without which none of this can connect.
+# The CLI install + OIDC auth + connection preflight live in one composite
+# action (.github/actions/snowflake-setup), SHA-pinned because it holds
+# id-token: write.
 #
 # NOT ON EVERY PUSH: main and manual dispatch only, gated on the `deploy` GitHub
 # environment so required reviewers can sit in front of a production change. The
@@ -54,6 +57,7 @@ jobs:
       dev_specs: ${{ steps.decide.outputs.dev_specs }}
       dbt: ${{ steps.decide.outputs.dbt }}
       agents: ${{ steps.decide.outputs.agents }}
+      dashboard: ${{ steps.decide.outputs.dashboard }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -85,6 +89,8 @@ jobs:
               - 'dbt-pipelines/**'
             agents:
               - 'dbt-pipelines/agents/**'
+            dashboard:
+              - 'ops-dashboard/**'
 
       - name: Decide what to deploy
         id: decide
@@ -92,7 +98,7 @@ jobs:
           DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
           F: ${{ toJSON(steps.filter.outputs) }}
         run: |
-          for k in image registry tasks dev_specs dbt agents; do
+          for k in image registry tasks dev_specs dbt agents dashboard; do
             if [ "$DISPATCH" = "true" ]; then
               v=true
             else
@@ -122,9 +128,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: snowflakedb/snowflake-actions@v3
-        with:
-          use-oidc: true
+      - uses: ./.github/actions/snowflake-setup
 
       - name: Log in to the Snowflake image registry
         run: snow spcs image-registry login
@@ -156,15 +160,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: snowflakedb/snowflake-actions@v3
-        with:
-          use-oidc: true
+      - uses: ./.github/actions/snowflake-setup
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: pip install pyyaml
-      - name: Verify connection
-        run: snow connection test -x
       - name: Sync registries/*.yml into OPS.PIPELINE_REGISTRY
         run: |
           python -m pipelines.batch.registry_sync --emit-sql --prune > registry_sync.sql
@@ -193,9 +193,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: snowflakedb/snowflake-actions@v3
-        with:
-          use-oidc: true
+      - uses: ./.github/actions/snowflake-setup
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -239,8 +237,28 @@ jobs:
           echo "----- resume.sql -----" && cat resume.sql
           snow sql -f resume.sql -x
 
-      - name: Show resulting Task state
-        run: snow sql -q "SHOW TASKS IN SCHEMA DLT_DB.OPS;" -x
+      - name: Assert scheduled Tasks are started
+        # CLAUDE.md: "Verify with SHOW TASKS, not with the target's exit code:
+        # suspended looks exactly like success." The expected set comes from the
+        # generator itself, so a paused sport (schedules commented out in its
+        # registry, e.g. WNBA since 2026-08-12) is simply absent here and is
+        # never asserted on or accidentally un-paused.
+        run: |
+          snow sql -x -q "SHOW TASKS IN SCHEMA DLT_DB.OPS;" --format json > show_tasks.json
+          python3 - <<'PY'
+          import json
+          import re
+
+          expected = {
+              m.upper()
+              for m in re.findall(r"DLT_DB\.OPS\.(DLT_TASK_\w+)", open("resume.sql").read(), re.I)
+          }
+          assert expected, "resume.sql named no tasks; generator output changed shape?"
+          state = {t["name"].upper(): t["state"] for t in json.load(open("show_tasks.json"))}
+          bad = {name: state.get(name, "MISSING") for name in sorted(expected) if state.get(name) != "started"}
+          assert not bad, f"tasks not started after resume: {bad}"
+          print(f"all {len(expected)} scheduled tasks started")
+          PY
 
   # ---------------------------------------------------------------------------
   # Dev job spec templates
@@ -261,9 +279,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: snowflakedb/snowflake-actions@v3
-        with:
-          use-oidc: true
+      - uses: ./.github/actions/snowflake-setup
       - name: Upload dev spec templates
         run: |
           for f in deploy/spcs/dlt_dev_job*.tmpl.yaml; do
@@ -274,45 +290,68 @@ jobs:
   # ---------------------------------------------------------------------------
   # dbt
   # ---------------------------------------------------------------------------
-  # PREREQUISITE PARTLY SATISFIED (2026-08-09), see BACKLOG "Enable deploy.yml's
-  # dbt job". The original blocker is gone: DBT_RUNNER_ROLE exists and env.yml's
-  # prod environments use it. Still needed before enabling:
-  #   1. GRANT ROLE DBT_RUNNER_ROLE TO USER DLT_DEPLOYER;
-  #   2. The vars are stale: the project objects are now
-  #      DLT_DB.DEPLOY.CORTEX_LIFECYCLE (dev) plus per-sport _NFL / _WNBA
-  #      siblings, and all three need deploying (make -C dbt-pipelines
-  #      deploy-all).
-  #   3. The build step below is now optional: the per-sport trigger tasks
-  #      (sql/sources/<sport>/05_dbt_trigger.sql) build when data lands, so
-  #      CI's job is really just deploying code to the sport objects, which
-  #      IS the prod release step.
+  # One matrix leg per sport, because concurrent EXECUTE DBT PROJECT against a
+  # single object is unsupported and each sport's trigger task fires its own
+  # object (DLT_DB.DEPLOY.CORTEX_LIFECYCLE_<SPORT>). Deploying the object IS
+  # the prod release step: the per-sport trigger tasks
+  # (sql/sources/<sport>/05_dbt_trigger.sql) build when data lands, so there
+  # is deliberately no `snow dbt execute build` here.
   #
-  # `--env` must come BEFORE the project name. Tokens after it are passed through
-  # to dbt Core, which has no --env and will reject them.
+  # The deploy runs as DBT_RUNNER_ROLE (job-level override), which makes it the
+  # object's owner, and `make deploy-sport` carries the USAGE re-grant plus an
+  # ownership normalization so laptop (SYSADMIN) and CI deploys converge on
+  # DBT_RUNNER_ROLE owning the object -- neither path strands the other.
   dbt:
     needs: changes
     if: needs.changes.outputs.dbt == 'true'
     runs-on: ubuntu-latest
     environment: deploy
-    defaults:
-      run:
-        working-directory: dbt-pipelines
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # WNBA paused 2026-08-12; add
+          #   { sport: wnba, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_WNBA }
+          # here (and to the agents matrix) to revive.
+          - { sport: nfl, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL }
+          - { sport: ncaaf, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NCAAF }
     env:
-      DBT_PROJECT: ${{ vars.DBT_PROJECT_FQN }} # e.g. NFL_PROD_DB.ANALYTICS.cortex_lifecycle
-      DBT_PROJECT_NAME: ${{ vars.DBT_PROJECT_NAME }} # e.g. cortex_lifecycle
+      # DBT_RUNNER_ROLE owns the prod dbt estate; it has USAGE on DBT_WH only,
+      # so the workflow-level DLT_WH must be overridden here.
+      SNOWFLAKE_ROLE: DBT_RUNNER_ROLE
+      SNOWFLAKE_WAREHOUSE: DBT_WH
+      # The snow dbt --env / --default-env flags are feature-flagged.
+      SNOWFLAKE_CLI_FEATURES_ENABLE_DBT_PROJECT_ENV_VARS: "true"
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: snowflakedb/snowflake-actions@v3
-        with:
-          use-oidc: true
-      - name: Deploy the dbt project object
+      - uses: ./.github/actions/snowflake-setup
+      - name: Deploy ${{ matrix.object }}
+        # The Makefile target is the single source of truth for the deploy +
+        # re-grant + ownership sequence; CI passes CONN_ARGS=-x to use the
+        # temporary OIDC connection instead of a named one.
+        run: make -C dbt-pipelines deploy-sport SPORT=${{ matrix.sport }} CONN_ARGS=-x
+      - name: Assert DBT_RUNNER_ROLE still holds the object
+        # `snow dbt deploy --force` is CREATE OR REPLACE and drops grants. If
+        # this regressed, the triggered builds would fail silently until the
+        # task auto-suspends (measured: two days, Aug 2026). Fail loudly here
+        # instead.
         run: |
-          snow dbt deploy "$DBT_PROJECT_NAME" --source . --default-env prod \
-            --external-access-integration dbt_ext_access --force -x
-      - name: Build models
-        run: snow dbt execute --env prod "$DBT_PROJECT" build -x
+          snow sql -x --format json \
+            -q "SHOW GRANTS ON DBT PROJECT ${{ matrix.object }};" > grants.json
+          python3 - <<'PY'
+          import json
+
+          rows = json.load(open("grants.json"))
+          ok = any(
+              row.get("grantee_name") == "DBT_RUNNER_ROLE"
+              and row.get("privilege") in ("USAGE", "OWNERSHIP")
+              for row in rows
+          )
+          assert ok, f"DBT_RUNNER_ROLE lost access to the project object: {rows}"
+          print("DBT_RUNNER_ROLE grant verified")
+          PY
 
   # ---------------------------------------------------------------------------
   # Cortex Agents
@@ -322,7 +361,9 @@ jobs:
   # It needs the models to exist first, hence `needs: dbt`.
   #
   # `alter: true` updates in place rather than dropping and recreating, so a live
-  # agent does not disappear mid-deploy.
+  # agent does not disappear mid-deploy. The --args quoting trick (embedded
+  # quotes, or the CLI splits the token server-side) lives in the Makefile's
+  # deploy-agent target, the single home for it.
   agents:
     needs: [changes, dbt]
     if: |
@@ -331,19 +372,78 @@ jobs:
       && needs.dbt.result != 'failure'
     runs-on: ubuntu-latest
     environment: deploy
-    defaults:
-      run:
-        working-directory: dbt-pipelines
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # WNBA paused; revive together with the dbt matrix above.
+          - { sport: nfl }
+          - { sport: ncaaf }
     env:
-      DBT_PROJECT: ${{ vars.DBT_PROJECT_FQN }}
+      SNOWFLAKE_ROLE: DBT_RUNNER_ROLE
+      SNOWFLAKE_WAREHOUSE: DBT_WH
+      SNOWFLAKE_CLI_FEATURES_ENABLE_DBT_PROJECT_ENV_VARS: "true"
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: snowflakedb/snowflake-actions@v3
+      - uses: ./.github/actions/snowflake-setup
+      - name: Redeploy the ${{ matrix.sport }} analyst agent
+        run: make -C dbt-pipelines deploy-agent SPORT=${{ matrix.sport }} CONN_ARGS=-x
+
+  # ---------------------------------------------------------------------------
+  # Ops dashboard
+  # ---------------------------------------------------------------------------
+  # Mirrors the manual flow in ops-dashboard/Makefile: image-push, spec-upload,
+  # deploy. Independent of the dlt image and Task fleet (different image,
+  # different service, no Task DDL), so it only needs `changes`; the workflow's
+  # `deploy` concurrency group is the only serialization it requires.
+  dashboard:
+    needs: changes
+    if: needs.changes.outputs.dashboard == 'true'
+    runs-on: ubuntu-latest
+    environment: deploy
+    defaults:
+      run:
+        working-directory: ops-dashboard
+    steps:
+      - uses: actions/checkout@v4
         with:
-          use-oidc: true
-      - name: Redeploy the analyst agent
+          persist-credentials: false
+      - uses: ./.github/actions/snowflake-setup
+      - name: Build and push ops-dashboard image
+        # Tag = short git SHA, NEVER latest: ALTER SERVICE only rolls when the
+        # rendered spec text changes, and a fixed tag makes every push a silent
+        # no-op (ops-dashboard/Makefile).
         run: |
-          snow dbt execute --env prod "$DBT_PROJECT" \
-            run-operation deploy_nfl_analyst --args '{alter: true}' -x
+          tag="$(git rev-parse --short HEAD)"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          snow spcs image-registry login
+          host="$(snow spcs image-registry url)"
+          target="$host/dlt_db/deploy/images/ops-dashboard:$tag"
+          echo "Building and pushing $target"
+          docker build --platform linux/amd64 -f deploy/spcs/Dockerfile -t "$target" .
+          docker push "$target"
+      - name: Upload the service spec template
+        run: snow stage copy deploy/spcs/ops_dashboard.tmpl.yaml @DLT_DB.DEPLOY.SPECS --overwrite -x
+      - name: Roll the service to the new tag
+        # OPS_DASHBOARD_ROLE owns the service, and ALTER SERVICE FROM a spec
+        # requires ownership; this one statement switches role for that reason.
+        run: |
+          snow sql -x --role OPS_DASHBOARD_ROLE -q "ALTER SERVICE DLT_DB.DEPLOY.OPS_DASHBOARD
+            FROM @DLT_DB.DEPLOY.SPECS
+            SPECIFICATION_TEMPLATE_FILE = 'ops_dashboard.tmpl.yaml'
+            USING (tag => '$TAG');"
+      - name: Wait for the service to come back READY
+        run: |
+          for i in $(seq 1 30); do
+            snow sql -x --role OPS_DASHBOARD_ROLE --format json \
+              -q "SELECT SYSTEM\$GET_SERVICE_STATUS('DLT_DB.DEPLOY.OPS_DASHBOARD') AS s;" > status.json
+            state=$(python3 -c "import json; print(json.loads(json.load(open('status.json'))[0]['S'])[0]['status'])")
+            echo "attempt $i: $state"
+            [ "$state" = "READY" ] && exit 0
+            [ "$state" = "FAILED" ] && { echo "service FAILED after roll"; exit 1; }
+            sleep 10
+          done
+          echo "service not READY within 5 minutes"
+          exit 1
