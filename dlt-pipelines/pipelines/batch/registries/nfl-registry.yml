@@ -78,7 +78,13 @@ pipelines:
     source: rest_api
     # daily. Rosters churn all season on waivers and practice-squad moves,
     # and hardest at the 53-man cut (Sun 30 Aug 2026, 18:00 ET).
-    schedule: "0 8 * * *"
+    #
+    # THE NFL DAILIES ARE DELIBERATELY CLUSTERED in one 09:00-09:25 UTC window
+    # (5-minute stagger, not the same minute: one API key, one warm pool node)
+    # so their loads coalesce into fewer triggered dbt builds instead of one
+    # build per load. Reference goes FIRST so players land before the stats
+    # that reference them. nfl_injuries stays at 22:00, deadline-driven.
+    schedule: "0 9 * * *"
     config:
       client: *nfl_client
       resource_defaults:
@@ -139,9 +145,10 @@ pipelines:
   - name: nfl_games
     source: rest_api
     # daily. Flex scheduling moves kickoffs with 12 to 28 days notice, so the
-    # schedule is never settled; scores also want to be same-day. 09:00 UTC is
-    # after Monday Night Football ends (~03:45 UTC Tue in EDT, 04:45 in EST).
-    schedule: "0 9 * * *"
+    # schedule is never settled; scores also want to be same-day. The 09:00
+    # window is after Monday Night Football ends (~03:45 UTC Tue in EDT,
+    # 04:45 in EST); :05 slots this after nfl_reference in the cluster.
+    schedule: "5 9 * * *"
     config:
       client: *nfl_client
       # `params` deep merges between resource_defaults and a resource, while every
@@ -242,8 +249,9 @@ pipelines:
   #   make run-snowflake NAME=nfl_stats RESOURCE=stats_regular PARAM="seasons[]=2025"
   - name: nfl_stats
     source: rest_api
-    # daily. Box scores follow the Thu / Sun / Mon games.
-    schedule: "0 10 * * *"
+    # daily. Box scores follow the Thu / Sun / Mon games. Third slot in the
+    # 09:00 cluster, after reference and games.
+    schedule: "10 9 * * *"
     config:
       client: *nfl_client
       resource_defaults:
@@ -368,7 +376,8 @@ pipelines:
     source: rest_api
     # weekly, Tuesday. The expensive one: a request per game, ~334 of them.
     # A game's plays are final once it ends, so re-fetching daily buys nothing.
-    schedule: "0 11 * * 2"
+    # The Tuesday weeklies extend the 09:00 cluster (:15/:20/:25).
+    schedule: "15 9 * * 2"
     config:
       client: *nfl_client
       resource_defaults:
@@ -469,7 +478,7 @@ pipelines:
   - name: nfl_standings
     source: rest_api
     # weekly, Tuesday. Only meaningful once a full week has been played.
-    schedule: "0 12 * * 2"
+    schedule: "20 9 * * 2"
     config:
       client: *nfl_client
       resources:
@@ -567,7 +576,7 @@ pipelines:
   - name: nfl_advanced_stats
     source: rest_api
     # weekly, Tuesday. Same reasoning as standings.
-    schedule: "0 13 * * 2"
+    schedule: "25 9 * * 2"
     config:
       client: *nfl_client
       resource_defaults:

@@ -56,16 +56,22 @@ reports success while re-fetching a season that ended months ago.
 
 | Pipeline | Cron (UTC) | Cadence | Why |
 |---|---|---|---|
-| `nfl_reference` | `0 8 * * *` | daily | rosters churn on waivers all season |
-| `nfl_games` | `0 9 * * *` | daily | flex scheduling moves kickoffs; scores same-day |
-| `nfl_stats` | `0 10 * * *` | daily | box scores follow the games |
-| `nfl_plays` | `0 11 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
-| `nfl_standings` | `0 12 * * 2` | Tuesday | only meaningful after a full week |
-| `nfl_advanced_stats` | `0 13 * * 2` | Tuesday | same |
+| `nfl_reference` | `0 9 * * *` | daily | rosters churn on waivers all season; first in the cluster so players land before stats |
+| `nfl_games` | `5 9 * * *` | daily | flex scheduling moves kickoffs; scores same-day |
+| `nfl_stats` | `10 9 * * *` | daily | box scores follow the games |
+| `nfl_plays` | `15 9 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
+| `nfl_standings` | `20 9 * * 2` | Tuesday | only meaningful after a full week |
+| `nfl_advanced_stats` | `25 9 * * 2` | Tuesday | same |
 | `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently |
 
-Cron is five fields, **Sunday is 0**, so Tuesday is `2`. Hours are staggered because `DLT_POOL` maxes
-at three nodes.
+Cron is five fields, **Sunday is 0**, so Tuesday is `2`.
+
+**Why one 09:00-09:25 window instead of hourly staggering.** Loads landing close together coalesce
+into fewer triggered dbt builds (the trigger drains everything in the stream per fire), and the pool
+wakes once instead of once per pipeline. The 5-minute stagger, rather than the same minute, keeps
+one API key from being hit concurrently and lets a single warm pool node work through the queue.
+Expect two builds from the window (the first load fires a build almost immediately; the 900s trigger
+interval coalesces the rest), plus the injuries build at 22:xx.
 
 **Why 09:00 UTC.** A normal week ends with Monday Night Football at 20:15 ET, final around 23:45 ET.
 That is 03:45 UTC Tuesday under EDT and 04:45 under EST. 09:00 UTC clears both, and the margin is
