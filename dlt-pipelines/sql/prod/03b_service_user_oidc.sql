@@ -32,6 +32,13 @@ USE ROLE USERADMIN;
 -- what is used here. Changing the workflow's `environment:` key without changing
 -- this SUBJECT breaks authentication, and the error will say the token was
 -- rejected rather than that the subject did not match.
+-- THE SUBJECT CARRIES GITHUB'S NUMERIC IDS, NOT JUST NAMES. GitHub embeds the
+-- stable org and repo ids in the OIDC sub claim (name-reuse hardening), so the
+-- token's subject is `repo:<org>@<org_id>/<repo>@<repo_id>:environment:<env>`.
+-- The ID-less legacy form fails with "the subject or issuer claims were not
+-- recognized" (observed on the first live run, Aug 2026); the failing job's
+-- log echoes the exact subject to copy here. The ids survive renames, which
+-- is strictly better than names alone.
 CREATE USER IF NOT EXISTS DLT_DEPLOYER
     TYPE              = SERVICE
     DEFAULT_ROLE      = DLT_LOADER_ROLE
@@ -40,7 +47,7 @@ CREATE USER IF NOT EXISTS DLT_DEPLOYER
     WORKLOAD_IDENTITY = (
         TYPE    = OIDC
         ISSUER  = 'https://token.actions.githubusercontent.com'
-        SUBJECT = 'repo:pronoiaLabs/weekend-warriors:environment:deploy'
+        SUBJECT = 'repo:pronoiaLabs@255587542/weekend-warriors@1317793177:environment:deploy'
     )
     COMMENT = 'Keyless CI/CD deployer for dlt + dbt (GitHub Actions OIDC).';
 

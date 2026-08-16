@@ -131,11 +131,13 @@ jobs:
       - uses: ./.github/actions/snowflake-setup
 
       - name: Log in to the Snowflake image registry
-        run: snow spcs image-registry login
+        # -x everywhere: the OIDC auth is a temporary connection, and a bare
+        # snow command fails with "Connection default is not configured".
+        run: snow spcs image-registry login -x
 
       - name: Build and push (linux/amd64)
         run: |
-          host="$(snow spcs image-registry url)"
+          host="$(snow spcs image-registry url -x)"
           # Docker references must be lowercase; Snowflake maps this back to
           # DLT_DB.DEPLOY.IMAGES.
           target="$host/dlt_db/deploy/images/dlt-pipeline:latest"
@@ -418,15 +420,33 @@ jobs:
         run: |
           tag="$(git rev-parse --short HEAD)"
           echo "TAG=$tag" >> "$GITHUB_ENV"
-          snow spcs image-registry login
-          host="$(snow spcs image-registry url)"
+          snow spcs image-registry login -x
+          host="$(snow spcs image-registry url -x)"
           target="$host/dlt_db/deploy/images/ops-dashboard:$tag"
           echo "Building and pushing $target"
           docker build --platform linux/amd64 -f deploy/spcs/Dockerfile -t "$target" .
           docker push "$target"
       - name: Upload the service spec template
         run: snow stage copy deploy/spcs/ops_dashboard.tmpl.yaml @DLT_DB.DEPLOY.SPECS --overwrite -x
+      - name: Check whether the service exists
+        # The dashboard can run local-only: the SPCS pool + service are a
+        # deliberate human setup (`make -C ops-dashboard setup CONFIRM=1`,
+        # always-on pool = real cost). Until that has been run there is
+        # nothing to roll, and that is a notice, not a failure. The image and
+        # spec above still ship, so going live later is just the setup run.
+        id: svc
+        run: |
+          count=$(snow sql -x --role OPS_DASHBOARD_ROLE --format json \
+            -q "SHOW SERVICES LIKE 'OPS_DASHBOARD' IN SCHEMA DLT_DB.DEPLOY;" \
+            | python3 -c "import json, sys; print(len(json.load(sys.stdin)))")
+          if [ "$count" = "0" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::OPS_DASHBOARD service not set up (dashboard is local-only). Image $TAG and spec pushed; roll skipped. Run make -C ops-dashboard setup CONFIRM=1 to go live."
+          else
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Roll the service to the new tag
+        if: steps.svc.outputs.exists == 'true'
         # OPS_DASHBOARD_ROLE owns the service, and ALTER SERVICE FROM a spec
         # requires ownership; this one statement switches role for that reason.
         run: |
@@ -435,6 +455,7 @@ jobs:
             SPECIFICATION_TEMPLATE_FILE = 'ops_dashboard.tmpl.yaml'
             USING (tag => '$TAG');"
       - name: Wait for the service to come back READY
+        if: steps.svc.outputs.exists == 'true'
         run: |
           for i in $(seq 1 30); do
             snow sql -x --role OPS_DASHBOARD_ROLE --format json \
