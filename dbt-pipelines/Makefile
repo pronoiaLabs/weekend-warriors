@@ -20,6 +20,9 @@
 
 SNOW      ?= snow
 CONN      ?= weekend-warriors
+# CI overrides with CONN_ARGS=-x: the deploy workflow authenticates via OIDC
+# env vars (a temporary connection), not a named connections.toml entry.
+CONN_ARGS ?= -c $(CONN)
 SNOW_DBT  := $(SNOW) dbt
 EAI       := dbt_ext_access
 
@@ -47,22 +50,30 @@ help: ## Show this help
 
 deploy-dev: ## Upload the source tree to the shared dev object
 	@$(call hdr,deploy $(DEV_FQN))
-	$(SNOW_DBT) deploy $(DEV_FQN) -c $(CONN) --source . \
+	$(SNOW_DBT) deploy $(DEV_FQN) $(CONN_ARGS) --source . \
 		--default-env dev --external-access-integration $(EAI) --force
 
-# The trailing GRANT is load-bearing, not belt-and-suspenders: `snow dbt
-# deploy --force` is a CREATE OR REPLACE, and replacing the object DROPS its
-# grants. The DBT_BUILD_<SPORT> trigger task runs as DBT_RUNNER_ROLE (primary
-# role alone), so without USAGE re-granted here every triggered build fails
-# with "does not exist or not authorized" until the task auto-suspends after
-# the consecutive-failure threshold. Cost one two-day prod outage (Aug 2026)
-# to learn.
+# The trailing GRANTs are load-bearing, not belt-and-suspenders:
+#
+# USAGE: `snow dbt deploy --force` is a CREATE OR REPLACE, and replacing the
+# object DROPS its grants. The DBT_BUILD_<SPORT> trigger task runs as
+# DBT_RUNNER_ROLE (primary role alone), so without USAGE re-granted here every
+# triggered build fails with "does not exist or not authorized" until the task
+# auto-suspends after the consecutive-failure threshold. Cost one two-day prod
+# outage (Aug 2026) to learn.
+#
+# OWNERSHIP: CI (deploy.yml) deploys as DBT_RUNNER_ROLE while the laptop
+# deploys as SYSADMIN, and CREATE OR REPLACE requires owning the existing
+# object. Normalizing ownership to DBT_RUNNER_ROLE after every deploy makes
+# both paths converge, so neither strands the other's next deploy. (SYSADMIN
+# still deploys fine: it inherits DBT_RUNNER_ROLE through the role hierarchy.)
 deploy-sport: ## Upload the source tree to a sport's prod object (SPORT=nfl|wnba|ncaaf)
 	@test -n "$(SPORT)" || { echo "usage: make deploy-sport SPORT=nfl|wnba|ncaaf"; exit 1; }
 	@$(call hdr,deploy $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z))
-	$(SNOW_DBT) deploy $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) -c $(CONN) --source . \
+	$(SNOW_DBT) deploy $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) $(CONN_ARGS) --source . \
 		--default-env $(call sport_env,$(SPORT)) --external-access-integration $(EAI) --force
-	$(SNOW) sql -c $(CONN) -q "GRANT USAGE ON DBT PROJECT $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) TO ROLE DBT_RUNNER_ROLE"
+	$(SNOW) sql $(CONN_ARGS) -q "GRANT USAGE ON DBT PROJECT $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) TO ROLE DBT_RUNNER_ROLE"
+	$(SNOW) sql $(CONN_ARGS) -q "GRANT OWNERSHIP ON DBT PROJECT $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS"
 
 deploy-all: deploy-dev ## Deploy dev + every sport object
 	@$(MAKE) deploy-sport SPORT=nfl
@@ -73,10 +84,24 @@ deploy-all: deploy-dev ## Deploy dev + every sport object
 
 build-dev: ## Dev build as yourself (ENV=dev|wnba_dev, default dev)
 	@$(call hdr,build $(or $(ENV),dev) on $(DEV_FQN))
-	$(SNOW_DBT) execute -c $(CONN) --env $(or $(ENV),dev) $(DEV_FQN) build
+	$(SNOW_DBT) execute $(CONN_ARGS) --env $(or $(ENV),dev) $(DEV_FQN) build
 
 build-sport: ## Prod build on a sport's object, as the connection's role (SPORT=nfl|wnba)
 	@test -n "$(SPORT)" || { echo "usage: make build-sport SPORT=nfl|wnba"; exit 1; }
 	@$(call hdr,build $(call sport_env,$(SPORT)) on $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z))
-	$(SNOW_DBT) execute -c $(CONN) --env $(call sport_env,$(SPORT)) \
+	$(SNOW_DBT) execute $(CONN_ARGS) --env $(call sport_env,$(SPORT)) \
 		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) build
+
+##@ Deploy agents
+
+# The --args value must carry EMBEDDED quotes: the CLI reassembles the dbt
+# command line without re-quoting, and the space inside the YAML splits the
+# token server-side ("String '{alter:' is not valid YAML"). This target is
+# the single home for that trick and for the sport->env mapping; deploy.yml's
+# agents job calls it rather than spelling the args inline.
+deploy-agent: ## Redeploy a sport's analyst agent in place (SPORT=nfl|wnba|ncaaf)
+	@test -n "$(SPORT)" || { echo "usage: make deploy-agent SPORT=nfl|wnba|ncaaf"; exit 1; }
+	@$(call hdr,deploy agent $(SPORT)_analyst via $(call sport_env,$(SPORT)))
+	$(SNOW_DBT) execute $(CONN_ARGS) --env $(call sport_env,$(SPORT)) \
+		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) \
+		run-operation deploy_$(SPORT)_analyst --args "'{alter: true}'"

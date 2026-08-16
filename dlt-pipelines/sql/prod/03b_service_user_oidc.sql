@@ -47,6 +47,44 @@ CREATE USER IF NOT EXISTS DLT_DEPLOYER
 GRANT ROLE DLT_LOADER_ROLE TO USER DLT_DEPLOYER;
 
 -- ---------------------------------------------------------------------------
+-- 1b. Deploy-job roles beyond ingestion
+-- ---------------------------------------------------------------------------
+-- deploy.yml's dbt/agents jobs run as DBT_RUNNER_ROLE (the prod dbt estate's
+-- owner; job-level SNOWFLAKE_ROLE override) and the dashboard job switches to
+-- OPS_DASHBOARD_ROLE for its one ALTER SERVICE statement (service ownership).
+-- The user needs both granted, and DBT_RUNNER_ROLE needs to be able to
+-- CREATE OR REPLACE the sport project objects it will own, plus USAGE on the
+-- external access integration the deploy references in DDL.
+--
+-- Ownership of the sport objects is transferred once here; after that,
+-- `make deploy-sport` normalizes ownership back to DBT_RUNNER_ROLE on every
+-- deploy (laptop or CI), so the two paths never strand each other.
+GRANT ROLE DBT_RUNNER_ROLE    TO USER DLT_DEPLOYER;
+GRANT ROLE OPS_DASHBOARD_ROLE TO USER DLT_DEPLOYER;
+
+USE ROLE SYSADMIN;
+GRANT CREATE DBT PROJECT ON SCHEMA DLT_DB.DEPLOY TO ROLE DBT_RUNNER_ROLE;
+GRANT OWNERSHIP ON DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL
+  TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NCAAF
+  TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
+-- (repeat for CORTEX_LIFECYCLE_WNBA when the sport is revived)
+
+-- The prod agents were first deployed from the laptop as SYSADMIN, so
+-- SYSADMIN owned them (verified Aug 2026), and the agents job's
+-- `alter: true` as DBT_RUNNER_ROLE fails on ownership without this. Once
+-- transferred, agent redeploys as DBT_RUNNER_ROLE keep the ownership.
+GRANT OWNERSHIP ON AGENT NFL_PROD_DB.ANALYTICS.NFL_ANALYST
+  TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON AGENT NCAAF_PROD_DB.ANALYTICS.NCAAF_ANALYST
+  TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
+
+-- The integration was created ad-hoc (dbt-pipelines/README.md); verify with
+-- SHOW GRANTS ON INTEGRATION DBT_EXT_ACCESS before assuming this is missing.
+USE ROLE ACCOUNTADMIN;
+GRANT USAGE ON INTEGRATION DBT_EXT_ACCESS TO ROLE DBT_RUNNER_ROLE;
+
+-- ---------------------------------------------------------------------------
 -- 2. Network policy: the part that is easy to miss
 -- ---------------------------------------------------------------------------
 -- WITHOUT THIS THE USER ABOVE AUTHENTICATES CORRECTLY AND STILL CANNOT CONNECT.

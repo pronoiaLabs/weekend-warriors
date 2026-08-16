@@ -1,0 +1,42 @@
+# Shared Snowflake CLI setup for every authenticating deploy job: pinned CLI,
+# GitHub OIDC auth, and a connection preflight so an auth regression fails
+# here with a clear message instead of halfway through a deploy step.
+#
+# CALLING JOBS MUST SET `environment: deploy`. The OIDC subject claim is
+# repo:pronoiaLabs/weekend-warriors:environment:deploy (see
+# dlt-pipelines/sql/prod/03b_service_user_oidc.sql); without the environment
+# the token's subject does not match and Snowflake rejects it with a
+# misleading "token rejected" error.
+#
+# The action exports SNOWFLAKE_TOKEN and SNOWFLAKE_AUTHENTICATOR=
+# WORKLOAD_IDENTITY into GITHUB_ENV. SNOWFLAKE_ACCOUNT / USER / ROLE /
+# WAREHOUSE remain the workflow's responsibility (the workflow-level env
+# block), and every downstream `snow` command needs `-x` because the OIDC
+# connection is temporary, not a named connection.
+#
+# Checkout is NOT done here: a local composite action only exists after the
+# job has checked out the repo, so each job keeps its own checkout step.
+name: snowflake-setup
+description: Pinned Snowflake CLI + GitHub OIDC auth + connection preflight
+
+inputs:
+  cli-version:
+    description: >
+      Snowflake CLI version. Pinned to the laptop's version; the snow dbt
+      --env / --default-env flags need >= 3.21.
+    required: false
+    default: "3.23.0"
+
+runs:
+  using: composite
+  steps:
+    # SHA = v3.3.1. The action holds id-token: write, so it is pinned to a
+    # commit rather than the floating v3 tag, per the action's own README.
+    - uses: snowflakedb/snowflake-actions/snowflake-cli@1160898243c351349621a6c2bac2e455ab1077b2 # v3.3.1
+      with:
+        use-oidc: true
+        cli-version: ${{ inputs.cli-version }}
+
+    - name: Verify Snowflake connection
+      shell: bash
+      run: snow connection test -x
