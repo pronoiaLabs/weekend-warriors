@@ -131,11 +131,13 @@ jobs:
       - uses: ./.github/actions/snowflake-setup
 
       - name: Log in to the Snowflake image registry
-        run: snow spcs image-registry login
+        # -x everywhere: the OIDC auth is a temporary connection, and a bare
+        # snow command fails with "Connection default is not configured".
+        run: snow spcs image-registry login -x
 
       - name: Build and push (linux/amd64)
         run: |
-          host="$(snow spcs image-registry url)"
+          host="$(snow spcs image-registry url -x)"
           # Docker references must be lowercase; Snowflake maps this back to
           # DLT_DB.DEPLOY.IMAGES.
           target="$host/dlt_db/deploy/images/dlt-pipeline:latest"
@@ -418,8 +420,8 @@ jobs:
         run: |
           tag="$(git rev-parse --short HEAD)"
           echo "TAG=$tag" >> "$GITHUB_ENV"
-          snow spcs image-registry login
-          host="$(snow spcs image-registry url)"
+          snow spcs image-registry login -x
+          host="$(snow spcs image-registry url -x)"
           target="$host/dlt_db/deploy/images/ops-dashboard:$tag"
           echo "Building and pushing $target"
           docker build --platform linux/amd64 -f deploy/spcs/Dockerfile -t "$target" .
