@@ -70,6 +70,15 @@ GRANT OWNERSHIP ON DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NCAAF
   TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
 -- (repeat for CORTEX_LIFECYCLE_WNBA when the sport is revived)
 
+-- The prod agents were first deployed from the laptop as SYSADMIN, so
+-- SYSADMIN owned them (verified Aug 2026), and the agents job's
+-- `alter: true` as DBT_RUNNER_ROLE fails on ownership without this. Once
+-- transferred, agent redeploys as DBT_RUNNER_ROLE keep the ownership.
+GRANT OWNERSHIP ON AGENT NFL_PROD_DB.ANALYTICS.NFL_ANALYST
+  TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON AGENT NCAAF_PROD_DB.ANALYTICS.NCAAF_ANALYST
+  TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
+
 -- The integration was created ad-hoc (dbt-pipelines/README.md); verify with
 -- SHOW GRANTS ON INTEGRATION DBT_EXT_ACCESS before assuming this is missing.
 USE ROLE ACCOUNTADMIN;
