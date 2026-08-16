@@ -84,9 +84,10 @@ pipelines:
     # weekly, Wednesday. 536 teams and 124k players make this the largest reference
     # crawl in the account (~1,250 requests); rosters churn on the college calendar
     # (signing days, transfer portal windows), not daily waivers, so weekly is
-    # enough. 02:00 Wed sits an hour after WNBA's shot_locations (01:00 Wed) and
-    # well clear of the NFL band.
-    schedule: "0 2 * * 3"
+    # enough. Wednesdays it joins the 06:00 cluster (see ncaaf_games): last
+    # slot, since at ~1,250 requests and ~4 min it is the long pole and
+    # nothing downstream of it runs the same morning.
+    schedule: "10 6 * * 3"
     config:
       client: *ncaaf_client
       resource_defaults:
@@ -144,6 +145,11 @@ pipelines:
     # Saturday) go final around 05:45 UTC, so a daily 06:00 run captures the whole
     # Saturday slate the same night. The NCAAF band is 02:00-07:59 UTC, below the
     # NFL's 08:00-13:00 and WNBA's 14:00-23:00.
+    #
+    # THE NCAAF PIPELINES ARE DELIBERATELY CLUSTERED in one 06:00-06:20 UTC
+    # window (5-minute stagger, same pattern as NFL's 09:00 cluster) so loads
+    # coalesce into fewer triggered dbt builds and one pool wake-up. 06:00 is
+    # the anchor and games goes first: stats box scores join on games.
     schedule: "0 6 * * *"
     config:
       client: *ncaaf_client
@@ -180,8 +186,8 @@ pipelines:
     source: rest_api
     # daily, an hour after games. Box scores follow the games that just went final;
     # the two stay separate pipelines so a stats failure cannot take the schedule
-    # refresh down with it.
-    schedule: "0 7 * * *"
+    # refresh down with it. Second slot in the 06:00 cluster, after games.
+    schedule: "5 6 * * *"
     config:
       client: *ncaaf_client
       resource_defaults:
@@ -217,8 +223,8 @@ pipelines:
   - name: ncaaf_season_stats
     source: rest_api
     # weekly, Monday. Season rollups only move when games complete, and the college
-    # week is effectively over Saturday night; Monday 03:00 sits after standings.
-    schedule: "0 3 * * 1"
+    # week is effectively over Saturday night; sits after standings in the cluster.
+    schedule: "15 6 * * 1"
     config:
       client: *ncaaf_client
       resource_defaults:
@@ -260,9 +266,10 @@ pipelines:
   - name: ncaaf_standings
     source: rest_api
     # weekly, Monday. Standings settle when the Saturday slate finishes; Monday
-    # 02:00 UTC (Sunday 10pm ET) has every weekend game final, including the rare
-    # Sunday game. scd2 versions the weekly snapshot.
-    schedule: "0 2 * * 1"
+    # Monday morning has every weekend game final, including the rare Sunday
+    # game. scd2 versions the weekly snapshot. Mondays extend the 06:00
+    # cluster (:10/:15/:20).
+    schedule: "10 6 * * 1"
     config:
       client: *ncaaf_client
       resources:
@@ -307,9 +314,10 @@ pipelines:
   - name: ncaaf_rankings
     source: rest_api
     # weekly, Monday. The AP poll releases Sunday afternoon US time (~18:00 UTC);
-    # Monday 04:00 UTC captures the fresh week. Before the season's first poll the
-    # endpoint returns an empty array and the run is a clean no-op by design.
-    schedule: "0 4 * * 1"
+    # The AP poll releases Sunday ~18:00 UTC, so any Monday-morning slot
+    # captures the fresh week. Before the season's first poll the endpoint
+    # returns an empty array and the run is a clean no-op by design.
+    schedule: "20 6 * * 1"
     config:
       client: *ncaaf_client
       resources:

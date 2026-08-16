@@ -363,12 +363,19 @@ sports never stack against the shared 600 req/min API limit or `DLT_POOL`.
 
 | Pipeline | Cron (UTC) | Cadence | Why |
 |---|---|---|---|
-| `ncaaf_standings` | `0 2 * * 1` | Monday | weekend settled by Sunday 10pm ET; scd2 weekly snapshot |
-| `ncaaf_season_stats` | `0 3 * * 1` | Monday | rollups move when games complete |
-| `ncaaf_rankings` | `0 4 * * 1` | Monday | AP poll releases Sunday ~18:00 UTC; endpoint returns the latest week only, so the weekly run accumulates the season |
-| `ncaaf_reference` | `0 2 * * 3` | Wednesday | 536 teams + 124k players is ~1,250 requests; college rosters churn on portal windows, not daily waivers |
-| `ncaaf_games` | `0 6 * * *` | daily | the latest kickoffs (Hawaii, 10:30pm ET Sat) go final ~05:45 UTC; 06:00 catches the whole slate same-night |
-| `ncaaf_stats` | `0 7 * * *` | daily | box scores an hour behind the games |
+| `ncaaf_games` | `0 6 * * *` | daily | the latest kickoffs (Hawaii, 10:30pm ET Sat) go final ~05:45 UTC; 06:00 catches the whole slate same-night. Anchor of the cluster; first so stats can join on games |
+| `ncaaf_stats` | `5 6 * * *` | daily | box scores right behind the games |
+| `ncaaf_standings` | `10 6 * * 1` | Monday | weekend settled well before Monday morning; scd2 weekly snapshot |
+| `ncaaf_season_stats` | `15 6 * * 1` | Monday | rollups move when games complete |
+| `ncaaf_rankings` | `20 6 * * 1` | Monday | AP poll releases Sunday ~18:00 UTC; endpoint returns the latest week only, so the weekly run accumulates the season |
+| `ncaaf_reference` | `10 6 * * 3` | Wednesday | 536 teams + 124k players is ~1,250 requests; college rosters churn on portal windows, not daily waivers |
+
+**One 06:00-06:20 window, same pattern as the NFL's 09:00 cluster.** Loads
+landing together coalesce into fewer triggered dbt builds (Mondays 5 builds
+become 2, Wednesdays 3 become 2; plain days stay at 2, the two-daily floor)
+and the pool wakes once per morning instead of twice. The cluster stays
+inside the NCAAF band, so the sports still never stack against the shared
+API limit.
 
 **No injuries, no plays, no odds.** The API has no NCAAF injuries endpoint at
 all; play-by-play carries no down/distance/field position (scoring timeline
