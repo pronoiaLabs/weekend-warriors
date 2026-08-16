@@ -1,21 +1,36 @@
-/** Everything on this dashboard is UTC: the Tasks are scheduled in UTC and the
-    views record UTC, so no formatter here reads the browser time zone. */
+/** Times display in the viewer's local timezone, 12-hour am/pm, with no zone
+    label: the dashboard reads on the wall clock. The exception is bare
+    calendar dates (YYYY-MM-DD day identifiers from the API): those are
+    anchored at UTC midnight so "2026-08-15" never renders as Friday in a
+    negative-offset zone. Timestamps convert; day names for day keys do not. */
 
-const HHMM = new Intl.DateTimeFormat('en-GB', {
-  hour: '2-digit',
+const HHMM = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
   minute: '2-digit',
-  hour12: false,
-  timeZone: 'UTC',
+  hour12: true,
 })
 
-const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' })
-const WEEKDAY_LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' })
-const MONTH_DAY = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
+const HHMMSS = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true,
 })
-const MONTH_DAY_YEAR = new Intl.DateTimeFormat('en-US', {
+
+/** Local-zone formatters, for timestamps. */
+const WEEKDAY_LOCAL = new Intl.DateTimeFormat('en-US', { weekday: 'short' })
+const MONTH_DAY_LOCAL = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
+/** en-CA renders "2026-08-11"; sliced for full or MM-DD forms. */
+const DATE_LOCAL = new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+/** UTC-anchored formatters, ONLY for bare YYYY-MM-DD day keys. */
+const WEEKDAY_UTC = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' })
+const WEEKDAY_LONG_UTC = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' })
+const MONTH_DAY_YEAR_UTC = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
   year: 'numeric',
@@ -27,29 +42,29 @@ export function hhmm(iso: string): string {
 }
 
 export function weekday(iso: string): string {
-  return WEEKDAY.format(new Date(iso))
+  return WEEKDAY_LOCAL.format(new Date(iso))
 }
 
-/** "Tue 08-11 13:00", the shape the wireframe uses for a next fire. */
+/** "Tue 08-11 1:00 PM", the shape the wireframe uses for a next fire. */
 export function dayHhmm(iso: string): string {
   const at = new Date(iso)
-  return `${WEEKDAY.format(at)} ${at.toISOString().slice(5, 10)} ${HHMM.format(at)}`
+  return `${WEEKDAY_LOCAL.format(at)} ${DATE_LOCAL.format(at).slice(5)} ${HHMM.format(at)}`
 }
 
 /** "AUG 7", used inside anomaly badges. */
 export function shortDate(iso: string): string {
-  return MONTH_DAY.format(new Date(iso)).toUpperCase()
+  return MONTH_DAY_LOCAL.format(new Date(iso)).toUpperCase()
 }
 
 /** "Saturday 2026-08-08" from a bare YYYY-MM-DD. */
 export function longDay(isoDate: string): string {
-  return `${WEEKDAY_LONG.format(new Date(`${isoDate}T00:00:00Z`))} ${isoDate}`
+  return `${WEEKDAY_LONG_UTC.format(new Date(`${isoDate}T00:00:00Z`))} ${isoDate}`
 }
 
 /** "Saturday, Aug 8 2026" from a bare YYYY-MM-DD, the incident feed day header. */
 export function longDayTitle(isoDate: string): string {
   const at = new Date(`${isoDate}T00:00:00Z`)
-  return `${WEEKDAY_LONG.format(at)}, ${MONTH_DAY_YEAR.format(at).replace(',', '')}`
+  return `${WEEKDAY_LONG_UTC.format(at)}, ${MONTH_DAY_YEAR_UTC.format(at).replace(',', '')}`
 }
 
 export function num(value: number | null | undefined): string {
@@ -69,21 +84,45 @@ export function elapsedMs(value: number | null | undefined): string {
   return duration(Math.round(value / 1000)) ?? 'NULL'
 }
 
-/** "hh:mm:ss", the log table's timestamp. Milliseconds are dropped: two lines
-    of the same second are already adjacent in EVENT_TS order. */
+/** "8:14:23 PM", the log table's timestamp. Milliseconds are dropped: two
+    lines of the same second are already adjacent in EVENT_TS order. */
 export function hhmmss(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 19)
+  return HHMMSS.format(new Date(iso))
 }
 
-/** "Sat 2026-08-08", the run detail header's day. */
+/** "Sat 2026-08-08", the run detail header's day, in the viewer's zone. */
 export function dayDate(iso: string): string {
-  return `${WEEKDAY.format(new Date(iso))} ${iso.slice(0, 10)}`
+  const at = new Date(iso)
+  return `${WEEKDAY_LOCAL.format(at)} ${DATE_LOCAL.format(at)}`
 }
 
-/** "Mo 27", one heatmap cell's label. */
+/** "Mo 27", one heatmap cell's label, from a bare YYYY-MM-DD. */
 export function dayShort(isoDate: string): string {
   const at = new Date(`${isoDate}T00:00:00Z`)
-  return `${WEEKDAY.format(at).slice(0, 2)} ${isoDate.slice(8, 10)}`
+  return `${WEEKDAY_UTC.format(at).slice(0, 2)} ${isoDate.slice(8, 10)}`
+}
+
+/** Cron (UTC, as the Tasks are scheduled) to local prose: "daily 6:00 PM" or
+    "weekly Mon 9:00 PM". The API ships the raw cron and the conversion
+    happens here because only the browser knows the viewer's zone -- and a
+    weekly slot can land on a DIFFERENT local weekday than its UTC one.
+
+    Anchored on today's date so the current DST offset applies. Only the
+    shapes the registry uses (fixed minute/hour, * or single day-of-week);
+    anything else falls back to the raw cron string. */
+export function cronProse(cron: string): string {
+  const parts = cron.trim().split(/\s+/)
+  if (parts.length !== 5) return cron
+  const [minute, hour, dom, month, dow] = parts
+  if (!/^\d+$/.test(minute) || !/^\d+$/.test(hour) || dom !== '*' || month !== '*') return cron
+  const now = new Date()
+  const at = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), +hour, +minute),
+  )
+  if (dow === '*') return `daily ${HHMM.format(at)}`
+  if (!/^\d+$/.test(dow)) return cron
+  at.setUTCDate(at.getUTCDate() + ((+dow % 7) - at.getUTCDay()))
+  return `weekly ${WEEKDAY_LOCAL.format(at)} ${HHMM.format(at)}`
 }
 
 /** Relative age against a timestamp taken from the payload. The browser clock

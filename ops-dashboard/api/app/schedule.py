@@ -20,8 +20,6 @@ MISSED_GRACE = timedelta(minutes=15)
 # cannot double-match while still absorbing a late Task start.
 MATCH_WINDOW = timedelta(hours=1)
 
-_DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
 
 def slots_between(schedule: str, start: datetime, end: datetime) -> list[datetime]:
     """Fire times in [start, end), timezone-aware UTC."""
@@ -56,21 +54,7 @@ def slot_state(slot: datetime, has_run: bool, now: datetime) -> str:
     return "pending"
 
 
-def prose(schedule: str) -> str:
-    """Cron to a human string, e.g. 'daily 10:00 UTC' or 'weekly Tue 13:00 UTC'.
-
-    Only the shapes the registry actually uses (fixed minute/hour, * or single
-    day-of-week); anything else falls back to the raw cron string.
-    """
-    parts = schedule.split()
-    if len(parts) != 5:
-        return schedule
-    minute, hour, dom, month, dow = parts
-    if not (minute.isdigit() and hour.isdigit() and dom == "*" and month == "*"):
-        return schedule
-    at = f"{int(hour):02d}:{int(minute):02d} UTC"
-    if dow == "*":
-        return f"daily {at}"
-    if dow.isdigit():
-        return f"weekly {_DOW[(int(dow) - 1) % 7]} {at}"
-    return schedule
+# Cron-to-prose rendering lives in the frontend (utils/format.ts cronProse):
+# schedules are UTC facts, but only the browser knows the viewer's timezone,
+# and a weekly slot can land on a different local weekday than its UTC one.
+# The payloads ship the raw cron string.

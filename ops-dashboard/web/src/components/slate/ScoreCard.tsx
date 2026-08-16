@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { SlateCard } from '../../api/types.ts'
 import { useOpsSearch } from '../../hooks/useDayParam.ts'
-import { duration, hhmm, num } from '../../utils/format.ts'
+import { cronProse, duration, hhmm, num } from '../../utils/format.ts'
 
 /** The waiting placeholder, a glyph rather than a number so an upcoming slot
     never reads as a score of zero. Written as an escape so the only em dash in
@@ -72,7 +72,7 @@ function shell(card: SlateCard, sport: string): Shell {
       team: card.pipeline,
       score: <span className="score dash">·</span>,
       under: null,
-      meta: card.schedule,
+      meta: cronProse(card.schedule),
       err: 'slot passed, no run row at all',
     }
   }
@@ -82,14 +82,14 @@ function shell(card: SlateCard, sport: string): Shell {
     return {
       to: pipelineLink,
       variant: 'sched',
-      status: <span className="st sched">{hhmm(card.at)} UTC</span>,
+      status: <span className="st sched">{hhmm(card.at)}</span>,
       at: null,
       team: card.pipeline,
       score: <span className="score dash">{WAITING}</span>,
       under: last
         ? `last: ${num(last.rows_loaded)} rows · ${duration(last.duration_s) ?? 'no duration'}`
         : 'no previous run recorded',
-      meta: card.schedule,
+      meta: cronProse(card.schedule),
       err: null,
     }
   }
@@ -110,7 +110,7 @@ function shell(card: SlateCard, sport: string): Shell {
       </span>
     ),
     under: null,
-    meta: card.schedule,
+    meta: cronProse(card.schedule),
     err: failed
       ? `${card.error_excerpt ?? 'no error text recorded'}${prevContext(card.prev?.rows_loaded)}`
       : null,

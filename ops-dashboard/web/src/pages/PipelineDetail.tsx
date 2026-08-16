@@ -16,7 +16,7 @@ import { Tabs } from '../components/Tabs.tsx'
 import { VerdictPair } from '../components/VerdictPair.tsx'
 import { Chrome } from '../components/slate/Chrome.tsx'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
-import { bytes, cores, dayHhmm, hhmm, num, relativeTo, shortDate } from '../utils/format.ts'
+import { bytes, cores, cronProse, dayHhmm, hhmm, num, relativeTo, shortDate } from '../utils/format.ts'
 
 // The list scrolls in its own window and only the selected run mounts its
 // evidence, so depth costs neither page length nor fetches. The API caps at 50.
@@ -189,7 +189,7 @@ function RunListItem({
       type="button"
       className={classes}
       aria-pressed={selected}
-      aria-label={`Show evidence for the run at ${dayHhmm(run.run_started_at)} UTC`}
+      aria-label={`Show evidence for the run at ${dayHhmm(run.run_started_at)}`}
       onClick={onSelect}
     >
       <span className={failed ? 'outcome fail' : 'outcome'}>{run.task_state ?? 'NO STATE'}</span>
@@ -226,7 +226,7 @@ function RunEvidence({ run }: { run: RunRow }) {
       <div className="runpane-head">
         <span className={failed ? 'outcome fail' : 'outcome'}>{run.task_state ?? 'NO STATE'}</span>
         <span className="ts">
-          {shortDate(run.run_started_at)} · {hhmm(run.run_started_at)} UTC
+          {shortDate(run.run_started_at)} · {hhmm(run.run_started_at)}
         </span>
         {run.dlt_record_missing ? <span className="flag missing">RECORD MISSING</span> : null}
         {/* The wireframe drew no chip for a disagreement; that omission was
@@ -372,7 +372,7 @@ export default function PipelineDetail() {
           <div className="facts">
             <Fact label="TASK_NAME" value={detail.task_name ?? 'not on any run row'} mono />
             <Fact label="COMPUTE_POOL" value={detail.compute_pool ?? 'not on any run row'} mono />
-            <Fact label={`Schedule · ${detail.cron}`} value={detail.schedule} />
+            <Fact label={`Schedule · ${detail.cron}`} value={cronProse(detail.cron)} />
             <Fact
               label={`Succeeded · ${detail.window_days} days`}
               value={`${detail.succeeded} / ${detail.runs_in_window} succeeded · ${detail.window_days} days`}
@@ -393,7 +393,7 @@ export default function PipelineDetail() {
                   : `none in ${detail.window_days} days`
               }
             />
-            <Fact label="Next fire" value={`${dayHhmm(detail.next_fire)} UTC`} />
+            <Fact label="Next fire" value={dayHhmm(detail.next_fire)} />
           </div>
         </section>
 

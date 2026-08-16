@@ -73,8 +73,8 @@ function runFacts(run: RunDetailPayload): FactSpec[] {
     { k: 'QUERY_ID', v: run.query_id },
     { k: 'SERVICE_NAME', v: run.service_name ?? 'NULL' },
     { k: 'COMPUTE_POOL', v: run.compute_pool ?? 'NULL' },
-    { k: 'RUN_STARTED_AT', v: `${hhmmss(run.run_started_at)} UTC` },
-    { k: 'RUN_ENDED_AT', v: run.run_ended_at ? `${hhmmss(run.run_ended_at)} UTC` : 'NULL' },
+    { k: 'RUN_STARTED_AT', v: hhmmss(run.run_started_at) },
+    { k: 'RUN_ENDED_AT', v: run.run_ended_at ? hhmmss(run.run_ended_at) : 'NULL' },
     { k: 'DURATION_S', v: String(run.duration_s ?? 'NULL') },
     { k: 'CONTAINER_SPAN_S', v: String(run.container_span_s ?? 'NULL') },
     { k: 'STARTUP_OVERHEAD_S', v: String(run.startup_overhead_s ?? 'NULL') },
@@ -390,7 +390,7 @@ export default function RunDetail() {
           <h1>{run.pipeline}</h1>
           <span className="when">
             {dayDate(run.run_started_at)} · RUN_STARTED_AT {hhmmss(run.run_started_at)} to
-            RUN_ENDED_AT {run.run_ended_at ? hhmmss(run.run_ended_at) : 'NULL'} UTC
+            RUN_ENDED_AT {run.run_ended_at ? hhmmss(run.run_ended_at) : 'NULL'}
           </span>
         </header>
 
