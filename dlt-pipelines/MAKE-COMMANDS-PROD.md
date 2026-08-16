@@ -56,16 +56,22 @@ reports success while re-fetching a season that ended months ago.
 
 | Pipeline | Cron (UTC) | Cadence | Why |
 |---|---|---|---|
-| `nfl_reference` | `0 8 * * *` | daily | rosters churn on waivers all season |
-| `nfl_games` | `0 9 * * *` | daily | flex scheduling moves kickoffs; scores same-day |
-| `nfl_stats` | `0 10 * * *` | daily | box scores follow the games |
-| `nfl_plays` | `0 11 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
-| `nfl_standings` | `0 12 * * 2` | Tuesday | only meaningful after a full week |
-| `nfl_advanced_stats` | `0 13 * * 2` | Tuesday | same |
+| `nfl_reference` | `0 9 * * *` | daily | rosters churn on waivers all season; first in the cluster so players land before stats |
+| `nfl_games` | `5 9 * * *` | daily | flex scheduling moves kickoffs; scores same-day |
+| `nfl_stats` | `10 9 * * *` | daily | box scores follow the games |
+| `nfl_plays` | `15 9 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
+| `nfl_standings` | `20 9 * * 2` | Tuesday | only meaningful after a full week |
+| `nfl_advanced_stats` | `25 9 * * 2` | Tuesday | same |
 | `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently |
 
-Cron is five fields, **Sunday is 0**, so Tuesday is `2`. Hours are staggered because `DLT_POOL` maxes
-at three nodes.
+Cron is five fields, **Sunday is 0**, so Tuesday is `2`.
+
+**Why one 09:00-09:25 window instead of hourly staggering.** Loads landing close together coalesce
+into fewer triggered dbt builds (the trigger drains everything in the stream per fire), and the pool
+wakes once instead of once per pipeline. The 5-minute stagger, rather than the same minute, keeps
+one API key from being hit concurrently and lets a single warm pool node work through the queue.
+Expect two builds from the window (the first load fires a build almost immediately; the 900s trigger
+interval coalesces the rest), plus the injuries build at 22:xx.
 
 **Why 09:00 UTC.** A normal week ends with Monday Night Football at 20:15 ET, final around 23:45 ET.
 That is 03:45 UTC Tuesday under EDT and 04:45 under EST. 09:00 UTC clears both, and the margin is
@@ -357,12 +363,19 @@ sports never stack against the shared 600 req/min API limit or `DLT_POOL`.
 
 | Pipeline | Cron (UTC) | Cadence | Why |
 |---|---|---|---|
-| `ncaaf_standings` | `0 2 * * 1` | Monday | weekend settled by Sunday 10pm ET; scd2 weekly snapshot |
-| `ncaaf_season_stats` | `0 3 * * 1` | Monday | rollups move when games complete |
-| `ncaaf_rankings` | `0 4 * * 1` | Monday | AP poll releases Sunday ~18:00 UTC; endpoint returns the latest week only, so the weekly run accumulates the season |
-| `ncaaf_reference` | `0 2 * * 3` | Wednesday | 536 teams + 124k players is ~1,250 requests; college rosters churn on portal windows, not daily waivers |
-| `ncaaf_games` | `0 6 * * *` | daily | the latest kickoffs (Hawaii, 10:30pm ET Sat) go final ~05:45 UTC; 06:00 catches the whole slate same-night |
-| `ncaaf_stats` | `0 7 * * *` | daily | box scores an hour behind the games |
+| `ncaaf_games` | `0 6 * * *` | daily | the latest kickoffs (Hawaii, 10:30pm ET Sat) go final ~05:45 UTC; 06:00 catches the whole slate same-night. Anchor of the cluster; first so stats can join on games |
+| `ncaaf_stats` | `5 6 * * *` | daily | box scores right behind the games |
+| `ncaaf_standings` | `10 6 * * 1` | Monday | weekend settled well before Monday morning; scd2 weekly snapshot |
+| `ncaaf_season_stats` | `15 6 * * 1` | Monday | rollups move when games complete |
+| `ncaaf_rankings` | `20 6 * * 1` | Monday | AP poll releases Sunday ~18:00 UTC; endpoint returns the latest week only, so the weekly run accumulates the season |
+| `ncaaf_reference` | `10 6 * * 3` | Wednesday | 536 teams + 124k players is ~1,250 requests; college rosters churn on portal windows, not daily waivers |
+
+**One 06:00-06:20 window, same pattern as the NFL's 09:00 cluster.** Loads
+landing together coalesce into fewer triggered dbt builds (Mondays 5 builds
+become 2, Wednesdays 3 become 2; plain days stay at 2, the two-daily floor)
+and the pool wakes once per morning instead of twice. The cluster stays
+inside the NCAAF band, so the sports still never stack against the shared
+API limit.
 
 **No injuries, no plays, no odds.** The API has no NCAAF injuries endpoint at
 all; play-by-play carries no down/distance/field position (scoring timeline
