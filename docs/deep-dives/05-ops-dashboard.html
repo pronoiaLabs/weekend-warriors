@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch. 5 · The ops dashboard: one table, every run · weekend-warriors</title>
+<meta name="description" content="What you can actually observe when every pipeline run, log line, metric sample and dbt build lands in one Snowflake table the dashboard reads in ~110ms.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>">
+<link rel="stylesheet" href="../assets/almanac.css">
+</head>
+<body>
+<div class="page">
+  <p class="crumb"><a href="../index.html">weekend-warriors</a><span class="dot">·</span>Hear Me Out<span class="dot">·</span>Deep Dives</p>
+  <header class="chapter">
+    <div class="inner">
+      <p class="ch-no">Chapter 5</p>
+      <h1>The ops dashboard: one table, every run</h1>
+      <p class="ch-sub">what a platform with no servers lets you see</p>
+      <div class="ch-rule"></div>
+    </div>
+  </header>
+  <article class="chapter-body">
+    <p class="lede">A platform with no servers still has questions that arrive before coffee. Did last night's loads run? Did the one that ran actually work? What did the container say while it was dying? Every run here happens in a container that is gone before you wake up, launched by a Task nobody watched. The dashboard exists to answer those questions from evidence, and the whole design reduces to one move: everything a run produces flows into one table, and the dashboard reads that table in about 110 milliseconds.</p>
+
+    <h2><span class="no">§ 1.</span> Where the evidence comes from</h2>
+    <p>A container running as an SPCS job writes its stdout, its structured logs, and platform metrics to an event table. That is the raw feed. This project points it at a dedicated table, <code>DLT_DB.OPS.DLT_EVENTS</code>, rather than the shared <code>SNOWFLAKE.TELEMETRY.EVENTS</code>, for one reason that only surfaces when you try the other way: change tracking cannot be enabled on objects inside the <code>SNOWFLAKE</code> database, and the entire observability layer hangs streams off the event table. No streams, no event-driven anything.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>SPCS reads the ACCOUNT-level EVENT_TABLE parameter and ignores a database-level one, contrary to the general event-table documentation. A database binding reads back as level=DATABASE while doing nothing. And a compute pool node resolves its event table when the node starts, so changing the parameter does not affect a pool with live nodes. Suspend the pool and let it auto-resume; recreating the service is not sufficient. Each of these cost a failed verification.</p>
+    </div>
+
+    <h2><span class="no">§ 2.</span> Materialize, don't query raw</h2>
+    <p>The first version of this layer was views over the event table, and it worked the way views over a growing event table always work: 4.6 to 6.0 seconds per uncached dashboard query, getting slower every week. The fix is the same pattern the dbt builds use, streams plus a triggered task. Two append-only streams on <code>DLT_EVENTS</code> fire <code>OBS_REFRESH</code>, whose procedure drains new events through a regex parse into <code>LOG_LINES</code> and <code>METRIC_SAMPLES</code>, merges live <code>TASK_HISTORY()</code> into <code>TASK_RUNS</code>, then walks the pipeline registry and MERGEs everything into one <code>DLT_DB.OPS.PIPELINE_RUNS</code> table, one row per run, every league in the same table.</p>
+    <p>Three properties of that arrangement do the real work. A run appears in the table, with its logs, while the container is still executing, about a minute after start, so the dashboard is not a post-mortem tool; you watch a run live. A sweep every four hours bounds the two cases that emit no events at all (a container that never started, and the final verdict landing after the last event flush). And a new league needs zero observability objects: the refresh reads the registry, so the day a league's first pipeline is scheduled, its runs are already flowing into the same table.</p>
+
+    <h2><span class="no">§ 3.</span> What a run record can tell you</h2>
+    <p>This is the part worth slowing down for, because it is the answer to "what will I actually be able to observe." Each row in <code>PIPELINE_RUNS</code> is a complete account of one run, and the columns group into five stories.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 1 · one run record, trimmed to the shape of the evidence</p>
+      <pre><code>SPORT                  NFL              -- identity: who ran
+PIPELINE               nfl_plays
+TASK_NAME              DLT_TASK_NFL_PLAYS
+QUERY_ID / SERVICE     ...              -- joinable to everything else
+
+RUN_STARTED_AT         ...              -- timing: when and how long
+DURATION_S             328
+STARTUP_OVERHEAD_S     41               -- container boot vs real work
+
+TASK_STATE             FAILED           -- verdict, from two witnesses
+DLT_STATUS             failed
+OUTCOME_DISAGREES      false
+DLT_RECORD_MISSING     false
+
+ROWS_LOADED            null             -- payload: what landed
+ROW_COUNTS             {...}            -- per-table row counts
+ERROR_TEXT             "Pipeline execution failed at step=load..."
+
+LOG_LINES / ERROR_LINES  204 / 2        -- evidence volume
+CPU_CORES_MAX / LIMIT    0.9 / 2.0      -- resources actually used
+MEM_BYTES_MAX / REQUESTED ...
+RESTARTS                 0
+CONTAINER_NEVER_STARTED  false          -- the silent-death flag</code></pre>
+      <p class="caption">Identity, timing, verdict, payload, resources: one row answers the before-coffee questions without opening a single log stream by hand.</p>
+    </div>
+    <p>The verdict block deserves its own paragraph, because it encodes a distrust that was earned. The pipeline framework keeps its own run ledger, and that ledger under-reports failures systematically: the recording call sits inside the run function, so anything that dies earlier, a bad spec, a missing credential, a container that never came up, is never recorded. Measured over one week, the Task layer saw more failures than the ledger did, and the gap correlated with severity, because the worse the failure the earlier it happens. So the dashboard treats <code>TASK_HISTORY</code> as the spine, joins the pipeline's own record on, and surfaces the disagreement as data: <code>OUTCOME_DISAGREES</code> when the two witnesses conflict, <code>DLT_RECORD_MISSING</code> when the run died too early to testify. Anything built on the ledger alone reads rosier than reality; the dashboard is built to say so.</p>
+    <p>Beneath the run row sit the two per-event tables. <code>LOG_LINES</code> holds every parsed log line with severity, so a failing run's errors are a filter, not an expedition. <code>METRIC_SAMPLES</code> holds the platform metrics, with one honest caveat baked into the layout: samples arrive roughly every 30 seconds against runs of one to a few minutes, so a run carries one to four samples. That is a trend across runs, not a per-run peak, and the dashboard presents it that way rather than pretending otherwise.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>There is no container exit code anywhere in the platform telemetry, and the storage metric group has never emitted a row despite being declared. The failure reason for a run that died comes from TASK_HISTORY.ERROR_MESSAGE, full stop. Design your observability around what the platform actually emits, not what the spec file lets you request.</p>
+    </div>
+
+    <h2><span class="no">§ 4.</span> Watching the builds, not just the loads</h2>
+    <p>Ingestion is half the platform; the dbt builds that fire when data lands (Chapter 2) are the other half, and they get the same treatment. Every query a build runs carries a JSON query tag, and every build mints an id that rides through the trigger into the tag of every statement it executes.</p>
+    <div class="listing">
+      <p class="listing-label">Listing 2 · the query tag every dbt statement carries</p>
+      <pre><code>{"app": "dbt",
+ "sport": "nfl",
+ "env": "prod",
+ "build_id": "0a1b2c3d-...",   -- minted per triggered build
+ "node": "fact_player_game_offense"}</code></pre>
+      <p class="caption">One tag ties a warehouse query to its build, its league, its environment, and the exact model that ran it. Sport-level cost attribution falls out of this for free.</p>
+    </div>
+    <p>After each build, a harvest task collects every tagged query into a query log and captures per-operator execution statistics for the heaviest ones. The result on the dashboard's builds page: each build with its environment, duration, verdict, how many raw loads it drained in one pass (the coalescing evidence, when a clustered ingestion window lands five loads and one build absorbs them), and a drill-down to the individual model queries with their timings. When a build slows down, the answer to "which model, and why" is a click, not a hunt through query history.</p>
+    <div class="hard-won">
+      <p class="hw-label">Hard-Won Fact</p>
+      <p>A procedure's RETURN string never reaches TASK_HISTORY.RETURN_VALUE; only SYSTEM$SET_RETURN_VALUE gets there, which is how each build's id survives from the trigger procedure into task history for the dashboard to parse back out. And INFORMATION_SCHEMA.TASK_HISTORY() is account-wide regardless of which database qualifies the function call, a fact that mislabeled an entire bootstrap before it was caught.</p>
+    </div>
+
+    <h2><span class="no">§ 5.</span> The punchline</h2>
+    <p>Stack it up and this is what you get to observe, from one browser tab, with nothing deployed outside the account: the whole scheduled fleet with a health strip per pipeline; any run's full story while it is still running, timing split into boot and work, verdict from two witnesses that are allowed to disagree, logs by severity, resource use against limits; every dbt build with the loads it drained and the per-model queries underneath it; and cost attribution down to the league, because the tags were there all along. The dashboard itself is part of the repo, an API and a small web app that read the one table. The platform runs itself; this is how you check its work.</p>
+  </article>
+  <nav class="chapter-nav">
+    <a href="04-scheduling-with-tasks.html"><span class="dir">Previous · Ch. 4</span><span class="t">Scheduling containers with nothing but Snowflake Tasks</span></a>
+    <a class="next" href="../index.html"><span class="dir">Contents</span><span class="t">weekend-warriors</span></a>
+  </nav>
+  <footer class="colophon">
+    <div class="inner-rule">
+      <p class="stack">Snowflake (SPCS · Tasks · Streams · Cortex) + dlt + dbt</p>
+      <p class="meta">Data: balldontlie.io<span class="sep">·</span><a class="repo" href="https://github.com/pronoiaLabs/weekend-warriors">github.com/pronoiaLabs/weekend-warriors</a><span class="sep">·</span>Apache-2.0</p>
+      <p class="end-mark">&#10045;</p>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
