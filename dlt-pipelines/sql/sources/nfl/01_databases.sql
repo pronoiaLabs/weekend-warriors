@@ -73,13 +73,20 @@ CREATE DATABASE IF NOT EXISTS NFL_PROD_DB
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.RAW
     COMMENT = 'Raw / landing layer written by dlt (production).';
 
--- ANALYTICS : dbt models built on top of RAW.
---
--- NOT called STAGING, deliberately. dlt creates <dataset>_STAGING for every merge, so
--- RAW_STAGING already exists in this database and a dbt schema called STAGING would
--- sit beside it meaning something entirely different.
+-- dbt layers. PREP / CORE / FEATURES / ANALYTICS. Created here so a greenfield
+-- `make setup-source SOURCE=nfl` is enough before the first EXECUTE DBT PROJECT:
+-- DBT_RUNNER_ROLE has no CREATE SCHEMA on this database. ANALYTICS is not called
+-- STAGING, deliberately -- dlt creates <dataset>_STAGING for every merge, so
+-- RAW_STAGING already exists and a dbt schema called STAGING would sit beside it
+-- meaning something entirely different.
+CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.PREP
+    COMMENT = 'dbt staging views over RAW.';
+CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.CORE
+    COMMENT = 'dbt conformed dimensions and facts.';
+CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.FEATURES
+    COMMENT = 'dbt ML feature marts. Not exposed to Cortex agents.';
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.ANALYTICS
-    COMMENT = 'dbt models built on RAW. Not STAGING: dlt owns RAW_STAGING.';
+    COMMENT = 'dbt semantic views and evaluations. Not STAGING: dlt owns RAW_STAGING.';
 
 -- OPS : production run metadata.
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.OPS
