@@ -43,19 +43,23 @@ pipelines:
   # Two RAW tables: news_articles (one row per URL, markdown + feed metadata + the
   # raw extraction JSON) and news_player_mentions (one row per url x player).
   #
-  # No schedule yet: this is local-only until the Snowflake wiring lands. The
-  # bindings above are declared now so scheduling later is one cron line. Intended
-  # cadence: HOURLY ("5 * * * *"). The short-post wires below (pft, pfr) expose 15
-  # to 30 items and post dozens a day, so two runs a day would drop updates; the
-  # club and article feeds hold 20 to 100 items and tolerate either.
+  # HOURLY. The short-post wires below (pft, pfr) expose 15 to 30 items and post
+  # dozens a day, so two runs a day would drop updates; the club and article feeds
+  # hold 20 to 100 items and tolerate either. Five past the hour keeps clear of the
+  # other NFL tasks, which all fire on the hour.
+  #
+  # Every run that lands rows inserts into RAW._DLT_LOADS and so fires
+  # DBT_BUILD_NFL; the 900s trigger interval coalesces, but this is now the most
+  # frequent trigger of the NFL dbt build. Revisit the cadence if build noise bites.
   #
   # Note for the EAI network rule: the container fetches these feeds directly, so
   # every feed host below must be in the rule's VALUE_LIST with its port, not just
-  # api.firecrawl.dev.
+  # api.firecrawl.dev (sql/sources/firecrawl/02_external_access.sql).
   #
   #   make run-local NAME=nfl_news
   - name: nfl_news
     source: firecrawl
+    schedule: "5 * * * *"
     config:
       api_key: "secret:sources.firecrawl.api_key"
 
