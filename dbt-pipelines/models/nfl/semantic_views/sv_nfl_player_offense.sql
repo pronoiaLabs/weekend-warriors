@@ -76,7 +76,11 @@ facts (
     player_games.total_scrimmage_tds as scrimmage_touchdowns comment = 'Rushing plus receiving touchdowns.',
     player_games.total_touches as touches comment = 'Carries plus receptions.',
     player_games.fumbles_committed as fumbles comment = 'Fumbles, whether or not lost.',
-    player_games.fumbles_turned_over as fumbles_lost comment = 'Fumbles lost to the opponent.'
+    player_games.fumbles_turned_over as fumbles_lost comment = 'Fumbles lost to the opponent.',
+
+    -- fantasy
+    player_games.two_pt_conversions as two_point_conversions comment = 'Two-point conversions rushed or caught, parsed from play-by-play. Zero when none.',
+    player_games.fanduel_pts as fanduel_points comment = 'FanDuel fantasy points for this player-game under FanDuel NFL scoring (half PPR). Zero, not null, when nothing scored.'
 )
 
 dimensions (
@@ -223,10 +227,18 @@ metrics (
     player_games.total_fumbles as sum(player_games.fumbles_committed)
         comment = 'Total fumbles.',
     player_games.total_fumbles_lost as sum(player_games.fumbles_turned_over)
-        comment = 'Total fumbles lost to the opponent.'
+        comment = 'Total fumbles lost to the opponent.',
+
+    -- fantasy
+    player_games.total_fanduel_points as sum(player_games.fanduel_pts)
+        with synonyms ('fantasy points', 'fanduel points', 'dfs points', 'fantasy score')
+        comment = 'Total FanDuel fantasy points. FanDuel NFL scoring: half PPR, 4-point passing touchdowns, -1 per interception, -2 per fumble lost, 3-point bonuses at 100 rushing or receiving yards and 300 passing yards, 2 per two-point conversion. Offensive players only; kickers and defenses are not scored here.',
+    player_games.fanduel_points_per_game as avg(player_games.fanduel_pts)
+        with synonyms ('fantasy points per game', 'fanduel average')
+        comment = 'Average FanDuel fantasy points per game played.'
 )
 
-comment = 'Individual NFL offensive production at player-by-game grain, 2023 to 2025 seasons. Covers passing, rushing and receiving for every player who recorded offensive involvement. Use this for statistical leaders, per-game production, and efficiency rates. Does NOT contain defensive statistics, kicking or returns, Next Gen tracking metrics, or team-level results.'
+comment = 'Individual NFL offensive production at player-by-game grain, 2023 to 2025 seasons. Covers passing, rushing and receiving for every player who recorded offensive involvement, plus FanDuel fantasy points per game. Use this for statistical leaders, per-game production, efficiency rates and fantasy scoring. Does NOT contain defensive statistics, kicking or returns, Next Gen tracking metrics, or team-level results.'
 
 ai_sql_generation 'DEFAULT TO REGULAR SEASON: unless the user explicitly says preseason, postseason, playoffs, or career/all games, filter season_type = ''Regular Season''.
 DEFAULT SEASON: if no season is given, use the most recent season present in the data. Determine that from the data rather than assuming a year.
@@ -235,7 +247,8 @@ IDENTIFY BY ACTIVITY, NOT POSITION: to find quarterbacks use has_passing, runnin
 RATES: compute as a sum over a sum, never as an average of per-game rates. Present percentages rounded to one decimal place.
 YARDS AND TOUCHDOWNS: report as whole numbers.
 GRAIN: one row per player per game. To count games use count(player_game_key); to count distinct players use count(distinct player_key).
-SCRIMMAGE YARDS: total_scrimmage is rushing plus receiving and is zero (not null) for a pure passer, so it is safe to sum but do not rank quarterbacks by it.'
+SCRIMMAGE YARDS: total_scrimmage is rushing plus receiving and is zero (not null) for a pure passer, so it is safe to sum but do not rank quarterbacks by it.
+FANTASY POINTS: total_fanduel_points uses FanDuel NFL scoring only (half PPR, 4-point passing TD, -1 INT, -2 fumble lost, 3-point yardage bonuses, 2 per two-point conversion). Say "FanDuel scoring" in the answer. It covers offensive players only; kickers and team defenses are not scored in this data, and return touchdowns count only for players with offensive involvement in that game.'
 
 ai_question_categorization 'Answer questions about individual offensive production: passing, rushing, receiving, efficiency rates, statistical leaders and per-game output.
 If the question is about DEFENSIVE statistics (tackles, sacks recorded, interceptions caught by a defender, passes defended), mark it out of scope and tell the user those live in the player defense view.

@@ -2,7 +2,8 @@
     config(
         materialized='incremental',
         unique_key='player_game_key',
-        incremental_strategy='merge'
+        incremental_strategy='merge',
+        on_schema_change='append_new_columns'
     )
 }}
 
@@ -46,6 +47,29 @@
     measure becomes unreachable. Note the consequence: a special-teamer who
     fumbled on a return appears in this fact with no passing/rushing/receiving
     volume. That is the correct trade -- the alternative loses the fumble.
+
+    FANDUEL POINTS (fanduel_points). The scoring math is NOT here: it is the
+    NFL_FANDUEL_POINTS SQL UDF in macros/nfl/nfl_fanduel_udf.sql, created by
+    dbt_project.yml's on-run-start so it exists before this fact builds, in
+    the schema CORE resolves to. This model only passes the measures in. One
+    definition, so a season total or a what-if query scores the same way.
+    Three of the inputs need a word. fumbles_touchdowns, kick_return_touchdowns and
+    punt_return_touchdowns sit on the same STATS row but are PUBLISHED by the
+    defense and special facts; they are read here inside the expression only,
+    never republished, so the one-measure-one-fact invariant that
+    assert_phase_fact_measures_reconcile.sql guards still holds. Two-point
+    conversions exist nowhere in the box score; fact_two_point_conversion
+    parses them out of play-by-play text and they join on player_game_key.
+    Not counted, by construction: a player whose only action was a return TD
+    or a fumble-recovery TD with no passing/rushing/receiving volume is not in
+    this fact (the activity filter is unchanged); two-point conversions in the
+    23 completed games that have no play-by-play; kicker scoring, which needs
+    field-goal distance the source does not carry.
+
+    on_schema_change='append_new_columns' because this fact is incremental:
+    without it a new column is silently dropped from an existing table. It adds
+    the column but fills history only on a --full-refresh, which the release
+    of a new derived column therefore requires once.
 */
 
 with stats as (
@@ -105,6 +129,22 @@ offense as (
               fumbles,
               fumbles_lost
           ) is not null
+
+),
+
+-- successful, resolved two-point conversions per player-game. Passer and
+-- receiver are separate rows upstream, so the split into thrown vs converted
+-- falls out of the role.
+two_point as (
+
+    select
+        player_game_key,
+        sum(iff(role in ('rush', 'receive'), 1, 0))     as two_point_conversions,
+        sum(iff(role = 'pass', 1, 0))                   as two_point_conversions_thrown
+    from {{ ref('fact_two_point_conversion') }}
+    where is_success
+      and player_key is not null
+    group by player_game_key
 
 )
 
@@ -185,6 +225,33 @@ select
     (o.rushing_attempts  is not null)                   as has_rushing,
     (o.receiving_targets is not null)                   as has_receiving,
 
+    -- ---------------------------------------------------------------
+    -- two-point conversions, from play-by-play (see header)
+    -- ---------------------------------------------------------------
+    coalesce(tp.two_point_conversions, 0)               as two_point_conversions,
+    coalesce(tp.two_point_conversions_thrown, 0)        as two_point_conversions_thrown,
+
+    -- ---------------------------------------------------------------
+    -- fanduel_points: the scoring math is the NFL_FANDUEL_POINTS UDF
+    -- (macros/nfl/nfl_fanduel_udf.sql), created by on-run-start. The three
+    -- terms read from other phases' measures are explained in the header.
+    -- ---------------------------------------------------------------
+    {{ nfl_fanduel_points_fqn() }}(
+        o.receptions,
+        o.receiving_yards,
+        o.receiving_touchdowns,
+        o.rushing_yards,
+        o.rushing_touchdowns,
+        o.passing_yards,
+        o.passing_touchdowns,
+        o.passing_interceptions,
+        o.fumbles_lost,
+        o.fumbles_touchdowns,
+        coalesce(o.kick_return_touchdowns, 0) + coalesce(o.punt_return_touchdowns, 0),
+        tp.two_point_conversions,
+        tp.two_point_conversions_thrown
+    )                                                   as fanduel_points,
+
     -- exact numeric watermark for the next incremental run. NOT float: a float
     -- cast loses precision on a 17-digit load id and breaks the comparison.
     o._dlt_load_id::number(38, 6)                       as dlt_load_id_numeric
@@ -192,3 +259,5 @@ select
 from offense o
 inner join games g
     on o.game_key = g.game_key
+left join two_point tp
+    on o.player_game_key = tp.player_game_key

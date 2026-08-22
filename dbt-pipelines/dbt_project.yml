@@ -14,6 +14,11 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+# Functions the models call must exist before they build. Each macro here is
+# gated on DBT_SPORT internally, so a WNBA or NCAAF run creates nothing NFL.
+on-run-start:
+  - "{{ create_nfl_fanduel_udf() }}"
+
 models:
   cortex_agent_lifecycle:
 
