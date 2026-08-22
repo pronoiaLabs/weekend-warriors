@@ -39,6 +39,7 @@ own to patch, and nothing running on your laptop once it is deployed.
 |---|---|
 | [dlt-pipelines/](dlt-pipelines/) | The collector. Pulls API data on a schedule and lands it, raw and complete. |
 | [dbt-pipelines/](dbt-pipelines/) | The brain. Turns raw tables into clean models, and defines the agents. |
+| [ml/](ml/) | Laptop trainer + Snowflake Model Registry. uv, not conda. NFL game-total first. |
 | [ops-dashboard/](ops-dashboard/) | The window. A local dashboard for watching pipelines and builds run. |
 
 Each part has its own README with the full technical detail. This page stays out of the weeds on

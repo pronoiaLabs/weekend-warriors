@@ -84,6 +84,9 @@ ALTER WAREHOUSE DLT_DEV_WH     SET TAG DLT_DB.OPS.COST_CENTER = 'dev';
 -- tasks' MERGE queries.
 ALTER COMPUTE POOL DLT_POOL     SET TAG DLT_DB.OPS.COST_CENTER = 'ingestion';
 ALTER COMPUTE POOL DLT_DEV_POOL SET TAG DLT_DB.OPS.COST_CENTER = 'dev';
+-- Created by sql/dev/02_compute.sql (setup-dev). Same prerequisite as DLT_DEV_POOL:
+-- this file fails if setup-ops is applied before setup-dev.
+ALTER COMPUTE POOL ML_DEV_POOL  SET TAG DLT_DB.OPS.COST_CENTER = 'dev';
 
 ALTER TABLE DLT_DB.OPS.DLT_EVENTS SET TAG DLT_DB.OPS.COST_CENTER = 'ops';
 

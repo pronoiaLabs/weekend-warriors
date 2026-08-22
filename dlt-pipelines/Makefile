@@ -181,7 +181,8 @@ endef
         test test-config lint fmt list plan \
         run-local run-snowflake run-prod run-spcs \
         sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
-        setup-base setup-dev setup-prod setup-ops setup-source new-source \
+        setup-base setup-dev setup-prod setup-ops setup-integrations \
+        setup-source new-source \
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
         sync-apply tasks-apply tasks-suspend tasks-resume deploy \
@@ -398,7 +399,7 @@ setup-base: ## Apply shared control-plane DDL sql/base/* (guard: CONFIRM=1)
 
 setup-dev: ## Apply development DDL sql/dev/* -- the primary developer path (guard: CONFIRM=1)
 	@if [ "$(CONFIRM)" != "1" ]; then \
-		echo "Creates DLT_DEV_DB (per-developer schemas), DLT_DEV_POOL, DLT_DEV_WH."; \
+		echo "Creates DLT_DEV_DB (per-developer schemas), DLT_DEV_POOL, ML_DEV_POOL, DLT_DEV_WH."; \
 		echo "This is where developers work. Re-run with CONFIRM=1  (optionally SNOW_CONN=<connection>)."; \
 		exit 2; \
 	fi
@@ -448,6 +449,20 @@ setup-ops: ## Apply observability DDL sql/ops/* -- event table + binding (guard:
 	@echo "     snow sql -q \"ALTER COMPUTE POOL DLT_DEV_POOL SUSPEND;\"   -- auto_resume brings it back"
 	@echo "  3. make run-spcs NAME=sample, then confirm rows land in DLT_DB.OPS.DLT_EVENTS"
 	@echo "     while MAX(TIMESTAMP) in SNOWFLAKE.TELEMETRY.EVENTS stays put."
+
+setup-integrations: ## Apply Git / Workspace DDL sql/integrations/* (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates INTEGRATIONS.GITHUB and the GITHUB_API_INT API integration"; \
+		echo "(Snowflake GitHub App, prefix https://github.com/pronoiaLabs)."; \
+		echo "Needs ACCOUNTADMIN for CREATE API INTEGRATION."; \
+		echo "Re-run with CONFIRM=1 (optionally SNOW_CONN=<connection>)."; \
+		exit 2; \
+	fi
+	@for f in sql/integrations/*.sql; do echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
+	@echo "Git integration ready. In Snowsight: Projects -> Workspaces -> From Git repository."
+	@echo "  URL: https://github.com/pronoiaLabs/weekend-warriors"
+	@echo "  API integration: GITHUB_API_INT"
+	@echo "  Auth: OAuth2 (snowflakedb GitHub App). Do not pick Public repository."
 
 setup-source: ## Apply one source's DDL sql/sources/$(SOURCE)/* (SOURCE=nfl, guard: CONFIRM=1)
 	@if [ -z "$(SOURCE)" ]; then \
