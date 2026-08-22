@@ -8,7 +8,7 @@
     This override switches on DBT_COLLAPSE_SCHEMAS, injected by env.yml:
 
       dev  (collapse=true)   every layer  -> NFL_DEV_DB.DEV_<user>
-      prod (collapse=false)  +schema wins -> NFL_PROD_DB.PREP / .CORE / .ANALYTICS
+      prod (collapse=false)  +schema wins -> NFL_PROD_DB.PREP / .CORE / .FEATURES / .ANALYTICS
 
     Models with no +schema config fall back to target.schema in both cases.
 

@@ -57,6 +57,12 @@ models:
         facts:
           +materialized: table
 
+      # FEATURES -- ML marts. Train and score only; not a Cortex tool.
+      # Prod: NFL_PROD_DB.FEATURES. Dev collapses into DEV_<user>.
+      features:
+        +materialized: table
+        +schema: FEATURES
+
       # ANALYTICS -- semantic views and evaluation datasets, consumed by agents.
       #
       # sv_example and eval_dataset are the upstream template's skeletons. They

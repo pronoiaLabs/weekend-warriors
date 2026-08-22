@@ -2,7 +2,7 @@
 -- 04_dbt_runner.sql -- the dbt build identity
 -- =============================================================================
 -- DBT_RUNNER_ROLE is the least-privilege role that owns the dbt side of prod:
--- the PREP / CORE / ANALYTICS schemas and their contents (transferred in each
+-- the PREP / CORE / FEATURES / ANALYTICS schemas and their contents (transferred in each
 -- sport's 05_dbt_trigger.sql), the per-sport dbt trigger tasks, and the
 -- warehouse the builds run on. dbt-pipelines/env.yml names it as DBT_ROLE for
 -- the prod environments; dev environments keep CURRENT_ROLE().

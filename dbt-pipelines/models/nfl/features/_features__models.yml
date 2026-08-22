@@ -1,0 +1,66 @@
+version: 2
+
+models:
+
+  - name: feat_team_game_rolling
+    description: >
+      Team x game on the full dim_game slate. Rest includes preseason.
+      Rolling windows are completed regular-season and postseason only,
+      1-preceding, ratio-of-sums. Unplayed rows carry a trailing snapshot.
+    columns:
+      - name: team_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+
+  - name: feat_game_matchup
+    description: >
+      One row per dim_game. home_* / away_* from feat_team_game_rolling.
+      Weather is forecast preferred over hist_forecast, never archive.
+      close_* is one vendor. Outcomes are label_* only.
+    columns:
+      - name: game_key
+        tests:
+          - unique
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+
+  - name: feat_player_game_rolling
+    description: >
+      Player x game. Completed games from fact_player_game_offense;
+      unplayed games from last box-score team_key. Same 1-preceding
+      windows. Usage share is vs team rolling sums, not the current box.
+    columns:
+      - name: player_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, player_id]
+
+  - name: feat_player_weather
+    description: >
+      Player x game. Matchup weather joined to trailing role. Five
+      role x weather products. Never archive or RAW hourly.
+    columns:
+      - name: player_game_key
+        tests:
+          - unique
+          - not_null
+          - relationships: {to: "ref('feat_player_game_rolling')", field: player_game_key}
