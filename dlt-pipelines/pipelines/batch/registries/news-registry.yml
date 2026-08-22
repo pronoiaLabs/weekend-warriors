@@ -1,0 +1,163 @@
+# News pipelines: discovered through curated RSS/Atom feeds, scraped through Firecrawl.
+#
+# Every file in this directory is merged into one registry, so pipeline names must be
+# unique across ALL of them, not just within this file. `defaults:` below applies only
+# to this file's pipelines.
+#
+# NAMING: VENDOR AND CONTENT ARE DIFFERENT AXES HERE, a first for this repo. The
+# source type, the secret, the env var and the EAI are named for the vendor
+# (`firecrawl`), because one Firecrawl key and one egress rule serve any sport. The
+# pipeline and its tables are named for the content (`nfl_news`), which is what puts
+# them in NFL_PROD_DB.RAW beside the BallDontLie tables. tests/test_registry_config.py
+# pins every `nfl_*` pipeline to that database, so the prefix is load-bearing.
+#
+# SECRETS ARE NEVER STORED HERE. `secret:sources.firecrawl.api_key` resolves through
+# .dlt/secrets.toml locally and through the bound Snowflake SECRET (env var
+# SOURCES__FIRECRAWL__API_KEY) in a container.
+#
+# Source module: pipelines/batch/firecrawl_source.py. Read its docstring for what one
+# run does, why feeds replaced search, and what the credit bill depends on.
+
+anchors:
+  # Feed shape. `extract` decides the Firecrawl bill per item:
+  #   all    every item gets markdown + JSON player-mention extraction (5 credits)
+  #   gated  extraction only when title + summary matches extract_keywords as whole
+  #          words (5 credits), otherwise markdown only (1 credit)
+  #   none   markdown only (1 credit)
+  # The feed name becomes the `feed` column; keep it short and stable.
+  club_feed: &club_feed
+    extract: gated
+
+defaults:
+  destination: snowflake
+  database: NFL                       # -> NFL_DEV_DB / NFL_PROD_DB
+  dataset_name: RAW
+  group: news                         # make run-local GROUP=news
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  secret: DLT_DB.OPS.FIRECRAWL_API_KEY    # Snowflake SECRET (sql/sources/firecrawl/, Phase 2)
+  env_var: SOURCES__FIRECRAWL__API_KEY    # matches `secret:sources.firecrawl.api_key` below
+  external_access: FIRECRAWL_API_EAI      # egress to api.firecrawl.dev AND every feed host (Phase 2)
+
+pipelines:
+  # Two RAW tables: news_articles (one row per URL, markdown + feed metadata + the
+  # raw extraction JSON) and news_player_mentions (one row per url x player).
+  #
+  # No schedule yet: this is local-only until the Snowflake wiring lands. The
+  # bindings above are declared now so scheduling later is one cron line. Intended
+  # cadence: HOURLY ("5 * * * *"). The short-post wires below (pft, pfr) expose 15
+  # to 30 items and post dozens a day, so two runs a day would drop updates; the
+  # club and article feeds hold 20 to 100 items and tolerate either.
+  #
+  # Note for the EAI network rule: the container fetches these feeds directly, so
+  # every feed host below must be in the rule's VALUE_LIST with its port, not just
+  # api.firecrawl.dev.
+  #
+  #   make run-local NAME=nfl_news
+  - name: nfl_news
+    source: firecrawl
+    config:
+      api_key: "secret:sources.firecrawl.api_key"
+
+      # Every URL below was fetched and parsed on 2026-08-22. Feeds are read in this
+      # order; discovered items are then sorted newest first before the cap.
+      feeds:
+        # --- Short-post wires: one event per item, many per day. Every item is
+        #     about a player or a transaction, so they are extracted outright.
+        #     Both carry the full post in content:encoded (landed as feed_content).
+        - name: pft
+          url: https://www.nbcsports.com/profootballtalk.rss     # the old profootballtalk.nbcsports.com/feed 301s here
+          extract: all
+        - name: pfr
+          url: https://www.profootballrumors.com/feed            # signings, cuts, IR, waivers
+          extract: all
+
+        # --- Article feeds: a few long-form pieces a day, hours behind the wires.
+        #     Backfill and context; extracted only when the gate fires.
+        - name: cbs
+          url: https://www.cbssports.com/rss/headlines/nfl/
+          extract: gated
+        - name: espn
+          # pubDate says "EST" year-round, so feedparser reads summer items an
+          # hour early. Accepted: an article feed, not a wire.
+          url: https://www.espn.com/espn/rss/nfl/news
+          extract: gated
+
+        # --- Club sites: https://www.<domain>/rss/news, same platform for every
+        #     team. Beat practice-participation notes often land here first.
+        #     Two clubs are deliberately absent: dallascowboys.com (newest item
+        #     2018) and commanders.com (newest item 2022) parse but are dead.
+        - {name: club_buf, url: https://www.buffalobills.com/rss/news, <<: *club_feed}
+        - {name: club_mia, url: https://www.miamidolphins.com/rss/news, <<: *club_feed}
+        - {name: club_ne,  url: https://www.patriots.com/rss/news, <<: *club_feed}
+        - {name: club_nyj, url: https://www.newyorkjets.com/rss/news, <<: *club_feed}
+        - {name: club_bal, url: https://www.baltimoreravens.com/rss/news, <<: *club_feed}
+        - {name: club_cin, url: https://www.bengals.com/rss/news, <<: *club_feed}
+        - {name: club_cle, url: https://www.clevelandbrowns.com/rss/news, <<: *club_feed}
+        - {name: club_pit, url: https://www.steelers.com/rss/news, <<: *club_feed}
+        - {name: club_hou, url: https://www.houstontexans.com/rss/news, <<: *club_feed}
+        - {name: club_ind, url: https://www.colts.com/rss/news, <<: *club_feed}
+        - {name: club_jax, url: https://www.jaguars.com/rss/news, <<: *club_feed}
+        - {name: club_ten, url: https://www.tennesseetitans.com/rss/news, <<: *club_feed}
+        - {name: club_den, url: https://www.denverbroncos.com/rss/news, <<: *club_feed}
+        - {name: club_kc,  url: https://www.chiefs.com/rss/news, <<: *club_feed}
+        - {name: club_lv,  url: https://www.raiders.com/rss/news, <<: *club_feed}
+        - {name: club_lac, url: https://www.chargers.com/rss/news, <<: *club_feed}
+        - {name: club_nyg, url: https://www.giants.com/rss/news, <<: *club_feed}
+        - {name: club_phi, url: https://www.philadelphiaeagles.com/rss/news, <<: *club_feed}
+        - {name: club_chi, url: https://www.chicagobears.com/rss/news, <<: *club_feed}
+        - {name: club_det, url: https://www.detroitlions.com/rss/news, <<: *club_feed}
+        - {name: club_gb,  url: https://www.packers.com/rss/news, <<: *club_feed}
+        - {name: club_min, url: https://www.vikings.com/rss/news, <<: *club_feed}
+        - {name: club_atl, url: https://www.atlantafalcons.com/rss/news, <<: *club_feed}
+        - {name: club_car, url: https://www.panthers.com/rss/news, <<: *club_feed}
+        - {name: club_no,  url: https://www.neworleanssaints.com/rss/news, <<: *club_feed}
+        - {name: club_tb,  url: https://www.buccaneers.com/rss/news, <<: *club_feed}
+        - {name: club_ari, url: https://www.azcardinals.com/rss/news, <<: *club_feed}
+        - {name: club_lar, url: https://www.therams.com/rss/news, <<: *club_feed}
+        - {name: club_sf,  url: https://www.49ers.com/rss/news, <<: *club_feed}
+        - {name: club_sea, url: https://www.seahawks.com/rss/news, <<: *club_feed}
+
+      # Items older than this are ignored. Guards the first run against a club
+      # feed's 100-item backlog; at hourly cadence nothing legitimate is this old.
+      max_age_hours: 48
+
+      # Gate for `extract: gated` feeds, matched as WHOLE WORDS against the item's
+      # title + summary. All-caps keywords (IR) match case-sensitively.
+      #
+      # Phrases, not bare status words: `out` alone matched "find out" on a club
+      # "How to Watch" post and bought a 5-credit extraction of a broadcast schedule.
+      # Measured, not hypothetical. Same reasoning keeps `starter` out of the list.
+      extract_keywords:
+        - injury
+        - injured
+        - questionable
+        - doubtful
+        - ruled out
+        - out for the season
+        - out indefinitely
+        - will not play
+        - IR
+        - injured reserve
+        - hamstring
+        - ankle
+        - concussion
+        - named the starter
+        - starting lineup
+        - benched
+        - depth chart
+        - practice report
+        - did not practice
+        - limited
+
+      # Host-level skip, mostly moot with curated feeds; kept for syndicated links.
+      exclude_domains:
+        - theathletic.com
+
+      # Safety rails. max_scrapes_per_run bounds one run's bill at
+      # max_scrapes_per_run x 5 credits even if every item is extracted. The cap
+      # keeps the newest items; the rest are retried next run.
+      max_scrapes_per_run: 40
+      seen_retention_days: 30
+      wait_timeout: 300
+      feed_timeout: 15

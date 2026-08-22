@@ -259,6 +259,14 @@ def build_source(spec: PipelineSpec):
             n_orders=cfg.get("n_orders", 5),
         )
 
+    if spec.source == "firecrawl":
+        # Search -> scrape -> extract with control flow between the calls, which the
+        # rest_api source cannot express. No season token: news is dated by the
+        # search window, not the season. See pipelines/batch/firecrawl_source.py.
+        from pipelines.batch.firecrawl_source import firecrawl_news  # noqa: PLC0415
+
+        return firecrawl_news(name=spec.name, config=cfg)
+
     # models.validate() guards this; this branch is a defensive fallback.
     raise ValueError(f"unhandled source type: {spec.source!r}")
 

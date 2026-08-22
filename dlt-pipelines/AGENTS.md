@@ -168,34 +168,26 @@ that round-trip.** So these, and only these, require a custom source type:
 Fan-out, call chaining, incremental scoping, auth, and pagination are all declarative. Do not write
 a custom source for those.
 
+One custom source exists: `firecrawl` (`pipelines/batch/firecrawl_source.py`, registry
+`news-registry.yml`). It earns its Python because the items of one call (reading a curated list
+of RSS/Atom feeds) decide the arguments of the next (a Firecrawl batch scrape), and only some
+pages get the 5x-cost extraction, chosen per feed. Note its naming: the source type, secret and
+env var are named for the vendor (`firecrawl`), the pipeline and its tables for the content
+(`nfl_news`), because one Firecrawl key serves any sport.
+
 ---
 
 ## Template constraints worth knowing before you edit
 
-### `write_disposition` is forced onto every resource
+### `write_disposition` is an optional override, applied to every resource when set
 
-`run.py:126-129` passes it to `pipeline.run()`, which applies it to every resource in the source
-(`dlt/extract/extract.py:191-194`). It defaults to `"merge"` at `models.py:38` and is never `None`,
-so it **always** clobbers per-resource dispositions declared in the config.
-
-Consequences: you cannot mix dispositions in one entry, and the dict form that `scd2` needs fails
-validation at `models.py:56-60`, which only accepts the three plain strings.
-
-Fix, if you need either:
-
-```python
-# models.py
-write_disposition: str | dict | None = None
-# and make the validation conditional
-
-# run.py
-run_kwargs = {}
-if spec.write_disposition:
-    run_kwargs["write_disposition"] = spec.write_disposition
-info = pipeline.run(build_source(spec), **run_kwargs)
-```
-
-`tests/test_registry_config.py:66-81` and `:83-88` pin the old default and must be updated with it.
+The template forced `"merge"` onto every resource. That is gone: `PipelineSpec.write_disposition`
+defaults to `None` (`models.py`, see the field's docstring) and `run.py` passes it to
+`pipeline.run()` only when the entry sets one. Leave it unset and each resource keeps the
+disposition it declares for itself, which is how a mixed-disposition pipeline (scd2 on one table,
+merge on another) is expressed. Set it, as a string or as the `{disposition: merge, strategy: scd2}`
+dict, and dlt applies it to **every** resource in the source; that is still the right tool for a
+small reference table you want replaced wholesale.
 
 ### `sources/` is not in the image
 
