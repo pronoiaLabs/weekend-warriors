@@ -48,11 +48,13 @@
     fumbled on a return appears in this fact with no passing/rushing/receiving
     volume. That is the correct trade -- the alternative loses the fumble.
 
-    FANDUEL POINTS (fanduel_points). The scoring math is NOT here: it is the
-    NFL_FANDUEL_POINTS SQL UDF in macros/nfl/nfl_fanduel_udf.sql, created by
-    dbt_project.yml's on-run-start so it exists before this fact builds, in
-    the schema CORE resolves to. This model only passes the measures in. One
-    definition, so a season total or a what-if query scores the same way.
+    FANTASY POINTS (fanduel_points, draftkings_points). The scoring math is
+    NOT here: it is the NFL_FANDUEL_POINTS and NFL_DRAFTKINGS_POINTS SQL UDFs
+    in macros/nfl/nfl_fantasy_udfs.sql, generated from one coefficient table
+    and created by dbt_project.yml's on-run-start so they exist before this
+    fact builds, in the schema CORE resolves to. This model only passes the
+    same thirteen measures to each. The books differ only in receptions
+    (FanDuel 0.5, DraftKings 1.0) and fumbles lost (-2, -1).
     Three of the inputs need a word. fumbles_touchdowns, kick_return_touchdowns and
     punt_return_touchdowns sit on the same STATS row but are PUBLISHED by the
     defense and special facts; they are read here inside the expression only,
@@ -232,11 +234,12 @@ select
     coalesce(tp.two_point_conversions_thrown, 0)        as two_point_conversions_thrown,
 
     -- ---------------------------------------------------------------
-    -- fanduel_points: the scoring math is the NFL_FANDUEL_POINTS UDF
-    -- (macros/nfl/nfl_fanduel_udf.sql), created by on-run-start. The three
-    -- terms read from other phases' measures are explained in the header.
+    -- fantasy points, one column per book. The scoring math is the
+    -- NFL_<BOOK>_POINTS UDFs (macros/nfl/nfl_fantasy_udfs.sql), created by
+    -- on-run-start; both take the same thirteen inputs. The three inputs
+    -- read from other phases' measures are explained in the header.
     -- ---------------------------------------------------------------
-    {{ nfl_fanduel_points_fqn() }}(
+    {{ nfl_fantasy_points_fqn('fanduel') }}(
         o.receptions,
         o.receiving_yards,
         o.receiving_touchdowns,
@@ -251,6 +254,21 @@ select
         tp.two_point_conversions,
         tp.two_point_conversions_thrown
     )                                                   as fanduel_points,
+    {{ nfl_fantasy_points_fqn('draftkings') }}(
+        o.receptions,
+        o.receiving_yards,
+        o.receiving_touchdowns,
+        o.rushing_yards,
+        o.rushing_touchdowns,
+        o.passing_yards,
+        o.passing_touchdowns,
+        o.passing_interceptions,
+        o.fumbles_lost,
+        o.fumbles_touchdowns,
+        coalesce(o.kick_return_touchdowns, 0) + coalesce(o.punt_return_touchdowns, 0),
+        tp.two_point_conversions,
+        tp.two_point_conversions_thrown
+    )                                                   as draftkings_points,
 
     -- exact numeric watermark for the next incremental run. NOT float: a float
     -- cast loses precision on a 17-digit load id and breaks the comparison.
