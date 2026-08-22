@@ -273,6 +273,14 @@ models:
         tests:
           - not_null
           - dbt_utils.accepted_range: {min_value: -10, max_value: 80, severity: warn}
+      - name: draftkings_points
+        description: >
+          DraftKings Classic scoring applied to this row. Same thirteen inputs
+          as fanduel_points; differs only in full PPR (1.0 per reception) and
+          -1 per fumble lost. Kickers are not scored.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: -10, max_value: 80, severity: warn}
       - name: dlt_load_id_numeric
         description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
         tests: [not_null]
