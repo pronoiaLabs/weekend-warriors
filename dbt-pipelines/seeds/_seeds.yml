@@ -1,0 +1,20 @@
+version: 2
+
+seeds:
+  - name: seed_nfl_player_aliases
+    description: >
+      Nicknames and shortenings the news uses that the roster does not: "Abe
+      Lucas", "CMC". Consulted FIRST by fact_player_news_mention, before the
+      normalized-name match. Normalization (case, punctuation, Jr/III) is not an
+      alias: "D.J. Wonnum" and "Kenneth Walker" resolve without a row here.
+      Grow this file from the unresolved names that
+      assert_news_mentions_resolve surfaces; player_id is the BallDontLie id
+      from RAW.PLAYERS.
+    columns:
+      - name: alias
+        description: "Name as the news writes it. Matched after normalization."
+        tests: [unique, not_null]
+      - name: player_id
+        tests:
+          - not_null
+          - relationships: {to: "source('nfl_raw', 'players')", field: id}

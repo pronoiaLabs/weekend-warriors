@@ -485,3 +485,39 @@ models:
           - not_null: {config: {severity: warn}}
       - name: is_current
         tests: [not_null]
+
+  - name: fact_player_news_mention
+    description: >
+      One extracted player mention per news article, resolved to a player by
+      name where possible. Grain: article url x player name as written.
+      player_key is NULL for ambiguous and unresolved mentions and for team
+      names the extraction mistook for players; resolution_method says which.
+      Filter player_key is not null for anything keyed.
+    columns:
+      - name: mention_key
+        description: "Surrogate key. Grain of this fact."
+        tests: [unique, not_null]
+      - name: article_key
+        tests: [not_null]
+      - name: player_key
+        description: "NULL when unresolved. dbt's relationships test ignores NULLs, so only resolved keys are checked."
+        tests:
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: mention_team_key
+        description: "The team the article names for this mention, when recognized. NULL otherwise."
+        tests:
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: published_date
+        tests: [not_null]
+      - name: resolution_method
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['alias', 'exact', 'exact_team', 'ambiguous', 'unresolved', 'team_not_player']
+      - name: candidate_count
+        tests: [not_null]
+
+    tests:
+      # the declared grain, in natural-key terms
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [url, player_name_text]

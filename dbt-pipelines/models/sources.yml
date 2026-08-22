@@ -315,6 +315,41 @@ sources:
           - name: week
             tests: [not_null]
 
+      # --- News: the Firecrawl source (dlt news-registry.yml), hourly -------
+      - name: news_articles
+        description: >
+          One row per article URL discovered from the curated feeds and scraped
+          through Firecrawl: feed metadata, the page as markdown, and the raw
+          JSON extraction when the feed's extract mode fired. Merge on url.
+          Text columns are large (markdown runs to ~100k chars), so downstream
+          models name their columns rather than SELECT *.
+        columns:
+          - name: url
+            description: "Canonical article URL from the feed. Natural key."
+            tests: [unique, not_null]
+          - name: feed
+            description: "Registry feed name: pft, pfr, cbs, espn, or club_<abbr>."
+            tests: [not_null]
+          - name: fetched_at
+            tests: [not_null]
+
+      - name: news_player_mentions
+        description: >
+          One row per article x player name AS THE ARTICLE WROTE IT, from the
+          JSON extraction. No provider id exists here, which is why CORE owns
+          the match to a player and this source carries no relationship test
+          to players.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [url, player_name]
+        columns:
+          - name: url
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'news_articles')", field: url}
+          - name: player_name
+            tests: [not_null]
+
   - name: wnba_raw
     description: >
       Raw WNBA data landed by dlt from the BallDontLie API. Owned by the dlt

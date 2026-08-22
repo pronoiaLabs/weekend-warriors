@@ -152,6 +152,12 @@ tests:
     ncaaf:
       +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'ncaaf') | as_bool }}"
 
+seeds:
+  cortex_agent_lifecycle:
+    nfl:
+      +tags: ['nfl']
+      +enabled: "{{ (env_var('DBT_SPORT', 'nfl') == 'nfl') | as_bool }}"
+
 sources:
   cortex_agent_lifecycle:
     # Sources gate on DBT_SPORT too, so their yml tests follow their sport.
