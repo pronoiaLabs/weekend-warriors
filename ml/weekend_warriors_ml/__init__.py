@@ -1,1 +1,1 @@
-"""NFL game-total v1: train on FEATURES, register on SPCS, score from uv."""
+"""NFL models on FEATURES: spec registry, walk-forward fit, SPCS register."""
