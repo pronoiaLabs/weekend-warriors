@@ -24,23 +24,23 @@ select
     lower(nullif(trim(vendor), ''))                                  as vendor,
     try_to_decimal(coalesce(
         spread_home_value::string,
-        raw_record:'SPREAD_HOME_VALUE__V_DOUBLE'::string
+        raw_record:SPREAD_HOME_VALUE__V_DOUBLE::string
     ), 18, 4)                                                        as home_spread,
     try_to_number(spread_home_odds)                                  as home_spread_odds,
     try_to_decimal(coalesce(
         spread_away_value::string,
-        raw_record:'SPREAD_AWAY_VALUE__V_DOUBLE'::string
+        raw_record:SPREAD_AWAY_VALUE__V_DOUBLE::string
     ), 18, 4)                                                        as away_spread,
     try_to_number(spread_away_odds)                                  as away_spread_odds,
     try_to_number(moneyline_home_odds)                               as home_moneyline_odds,
     try_to_number(moneyline_away_odds)                               as away_moneyline_odds,
     try_to_decimal(coalesce(
         total_value::string,
-        raw_record:'TOTAL_VALUE__V_DOUBLE'::string
+        raw_record:TOTAL_VALUE__V_DOUBLE::string
     ), 18, 4)                                                        as total_line,
     try_to_number(total_over_odds)                                   as over_odds,
     try_to_number(total_under_odds)                                  as under_odds,
-    try_to_number(raw_record:'SEASON_TYPE'::string)                  as season_type,
+    try_to_number(raw_record:SEASON_TYPE::string)                    as season_type,
     try_to_timestamp_tz(updated_at::string)                          as source_updated_at,
     _dlt_valid_from                                                  as valid_from,
     _dlt_valid_to                                                    as valid_to,

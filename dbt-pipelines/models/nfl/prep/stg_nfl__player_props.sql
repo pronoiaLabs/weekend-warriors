@@ -27,12 +27,12 @@ select
     lower(nullif(trim(market__type::string), ''))                    as market_type,
     try_to_decimal(coalesce(
         line_value::string,
-        raw_record:'LINE_VALUE__V_DOUBLE'::string
+        raw_record:LINE_VALUE__V_DOUBLE::string
     ), 18, 4)                                                        as line_value,
     try_to_number(market__odds)                                      as market_odds,
     try_to_number(market__over_odds)                                 as over_odds,
     try_to_number(market__under_odds)                                as under_odds,
-    try_to_number(raw_record:'SEASON_TYPE'::string)                  as season_type,
+    try_to_number(raw_record:SEASON_TYPE::string)                    as season_type,
     try_to_timestamp_tz(updated_at::string)                          as source_updated_at,
     _dlt_valid_from                                                  as valid_from,
     _dlt_valid_to                                                    as valid_to,
