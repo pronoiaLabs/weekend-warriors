@@ -5,7 +5,18 @@
 }}
 
 /*
-    fact_team_game -- one row per team per COMPLETED game. Grain: team x game.
+    fact_team_game_offense -- one row per team per COMPLETED game. Grain: team x game.
+
+    OFFENSE, by name and by content. Every box-score column here is what THIS
+    team's offense did: its yards, attempts, first downs, third and fourth down
+    conversions, red zone trips, drives, possession time, the sacks its
+    quarterback took (sacks_allowed), its turnovers and its penalties. The only
+    defensive readings are points_allowed and the provider's defensive_touchdowns.
+    The same game seen from this team's defense (yards allowed, takeaways,
+    sacks recorded, pressure and coverage counts) is fact_team_game_defense,
+    a 1:1 twin on team_game_key. The game result (points, margin, win/loss/tie)
+    lives here rather than on the twin because records aggregate from one row
+    per team-game, and this is that row.
 
     Two rows per completed game, exactly. Scheduled games are filtered out at
     the games CTE: a fact row asserts "this team played this game and here is

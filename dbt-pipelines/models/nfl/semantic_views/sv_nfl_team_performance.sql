@@ -16,7 +16,7 @@
 */
 
 tables (
-    team_games as {{ ref('fact_team_game') }}
+    team_games as {{ ref('fact_team_game_offense') }}
         primary key (team_game_key)
         with synonyms ('team games', 'game results', 'box score', 'team stats')
         comment = 'One row per team per game: result, scoring and full team box score. Grain is team x game, so a single game appears twice, once for each team. Covers preseason, regular season and postseason.',

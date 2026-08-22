@@ -1,5 +1,5 @@
 /*
-    fact_team_game must have exactly two rows per game -- one per team -- and the
+    fact_team_game_offense must have exactly two rows per game -- one per team -- and the
     two rows must be mirror images: each team's points_scored is the other's
     points_allowed, and the two teams must be different.
 
@@ -18,7 +18,7 @@ with per_game as (
         sum(points_allowed)               as total_allowed,
         count_if(is_home)                 as n_home,
         count_if(not is_home)             as n_away
-    from {{ ref('fact_team_game') }}
+    from {{ ref('fact_team_game_offense') }}
     group by game_id
 
 )

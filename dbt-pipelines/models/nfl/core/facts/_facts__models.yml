@@ -103,12 +103,16 @@ models:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [game_id, player_id, vendor, prop_type]
 
-  - name: fact_team_game
+  - name: fact_team_game_offense
     description: >
-      One row per team per game. Grain: team x game. 2,004 rows.
+      One row per team per completed game: the team's OWN box score plus the
+      game result. Grain: team x game. ~2,050 rows.
       GAMES unpivoted to team level (UNION ALL, cannot fan out) with the
       TEAM_STATS box score left-joined on. Four rows have has_box_score = false
       because two games have no team_stats row.
+      Every box-score measure is offensive (sacks_allowed is sacks the team's
+      QB took). The defensive view of the same game is fact_team_game_defense,
+      1:1 on team_game_key.
       Covers all season types -- filter on season_type, do not assume regular season.
     columns:
       - name: team_game_key
@@ -148,6 +152,66 @@ models:
         description: "NULL where has_box_score is false. Roughly 1800s per team per game."
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 5400, severity: warn}
+
+    tests:
+      # the declared grain
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+
+  - name: fact_team_game_defense
+    description: >
+      The same team-game seen from the defense. Grain: team x game, 1:1 with
+      fact_team_game_offense on team_game_key.
+      opp_* columns are the opponent's offensive box score read as "allowed"
+      (a self-join of the offense fact, safe because that fact is mirrored);
+      the pressure and coverage block is fact_player_game_defense rolled up
+      to the team. takeaways is the opponent's turnovers, NOT a sum of
+      fumbles_recovered, which counts own-fumble recoveries too.
+      Two defensive_touchdowns columns are exposed on purpose: the provider's
+      team box and the player rollup disagree on 155 rows.
+    columns:
+      - name: team_game_key
+        description: "Surrogate key, identical to the offense row's. Grain of this fact."
+        tests:
+          - unique
+          - not_null
+          - relationships: {to: "ref('fact_team_game_offense')", field: team_game_key}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: opponent_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: season_week_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
+      - name: date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key}
+      - name: points_allowed
+        tests: [not_null]
+      - name: has_opp_box_score
+        description: "False on the rows whose opponent has no team_stats row; every opp_* measure is NULL there."
+        tests: [not_null]
+      - name: has_player_defense
+        description: "Whether any player defensive stats rolled up for this team-game. False on the same 4 rows that lack a box score (two 2023 preseason games with no player stats at all); the pressure block is NULL there."
+        tests: [not_null]
+      - name: takeaways
+        description: "The opponent's turnovers. NULL where has_opp_box_score is false."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: sacks_recorded
+        description: "Sum of player defensive_sacks. FLOAT: half-sacks are real. Agrees with opp_sacks_allowed within 1.0."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
 
     tests:
       # the declared grain

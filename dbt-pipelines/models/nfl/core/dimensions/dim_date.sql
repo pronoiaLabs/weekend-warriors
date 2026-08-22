@@ -75,7 +75,7 @@ select
     -- (Sun/Mon/Thu) is wrong for this data: Saturday hosts 94 games and Friday
     -- 80, against Thursday's 17, so filtering on it would discard 23% of the
     -- schedule. Which days have games is a property of the fact, not the
-    -- calendar -- join to fact_team_game instead of guessing here.
+    -- calendar -- join to fact_team_game_offense instead of guessing here.
     (dayname(date_day) = 'Sun')               as is_sunday,
     (dayname(date_day) = 'Mon')               as is_monday,
     (dayname(date_day) = 'Thu')               as is_thursday,

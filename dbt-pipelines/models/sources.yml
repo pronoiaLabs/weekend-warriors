@@ -97,7 +97,7 @@ sources:
         description: >
           Team box score, one row per team per game. 2,000 rows against an
           expected 2,004 -- two games have no team_stats row, so the
-          fact_team_game box score is null for those four team-game rows.
+          fact_team_game_offense box score is null for those four team-game rows.
         tests:
           - dbt_utils.unique_combination_of_columns:
               combination_of_columns: [game__id, team__id]

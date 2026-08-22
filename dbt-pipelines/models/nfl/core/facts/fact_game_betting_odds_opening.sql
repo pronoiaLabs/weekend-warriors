@@ -26,7 +26,7 @@ selected as (
 
 home_results as (
 
-    select * from {{ ref('fact_team_game') }} where is_home
+    select * from {{ ref('fact_team_game_offense') }} where is_home
 
 ),
 

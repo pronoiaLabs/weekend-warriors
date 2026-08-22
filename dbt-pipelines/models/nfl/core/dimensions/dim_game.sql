@@ -7,18 +7,18 @@
 /*
     dim_game -- descriptive context for each game. Grain: game.
 
-    THE ONLY PLACE THE FULL NFL SLATE IS READABLE. fact_team_game filters to
+    THE ONLY PLACE THE FULL NFL SLATE IS READABLE. fact_team_game_offense filters to
     completed games (an unplayed game has no fact rows), so scheduled games
     exist solely here, flagged by is_completed. The schedule semantic view
     anchors on this table for exactly that reason.
 
-    Scores live on fact_team_game, not here. dim_game answers "when, where, who
+    Scores live on fact_team_game_offense, not here. dim_game answers "when, where, who
     played, what kind of game was it"; the outcome is a measure and belongs in
     the fact. went_to_overtime is the exception -- it is a characteristic of the
     game rather than a quantity, so it sits here as a dimension attribute.
 
     home_team_key and away_team_key are kept as a convenience for questions
-    phrased in home/away terms. fact_team_game additionally exposes
+    phrased in home/away terms. fact_team_game_offense additionally exposes
     opponent_team_key, which is the easier path for most analysis.
 */
 
