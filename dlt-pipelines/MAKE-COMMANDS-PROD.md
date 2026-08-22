@@ -62,7 +62,10 @@ reports success while re-fetching a season that ended months ago.
 | `nfl_plays` | `15 9 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
 | `nfl_standings` | `20 9 * * 2` | Tuesday | only meaningful after a full week |
 | `nfl_advanced_stats` | `25 9 * * 2` | Tuesday | same |
+| `nfl_odds_opening` | `30 9 * * *` | daily | immutable game and player-prop openings, both fanned out per game |
 | `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently |
+| `nfl_game_odds` | `0 */2 * * 0,1,4,5,6` | every 2h Thu-Mon | SCD2 snapshots of current game lines |
+| `nfl_player_props` | `10 */2 * * 0,1,4,5,6` | every 2h Thu-Mon | SCD2 snapshots, staggered off game odds |
 
 Cron is five fields, **Sunday is 0**, so Tuesday is `2`.
 
@@ -72,6 +75,11 @@ wakes once instead of once per pipeline. The 5-minute stagger, rather than the s
 one API key from being hit concurrently and lets a single warm pool node work through the queue.
 Expect two builds from the window (the first load fires a build almost immediately; the 900s trigger
 interval coalesces the rest), plus the injuries build at 22:xx.
+
+The live betting Tasks use Snowflake's five-field cron step syntax. They cover Thursday through
+Monday (Sunday is 0) and are staggered by ten minutes so their game fan-outs do not share the API
+key concurrently. Only observations captured while these Tasks run exist: live line movement
+cannot be backfilled.
 
 **Why 09:00 UTC.** A normal week ends with Monday Night Football at 20:15 ET, final around 23:45 ET.
 That is 03:45 UTC Tuesday under EDT and 04:45 under EST. 09:00 UTC clears both, and the margin is
@@ -194,8 +202,8 @@ needs. `make tasks-apply` uses `$(SNOW_LOADER)` to get this right; a Task applie
 hand without `--role` will not be.
 
 **Resume one at a time, cheapest first**, confirming each before the next: `nfl_reference` (32 rows
-plus a merge), then `nfl_standings`, then the daily ones, then `nfl_plays` last because it is the only
-expensive one.
+plus a merge), then `nfl_standings`, then the daily ones, then `nfl_plays`, `nfl_game_odds`, and
+`nfl_player_props` last because their per-game fan-outs make them the expensive Tasks.
 
 Run one by hand without waiting for its cron:
 
@@ -352,6 +360,26 @@ Two workable options, neither built:
   passing.
 
 Whichever gets built, the merge keys mean a backfill and a scheduled run cannot corrupt each other.
+
+Opening lines are the betting exception: they are immutable and can be backfilled in dev for
+2023-2025 before cloning forward. Live `ODDS` and `PLAYER_PROPS` are SCD2 observations of what the
+API returns now; no command can reconstruct line movement that was not captured at the time.
+
+```bash
+for SEASON in 2023 2024 2025; do
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=odds_opening_regular \
+    PARAM="opening_games_regular_ref:seasons[]=$SEASON"
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=odds_opening_post \
+    PARAM="opening_games_post_ref:seasons[]=$SEASON"
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=player_props_opening_regular \
+    PARAM="opening_games_regular_ref:seasons[]=$SEASON"
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=player_props_opening_post \
+    PARAM="opening_games_post_ref:seasons[]=$SEASON"
+done
+```
+
+The parent filter is required for both opening tables. `/odds/opening` rejects `season` alone and
+accepts only bracketed `game_ids[]`, which the child resources resolve from those parents.
 
 ---
 

@@ -21,6 +21,8 @@ This is the only genuinely dangerous part of the whole runbook.
 | `nfl_games`, `nfl_stats` | `PARAM="seasons[]=2024"` | array parameter, brackets required |
 | `nfl_plays` | `PARAM="games_regular_ref:seasons[]=2024"` | the filter goes on the **parent** resource |
 | `nfl_standings`, `nfl_advanced_stats` | `PARAM="season=2024"` | singular, and **required** |
+| `nfl_game_odds`, `nfl_player_props` | qualified `..._games_*_ref:seasons[]=2024` | live resources fan out from games |
+| `nfl_odds_opening` | qualified `opening_games_*_ref:seasons[]=2024` | both opening endpoints fan out from games |
 | `nfl_reference`, `nfl_injuries` | none | not season-scoped at all |
 
 **Why this matters.** The API ignores a parameter name it does not recognise and returns 200. So
@@ -77,8 +79,12 @@ does not give you the 2019 roster; it overwrites with today's. Run it on its own
 
 `nfl_injuries` is the same, only more so. See "Tables that only accumulate" below.
 
-**Everything is safe to re-run.** Every resource merges on a key, so a failed or interrupted run is
-fixed by running it again. Nothing duplicates.
+Live `ODDS` and `PLAYER_PROPS` movement is also not in the block: the API only exposes the current
+line, so historical movement cannot be backfilled. Start their schedules before the games you want
+to analyze. Opening lines are backfillable; see the betting section below.
+
+**Everything is safe to re-run.** Current-state resources merge on keys and historical snapshots use
+SCD2 content hashes, so a failed or interrupted run is fixed by running it again.
 
 ---
 
@@ -161,11 +167,49 @@ make run-snowflake NAME=nfl_advanced_stats RESOURCE=adv_passing_regular PARAM="s
 Six resources into three tables. `season` is **required**; a bare run returns
 `{"param":"season","error":"Invalid value"}`. No preseason data exists for these endpoints.
 
+### NFL betting: live movement and opening lines
+
+`nfl_game_odds` and `nfl_player_props` run every two hours Thu-Mon at minutes 0 and 10. Both fan
+out over current-season regular/postseason games and keep SCD2 history. Current lines require
+`WHERE _dlt_valid_to IS NULL`.
+
+```bash
+# Local DuckDB smoke tests (one child; its selected:false parent runs automatically).
+make run-local NAME=nfl_game_odds RESOURCE=odds_regular
+make run-local NAME=nfl_player_props RESOURCE=player_props_regular
+
+# Developer Snowflake refreshes.
+make run-snowflake NAME=nfl_game_odds
+make run-snowflake NAME=nfl_player_props
+make run-snowflake NAME=nfl_odds_opening
+```
+
+`nfl_odds_opening` runs daily at 09:30 UTC. Backfill immutable opening lines for 2023-2025:
+
+```bash
+for SEASON in 2023 2024 2025; do
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=odds_opening_regular \
+    PARAM="opening_games_regular_ref:seasons[]=$SEASON"
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=odds_opening_post \
+    PARAM="opening_games_post_ref:seasons[]=$SEASON"
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=player_props_opening_regular \
+    PARAM="opening_games_regular_ref:seasons[]=$SEASON"
+  make run-snowflake NAME=nfl_odds_opening RESOURCE=player_props_opening_post \
+    PARAM="opening_games_post_ref:seasons[]=$SEASON"
+done
+```
+
+Both opening endpoints require a game filter for historical loads. `/odds/opening` specifically
+requires bracketed `game_ids[]` (the registry supplies it from the parent); `season` alone and bare
+`game_ids` both return HTTP 400. Opening lines merge on `id`; live line movement cannot be
+reconstructed by a backfill.
+
 ---
 
 ## Tables that only accumulate
 
-`STANDINGS` and `PLAYER_INJURIES` use scd2, so they keep every version rather than overwriting.
+`STANDINGS`, `PLAYER_INJURIES`, `ODDS`, and `PLAYER_PROPS` use scd2, so they keep every version
+rather than overwriting.
 
 **Current rows are `WHERE _dlt_valid_to IS NULL`.** The other tables need no such filter, so it is
 easy to forget, and forgetting it silently returns every historical version instead of erroring.
@@ -268,8 +312,9 @@ vendor computes `week = 0` from its own complete data, so it does not match the 
 complete in every check so far. The derived and detailed ones (`plays`, advanced stats) have holes.
 Treat that as a property of the source, and check coverage after every backfill rather than assuming.
 
-**In every table, `COUNT(*)` should equal the distinct count of its key.** If it does not, a merge
-key is wrong and rows are accumulating on each run.
+**In non-SCD2 tables, `COUNT(*)` should equal the distinct count of the declared key.** SCD2 tables
+intentionally hold several versions; filter `_dlt_valid_to IS NULL` before checking current-row
+uniqueness.
 
 What ran, and with what parameters:
 
@@ -324,8 +369,8 @@ make run-local NAME=nfl_games RESOURCE=games_post PARAM="seasons[]=2019"
 
 ## When something fails
 
-**Re-run it.** Every resource merges on a key, so a partial load is repaired by repeating the
-command. There is no cleanup step and no risk of duplication.
+**Re-run it.** Keyed merges and SCD2 content hashes both make a partial load safe to repeat. There
+is no cleanup step.
 
 **Check `_DLT_RUNS` for the failure**, which is recorded with its resources and params even when the
 run never moved a row:

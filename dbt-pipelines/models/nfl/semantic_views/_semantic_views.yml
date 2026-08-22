@@ -15,3 +15,17 @@ models:
       carries no scores or results; those belong to sv_nfl_team_performance. Scheduled
       2026 games carry kickoff-time strings or TBD as their status; is_completed is the
       played-versus-upcoming flag.
+
+  - name: sv_nfl_game_odds
+    description: >
+      NFL game moneyline, spread and total markets at game x sportsbook vendor grain.
+      Keeps opening and strictly pre-kickoff closing timing explicit, derives American
+      odds probabilities and same-vendor line movement, and grades ATS/over-under only
+      for completed games. Contains no live or post-kickoff odds.
+
+  - name: sv_nfl_player_props
+    description: >
+      NFL player prop offers at game x player x sportsbook vendor x prop_type grain.
+      Exposes opening and strictly pre-kickoff closing lines and movement. Deliberately
+      does not claim over/under outcomes because prop types are not safely mapped to
+      heterogeneous box-score measures.

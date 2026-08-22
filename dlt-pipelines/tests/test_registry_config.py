@@ -334,6 +334,9 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_standings": 1,      # the resource itself
         "nfl_advanced_stats": 1, # once, in resource_defaults
         "nfl_plays": 3,          # the three parents that drive the fan-out
+        "nfl_game_odds": 2,      # regular/post games parents
+        "nfl_player_props": 2,   # regular/post games parents
+        "nfl_odds_opening": 2,   # regular/post games parents drive both endpoints
         # WNBA. Fewer tokens than the NFL for the same coverage, because /plays takes
         # no season_type and so needs one parent instead of three.
         "wnba_games": 1,             # once, in resource_defaults
@@ -386,6 +389,104 @@ def test_pipelines_with_no_season_have_no_token() -> None:
         "ncaaf_reference",
     ):
         assert "{current_season}" not in json.dumps(load_registry().get(name).config)
+
+
+# ---------------------------------------------------------------------------
+# NFL betting resources: history, fan-out, and pagination
+# ---------------------------------------------------------------------------
+
+
+def _resources(pipeline: str) -> dict[str, dict]:
+    resources = load_registry().get(pipeline).config["resources"]
+    return {resource["name"]: resource for resource in resources}
+
+
+def test_live_nfl_betting_resources_preserve_line_movement() -> None:
+    for pipeline, names, table in (
+        ("nfl_game_odds", ("odds_regular", "odds_post"), "odds"),
+        (
+            "nfl_player_props",
+            ("player_props_regular", "player_props_post"),
+            "player_props",
+        ),
+    ):
+        resources = _resources(pipeline)
+        for name in names:
+            resource = resources[name]
+            assert resource["table_name"] == table
+            assert resource["merge_key"] == "season_type"
+            assert resource["write_disposition"] == {
+                "disposition": "merge",
+                "strategy": "scd2",
+            }
+            # SCD2 hashes row content; a primary key would deduplicate versions in
+            # staging rather than being needed for identity.
+            assert "primary_key" not in resource
+
+
+def test_game_odds_fans_out_with_cursor_pagination() -> None:
+    resources = _resources("nfl_game_odds")
+    for season_type, suffix in ((2, "regular"), (3, "post")):
+        parent = resources[f"odds_games_{suffix}_ref"]
+        child = resources[f"odds_{suffix}"]
+
+        assert parent["selected"] is False
+        assert parent["endpoint"]["params"]["season_type"] == season_type
+        assert parent["endpoint"]["params"]["seasons[]"] == "{current_season}"
+        assert child["constants"]["season_type"] == season_type
+        assert child["endpoint"]["params"]["game_ids[]"] == (
+            f"{{resources.odds_games_{suffix}_ref.id}}"
+        )
+        assert child["endpoint"]["params"]["per_page"] == 100
+        assert child["endpoint"]["paginator"] == {
+            "type": "cursor",
+            "cursor_path": "meta.next_cursor",
+            "cursor_param": "cursor",
+        }
+
+
+def test_player_props_are_deliberately_unpaginated() -> None:
+    resources = _resources("nfl_player_props")
+    for suffix in ("regular", "post"):
+        endpoint = resources[f"player_props_{suffix}"]["endpoint"]
+        assert endpoint["path"] == "odds/player_props"
+        assert "paginator" not in endpoint
+        assert endpoint["params"]["game_id"] == (
+            f"{{resources.props_games_{suffix}_ref.id}}"
+        )
+
+
+def test_opening_markets_fan_out_and_merge_by_id() -> None:
+    resources = _resources("nfl_odds_opening")
+
+    for season_type, suffix in ((2, "regular"), (3, "post")):
+        parent = resources[f"opening_games_{suffix}_ref"]
+        odds = resources[f"odds_opening_{suffix}"]
+        props = resources[f"player_props_opening_{suffix}"]
+
+        assert parent["selected"] is False
+        assert parent["endpoint"]["params"]["season_type"] == season_type
+        assert parent["endpoint"]["params"]["seasons[]"] == "{current_season}"
+
+        assert odds["primary_key"] == "id"
+        assert odds["table_name"] == "odds_opening"
+        assert odds["write_disposition"] == "merge"
+        assert odds["constants"]["season_type"] == season_type
+        assert odds["endpoint"]["params"] == {
+            "per_page": 100,
+            "game_ids[]": f"{{resources.opening_games_{suffix}_ref.id}}",
+        }
+        assert odds["endpoint"]["paginator"] == {
+            "type": "cursor",
+            "cursor_path": "meta.next_cursor",
+            "cursor_param": "cursor",
+        }
+
+        assert props["primary_key"] == "id"
+        assert props["table_name"] == "player_props_opening"
+        assert props["write_disposition"] == "merge"
+        assert props["constants"]["season_type"] == season_type
+        assert "paginator" not in props["endpoint"]
 
 
 # ---------------------------------------------------------------------------
