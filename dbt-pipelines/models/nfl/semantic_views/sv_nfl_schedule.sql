@@ -100,7 +100,7 @@ dimensions (
     games.venue as venue
         with synonyms ('stadium name', 'where is the game')
         comment = 'Stadium name as the source spells it. Every row has one; aliases such as GEHA Field at Arrowhead Stadium and Arrowhead Stadium are the same bowl.',
-    stadiums.display_name as stadium_display_name
+    stadiums.stadium_display_name as display_name
         with synonyms ('stadium', 'bowl name')
         comment = 'Canonical stadium name after alias collapse.',
     stadiums.roof as roof
