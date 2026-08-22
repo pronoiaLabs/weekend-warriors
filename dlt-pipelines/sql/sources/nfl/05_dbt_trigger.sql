@@ -80,6 +80,10 @@ USE ROLE SYSADMIN;
 -- access through the role hierarchy. Semantic views are their own object
 -- class with their own bulk-transfer form (verified). Agents in ANALYTICS
 -- stay SYSADMIN-owned: dbt does not manage them.
+--
+-- NFL_PROD_DB.ML is deliberately not transferred. Registry objects and
+-- PRED_* tables are not dbt models; granting this role ownership would
+-- let CREATE OR REPLACE collide with log_model.
 GRANT OWNERSHIP ON ALL TABLES IN SCHEMA NFL_PROD_DB.PREP TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
 GRANT OWNERSHIP ON ALL VIEWS IN SCHEMA NFL_PROD_DB.PREP TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;
 GRANT OWNERSHIP ON SCHEMA NFL_PROD_DB.PREP TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS;

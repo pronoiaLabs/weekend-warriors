@@ -79,12 +79,17 @@ CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.RAW
 -- STAGING, deliberately -- dlt creates <dataset>_STAGING for every merge, so
 -- RAW_STAGING already exists and a dbt schema called STAGING would sit beside it
 -- meaning something entirely different.
+--
+-- ML is not a dbt layer. SYSADMIN keeps it (registry, experiments, pred tables).
+-- Stage + CREATE MODEL live in 06_ml.sql, which this same setup-source glob applies.
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.PREP
     COMMENT = 'dbt staging views over RAW.';
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.CORE
     COMMENT = 'dbt conformed dimensions and facts.';
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.FEATURES
     COMMENT = 'dbt ML feature marts. Not exposed to Cortex agents.';
+CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.ML
+    COMMENT = 'Model registry, experiments, and batch predictions. SYSADMIN-owned, not dbt, not Cortex.';
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.ANALYTICS
     COMMENT = 'dbt semantic views and evaluations. Not STAGING: dlt owns RAW_STAGING.';
 
