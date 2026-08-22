@@ -121,7 +121,13 @@ make setup-prod CONFIRM=1
 Creates `DLT_POOL`, `DLT_WH` and the `DLT_LOADER` service user. `NFL_PROD_DB` already exists from
 `make setup-source SOURCE=nfl CONFIRM=1`.
 
-**Seed the data.** Cloning from dev is instant, costs no storage and makes no API calls, and it
+**Seed the data.** Do **not** clone a person's `DEV_<user>` schema as the way to introduce a new
+RAW table. That was the original NFL bootstrap (recipe below, kept because it is how GAMES got
+here). New tables: empty landing DDL in `sql/sources/<vendor>/` (`make setup-source`), then
+`make run-prod NAME=<pipeline> CONFIRM=1`. A one-time `CREATE OR REPLACE TABLE … CLONE` is only
+for a backfill already sitting in a sandbox you do not want to fetch again.
+
+Cloning a **whole** schema from dev is instant, costs no storage and makes no API calls, and it
 carries dlt's `_dlt_*` state so the first Task continues rather than rebuilding:
 
 **Neither role can do this alone, and that is the isolation working.** `DLT_LOADER_ROLE` has no

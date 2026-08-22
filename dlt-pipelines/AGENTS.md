@@ -184,6 +184,14 @@ land in `NFL_PROD_DB.RAW`.
   case is `dlt_job_nosecret.tmpl.yaml`, selected by `generate_tasks.render_spec`
   when `spec.secret` is empty.
 
+A dbt `source()` on a new RAW table requires that table to exist **before**
+`deploy-sport`. `make run-snowflake` writes `DEV_<user>` and cannot satisfy it;
+cloning someone's sandbox is not the contract. Create an empty landing table in
+`sql/sources/<vendor>/` (`CREATE TABLE IF NOT EXISTS`, owned by `DLT_LOADER_ROLE`)
+and fill it with `make run-prod NAME=<pipeline> CONFIRM=1`. `setup-source` applies
+the DDL. `sql/**` is not in `deploy.yml`, so the object still has to exist before
+the dbt project object starts referencing it.
+
 ---
 
 ## Template constraints worth knowing before you edit

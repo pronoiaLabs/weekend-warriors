@@ -7,11 +7,12 @@
 --
 -- Applied by: make setup-source SOURCE=openmeteo CONFIRM=1
 --
--- There is no 01_databases.sql and no 03_secrets.sql. The source is named for
--- the VENDOR; pipelines are named for the CONTENT (nfl_weather_*) and land in
--- NFL_PROD_DB.RAW, which sources/nfl/01_databases.sql already creates. Open-Meteo
--- has no API key. The `make setup-source` banner will still print
--- "Creates OPENMETEO_DEV_DB"; it derives that from $(SOURCE) and is wrong here.
+-- There is no 01_databases.sql and no secrets file. 03_landing.sql creates the
+-- empty RAW table dbt sources. The source is named for the VENDOR; pipelines
+-- are named for the CONTENT (nfl_weather_*) and land in NFL_PROD_DB.RAW, which
+-- sources/nfl/01_databases.sql already creates. Open-Meteo has no API key. The
+-- `make setup-source` banner will still print "Creates OPENMETEO_DEV_DB"; it
+-- derives that from $(SOURCE) and is wrong here.
 --
 -- The port is REQUIRED in VALUE_LIST; a bare hostname is not enough.
 -- =============================================================================
