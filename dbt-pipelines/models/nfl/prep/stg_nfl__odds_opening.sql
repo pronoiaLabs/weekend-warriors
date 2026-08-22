@@ -25,21 +25,21 @@ select
         spread_home_value::string,
         raw_record:SPREAD_HOME_VALUE__V_DOUBLE::string
     ), 18, 4)                                                        as home_spread,
-    try_to_number(spread_home_odds)                                  as home_spread_odds,
+    spread_home_odds::number                                        as home_spread_odds,
     try_to_decimal(coalesce(
         spread_away_value::string,
         raw_record:SPREAD_AWAY_VALUE__V_DOUBLE::string
     ), 18, 4)                                                        as away_spread,
-    try_to_number(spread_away_odds)                                  as away_spread_odds,
-    try_to_number(moneyline_home_odds)                               as home_moneyline_odds,
-    try_to_number(moneyline_away_odds)                               as away_moneyline_odds,
+    spread_away_odds::number                                        as away_spread_odds,
+    moneyline_home_odds::number                                     as home_moneyline_odds,
+    moneyline_away_odds::number                                     as away_moneyline_odds,
     try_to_decimal(coalesce(
         total_value::string,
         raw_record:TOTAL_VALUE__V_DOUBLE::string
     ), 18, 4)                                                        as total_line,
-    try_to_number(total_over_odds)                                   as over_odds,
-    try_to_number(total_under_odds)                                  as under_odds,
-    try_to_number(raw_record:SEASON_TYPE::string)                    as season_type,
+    total_over_odds::number                                         as over_odds,
+    total_under_odds::number                                        as under_odds,
+    season_type::number                                             as season_type,
     try_to_timestamp_tz(opened_at::string)                           as opened_at,
     try_to_double(_dlt_load_id)                                      as dlt_load_id_numeric,
     to_timestamp_tz(try_to_double(_dlt_load_id))                     as loaded_at
