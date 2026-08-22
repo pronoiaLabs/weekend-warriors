@@ -9,7 +9,7 @@
     current season's unplayed schedule.
 
     Home and away sit side by side here, matching the source. The unpivot to
-    team x game grain happens downstream in fact_team_game, not here -- prep
+    team x game grain happens downstream in fact_team_game_offense, not here -- prep
     stays a faithful 1:1 view of the source shape.
 
     Unlike the pre-2026 shape of this source, not every row is a finished

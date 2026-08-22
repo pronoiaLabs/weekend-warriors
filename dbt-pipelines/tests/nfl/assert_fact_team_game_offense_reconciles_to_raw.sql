@@ -1,5 +1,5 @@
 /*
-    Reconcile fact_team_game back to the raw source.
+    Reconcile fact_team_game_offense back to the raw source.
 
     Every COMPLETED game's home and away score in NFL_PROD_DB.RAW.GAMES must
     appear on the matching team's row in the fact. This is the end-to-end check
@@ -35,7 +35,7 @@ fact as (
 
     select game_id, team_id, points_scored, points_allowed,
            win_count + loss_count + tie_count as result_flag_total
-    from {{ ref('fact_team_game') }}
+    from {{ ref('fact_team_game_offense') }}
 
 )
 

@@ -8,7 +8,7 @@
     stg_nfl__team_stats -- team box score, one row per team per game.
 
     2,000 rows against an expected 2,004: two games have no team_stats row.
-    fact_team_game left-joins this, so those four team-game rows carry a null
+    fact_team_game_offense left-joins this, so those four team-game rows carry a null
     box score rather than disappearing.
 
     dlt flattened the full game record and both teams into every row (73
@@ -37,7 +37,7 @@ renamed as (
         {{ dbt_utils.generate_surrogate_key(['team__id']) }}             as team_key,
         team__id                                                        as team_id,
 
-        -- home_away comes off team_stats itself; fact_team_game derives its own
+        -- home_away comes off team_stats itself; fact_team_game_offense derives its own
         -- is_home from games instead, since that covers all 2,004 rows
         home_away,
 

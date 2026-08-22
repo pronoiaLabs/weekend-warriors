@@ -1,10 +1,10 @@
 /*
     Cross-check the two independent paths to a team's season record.
 
-    fact_team_season carries the league's official standings. fact_team_game
+    fact_team_season carries the league's official standings. fact_team_game_offense
     carries every individual game. Aggregating the latter must reproduce the
     former -- but only after filtering to season_type = 2, because
-    fact_team_game also holds preseason and postseason games while standings
+    fact_team_game_offense also holds preseason and postseason games while standings
     are regular season only.
 
     This is the highest-value test in the project: it exercises the unpivot,
@@ -58,7 +58,7 @@
         the balance check.
 
     Standings seasons are restricted to seasons with at least one completed
-    REGULAR-SEASON game in fact_team_game, via a semi-join rather than a
+    REGULAR-SEASON game in fact_team_game_offense, via a semi-join rather than a
     literal year list. The scoping and the tolerance solve different windows
     and both are needed: the scope keeps a new season's 32 x 0-0 standings
     snapshot out until regular-season play begins (the preseason-only
@@ -70,7 +70,7 @@
 with seasons_with_regular_season_games as (
 
     select distinct season
-    from {{ ref('fact_team_game') }}
+    from {{ ref('fact_team_game_offense') }}
     where season_type = 2
 
 ),
@@ -91,7 +91,7 @@ from_games as (
         sum(case when not is_home then win_count  end)  as road_wins,
         sum(case when not is_home then loss_count end)  as road_losses,
         sum(case when not is_home then tie_count  end)  as road_ties
-    from {{ ref('fact_team_game') }}
+    from {{ ref('fact_team_game_offense') }}
     where season_type = 2          -- regular season only, to match standings
     group by team_id, season
 

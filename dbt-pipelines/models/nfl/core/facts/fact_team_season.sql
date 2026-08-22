@@ -14,10 +14,10 @@
     seasons. Summing wins here across seasons works; summing playoff_seed does
     not.
 
-    Note the overlap with fact_team_game -- a team's record could be derived by
+    Note the overlap with fact_team_game_offense -- a team's record could be derived by
     aggregating win_count there. Both are kept because they answer different
     questions and can legitimately disagree: standings are the league's official
-    record, while fact_team_game covers all season types and would need filtering
+    record, while fact_team_game_offense covers all season types and would need filtering
     to season_type = 2 to match. tests/assert_standings_reconcile_to_team_games.sql
     checks that they agree once that filter is applied.
 */

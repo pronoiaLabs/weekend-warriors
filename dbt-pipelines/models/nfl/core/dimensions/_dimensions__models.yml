@@ -73,8 +73,8 @@ models:
   - name: dim_game
     description: >
       Descriptive context per game. Grain: game. The only place the full
-      slate including unplayed games is readable; fact_team_game holds
-      completed games only. Scores are measures and live on fact_team_game,
+      slate including unplayed games is readable; fact_team_game_offense holds
+      completed games only. Scores are measures and live on fact_team_game_offense,
       not here.
     columns:
       - name: game_key

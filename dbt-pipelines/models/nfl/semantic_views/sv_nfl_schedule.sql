@@ -11,7 +11,7 @@
     structurally unanswerable anywhere else.
 
     SCORES ARE DELIBERATELY EXCLUDED. dim_game carries none by design (they
-    are measures and live on fact_team_game), and this view keeps it that
+    are measures and live on fact_team_game_offense), and this view keeps it that
     way: results belong to sv_nfl_team_performance. game_summary is also
     excluded — live recaps include scores. This view answers "what is on
     the schedule and what has been played", never "who won".
