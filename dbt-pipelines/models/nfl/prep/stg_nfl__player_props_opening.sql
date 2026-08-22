@@ -34,5 +34,5 @@ select
     season_type::number                                             as season_type,
     try_to_timestamp_tz(opened_at::string)                           as opened_at,
     try_to_double(_dlt_load_id)                                      as dlt_load_id_numeric,
-    to_timestamp_tz(try_to_double(_dlt_load_id))                     as loaded_at
+    to_timestamp_tz(try_to_double(_dlt_load_id)::number)             as loaded_at
 from source
