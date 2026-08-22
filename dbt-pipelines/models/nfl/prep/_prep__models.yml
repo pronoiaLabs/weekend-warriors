@@ -280,3 +280,35 @@ models:
       - name: catch_percentage
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
+
+  # ---------------------------------------------------------------------------
+  # News (Firecrawl source, hourly)
+  # ---------------------------------------------------------------------------
+  - name: stg_nfl__news_articles
+    description: "Scraped news articles with feed provenance and raw extraction. Grain: article URL."
+    columns:
+      - name: article_key
+        tests: [unique, not_null]
+      - name: url
+        tests: [unique, not_null]
+      - name: feed
+        tests: [not_null]
+      - name: published_at_effective
+        description: "Outlet timestamp, else feed timestamp, else fetch time. Never NULL."
+        tests: [not_null]
+
+  - name: stg_nfl__news_player_mentions
+    description: "Extracted player mentions, name as written plus its normalized form. Grain: url x player name."
+    columns:
+      - name: mention_key
+        tests: [unique, not_null]
+      - name: article_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('stg_nfl__news_articles')", field: article_key}
+      - name: player_name_text
+        tests: [not_null]
+      - name: player_name_normalized
+        description: "NULL only when the extracted name had no letters or digits at all."
+        tests:
+          - not_null: {config: {severity: warn}}

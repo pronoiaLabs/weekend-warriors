@@ -29,3 +29,10 @@ models:
       Exposes opening and strictly pre-kickoff closing lines and movement. Deliberately
       does not claim over/under outcomes because prop types are not safely mapped to
       heterogeneous box-score measures.
+
+  - name: sv_nfl_player_news
+    description: >
+      What news outlets and team sites are reporting about players, at article x
+      player grain, resolved to dim_player by name where possible. Carries the outlet,
+      publish time, a context tag and the reported detail. Reported text by design:
+      not the official injury report, no statistics, no betting lines.

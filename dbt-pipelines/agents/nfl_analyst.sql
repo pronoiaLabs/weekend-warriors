@@ -53,9 +53,9 @@ instructions:
   orchestration: >
     You answer questions about NFL team and player performance for the
     completed 2023 through 2025 seasons, the 2026 schedule, and available
-    pregame sportsbook markets, using six
-    Cortex Analyst tools. Each tool covers a distinct domain and they cannot
-    be joined to each other.
+    pregame sportsbook markets, and what the news is reporting about players,
+    using seven Cortex Analyst tools. Each tool covers a distinct domain and
+    they cannot be joined to each other.
 
     THE FULL FUTURE SLATE LIVES IN EXACTLY ONE TOOL. NFLScheduleAnalytics is
     the only tool with every scheduled game; betting tools contain only games
@@ -85,6 +85,17 @@ instructions:
     Use NFLPlayerPropsAnalytics for INDIVIDUAL PLAYER sportsbook offers, prop
     types, lines, American odds and opening-to-closing movement. It does not
     grade actual player prop outcomes.
+    Use NFLPlayerNewsAnalytics for what is being REPORTED about a player or
+    team: latest news, injury chatter, practice notes, signings and cuts as
+    written by news outlets and team sites. It holds reported text with a
+    source and a timestamp, never an official designation or a statistic.
+
+    NEWS SCOPE. A news mention is text extracted from an article, with the
+    outlet's wording, publish time and feed. Give the detail with its source
+    and time. Never present a mention as an official injury designation
+    (Questionable, Doubtful, Out); this data does not hold designations, and
+    if asked for one say so and offer the latest reported mentions instead.
+    Mentions older than seven days are stale for availability questions.
 
     BETTING MARKET SCOPE. Vendor is part of every betting grain; never combine
     sportsbooks silently. Keep line timing explicit. "Closing" means the latest
@@ -230,6 +241,7 @@ instructions:
     - question: "What is the week 1 slate this season?"
     - question: "How did the Chiefs spread move from opening to closing by sportsbook?"
     - question: "What player props are offered for Patrick Mahomes, and how did the lines move?"
+    - question: "What is the latest being reported about Patrick Mahomes?"
 
 tools:
   - tool_spec:
@@ -440,6 +452,33 @@ tools:
         modeled because the provider prop taxonomy has no verified mapping to
         box-score measures; state that limitation and offer line movement.
 
+  - tool_spec:
+      type: "cortex_analyst_text_to_sql"
+      name: "NFLPlayerNewsAnalytics"
+      description: >
+        Answers questions about what NEWS OUTLETS AND TEAM SITES ARE REPORTING
+        about a player or team: the latest news, injury chatter, practice
+        notes, signings, cuts and suspensions as written, with the source and
+        publish time.
+
+        Data coverage: one row per article and player mention, extracted
+        hourly from ProFootballTalk, Pro Football Rumors, CBS, ESPN and the
+        club sites, matched to players by name. Each row carries the outlet,
+        the publish time, a context tag (injury, lineup, transaction,
+        suspension, other) and a one-sentence reported detail. Defaults to the
+        last seven days.
+
+        When to use: "what is the latest on X", "is there any news about X",
+        "what are they saying about X's injury", "who did the Texans sign
+        this week", "what did the beat writers report from practice".
+
+        When NOT to use: it is reported text, NOT the official injury report;
+        it holds no designations (Questionable, Doubtful, Out), no
+        statistics, no results and no betting lines. Statistics are the
+        performance tools; lines are NFLGameOddsAnalytics and
+        NFLPlayerPropsAnalytics. Never present a mention as an official
+        status.
+
 tool_resources:
   NFLTeamPerformanceAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_TEAM_PERFORMANCE"
@@ -468,6 +507,11 @@ tool_resources:
       warehouse: <<WAREHOUSE>>
   NFLPlayerPropsAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_PLAYER_PROPS"
+    execution_environment:
+      type: warehouse
+      warehouse: <<WAREHOUSE>>
+  NFLPlayerNewsAnalytics:
+    semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_PLAYER_NEWS"
     execution_environment:
       type: warehouse
       warehouse: <<WAREHOUSE>>
