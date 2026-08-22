@@ -59,7 +59,7 @@ import yaml
 # ---------------------------------------------------------------------------
 
 # Sources the runner knows how to build. Extend build_source() in run.py to add more.
-SUPPORTED_SOURCES: tuple[str, ...] = ("rest_api", "sample")
+SUPPORTED_SOURCES: tuple[str, ...] = ("rest_api", "sample", "firecrawl")
 
 # Dispositions dlt accepts as a plain string. `skip` is deliberately absent: a
 # pipeline that loads nothing should not be in the registry.

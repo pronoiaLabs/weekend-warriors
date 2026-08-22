@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "dlt-snowflake-template"
 version = "0.1.0"
 requires-python = ">=3.11"
-# REST-API-only. dlt does not require sqlalchemy, connectorx, or pyarrow, and the
+# REST API plus the Firecrawl SDK (pipelines/batch/firecrawl_source.py). dlt does
+# not require sqlalchemy, connectorx, or pyarrow, and the
 # Snowflake destination defaults to jsonl (duckdb to insert_values), so Arrow is
 # not on the load path. pyarrow becomes required again only if you set
 # loader_file_format="parquet", use filesystem staging, or call
@@ -27,6 +28,8 @@ dependencies = [
     "snowflake-connector-python>=3.7",   # imported directly by pipelines/common/snowflake_session.py
     "pyyaml>=6",                         # imported directly by pipelines/batch/models.py
     "snowflake-telemetry-python>=0.6",   # optional import in pipelines/common/observability.py
+    "firecrawl-py>=4.38",                # imported inside pipelines/batch/firecrawl_source.py
+    "feedparser>=6",                     # imported inside pipelines/batch/firecrawl_source.py
 ]
 
 [project.optional-dependencies]

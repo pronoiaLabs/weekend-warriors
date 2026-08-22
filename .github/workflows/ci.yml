@@ -68,6 +68,7 @@ jobs:
           SOURCES__NFL__API_KEY: ci-dummy-not-a-real-key
           SOURCES__WNBA__API_KEY: ci-dummy-not-a-real-key
           SOURCES__NCAAF__API_KEY: ci-dummy-not-a-real-key
+          SOURCES__FIRECRAWL__API_KEY: ci-dummy-not-a-real-key
         run: pytest -q
 
       # Render the Task DDL and the resume statements. generate_tasks raises on any

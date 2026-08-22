@@ -364,7 +364,7 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
     # pipeline that needs a season and forgetting to list it here passes silently,
     # which is the exact failure the dict is meant to catch.
     checked = set(expected) | {
-        "nfl_reference", "nfl_injuries",
+        "nfl_reference", "nfl_injuries", "nfl_news",
         "wnba_reference", "wnba_injuries", "wnba_standings",
         "ncaaf_reference",
         "sample",
@@ -383,8 +383,10 @@ def test_pipelines_with_no_season_have_no_token() -> None:
     # this endpoint takes no season at all and returns every season it holds (2008 to
     # 2026) in one unpaginated request, so a token would throw away 18 seasons that
     # came free.
+    #
+    # nfl_news is dated by its search window (tbs), not by season.
     for name in (
-        "nfl_reference", "nfl_injuries",
+        "nfl_reference", "nfl_injuries", "nfl_news",
         "wnba_reference", "wnba_injuries", "wnba_standings",
         "ncaaf_reference",
     ):
