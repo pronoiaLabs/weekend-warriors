@@ -51,6 +51,35 @@
 
 
 {#
+    nfl_two_point_success -- did the OFFENSE convert a two-point attempt?
+
+    A boolean expression over a play description, shared by
+    fact_two_point_conversion and tests/nfl/assert_two_point_plays_are_all_parsed
+    so the fact and its guard cannot drift apart.
+
+    Reads only the offensive attempt. A play can also carry a DEFENSIVE
+    TWO-POINT ATTEMPT (the defense returns a failed try or a blocked kick) that
+    ends "ATTEMPT SUCCEEDS" and credits nobody on offense; a whole-text search
+    for SUCCEEDS counted those. Measured: 2 of 225 "successes" were defensive.
+
+      GSIS: the outcome clause that follows "TWO-POINT CONVERSION ATTEMPT."
+      ESPN: "(... for Two-Point Conversion)"; failures read "Conversion Failed)"
+#}
+
+{% macro nfl_two_point_success(column_name) %}
+
+    (
+        regexp_substr(
+            split_part({{ column_name }}, 'TWO-POINT CONVERSION ATTEMPT.', 2),
+            'ATTEMPT (SUCCEEDS|FAILS)', 1, 1, 'e', 1
+        ) = 'SUCCEEDS'
+        or {{ column_name }} like '%for Two-Point Conversion)%'
+    )
+
+{% endmacro %}
+
+
+{#
     nfl_normalize_player_name -- fold a player name into a comparable key.
 
     News writes "D.J. Wonnum" and "Kenneth Walker"; the roster has "DJ Wonnum" and
