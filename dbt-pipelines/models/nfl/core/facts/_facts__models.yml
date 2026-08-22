@@ -2,6 +2,107 @@ version: 2
 
 models:
 
+  - name: fact_game_betting_odds_opening
+    description: "Opening game lines. Grain: game x vendor; one deterministic opening endpoint row."
+    columns:
+      - name: game_vendor_odds_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: home_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: away_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: vendor
+        tests: [not_null]
+      - name: line_timing
+        tests:
+          - accepted_values: {values: ['opening']}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, vendor]
+
+  - name: fact_game_betting_odds_closing
+    description: "Latest line observed strictly before kickoff. Grain: game x vendor."
+    columns:
+      - name: game_vendor_odds_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: home_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: away_team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: vendor
+        tests: [not_null]
+      - name: line_timing
+        tests:
+          - accepted_values: {values: ['closing']}
+      - name: selected_snapshot_at
+        tests: [not_null]
+      - name: home_moneyline_devig_probability
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, vendor]
+
+  - name: fact_player_prop_opening
+    description: "Opening player props. Grain: game x player x vendor x prop_type."
+    columns:
+      - name: game_player_vendor_prop_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: vendor
+        tests: [not_null]
+      - name: prop_type
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, player_id, vendor, prop_type]
+
+  - name: fact_player_prop_closing
+    description: "Latest player prop observed strictly before kickoff. Grain: game x player x vendor x prop_type."
+    columns:
+      - name: game_player_vendor_prop_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: vendor
+        tests: [not_null]
+      - name: prop_type
+        tests: [not_null]
+      - name: selected_snapshot_at
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, player_id, vendor, prop_type]
+
   - name: fact_team_game
     description: >
       One row per team per game. Grain: team x game. 2,004 rows.

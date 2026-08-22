@@ -171,6 +171,77 @@ models:
       - name: player_key
         tests: [not_null]
 
+  - name: stg_nfl__odds
+    description: "Game betting line history. Grain: API odds id x SCD2 version."
+    columns:
+      - name: game_odds_snapshot_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: vendor
+        tests: [not_null]
+      - name: snapshot_observed_at
+        description: "Later of provider updated_at and dlt valid_from; the leakage-safe closing timestamp."
+        tests: [not_null]
+      - name: dlt_load_id_numeric
+        tests: [not_null]
+
+  - name: stg_nfl__odds_opening
+    description: "Immutable game opening lines. Grain: one API opening row."
+    columns:
+      - name: game_odds_opening_key
+        tests: [unique, not_null]
+      - name: source_odds_id
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: vendor
+        tests: [not_null]
+
+  - name: stg_nfl__player_props
+    description: "Player prop history. Grain: API prop id x SCD2 version."
+    columns:
+      - name: player_prop_snapshot_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: vendor
+        tests: [not_null]
+      - name: prop_type
+        tests: [not_null]
+      - name: snapshot_observed_at
+        tests: [not_null]
+
+  - name: stg_nfl__player_props_opening
+    description: "Immutable player prop openings. Grain: one API opening row."
+    columns:
+      - name: player_prop_opening_key
+        tests: [unique, not_null]
+      - name: source_prop_id
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: vendor
+        tests: [not_null]
+      - name: prop_type
+        tests: [not_null]
+
   # ---------------------------------------------------------------------------
   # Next Gen Stats -- player x season-week grain, no game_id
   # ---------------------------------------------------------------------------

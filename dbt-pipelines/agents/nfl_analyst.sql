@@ -52,13 +52,14 @@ orchestration:
 instructions:
   orchestration: >
     You answer questions about NFL team and player performance for the
-    completed 2023 through 2025 seasons, plus the 2026 schedule, using four
+    completed 2023 through 2025 seasons, the 2026 schedule, and available
+    pregame sportsbook markets, using six
     Cortex Analyst tools. Each tool covers a distinct domain and they cannot
     be joined to each other.
 
-    FUTURE GAMES LIVE IN EXACTLY ONE TOOL. NFLScheduleAnalytics is the only
-    tool that knows a game exists before it is played: the other three cover
-    completed games only. Route every question about the upcoming slate, a
+    THE FULL FUTURE SLATE LIVES IN EXACTLY ONE TOOL. NFLScheduleAnalytics is
+    the only tool with every scheduled game; betting tools contain only games
+    where a vendor offered a market. Route every question about the upcoming slate, a
     team's next game, a week's matchups, games remaining, or what is on the
     calendar to NFLScheduleAnalytics. The reverse rule matters just as much:
     the schedule tool holds NO scores, results or statistics, so never answer
@@ -78,6 +79,18 @@ instructions:
     Use NFLPlayerDefenseAnalytics when the subject is an individual and the
     statistic is defensive: tackles, sacks recorded, quarterback hits, passes
     defended, interceptions caught, fumble recoveries and defensive scores.
+    Use NFLGameOddsAnalytics for TEAM or MATCHUP betting questions: moneylines,
+    spreads, game totals, implied probabilities, opening-to-closing movement,
+    ATS covers and over/under results.
+    Use NFLPlayerPropsAnalytics for INDIVIDUAL PLAYER sportsbook offers, prop
+    types, lines, American odds and opening-to-closing movement. It does not
+    grade actual player prop outcomes.
+
+    BETTING MARKET SCOPE. Vendor is part of every betting grain; never combine
+    sportsbooks silently. Keep line timing explicit. "Closing" means the latest
+    snapshot observed strictly before kickoff, never live or post-kickoff.
+    Player prop outcomes are unavailable because the provider taxonomy is not
+    safely mapped to box-score measures; offer the line and movement instead.
 
     RESOLVE DIRECTION BEFORE ROUTING. Two statistics exist on both sides and the
     wrong choice silently returns a different number.
@@ -101,8 +114,8 @@ instructions:
     probability; Next Gen tracking metrics such as completion percentage above
     expectation, time to throw, separation or yards over expected; snap counts,
     pressure rates, coverage grades and missed tackles; any season before
-    2023; 2026 statistics or results, since the 2026 season exists only as a
-    schedule until games are played; and any league other than the NFL.
+    2023; live or in-game odds; graded player-prop outcomes; 2026 statistics or
+    results until games are played; and any league other than the NFL.
 
     EMPTY OR PARTIAL RESULTS. If a tool returns no rows, do not report zero.
     State that no matching records were found and give the most likely reason:
@@ -215,6 +228,8 @@ instructions:
     - question: "How did Kansas City perform at home versus on the road last season?"
     - question: "How has Detroit's third down and red zone efficiency changed from 2023 to 2025?"
     - question: "What is the week 1 slate this season?"
+    - question: "How did the Chiefs spread move from opening to closing by sportsbook?"
+    - question: "What player props are offered for Patrick Mahomes, and how did the lines move?"
 
 tools:
   - tool_spec:
@@ -382,6 +397,49 @@ tools:
         the home and away sides. Week numbers restart each season phase, so
         pair a week with Regular Season unless told otherwise.
 
+  - tool_spec:
+      type: "cortex_analyst_text_to_sql"
+      name: "NFLGameOddsAnalytics"
+      description: >
+        Answers NFL TEAM and MATCHUP betting-market questions: sportsbook
+        moneylines, spreads, game totals, implied probabilities, implied team
+        totals, opening-to-closing movement, ATS covers and over/under results.
+
+        Data coverage: one row per game per sportsbook vendor for opening and
+        closing markets. Closing is the latest snapshot observed STRICTLY before
+        kickoff; live and post-kickoff odds are excluded. Completed games carry
+        safe spread and total grading. Vendor and line timing are explicit.
+
+        When to use: team or matchup questions containing odds, betting line,
+        moneyline, spread, total, favorite, implied probability, line movement,
+        ATS, cover, over or under.
+
+        When NOT to use: individual-player lines belong to
+        NFLPlayerPropsAnalytics. The complete future slate belongs to
+        NFLScheduleAnalytics because not every scheduled game has a market.
+        Do not use for live betting or present historical odds as guaranteed
+        predictions.
+
+  - tool_spec:
+      type: "cortex_analyst_text_to_sql"
+      name: "NFLPlayerPropsAnalytics"
+      description: >
+        Answers questions about INDIVIDUAL PLAYER sportsbook offers: available
+        prop types, opening and strictly pre-kickoff closing lines, American
+        odds, vendors and line movement.
+
+        Data coverage: one row per game, player, sportsbook vendor and prop
+        type. Multiple API ids are resolved deterministically. Vendor and line
+        timing are part of the grain. No live or post-kickoff snapshots exist.
+
+        When to use: questions asking what line was offered for a player, which
+        books offered a prop, or how a player's line moved before kickoff.
+
+        When NOT to use: team spreads, moneylines and game totals belong to
+        NFLGameOddsAnalytics. Actual player prop over/under outcomes are NOT
+        modeled because the provider prop taxonomy has no verified mapping to
+        box-score measures; state that limitation and offer line movement.
+
 tool_resources:
   NFLTeamPerformanceAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_TEAM_PERFORMANCE"
@@ -400,6 +458,16 @@ tool_resources:
       warehouse: <<WAREHOUSE>>
   NFLScheduleAnalytics:
     semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_SCHEDULE"
+    execution_environment:
+      type: warehouse
+      warehouse: <<WAREHOUSE>>
+  NFLGameOddsAnalytics:
+    semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_GAME_ODDS"
+    execution_environment:
+      type: warehouse
+      warehouse: <<WAREHOUSE>>
+  NFLPlayerPropsAnalytics:
+    semantic_view: "<<DATABASE>>.<<SCHEMA>>.SV_NFL_PLAYER_PROPS"
     execution_environment:
       type: warehouse
       warehouse: <<WAREHOUSE>>

@@ -544,6 +544,237 @@ pipelines:
             params:
               per_page: 100
 
+  # --- Betting markets -----------------------------------------------------
+  # Live lines are snapshots whose movement is the fact, so both pipelines use scd2.
+  # No primary_key is declared: scd2 versions rows by content hash. `season_type` is
+  # the merge partition, preventing a regular-season extract from retiring postseason
+  # rows (and vice versa). Current rows have `_dlt_valid_to IS NULL`.
+  #
+  # Both live endpoints fan out from the current-season game slate. The parents are
+  # selected:false and never load; only regular season and postseason are requested.
+  - name: nfl_game_odds
+    source: rest_api
+    # Every two hours Thu-Mon. Minute 0 gives this pipeline the first API-key slot.
+    schedule: "0 */2 * * 0,1,4,5,6"
+    config:
+      client: *nfl_client
+      resource_defaults:
+        endpoint:
+          data_selector: data
+      resources:
+        - name: odds_games_regular_ref
+          selected: false
+          endpoint:
+            path: games
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+              season_type: 2
+        - name: odds_games_post_ref
+          selected: false
+          endpoint:
+            path: games
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+              season_type: 3
+
+        - name: odds_regular
+          table_name: odds
+          merge_key: season_type
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          constants:
+            season_type: 2
+          endpoint:
+            path: odds
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              game_ids[]: "{resources.odds_games_regular_ref.id}"
+        - name: odds_post
+          table_name: odds
+          merge_key: season_type
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          constants:
+            season_type: 3
+          endpoint:
+            path: odds
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              game_ids[]: "{resources.odds_games_post_ref.id}"
+
+  - name: nfl_player_props
+    source: rest_api
+    # Same window as game odds, staggered to avoid concurrent use of the NFL key.
+    schedule: "10 */2 * * 0,1,4,5,6"
+    config:
+      client: *nfl_client
+      resource_defaults:
+        endpoint:
+          data_selector: data
+      resources:
+        - name: props_games_regular_ref
+          selected: false
+          endpoint:
+            path: games
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+              season_type: 2
+        - name: props_games_post_ref
+          selected: false
+          endpoint:
+            path: games
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+              season_type: 3
+
+        # The API returns the complete response in one page; inheriting the client's
+        # single_page paginator is intentional.
+        - name: player_props_regular
+          table_name: player_props
+          merge_key: season_type
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          constants:
+            season_type: 2
+          endpoint:
+            path: odds/player_props
+            params:
+              game_id: "{resources.props_games_regular_ref.id}"
+        - name: player_props_post
+          table_name: player_props
+          merge_key: season_type
+          write_disposition:
+            disposition: merge
+            strategy: scd2
+          constants:
+            season_type: 3
+          endpoint:
+            path: odds/player_props
+            params:
+              game_id: "{resources.props_games_post_ref.id}"
+
+  # Opening lines are immutable historical records, so a normal merge on `id` is
+  # correct. Both opening endpoints require game ids for a season-wide load and reuse
+  # the regular/postseason parent fan-out. /odds/opening rejects `season` alone; its
+  # game-id parameter is specifically the bracketed `game_ids[]`.
+  - name: nfl_odds_opening
+    source: rest_api
+    # Daily after nfl_games and the 09:00 model-input cluster.
+    schedule: "30 9 * * *"
+    config:
+      client: *nfl_client
+      resource_defaults:
+        endpoint:
+          data_selector: data
+      resources:
+        - name: opening_games_regular_ref
+          selected: false
+          endpoint:
+            path: games
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+              season_type: 2
+        - name: opening_games_post_ref
+          selected: false
+          endpoint:
+            path: games
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              seasons[]: "{current_season}"
+              season_type: 3
+
+        - name: odds_opening_regular
+          primary_key: id
+          table_name: odds_opening
+          write_disposition: merge
+          constants:
+            season_type: 2
+          endpoint:
+            path: odds/opening
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              game_ids[]: "{resources.opening_games_regular_ref.id}"
+        - name: odds_opening_post
+          primary_key: id
+          table_name: odds_opening
+          write_disposition: merge
+          constants:
+            season_type: 3
+          endpoint:
+            path: odds/opening
+            paginator:
+              type: cursor
+              cursor_path: meta.next_cursor
+              cursor_param: cursor
+            params:
+              per_page: 100
+              game_ids[]: "{resources.opening_games_post_ref.id}"
+
+        - name: player_props_opening_regular
+          primary_key: id
+          table_name: player_props_opening
+          write_disposition: merge
+          constants:
+            season_type: 2
+          endpoint:
+            path: odds/player_props/opening
+            params:
+              game_id: "{resources.opening_games_regular_ref.id}"
+        - name: player_props_opening_post
+          primary_key: id
+          table_name: player_props_opening
+          write_disposition: merge
+          constants:
+            season_type: 3
+          endpoint:
+            path: odds/player_props/opening
+            params:
+              game_id: "{resources.opening_games_post_ref.id}"
+
   # --- Advanced statistics -------------------------------------------------
   # Next-Gen-style tracking metrics: air yards, time to throw, separation, yards over
   # expected. Three distinct endpoints feeding three tables, roughly 2,000 rows for a

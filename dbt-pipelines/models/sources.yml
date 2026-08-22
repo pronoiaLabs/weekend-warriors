@@ -181,6 +181,89 @@ sources:
               - relationships: {to: "source('nfl_raw', 'players')", field: id}
 
       # ---------------------------------------------------------------------
+      # Betting markets. The live endpoints are dlt SCD2 snapshots; opening
+      # endpoints are merge tables with one immutable API row per offer.
+      # ---------------------------------------------------------------------
+      - name: odds
+        description: >
+          Sportsbook game lines, dlt SCD2. Raw id repeats once per historical
+          version, so uniqueness is id plus _dlt_valid_from, never id alone.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [id, _dlt_valid_from]
+        columns:
+          - name: id
+            tests: [not_null]
+          - name: game_id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'games')", field: id}
+          - name: vendor
+            tests: [not_null]
+          - name: _dlt_valid_from
+            tests: [not_null]
+
+      - name: odds_opening
+        description: >
+          Immutable opening sportsbook lines. The API id is the endpoint row
+          identifier and is unique under the merge contract.
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: game_id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'games')", field: id}
+          - name: vendor
+            tests: [not_null]
+
+      - name: player_props
+        description: >
+          Sportsbook player prop snapshots, dlt SCD2. Logical market grain is
+          game x player x vendor x prop_type; API ids may differ within it.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [id, _dlt_valid_from]
+        columns:
+          - name: id
+            tests: [not_null]
+          - name: game_id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'games')", field: id}
+          - name: player_id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'players')", field: id}
+          - name: vendor
+            tests: [not_null]
+          - name: prop_type
+            tests: [not_null]
+          - name: _dlt_valid_from
+            tests: [not_null]
+
+      - name: player_props_opening
+        description: >
+          Immutable opening player prop offers. API id is unique under the
+          merge contract; CORE resolves any duplicate logical markets
+          deterministically.
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: game_id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'games')", field: id}
+          - name: player_id
+            tests:
+              - not_null
+              - relationships: {to: "source('nfl_raw', 'players')", field: id}
+          - name: vendor
+            tests: [not_null]
+          - name: prop_type
+            tests: [not_null]
+
+      # ---------------------------------------------------------------------
       # Next Gen Stats -- player x season x week grain, NO game_id.
       # These conform to dim_player and dim_season_week but NOT to dim_game.
       # ---------------------------------------------------------------------
