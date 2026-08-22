@@ -18,3 +18,28 @@ seeds:
         tests:
           - not_null
           - relationships: {to: "source('nfl_raw', 'players')", field: id}
+
+  - name: seed_nfl_stadiums
+    description: >
+      One row per exact RAW.GAMES.venue string. stadium_id collapses feed
+      renames onto one physical bowl; Highmark old vs new stay two ids.
+    columns:
+      - name: venue_name
+        description: "Exact match to RAW.GAMES.venue."
+        tests: [unique, not_null]
+      - name: stadium_id
+        tests: [not_null]
+      - name: display_name
+        tests: [not_null]
+      - name: lat
+        tests: [not_null]
+      - name: lon
+        tests: [not_null]
+      - name: roof
+        tests:
+          - not_null
+          - accepted_values: {values: ['open', 'retractable', 'fixed']}
+      - name: is_weather_relevant
+        tests: [not_null]
+      - name: is_international
+        tests: [not_null]

@@ -312,3 +312,21 @@ models:
         description: "NULL only when the extracted name had no letters or digits at all."
         tests:
           - not_null: {config: {severity: warn}}
+
+  # ---------------------------------------------------------------------------
+  # Weather (Open-Meteo source)
+  # ---------------------------------------------------------------------------
+  - name: stg_nfl__weather_hourly
+    description: "Open-Meteo hourly weather. Grain: stadium x hour x product. hour_at is UTC."
+    columns:
+      - name: stadium_id
+        tests: [not_null]
+      - name: hour_at
+        tests: [not_null]
+      - name: product
+        tests:
+          - not_null
+          - accepted_values: {values: ['archive', 'forecast', 'hist_forecast']}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [stadium_id, hour_at, product]

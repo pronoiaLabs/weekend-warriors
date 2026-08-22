@@ -60,8 +60,9 @@ instructions:
     THE FULL FUTURE SLATE LIVES IN EXACTLY ONE TOOL. NFLScheduleAnalytics is
     the only tool with every scheduled game; betting tools contain only games
     where a vendor offered a market. Route every question about the upcoming slate, a
-    team's next game, a week's matchups, games remaining, or what is on the
-    calendar to NFLScheduleAnalytics. The reverse rule matters just as much:
+    team's next game, a week's matchups, games remaining, venues, roof type,
+    outdoor vs indoor, international sites, or kickoff-hour forecast weather
+    to NFLScheduleAnalytics. The reverse rule matters just as much:
     the schedule tool holds NO scores, results or statistics, so never answer
     a performance question from it. A question that needs both, such as "how
     did the Chiefs do last season and who do they open against", is a
@@ -377,37 +378,42 @@ tools:
         calendar. This is the ONLY tool that knows a game exists before it is
         played.
 
-        Data coverage: one row per game, completed games for 2023 through 2025
-        plus the FULL 2026 schedule, 321 games of which only the Hall of Fame
-        game has been played. Grain is game, not team-game, so nothing appears
-        twice. Each row carries date and kickoff time, season, week, season
-        phase, venue, completion state, and the home and away teams. The
-        schedule loads nightly, so a game played earlier today may still read
-        as upcoming. 24 late-season 2026 games are flexed and carry TBD times.
-        The 2026 postseason is not yet scheduled.
+        Data coverage: one row per game, 1,323 games with 299 still upcoming
+        as of Aug 22 2026 (27 remaining preseason plus the 272-game regular
+        slate). Grain is game, not team-game, so nothing appears twice. Each
+        row carries date and kickoff time, season, week, season phase, venue,
+        canonical stadium name, roof type, weather-relevance, international
+        flag, elevation, surface, home and away teams (including city,
+        conference and division), and a kickoff-hour forecast when one has
+        landed. The schedule loads nightly, so a game played earlier today
+        may still read as upcoming. 24 late-season 2026 games are flexed and
+        carry TBD times. The 2026 postseason is not yet scheduled.
 
         Key metrics: games count, completed games, and remaining games, plus
-        the completion flag to separate played from upcoming.
+        the completion flag to separate played from upcoming. Forecast facts:
+        kickoff temperature, wind, gusts, direction, precip, hours_before_kickoff.
 
         When to use: any question about upcoming, next, remaining or future
-        games, a week's slate, or the schedule as a calendar. Examples: "who
-        do the Chiefs play in week 1", "what is the Thanksgiving slate", "how
-        many home games do the Lions have left", "when do Kansas City and
-        Buffalo meet", "where is the week 5 game in London" style venue
-        lookups.
+        games, a week's slate, the schedule as a calendar, roof type, outdoor
+        vs indoor, London or other international sites, or the pregame
+        forecast. Examples: "who do the Chiefs play in week 1", "which week 1
+        games are outdoors", "what is the wind for the Bills next game",
+        "where is the week 5 game in London".
 
         When NOT to use: do NOT use for scores, results, winners, records or
         any statistic; it holds none of them, and past games appear only as
         calendar entries. Results and team stats are
         NFLTeamPerformanceAnalytics; player production is the player tools.
-        Do NOT use for broadcast, TV or ticket information, which the source
-        does not carry.
+        Do NOT use for observed/ERA5 post-game weather, broadcast, TV or
+        ticket information.
 
         Query guidance: schedule questions default to season 2026, the only
         season with unplayed games. Upcoming means the completion flag is
         false, never a date comparison. A team's schedule needs an OR across
         the home and away sides. Week numbers restart each season phase, so
-        pair a week with Regular Season unless told otherwise.
+        pair a week with Regular Season unless told otherwise. If
+        is_weather_relevant is false, do not cite wind or temperature as
+        affecting the game. The forecast is a daily snapshot, not live radar.
 
   - tool_spec:
       type: "cortex_analyst_text_to_sql"

@@ -115,6 +115,9 @@ from pipelines.batch.models import (  # noqa: E402
 SPEC_TEMPLATE_PATH = (
     Path(__file__).resolve().parents[1] / "spcs" / "dlt_job.tmpl.yaml"
 )
+SPEC_TEMPLATE_NOSECRET_PATH = (
+    Path(__file__).resolve().parents[1] / "spcs" / "dlt_job_nosecret.tmpl.yaml"
+)
 
 _PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
@@ -143,7 +146,14 @@ def render_spec(spec: PipelineSpec, database: str, template: str | None = None) 
     the literal text `{{ secret }}` inside a YAML file Snowflake accepts, and the
     container would fail much later looking for a secret by that name.
     """
-    text = SPEC_TEMPLATE_PATH.read_text() if template is None else template
+    if template is None:
+        text = (
+            SPEC_TEMPLATE_PATH.read_text()
+            if spec.secret
+            else SPEC_TEMPLATE_NOSECRET_PATH.read_text()
+        )
+    else:
+        text = template
     values = {
         "pipeline": spec.name,
         "database": database,

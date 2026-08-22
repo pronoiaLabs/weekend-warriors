@@ -1,0 +1,48 @@
+venue_name,stadium_id,display_name,lat,lon,elevation_m,timezone,roof,surface,is_weather_relevant,is_international
+MetLife Stadium,metlife,MetLife Stadium,40.813611,-74.074444,4,America/New_York,open,grass,true,false
+SoFi Stadium,sofi,SoFi Stadium,33.95345,-118.3392,40,America/Los_Angeles,fixed,turf,false,false
+M&T Bank Stadium,mtbank,M&T Bank Stadium,39.278056,-76.622778,12,America/New_York,open,grass,true,false
+Lincoln Financial Field,lincoln,Lincoln Financial Field,39.900833,-75.1675,12,America/New_York,open,grass,true,false
+Raymond James Stadium,rayjay,Raymond James Stadium,27.975833,-82.503333,8,America/New_York,open,grass,true,false
+Ford Field,ford,Ford Field,42.34,-83.0456,183,America/Detroit,fixed,turf,false,false
+Empower Field at Mile High,milehigh,Empower Field at Mile High,39.743889,-105.02,1611,America/Denver,open,grass,true,false
+Levi's Stadium,levis,Levi's Stadium,37.403,-121.97,6,America/Los_Angeles,open,grass,true,false
+Lumen Field,lumen,Lumen Field,47.5952,-122.3316,5,America/Los_Angeles,open,turf,true,false
+Allegiant Stadium,allegiant,Allegiant Stadium,36.090833,-115.183611,610,America/Los_Angeles,fixed,turf,false,false
+Gillette Stadium,gillette,Gillette Stadium,42.090944,-71.264344,25,America/New_York,open,turf,true,false
+State Farm Stadium,statefarm,State Farm Stadium,33.5275,-112.2625,335,America/Phoenix,retractable,grass,true,false
+Soldier Field,soldier,Soldier Field,41.8623,-87.6167,181,America/Chicago,open,grass,true,false
+Paycor Stadium,paycor,Paycor Stadium,39.095,-84.516,147,America/New_York,open,turf,true,false
+Bank of America Stadium,boa,Bank of America Stadium,35.225833,-80.852778,221,America/New_York,open,turf,true,false
+AT&T Stadium,att,AT&T Stadium,32.747778,-97.092778,163,America/Chicago,retractable,turf,true,false
+Lambeau Field,lambeau,Lambeau Field,44.501389,-88.062222,195,America/Chicago,open,grass,true,false
+Acrisure Stadium,acrisure,Acrisure Stadium,40.446667,-80.015833,222,America/New_York,open,grass,true,false
+Caesars Superdome,superdome,Caesars Superdome,29.950833,-90.081111,1,America/Chicago,fixed,turf,false,false
+Highmark Stadium,highmark_new,Highmark Stadium,42.7684,-78.7865,210,America/New_York,open,grass,true,false
+U.S. Bank Stadium,usbank,U.S. Bank Stadium,44.973889,-93.258056,260,America/Chicago,fixed,turf,false,false
+Lucas Oil Stadium,lucasoil,Lucas Oil Stadium,39.760056,-86.163806,218,America/Indiana/Indianapolis,retractable,turf,true,false
+Mercedes-Benz Stadium,mbstadium,Mercedes-Benz Stadium,33.755,-84.401,305,America/New_York,retractable,turf,true,false
+Huntington Bank Field,huntington,Huntington Bank Field,41.506111,-81.699444,199,America/New_York,open,grass,true,false
+Hard Rock Stadium,hardrock,Hard Rock Stadium,25.958056,-80.238889,2,America/New_York,open,grass,true,false
+Nissan Stadium,nissan,Nissan Stadium,36.166389,-86.771389,137,America/Chicago,open,grass,true,false
+Northwest Stadium,northwest,Northwest Stadium,38.907778,-76.864444,60,America/New_York,open,grass,true,false
+EverBank Stadium,everbank,EverBank Stadium,30.323889,-81.6375,6,America/New_York,open,grass,true,false
+GEHA Field at Arrowhead Stadium,arrowhead,Arrowhead Stadium,39.048889,-94.483889,267,America/Chicago,open,grass,true,false
+NRG Stadium,nrg,NRG Stadium,29.684722,-95.410833,14,America/Chicago,retractable,turf,true,false
+Arrowhead Stadium,arrowhead,Arrowhead Stadium,39.048889,-94.483889,267,America/Chicago,open,grass,true,false
+Reliant Stadium,nrg,NRG Stadium,29.684722,-95.410833,14,America/Chicago,retractable,turf,true,false
+Tottenham Hotspur Stadium,tottenham,Tottenham Hotspur Stadium,51.604444,-0.066389,15,Europe/London,open,grass,true,true
+Wembley Stadium,wembley,Wembley Stadium,51.555833,-0.279722,50,Europe/London,retractable,grass,true,true
+Highmark Stadium (Old),highmark_old,Highmark Stadium (1973),42.7738,-78.787,210,America/New_York,open,grass,true,false
+Tom Benson Hall of Fame Stadium,hof,Tom Benson Hall of Fame Stadium,40.8203,-81.3978,323,America/New_York,open,turf,true,false
+Corinthians Arena,corinthians,Corinthians Arena,-23.545278,-46.474167,760,America/Sao_Paulo,retractable,grass,true,true
+Santiago Bernabéu,bernabeu,Santiago Bernabéu,40.453056,-3.688333,665,Europe/Madrid,retractable,grass,true,true
+Frankfurt Stadium,frankfurt,Frankfurt Stadium,50.068611,8.645278,110,Europe/Berlin,retractable,grass,true,true
+Croke Park,croke,Croke Park,53.360833,-6.251667,20,Europe/Dublin,open,grass,true,true
+Stade de France,stadefrance,Stade de France,48.924444,2.360139,35,Europe/Paris,open,grass,true,true
+Allianz Arena,allianz,Allianz Arena,48.218889,11.624722,520,Europe/Berlin,open,grass,true,true
+FC Bayern Munich Stadium,allianz,Allianz Arena,48.218889,11.624722,520,Europe/Berlin,open,grass,true,true
+Melbourne Cricket Ground,mcg,Melbourne Cricket Ground,-37.819722,144.983333,12,Australia/Melbourne,open,grass,true,true
+Estadio Banorte,banorte,Estadio Banorte,25.669167,-100.244444,540,America/Monterrey,open,grass,true,true
+Maracanã Stadium,maracana,Maracanã Stadium,-22.912167,-43.230167,8,America/Sao_Paulo,open,grass,true,true
+Olympic Stadium Berlin,olympiaberlin,Olympic Stadium Berlin,52.514722,13.239444,40,Europe/Berlin,open,grass,true,true

@@ -239,11 +239,25 @@ def test_the_two_sports_agree_in_august_which_is_why_this_needed_a_test() -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_scheduled_pipeline_without_bindings_is_rejected() -> None:
+def test_scheduled_pipeline_without_eai_is_rejected() -> None:
     with pytest.raises(RegistryError) as exc:
         _spec(schedule="0 9 * * *").validate()
-    msg = str(exc.value)
-    assert "secret" in msg and "env_var" in msg and "external_access" in msg
+    assert "external_access" in str(exc.value)
+
+
+def test_scheduled_pipeline_without_a_secret_is_accepted_when_eai_is_set() -> None:
+    # Open-Meteo: no key, but the container still needs egress.
+    _spec(schedule="0 9 * * *", external_access="OPENMETEO_API_EAI").validate()
+
+
+def test_scheduled_pipeline_cannot_declare_secret_without_env_var() -> None:
+    with pytest.raises(RegistryError) as exc:
+        _spec(
+            schedule="0 9 * * *",
+            external_access="NFL_API_EAI",
+            secret="DLT_DB.OPS.NFL_API_KEY",
+        ).validate()
+    assert "secret" in str(exc.value) and "env_var" in str(exc.value)
 
 
 def test_unscheduled_pipeline_needs_no_bindings() -> None:
@@ -285,9 +299,10 @@ def test_real_registry_every_scheduled_pipeline_can_actually_run() -> None:
     assert scheduled, "expected the NFL pipelines to be scheduled"
 
     for spec in scheduled:
-        assert spec.secret, f"{spec.name}: scheduled but no secret"
-        assert spec.env_var, f"{spec.name}: scheduled but no env_var"
         assert spec.external_access, f"{spec.name}: scheduled but no external_access"
+        if spec.secret or spec.env_var:
+            assert spec.secret, f"{spec.name}: env_var without secret"
+            assert spec.env_var, f"{spec.name}: secret without env_var"
         # 5-field cron; Snowflake wraps it as USING CRON <expr> UTC.
         assert len(spec.schedule.split()) == 5, f"{spec.name}: {spec.schedule!r}"
 
@@ -368,6 +383,9 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "wnba_reference", "wnba_injuries", "wnba_standings",
         "ncaaf_reference",
         "sample",
+        "nfl_weather_forecast",
+        "nfl_weather_archive",
+        "nfl_weather_hist_forecast",
     }
     assert {s.name for s in registry.pipelines} == checked, (
         "a pipeline is neither asserted to carry a season token nor asserted to have "
@@ -389,6 +407,9 @@ def test_pipelines_with_no_season_have_no_token() -> None:
         "nfl_reference", "nfl_injuries", "nfl_news",
         "wnba_reference", "wnba_injuries", "wnba_standings",
         "ncaaf_reference",
+        "nfl_weather_forecast",
+        "nfl_weather_archive",
+        "nfl_weather_hist_forecast",
     ):
         assert "{current_season}" not in json.dumps(load_registry().get(name).config)
 

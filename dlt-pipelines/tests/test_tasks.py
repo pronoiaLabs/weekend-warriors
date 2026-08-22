@@ -123,20 +123,26 @@ def test_inlined_spec_is_valid_yaml_with_the_right_bindings(spec) -> None:
     # per-source destination.
     assert container["env"]["SNOWFLAKE_DATABASE"] == "DLT_DB"
 
-    bound = container["secrets"][0]
-    assert bound["snowflakeSecret"] == spec.secret
-    assert bound["envVarName"] == spec.env_var
+    if spec.secret:
+        bound = container["secrets"][0]
+        assert bound["snowflakeSecret"] == spec.secret
+        assert bound["envVarName"] == spec.env_var
+    else:
+        assert "secrets" not in container
 
 
 def test_unsubstituted_placeholder_is_rejected() -> None:
     """A leftover placeholder is valid YAML, so nothing downstream would catch it."""
     from dataclasses import replace as dc_replace  # noqa: PLC0415
 
-    from deploy.tasks.generate_tasks import render_spec  # noqa: PLC0415
+    from deploy.tasks.generate_tasks import (  # noqa: PLC0415
+        SPEC_TEMPLATE_PATH,
+        render_spec,
+    )
 
     spec = dc_replace(load_registry().get("nfl_reference"), secret=None)
     with pytest.raises(Exception) as exc:
-        render_spec(spec, "NFL_PROD_DB")
+        render_spec(spec, "NFL_PROD_DB", template=SPEC_TEMPLATE_PATH.read_text())
     assert "secret" in str(exc.value)
 
 
@@ -233,6 +239,7 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
         "nfl_standings", "nfl_advanced_stats", "nfl_injuries",
         "nfl_game_odds", "nfl_player_props", "nfl_odds_opening",
         "nfl_news",
+        "nfl_weather_forecast",
     }
     # WNBA is PAUSED (2026-08-12): schedules commented out in wnba-registry.yml,
     # account tasks suspended. The pipelines stay registered and hand-runnable;

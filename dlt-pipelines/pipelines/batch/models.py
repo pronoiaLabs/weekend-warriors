@@ -59,7 +59,7 @@ import yaml
 # ---------------------------------------------------------------------------
 
 # Sources the runner knows how to build. Extend build_source() in run.py to add more.
-SUPPORTED_SOURCES: tuple[str, ...] = ("rest_api", "sample", "firecrawl")
+SUPPORTED_SOURCES: tuple[str, ...] = ("rest_api", "sample", "firecrawl", "openmeteo")
 
 # Dispositions dlt accepts as a plain string. `skip` is deliberately absent: a
 # pipeline that loads nothing should not be in the registry.
@@ -130,8 +130,9 @@ class PipelineSpec:
     #   env_var         the dlt env var it binds to, e.g. SOURCES__NFL__API_KEY
     #   external_access  the EAI granting egress, e.g. NFL_API_EAI
     #
-    # They are optional because `sample` needs none of them. validate() requires them
-    # once a `schedule` is present, since that is exactly when nobody is watching.
+    # They are optional because `sample` needs none of them, and Open-Meteo has no
+    # key. validate() requires `external_access` once a `schedule` is present;
+    # `secret` and `env_var` only when the source authenticates.
     secret: str | None = None
     env_var: str | None = None
     external_access: str | None = None
@@ -179,9 +180,14 @@ class PipelineSpec:
         """A scheduled pipeline must carry everything a Task cannot supply.
 
         A Task passes no arguments and nobody is watching when it fires. A missing
-        `secret` means the container raises KeyError from dlt.secrets; a missing
-        `external_access` means it has no network at all. Both surface as a red Task
-        at 09:00 UTC rather than as an error anyone reads.
+        `external_access` means the container has no network at all. A missing
+        `secret` on an authenticated source means KeyError from dlt.secrets. Both
+        surface as a red Task at 09:00 UTC rather than as an error anyone reads.
+
+        `external_access` is always required once `schedule` is set. `secret` and
+        `env_var` are required together only when the source authenticates — Open-Meteo
+        has no key, and a dummy secret would be a lie. Declaring one of them without
+        the other is still rejected, because the job spec binds them as a pair.
 
         Only enforced when `schedule` is set, because an unscheduled pipeline gets its
         bindings from the command line and `sample` needs none of them at all.
@@ -189,17 +195,18 @@ class PipelineSpec:
         if not self.schedule:
             return
 
-        missing = [
-            field_name
-            for field_name in ("secret", "env_var", "external_access")
-            if not getattr(self, field_name)
-        ]
-        if missing:
+        if not self.external_access:
             raise RegistryError(
                 f"pipeline '{self.name}': has a schedule but does not declare "
-                f"{', '.join(missing)}. A Snowflake Task passes no arguments, so a "
-                "scheduled pipeline must record its secret, the env var that secret "
-                "binds to, and its external access integration in the registry."
+                "external_access. A Snowflake Task passes no arguments, so a "
+                "scheduled pipeline must record its external access integration."
+            )
+
+        if bool(self.secret) != bool(self.env_var):
+            raise RegistryError(
+                f"pipeline '{self.name}': secret and env_var must be declared "
+                "together. A scheduled pipeline that authenticates needs both; "
+                "one that does not (Open-Meteo) should declare neither."
             )
 
     def _validate_database(self) -> None:

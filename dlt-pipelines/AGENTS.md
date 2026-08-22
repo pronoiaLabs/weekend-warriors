@@ -168,12 +168,21 @@ that round-trip.** So these, and only these, require a custom source type:
 Fan-out, call chaining, incremental scoping, auth, and pagination are all declarative. Do not write
 a custom source for those.
 
-One custom source exists: `firecrawl` (`pipelines/batch/firecrawl_source.py`, registry
-`news-registry.yml`). It earns its Python because the items of one call (reading a curated list
-of RSS/Atom feeds) decide the arguments of the next (a Firecrawl batch scrape), and only some
-pages get the 5x-cost extraction, chosen per feed. Note its naming: the source type, secret and
-env var are named for the vendor (`firecrawl`), the pipeline and its tables for the content
-(`nfl_news`), because one Firecrawl key serves any sport.
+Two custom sources exist. Both keep the vendor-vs-content split: source type, secret
+and EAI are named for the vendor; pipelines and tables are named for the content and
+land in `NFL_PROD_DB.RAW`.
+
+- `firecrawl` (`pipelines/batch/firecrawl_source.py`, registry `news-registry.yml`).
+  The items of one call (a curated RSS/Atom list) decide the arguments of the next
+  (a Firecrawl batch scrape), and only some pages get the 5x-cost extraction. One
+  Firecrawl key serves any sport.
+- `openmeteo` (`pipelines/batch/openmeteo_source.py`, registry `weather-registry.yml`).
+  Open-Meteo returns columnar hourly arrays (`hourly.time[]` zipped with
+  `wind_speed_10m[]`, etc.), which rest_api YAML cannot unzip. There is no API key.
+  A scheduled pipeline still needs `external_access`; `secret` / `env_var` are
+  required together only when the source authenticates. The prod job spec for that
+  case is `dlt_job_nosecret.tmpl.yaml`, selected by `generate_tasks.render_spec`
+  when `spec.secret` is empty.
 
 ---
 

@@ -1,0 +1,48 @@
+# NFL game-day weather from Open-Meteo. Lands in NFL_PROD_DB.RAW.
+#
+# NAMING: vendor vs content, same split as a firecrawl-style source. The source
+# type and the EAI are named for the vendor (`openmeteo`). The pipelines and
+# the table are named for the content (`nfl_weather_*`, `weather_hourly`),
+# which is what puts them beside the BallDontLie tables. tests pin every
+# `nfl_*` pipeline to NFL_*_DB, so the prefix is load-bearing.
+#
+# No API key. A scheduled pipeline still needs an EAI; it must not inherit
+# NFL_API_KEY / NFL_API_EAI from nfl-registry.yml defaults.
+#
+# Source module: pipelines/batch/openmeteo_source.py.
+
+defaults:
+  destination: snowflake
+  database: NFL
+  dataset_name: RAW
+  group: weather
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  external_access: OPENMETEO_API_EAI
+
+pipelines:
+  # Daily outlook for upcoming outdoor / retractable sites. Domes stay on the
+  # seed; we just do not spend a daily call on them.
+  - name: nfl_weather_forecast
+    source: openmeteo
+    schedule: "40 9 * * *"
+    config:
+      product: forecast
+      forecast_days: 16
+      weather_relevant_only: true
+
+  # ERA5 actuals. Manual backfill / rare refresh — not a Task.
+  - name: nfl_weather_archive
+    source: openmeteo
+    config:
+      product: archive
+      start_date: "2023-08-01"
+      end_date: "2026-02-15"
+
+  # What was knowable before kickoff. Manual backfill — not a Task.
+  - name: nfl_weather_hist_forecast
+    source: openmeteo
+    config:
+      product: hist_forecast
+      start_date: "2023-08-01"
+      end_date: "2026-02-15"
