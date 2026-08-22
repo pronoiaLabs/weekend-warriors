@@ -30,5 +30,5 @@ select
     precip_in::float                                    as precip_in,
     weather_code::number                                as weather_code,
     elevation_m::float                                  as elevation_m,
-    to_timestamp_tz(_dlt_load_id::float)                as loaded_at
+    to_timestamp_tz(_dlt_load_id::float::number)        as loaded_at
 from source
