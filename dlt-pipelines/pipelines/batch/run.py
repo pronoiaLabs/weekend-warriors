@@ -267,6 +267,13 @@ def build_source(spec: PipelineSpec):
 
         return firecrawl_news(name=spec.name, config=cfg)
 
+    if spec.source == "openmeteo":
+        # Columnar hourly arrays cannot be a rest_api data_selector. No season
+        # token: the window is start_date/end_date or forecast_days.
+        from pipelines.batch.openmeteo_source import openmeteo_weather  # noqa: PLC0415
+
+        return openmeteo_weather(name=spec.name, config=cfg)
+
     # models.validate() guards this; this branch is a defensive fallback.
     raise ValueError(f"unhandled source type: {spec.source!r}")
 

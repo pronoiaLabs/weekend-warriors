@@ -26,38 +26,54 @@ with games as (
 
     select * from {{ ref('stg_nfl__games') }}
 
+),
+
+venues as (
+
+    select
+        venue_name,
+        stadium_id
+    from {{ ref('seed_nfl_stadiums') }}
+
 )
 
 select
-    game_key,
-    game_id,
+    g.game_key,
+    g.game_id,
 
     -- when. Both spellings of the same instant: UTC as loaded, and US
     -- Eastern for display. The schedule semantic view exposes only the ET one.
-    game_datetime,
-    game_datetime_et,
-    game_date,
-    {{ dbt_utils.generate_surrogate_key(['game_date']) }}                     as date_key,
-    season,
-    week,
-    season_type,
-    season_type_name,
-    is_postseason,
-    {{ dbt_utils.generate_surrogate_key(['season', 'week', 'season_type']) }}  as season_week_key,
+    g.game_datetime,
+    g.game_datetime_et,
+    g.game_date,
+    {{ dbt_utils.generate_surrogate_key(['g.game_date']) }}                    as date_key,
+    g.season,
+    g.week,
+    g.season_type,
+    g.season_type_name,
+    g.is_postseason,
+    {{ dbt_utils.generate_surrogate_key(['g.season', 'g.week', 'g.season_type']) }} as season_week_key,
 
-    -- where
-    venue,
+    -- where. venue is the feed string; stadium_key collapses aliases.
+    g.venue,
+    iff(
+        v.stadium_id is not null,
+        {{ dbt_utils.generate_surrogate_key(['v.stadium_id']) }},
+        null
+    )                                                                         as stadium_key,
 
     -- participants
-    home_team_key,
-    home_team_id,
-    away_team_key,
-    away_team_id,
+    g.home_team_key,
+    g.home_team_id,
+    g.away_team_key,
+    g.away_team_id,
 
     -- character of the game
-    game_status,
-    is_completed,
-    went_to_overtime,
-    game_summary
+    g.game_status,
+    g.is_completed,
+    g.went_to_overtime,
+    g.game_summary
 
-from games
+from games g
+left join venues v
+    on g.venue = v.venue_name

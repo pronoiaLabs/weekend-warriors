@@ -86,6 +86,8 @@ SNOW_LOADER := snow sql --role $(PROD_ROLE) $(if $(SNOW_CONN),--connection $(SNO
 DEV_ROLE    ?= DLT_DEV_ROLE
 # warehouse the dev role can use
 DEV_WH      ?= DLT_DEV_WH
+# warehouse prod laptop loads use (same as the scheduled Task)
+PROD_WH     ?= DLT_WH
 SNOW_DEV    := snow sql --role $(DEV_ROLE) $(if $(SNOW_CONN),--connection $(SNOW_CONN),)
 DATASET     ?=                                       # dev schema; empty => DEV_<snowflake_user> from your snow connection
 SECRET      ?=                                       # e.g. DLT_DB.OPS.NFL_API_KEY
@@ -177,7 +179,7 @@ endef
 
 .PHONY: help doctor install secrets setup \
         test test-config lint fmt list plan \
-        run-local run-snowflake run-spcs \
+        run-local run-snowflake run-prod run-spcs \
         sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
         setup-base setup-dev setup-prod setup-ops setup-source new-source \
         image-build image-login image-push \
@@ -278,6 +280,31 @@ run-snowflake: ## laptop -> Snowflake via a snow connection (NAME=|GROUP= [RESOU
 	  DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE="$$db" DLT_DATASET="$$ds" \
 	  $(UV_RUN) python -m pipelines.batch.run $(if $(GROUP),--group $(GROUP),$(NAME)) $(RES_FLAGS) $(PARAM_FLAGS) && \
 	  echo "Ran '$(if $(GROUP),group $(GROUP),$(NAME))'$(if $(RESOURCE), resources [$(RESOURCE)],)$(if $(PARAM), params [$(PARAM)],) -> $$db.$$ds as $(DEV_ROLE) using snow connection '$(CONN)'."
+
+run-prod: ## laptop -> Snowflake PROD RAW as DLT_LOADER_ROLE (NAME= [CONFIRM=1] [RESOURCE=] [PARAM=] [CONN=] [DATASET=])
+	@if [ -z "$(NAME)$(GROUP)" ]; then \
+		echo "Set NAME=<pipeline> or GROUP=<group>. See 'make list'."; \
+		exit 2; \
+	fi
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Writes to production RAW as $(PROD_ROLE). Re-run with CONFIRM=1."; \
+		exit 2; \
+	fi
+	@if [ -n "$(GROUP)" ] && [ -z "$(SF_DATABASE)" ]; then \
+		echo "GROUP= spans pipelines that may target different databases."; \
+		echo "Run them by NAME=, or pass SF_DATABASE= to force one."; \
+		exit 2; \
+	fi
+	@$(call resolve_db_or_die,$(NAME),PROD); \
+	  db="$(if $(SF_DATABASE),$(SF_DATABASE),$$db)"; \
+	  $(snow_env_or_die); \
+	  ds="$(DATASET)"; ds="$${ds:-RAW}"; \
+	  DLT_REGISTRY_SOURCE=yaml DLT_DESTINATION=snowflake \
+	  DESTINATION__SNOWFLAKE__CREDENTIALS__ROLE=$(PROD_ROLE) SNOWFLAKE_ROLE=$(PROD_ROLE) \
+	  DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE=$(PROD_WH) SNOWFLAKE_WAREHOUSE=$(PROD_WH) \
+	  DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE="$$db" DLT_DATASET="$$ds" \
+	  $(UV_RUN) python -m pipelines.batch.run $(if $(GROUP),--group $(GROUP),$(NAME)) $(RES_FLAGS) $(PARAM_FLAGS) && \
+	  echo "Ran '$(if $(GROUP),group $(GROUP),$(NAME))'$(if $(RESOURCE), resources [$(RESOURCE)],)$(if $(PARAM), params [$(PARAM)],) -> $$db.$$ds as $(PROD_ROLE) using snow connection '$(CONN)'."
 
 # The container entrypoint is `python -m pipelines.batch.run`, so RESOURCE and PARAM
 # are the same CLI flags run-local and run-snowflake pass; they just have to travel

@@ -106,6 +106,33 @@ models:
         tests:
           - not_null
           - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: stadium_key
+        description: >
+          Physical bowl. Collapses venue-string aliases. Fails the build
+          when RAW.GAMES.venue is not in seed_nfl_stadiums.
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_stadium')", field: stadium_key}
+
+  - name: dim_stadium
+    description: >
+      Physical NFL (and neutral-site) bowls. Grain: stadium_id. Built from
+      seed_nfl_stadiums; one row per bowl after alias collapse.
+    columns:
+      - name: stadium_key
+        tests: [unique, not_null]
+      - name: stadium_id
+        tests: [unique, not_null]
+      - name: display_name
+        tests: [not_null]
+      - name: roof
+        tests:
+          - not_null
+          - accepted_values: {values: ['open', 'retractable', 'fixed']}
+      - name: is_weather_relevant
+        tests: [not_null]
+      - name: is_international
+        tests: [not_null]
 
   - name: dim_season_week
     description: >

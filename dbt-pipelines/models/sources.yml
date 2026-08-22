@@ -350,6 +350,24 @@ sources:
           - name: player_name
             tests: [not_null]
 
+      # --- Weather: the Open-Meteo source (dlt weather-registry.yml) --------
+      - name: weather_hourly
+        description: >
+          Open-Meteo hourly weather at stadium grain. product is archive
+          (ERA5 actuals), forecast (live outlook), or hist_forecast (what
+          was knowable before kickoff). hour_at is UTC. No game_id — dbt
+          joins the kickoff hour from dim_game.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [stadium_id, hour_at, product]
+        columns:
+          - name: stadium_id
+            tests: [not_null]
+          - name: hour_at
+            tests: [not_null]
+          - name: product
+            tests: [not_null]
+
   - name: wnba_raw
     description: >
       Raw WNBA data landed by dlt from the BallDontLie API. Owned by the dlt

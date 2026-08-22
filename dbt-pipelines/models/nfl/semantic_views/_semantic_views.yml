@@ -7,14 +7,11 @@ models:
 
   - name: sv_nfl_schedule
     description: >
-      The full NFL slate at game grain, played and unplayed alike: completed games for
-      2023-2025 plus the entire 2026 schedule (321 games, one played). The only view
-      anchored on dim_game rather than a fact, because scheduled games have no fact rows
-      and are structurally unreachable everywhere else. Home and away are role-playing
-      joins to dim_team, so a team's schedule is the OR of both sides. Deliberately
-      carries no scores or results; those belong to sv_nfl_team_performance. Scheduled
-      2026 games carry kickoff-time strings or TBD as their status; is_completed is the
-      played-versus-upcoming flag.
+      The full NFL slate at game grain, played and unplayed alike: 1,323 games with
+      299 still upcoming (Aug 22 2026). The only view anchored on dim_game rather than
+      a completed-game fact. Home and away are role-playing joins to dim_team; stadium
+      is dim_stadium (roof, weather-relevance, international). Forecast-only kickoff
+      weather is a 1:1 fact. Deliberately carries no scores, recaps, or ERA5 actuals.
 
   - name: sv_nfl_game_odds
     description: >

@@ -7,6 +7,10 @@ Everything below targets Snowflake. The database is **not** something you type: 
 `database: NFL`, and `make run-snowflake` resolves that to `NFL_DEV_DB` for you, landing in your own
 `DEV_<user>` schema inside it. The command echoes the resolved target when it finishes.
 
+`make run-prod NAME=… CONFIRM=1` is the laptop path to **production RAW** as `DLT_LOADER_ROLE`.
+Use it to fill a new table that dbt will `source()`, not `CLONE` from `DEV_<you>`. Guarded by
+`CONFIRM=1` because it writes prod.
+
 Swap `run-snowflake` for `run-local` to load to DuckDB instead, with no credentials and no risk to
 anything.
 

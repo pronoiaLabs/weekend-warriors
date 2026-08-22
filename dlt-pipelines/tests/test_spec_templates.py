@@ -53,6 +53,7 @@ EXPECTED_VARIABLES: dict[str, set[str]] = {
     "dlt_dev_job.tmpl.yaml": {"args", "database", "dataset", "secret", "env_var"},
     "dlt_dev_job_nosecret.tmpl.yaml": {"args", "database", "dataset"},
     "dlt_job.tmpl.yaml": {"pipeline", "database", "secret", "env_var"},
+    "dlt_job_nosecret.tmpl.yaml": {"pipeline", "database"},
 }
 
 # A deliberately awkward argv: brackets the shell would glob, an `=` a naive split
@@ -191,6 +192,7 @@ def test_only_the_prod_template_enables_alerts() -> None:
         ][0]["env"]
 
     assert env_of("dlt_job.tmpl.yaml")["DLT_ALERTS"] == "1"
+    assert env_of("dlt_job_nosecret.tmpl.yaml")["DLT_ALERTS"] == "1"
     assert "DLT_ALERTS" not in env_of("dlt_dev_job.tmpl.yaml")
     assert "DLT_ALERTS" not in env_of("dlt_dev_job_nosecret.tmpl.yaml")
 
@@ -206,3 +208,5 @@ def test_only_the_secret_template_binds_a_secret() -> None:
 
     assert "secrets" in containers("dlt_dev_job.tmpl.yaml")
     assert "secrets" not in containers("dlt_dev_job_nosecret.tmpl.yaml")
+    assert "secrets" in containers("dlt_job.tmpl.yaml")
+    assert "secrets" not in containers("dlt_job_nosecret.tmpl.yaml")
