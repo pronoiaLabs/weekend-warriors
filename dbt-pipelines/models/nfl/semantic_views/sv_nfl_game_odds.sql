@@ -51,13 +51,13 @@ facts (
     closing_odds.home_moneyline_odds as home_moneyline_odds comment = 'Closing home American moneyline odds.',
     closing_odds.away_moneyline_odds as away_moneyline_odds comment = 'Closing away American moneyline odds.',
     closing_odds.total_line as total_line comment = 'Closing over/under total.',
-    closing_odds.home_moneyline_implied_probability as home_implied_probability
+    closing_odds.home_moneyline_implied_probability as home_moneyline_implied_probability
         comment = 'Raw closing probability implied by home American odds, including vig.',
-    closing_odds.away_moneyline_implied_probability as away_implied_probability
+    closing_odds.away_moneyline_implied_probability as away_moneyline_implied_probability
         comment = 'Raw closing probability implied by away American odds, including vig.',
-    closing_odds.home_moneyline_devig_probability as home_devig_probability
+    closing_odds.home_moneyline_devig_probability as home_moneyline_devig_probability
         comment = 'Closing home win probability normalized across both sides to remove vig.',
-    closing_odds.away_moneyline_devig_probability as away_devig_probability
+    closing_odds.away_moneyline_devig_probability as away_moneyline_devig_probability
         comment = 'Closing away win probability normalized across both sides to remove vig.',
     closing_odds.home_spread_implied_probability as home_spread_implied_probability
         comment = 'Raw probability implied by the closing home spread price.',

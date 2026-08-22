@@ -17,7 +17,7 @@ with eligible as (
         g.date_key,
         g.season,
         g.week,
-        g.season_type,
+        g.season_type as game_season_type,
         g.season_type_name,
         g.season_week_key,
         g.home_team_key,
@@ -90,7 +90,7 @@ select
     game_date,
     season,
     week,
-    season_type,
+    game_season_type                                                as season_type,
     season_type_name,
     snapshot_observed_at                                           as selected_snapshot_at,
     source_updated_at,
@@ -134,22 +134,6 @@ select
     away_moneyline_implied_probability
         / nullif(home_moneyline_implied_probability + away_moneyline_implied_probability, 0)
                                                                     as away_moneyline_devig_probability,
-    iff(home_spread_odds < 0,
-        -home_spread_odds / (-home_spread_odds + 100.0),
-        iff(home_spread_odds > 0, 100.0 / (home_spread_odds + 100.0), null)
-    )                                                               as home_spread_implied_probability,
-    iff(away_spread_odds < 0,
-        -away_spread_odds / (-away_spread_odds + 100.0),
-        iff(away_spread_odds > 0, 100.0 / (away_spread_odds + 100.0), null)
-    )                                                               as away_spread_implied_probability,
-    iff(over_odds < 0,
-        -over_odds / (-over_odds + 100.0),
-        iff(over_odds > 0, 100.0 / (over_odds + 100.0), null)
-    )                                                               as over_implied_probability,
-    iff(under_odds < 0,
-        -under_odds / (-under_odds + 100.0),
-        iff(under_odds > 0, 100.0 / (under_odds + 100.0), null)
-    )                                                               as under_implied_probability,
     total_line / 2.0 - home_spread / 2.0                             as implied_home_team_total,
     total_line / 2.0 + home_spread / 2.0                             as implied_away_team_total,
     opening_home_spread,

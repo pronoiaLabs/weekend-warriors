@@ -42,5 +42,5 @@ select
         _dlt_valid_from
     )                                                                as snapshot_observed_at,
     try_to_double(_dlt_load_id)                                      as dlt_load_id_numeric,
-    to_timestamp_tz(try_to_double(_dlt_load_id))                     as loaded_at
+    to_timestamp_tz(try_to_double(_dlt_load_id)::number)             as loaded_at
 from source
