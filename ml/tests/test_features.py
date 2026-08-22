@@ -4,7 +4,7 @@ from weekend_warriors_ml.features import FEATURE_COLUMNS, assert_feature_contrac
 from weekend_warriors_ml.pipeline import PLAYER_LABEL_EXPR
 from weekend_warriors_ml.specs import GAME_FEATURES, SPECS, get_spec
 
-NOTEBOOKS = Path(__file__).resolve().parents[1] / "notebooks"
+NOTEBOOKS = Path(__file__).resolve().parents[1] / "notebooks" / "v1"
 
 
 def test_feature_list_has_no_close_or_label() -> None:

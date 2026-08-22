@@ -2,7 +2,7 @@
 
 uv project for NFL models on `NFL_PROD_DB.FEATURES`. Specs live in
 `weekend_warriors_ml/specs.py`. Each dedicated model has a Workspace notebook
-under `notebooks/`. Fit and register in the Workspace — do not cook from the
+under `notebooks/v1/`. Fit and register in the Workspace — do not cook from the
 laptop.
 
 X is FEATURES only. `close_*` is never in X. `label_*` is the target only.
@@ -21,7 +21,7 @@ uv run python -m weekend_warriors_ml inspect NFL_GAME_HOME_POINTS
 # Fit in the Workspace notebook, not here.
 ```
 
-Workspace (Container Runtime / SPCS): start at `notebooks/00_nfl_models.ipynb`,
+Workspace (Container Runtime / SPCS): start at `notebooks/v1/00_nfl_models.ipynb`,
 then open the per-model notebook. Keep the `ml/` folder in the Workspace so
 `weekend_warriors_ml` imports. First Python cell is
 `!uv pip install scikit-learn snowflake-ml-python` — rerun it after a

@@ -167,7 +167,7 @@ _add(
         comparator_column="close_total",
         task="regression",
         min_feature=None,
-        notebook="nfl_game_total_v1.ipynb",
+        notebook="nfl_game_total.ipynb",
         comment="Game total. X from FEAT_GAME_MATCHUP l5+std rates. No close_*, no label_*.",
     )
 )
@@ -184,7 +184,7 @@ _add(
         comparator_column="close_implied_home_total",
         task="regression",
         min_feature=None,
-        notebook="nfl_game_home_points_v1.ipynb",
+        notebook="nfl_game_home_points.ipynb",
         comment="Home score. Same matchup X as game total.",
     )
 )
@@ -201,7 +201,7 @@ _add(
         comparator_column="close_implied_away_total",
         task="regression",
         min_feature=None,
-        notebook="nfl_game_away_points_v1.ipynb",
+        notebook="nfl_game_away_points.ipynb",
         comment="Away score. Same matchup X as game total.",
     )
 )
@@ -218,7 +218,7 @@ _add(
         comparator_column="close_spread",
         task="regression",
         min_feature=None,
-        notebook="nfl_game_margin_v1.ipynb",
+        notebook="nfl_game_margin.ipynb",
         comment="Home margin (home - away). Comparator is close_spread.",
     )
 )
@@ -235,7 +235,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature=None,
-        notebook="nfl_game_home_net_pass_v1.ipynb",
+        notebook="nfl_game_home_net_pass.ipynb",
         comment="Home net passing yards. No historical close.",
     )
 )
@@ -252,7 +252,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature=None,
-        notebook="nfl_game_away_net_pass_v1.ipynb",
+        notebook="nfl_game_away_net_pass.ipynb",
         comment="Away net passing yards. No historical close.",
     )
 )
@@ -269,7 +269,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature=None,
-        notebook="nfl_game_home_rush_v1.ipynb",
+        notebook="nfl_game_home_rush.ipynb",
         comment="Home rushing yards. No historical close.",
     )
 )
@@ -286,7 +286,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature=None,
-        notebook="nfl_game_away_rush_v1.ipynb",
+        notebook="nfl_game_away_rush.ipynb",
         comment="Away rushing yards. No historical close.",
     )
 )
@@ -303,7 +303,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature="n_passing_l5",
-        notebook="nfl_player_passing_yards_v1.ipynb",
+        notebook="nfl_player_passing_yards.ipynb",
         comment="QB passing yards. X from player rolling + weather products. Label from CORE box.",
     )
 )
@@ -320,7 +320,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature="n_rushing_l5",
-        notebook="nfl_player_rushing_yards_v1.ipynb",
+        notebook="nfl_player_rushing_yards.ipynb",
         comment="Rushing yards. Gate: trailing rush games on l5.",
     )
 )
@@ -337,7 +337,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature="n_receiving_l5",
-        notebook="nfl_player_receiving_yards_v1.ipynb",
+        notebook="nfl_player_receiving_yards.ipynb",
         comment="Receiving yards. Gate: trailing receiving games on l5.",
     )
 )
@@ -354,7 +354,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature="n_receiving_l5",
-        notebook="nfl_player_receptions_v1.ipynb",
+        notebook="nfl_player_receptions.ipynb",
         comment="Receptions. Same stack as receiving yards.",
     )
 )
@@ -371,7 +371,7 @@ _add(
         comparator_column=None,
         task="regression",
         min_feature="n_passing_l5",
-        notebook="nfl_player_passing_tds_v1.ipynb",
+        notebook="nfl_player_passing_tds.ipynb",
         comment="Passing TD count. Not a Bernoulli anytime-TD model.",
     )
 )
@@ -388,7 +388,7 @@ _add(
         comparator_column=None,
         task="classification",
         min_feature="n_games_played_l5",
-        notebook="nfl_player_anytime_td_v1.ipynb",
+        notebook="nfl_player_anytime_td.ipynb",
         comment="I(rush TD + rec TD >= 1). QB pass-or-rush variant is a later spec.",
     )
 )

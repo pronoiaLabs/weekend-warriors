@@ -8,7 +8,7 @@ from pathlib import Path
 
 from weekend_warriors_ml.specs import SPECS, ModelSpec
 
-ROOT = Path(__file__).resolve().parents[1] / "notebooks"
+ROOT = Path(__file__).resolve().parents[1] / "notebooks" / "v1"
 
 
 def _id() -> str:
@@ -85,7 +85,7 @@ def _import_cells(model_name: str) -> list[dict]:
             "import sys\n"
             "\n"
             "here = Path.cwd().resolve()\n"
-            "for cand in (here, here.parent, here.parent.parent):\n"
+            "for cand in (here, *here.parents):\n"
             '    if (cand / "weekend_warriors_ml" / "pipeline.py").exists():\n'
             "        if str(cand) not in sys.path:\n"
             "            sys.path.insert(0, str(cand))\n"
@@ -298,8 +298,8 @@ def index_notebook() -> list[dict]:
     )
     return [
         _md(
-            "# NFL dedicated models\n\n"
-            "Index for the Workspace. Each notebook is the same pipeline: inspect FEATURES,\n"
+            "# NFL dedicated models (v1)\n\n"
+            "These notebooks live in `ml/notebooks/v1/`. Each one is the same pipeline: inspect FEATURES,\n"
             "walk-forward 2023–24 / 2025, register on `NFL_PROD_DB.ML`, write a pred table.\n"
             "Do not promote a version because it exists. Do not add FEATURES or ML to agents.\n\n"
             "| Model | Family | Task | Label | Notebook |\n"
