@@ -1,0 +1,47 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# Markets: pregame line movement for games and props.
+
+models:
+  - name: app_line_history
+    description: >
+      Every pregame line change for a game at a book, with the teams attached
+      and the change from the previous snapshot and from the opener. One row per
+      game, sportsbook and snapshot.
+    columns:
+      - name: app_line_history_key
+        tests: [unique, not_null]
+      - name: game_vendor_odds_key
+        tests: [not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: vendor
+        tests: [not_null]
+      - name: home_team_label
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_vendor_odds_key, snapshot_number]
+
+  - name: app_prop_line_history
+    description: >
+      A prop's movement from first offer to close: one row per game, player,
+      sportsbook, prop type and snapshot, with the player's identity, the stat
+      the prop maps to, and the change from the previous snapshot and the opener.
+    columns:
+      - name: app_prop_line_history_key
+        tests: [unique, not_null]
+      - name: game_player_vendor_prop_key
+        tests: [not_null]
+      - name: player_name
+        tests: [not_null]
+      - name: vendor
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_player_vendor_prop_key, snapshot_number]

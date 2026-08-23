@@ -28,6 +28,59 @@ models:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [game_id, vendor]
 
+  - name: fact_game_betting_odds_snapshot
+    description: >
+      Pregame game-line history. Grain: game x vendor x snapshot. Every distinct
+      line a book showed before kickoff in observation order, consecutive
+      duplicates collapsed; the last snapshot is the closing line.
+    columns:
+      - name: game_odds_snapshot_key
+        tests: [unique, not_null]
+      - name: game_vendor_odds_key
+        tests: [not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: vendor
+        tests: [not_null]
+      - name: snapshot_number
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1}
+      - name: minutes_before_kickoff
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, inclusive: false}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, vendor, snapshot_number]
+
+  - name: fact_player_prop_snapshot
+    description: >
+      Pregame player-prop history. Grain: game x player x vendor x prop type x
+      snapshot, consecutive duplicates collapsed; the last snapshot is the
+      closing prop.
+    columns:
+      - name: player_prop_snapshot_key
+        tests: [unique, not_null]
+      - name: game_player_vendor_prop_key
+        tests: [not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests: [not_null]
+      - name: vendor
+        tests: [not_null]
+      - name: prop_type
+        tests: [not_null]
+      - name: snapshot_number
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, player_id, vendor, prop_type, snapshot_number]
+
   - name: fact_game_betting_odds_closing
     description: "Latest line observed strictly before kickoff. Grain: game x vendor."
     columns:

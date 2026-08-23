@@ -1,0 +1,91 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# Players: a player's season wide and long, the leaderboard, the defensive twin.
+
+models:
+  - name: app_player_weeks
+    description: >
+      A player's season game by game: the offensive box score with identity,
+      team, opponent, the team result, fantasy points at both books and running
+      season counts. One row per player game; completed games only.
+    columns:
+      - name: app_player_weeks_key
+        tests: [unique, not_null]
+      - name: player_game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('fact_player_game_offense')", field: player_game_key}
+      - name: player_key
+        tests: [not_null]
+      - name: player_name
+        tests: [not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_result
+        tests:
+          - accepted_values: {values: ['W', 'L', 'T']}
+      - name: games_to_date
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 25}
+
+  - name: app_player_week_stats
+    description: >
+      app_player_weeks one stat at a time, with the trailing-three average, the
+      season average and total through the game, and the player's own prior
+      season: the same week's value and the season average one year earlier.
+    columns:
+      - name: app_player_week_stats_key
+        tests: [unique, not_null]
+      - name: player_game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('app_player_weeks')", field: player_game_key}
+      - name: stat_key
+        tests: [not_null]
+      - name: value
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_game_key, stat_key]
+
+  - name: app_player_leaders
+    description: >
+      Season totals and per-game rates per player, season and season type, with
+      a rank within the position for each leaderboard column (1 = most) and the
+      team from the player's most recent game.
+    columns:
+      - name: app_player_leaders_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: games
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 25}
+      - name: rank_fanduel_points
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_key, season, season_type]
+
+  - name: app_player_defense_weeks
+    description: >
+      A defender's season game by game: the defensive box score with identity,
+      team, opponent, the team result and running counts. One row per player
+      game; completed games only.
+    columns:
+      - name: app_player_defense_weeks_key
+        tests: [unique, not_null]
+      - name: player_game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('fact_player_game_defense')", field: player_game_key}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}

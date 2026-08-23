@@ -1,0 +1,31 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# News: resolved player mentions with the next game attached.
+
+models:
+  - name: app_news_mentions
+    description: >
+      Every resolved player news mention with the player's identity, the team
+      the article attributed him to, the feed, headline and context, how the
+      name was resolved, and the team's next scheduled game after the article.
+    columns:
+      - name: app_news_mentions_key
+        tests: [unique, not_null]
+      - name: mention_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('fact_player_news_mention')", field: mention_key}
+      - name: player_key
+        description: "NULL when the article's name did not resolve; is_player_resolved says so."
+      - name: player_name
+        tests: [not_null]
+      - name: published_at
+        tests: [not_null]
+      - name: feed
+        tests: [not_null]
+      - name: days_to_next_game
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
