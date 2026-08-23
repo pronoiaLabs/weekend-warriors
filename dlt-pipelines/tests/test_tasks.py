@@ -127,6 +127,11 @@ def test_inlined_spec_is_valid_yaml_with_the_right_bindings(spec) -> None:
     # per-source destination.
     assert container["env"]["SNOWFLAKE_DATABASE"] == "DLT_DB"
 
+    if spec.destination == "postgres":
+        assert container["env"]["DLT_DATASET"] == spec.dataset_name
+        expected_app_db = spec.config.get("database") or resolve_database(spec, "PROD")
+        assert container["env"]["SNOWFLAKE_APP_DATABASE"] == expected_app_db
+
     if spec.secret:
         bound = container["secrets"][0]
         assert bound["snowflakeSecret"] == spec.secret
@@ -189,8 +194,11 @@ def test_suspend_and_resume_cover_the_same_pipelines_as_tasks() -> None:
 
     for spec in tasks:
         assert f"dlt_task_{spec.name} SUSPEND" in suspend_sql(spec)
-        assert f"dlt_task_{spec.name} RESUME" in resume_sql(spec)
         assert f"dlt_task_{spec.name}" in task_sql(spec)
+        if spec.schedule:
+            assert f"dlt_task_{spec.name} RESUME" in resume_sql(spec)
+        else:
+            assert "RESUME;" not in resume_sql(spec)
 
     # `sample` has neither schedule nor after and must appear in none of them.
     unscheduled = [s for s in load_registry().pipelines if not s.schedule and not s.after]
@@ -211,7 +219,7 @@ def test_suspend_tolerates_a_task_that_does_not_exist_yet() -> None:
     """
     from deploy.tasks.generate_tasks import resume_sql, suspend_sql  # noqa: PLC0415
 
-    spec = next(s for s in load_registry().pipelines if s.schedule or s.after)
+    spec = next(s for s in load_registry().pipelines if s.schedule)
     assert "ALTER TASK IF EXISTS" in suspend_sql(spec)
     assert "IF EXISTS" not in resume_sql(spec)
 
@@ -258,57 +266,110 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
     # `sample` is the guard on the whole mechanism: it exists precisely to be the
     # pipeline that is runnable by hand and never becomes a Task.
     assert "sample" not in scheduled
-    # AFTER child, not cron. A cron assertion that included it would paper over
-    # generate_tasks emitting USING CRON by accident.
+    # Execute-only (`after:`), not cron. A cron assertion that included it
+    # would paper over generate_tasks emitting USING CRON by accident.
     assert "nfl_app_to_postgres" not in scheduled
+    assert "obs_to_postgres" not in scheduled
 
 
-def test_app_copy_task_is_after_harvest_not_cron() -> None:
+def test_app_copy_task_is_standalone_not_cron_or_after() -> None:
+    """Snowflake rejects AFTER across schemas (091413). This Task is execute-only."""
     spec = load_registry().get("nfl_app_to_postgres")
     sql = task_sql(spec)
-    assert "AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL" in sql
+    assert "AFTER " not in sql
     assert "USING CRON" not in sql
     assert "DLT_DESTINATION: postgres" in sql or "DLT_DESTINATION:postgres" in sql
     assert sql.index("EXTERNAL_ACCESS_INTEGRATIONS") < sql.index("FROM SPECIFICATION")
     assert "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD" in sql
     assert "NFL_PROD_DB" in sql
+    assert "DLT_DATASET: app_copy" in sql or "DLT_DATASET:app_copy" in sql
 
 
-def test_suspend_resume_include_the_harvest_graph_for_after_tasks() -> None:
-    from io import StringIO  # noqa: PLC0415
+def test_obs_copy_task_is_standalone_not_cron_or_after() -> None:
+    """Same execute-only pattern as APP. Source database is DLT_DB, not NFL_PROD_DB."""
+    spec = load_registry().get("obs_to_postgres")
+    sql = task_sql(spec)
+    assert "AFTER " not in sql
+    assert "USING CRON" not in sql
+    assert "DLT_DESTINATION: postgres" in sql or "DLT_DESTINATION:postgres" in sql
+    assert "DLT_DATASET: observability" in sql or "DLT_DATASET:observability" in sql
+    assert "SNOWFLAKE_APP_DATABASE: DLT_DB" in sql or "SNOWFLAKE_APP_DATABASE:DLT_DB" in sql
+    assert sql.index("EXTERNAL_ACCESS_INTEGRATIONS") < sql.index("FROM SPECIFICATION")
+    assert "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD" in sql
+    # Telemetry _DLT_RUNS still lands in NFL_PROD_DB.OPS.
+    assert "NFL_PROD_DB" in sql
+
+
+def test_app_copy_wrapper_is_the_harvest_dag_edge() -> None:
+    """The DAG edge is NFL_PROD_DB.OPS.APP_COPY_NFL, not generate_tasks AFTER."""
+    sql = (_ROOT / "sql/sources/nfl/08_app_copy_task.sql").read_text()
+    assert "CREATE OR ALTER TASK NFL_PROD_DB.OPS.APP_COPY_NFL" in sql
+    assert "AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL" in sql
+    assert "EXECUTE TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres" in sql
+    assert "GRANT OPERATE ON TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres" in sql
+    assert sql.index("DBT_BUILD_NFL SUSPEND") < sql.index("DBT_HARVEST_NFL SUSPEND")
+    assert sql.index("APP_COPY_NFL RESUME") < sql.index("DBT_HARVEST_NFL RESUME")
+    assert sql.index("DBT_HARVEST_NFL RESUME") < sql.index("DBT_BUILD_NFL RESUME")
+
+
+def test_obs_copy_wrappers_are_the_refresh_dag_edges() -> None:
+    """OBS_COPY and DBT_OBS_COPY both EXECUTE TASK the same loader."""
+    sql = (_ROOT / "sql/ops/11_obs_copy_task.sql").read_text()
+    assert "CREATE OR ALTER TASK DLT_DB.OPS.OBS_COPY" in sql
+    assert "AFTER DLT_DB.OPS.OBS_REFRESH" in sql
+    assert "CREATE OR ALTER TASK DLT_DB.OPS.DBT_OBS_COPY" in sql
+    assert "AFTER DLT_DB.OPS.DBT_RUNS_REFRESH" in sql
+    assert sql.count("EXECUTE TASK DLT_DB.OPS.dlt_task_obs_to_postgres") == 1
+    assert sql.count("CALL DLT_DB.OPS.SP_OBS_COPY_FIRE()") == 2
+    assert "GRANT OPERATE ON TASK DLT_DB.OPS.dlt_task_obs_to_postgres" in sql
+    assert "GRANT SELECT ON TABLE DLT_DB.OPS.DBT_RUNS TO ROLE DLT_LOADER_ROLE" in sql
+    assert "OBS_COPY_LATCH" in sql
+    assert "DATEADD('minute', -10, CURRENT_TIMESTAMP())" in sql
+    assert sql.index("USE ROLE DLT_LOADER_ROLE") < sql.index("USE ROLE DBT_RUNNER_ROLE")
+    assert sql.index("OBS_REFRESH SUSPEND") < sql.index("OBS_COPY SUSPEND")
+    assert sql.index("OBS_COPY RESUME") < sql.index("OBS_REFRESH RESUME")
+    assert sql.index("DBT_RUNS_REFRESH SUSPEND") < sql.index("DBT_OBS_COPY SUSPEND")
+    assert sql.index("DBT_OBS_COPY RESUME") < sql.index("DBT_RUNS_REFRESH RESUME")
+
+
+def test_suspend_resume_do_not_touch_the_harvest_graph() -> None:
+    """Crossing into NFL_PROD_DB.OPS from generate_tasks suspended the fleet
+    when apply then failed (2026-08-23). The harvest graph is 05/08's job.
+    """
     from contextlib import redirect_stdout  # noqa: PLC0415
+    from io import StringIO  # noqa: PLC0415
 
     from deploy.tasks.generate_tasks import main  # noqa: PLC0415
 
     suspend = StringIO()
     with redirect_stdout(suspend):
         assert main(["--suspend"]) == 0
-    suspend_sql = suspend.getvalue()
-    assert "ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND" in suspend_sql
-    assert "ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL SUSPEND" in suspend_sql
-    assert suspend_sql.index("DBT_BUILD_NFL") < suspend_sql.index(
-        "dlt_task_nfl_app_to_postgres"
-    )
+    assert "DBT_BUILD_NFL" not in suspend.getvalue()
+    assert "DBT_HARVEST_NFL" not in suspend.getvalue()
+    assert "dlt_task_nfl_app_to_postgres" in suspend.getvalue()
+    assert "dlt_task_obs_to_postgres" in suspend.getvalue()
 
     resume = StringIO()
     with redirect_stdout(resume):
         assert main(["--resume"]) == 0
-    resume_sql = resume.getvalue()
-    assert resume_sql.index("dlt_task_nfl_app_to_postgres") < resume_sql.index(
-        "DBT_HARVEST_NFL"
-    )
-    assert resume_sql.index("DBT_HARVEST_NFL") < resume_sql.index("DBT_BUILD_NFL")
-    assert "ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME" in resume_sql
-    assert "ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME" not in resume_sql
+    assert "DBT_BUILD_NFL" not in resume.getvalue()
+    assert "DBT_HARVEST_NFL" not in resume.getvalue()
+    assert "ALTER TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres RESUME" not in resume.getvalue()
+    assert "ALTER TASK DLT_DB.OPS.dlt_task_obs_to_postgres RESUME" not in resume.getvalue()
 
 
-def test_ci_task_resume_count_ignores_harvest_graph() -> None:
-    """CI greps CREATE OR ALTER TASK vs ALTER TASK DLT_DB.OPS.dlt_task_.
+def test_execute_only_task_is_not_resumed() -> None:
+    """091453: RESUME requires SCHEDULE/AFTER/WHEN. EXECUTE TASK works suspended."""
+    from deploy.tasks.generate_tasks import resume_sql  # noqa: PLC0415
 
-    Harvest-graph resumes (DBT_HARVEST_* / DBT_BUILD_*) are extra ALTER TASK
-    lines on purpose. Counting every ALTER TASK would fail the equality check
-    the moment an `after:` pipeline exists.
-    """
+    for name in ("nfl_app_to_postgres", "obs_to_postgres"):
+        out = resume_sql(load_registry().get(name))
+        assert "RESUME;" not in out
+        assert "execute-only" in out
+
+
+def test_ci_task_resume_count_matches_creates() -> None:
+    """CI greps USING CRON creates vs ALTER TASK DLT_DB.OPS.dlt_task_."""
     from contextlib import redirect_stdout  # noqa: PLC0415
     from io import StringIO  # noqa: PLC0415
 
@@ -321,21 +382,20 @@ def test_ci_task_resume_count_ignores_harvest_graph() -> None:
     with redirect_stdout(resume_out):
         assert main(["--resume"]) == 0
 
-    creates = [
+    scheduled = [
         line
         for line in tasks_out.getvalue().splitlines()
-        if line.startswith("CREATE OR ALTER TASK")
+        if "SCHEDULE = 'USING CRON" in line
     ]
     dlt_resumes = [
         line
         for line in resume_out.getvalue().splitlines()
         if line.startswith("ALTER TASK DLT_DB.OPS.dlt_task_")
     ]
-    harvest_resumes = [
-        line
-        for line in resume_out.getvalue().splitlines()
-        if line.startswith("ALTER TASK ") and "DBT_" in line
-    ]
-    assert creates
-    assert len(creates) == len(dlt_resumes)
-    assert harvest_resumes, "after: children must resume the harvest graph too"
+    assert scheduled
+    assert len(scheduled) == len(dlt_resumes)
+    assert "CREATE OR ALTER TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres" in tasks_out.getvalue()
+    assert "CREATE OR ALTER TASK DLT_DB.OPS.dlt_task_obs_to_postgres" in tasks_out.getvalue()
+    assert "ALTER TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres RESUME" not in resume_out.getvalue()
+    assert "ALTER TASK DLT_DB.OPS.dlt_task_obs_to_postgres RESUME" not in resume_out.getvalue()
+    assert "DBT_" not in resume_out.getvalue()

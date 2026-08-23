@@ -319,7 +319,11 @@ BEGIN
     e.RESOURCE_ATTRIBUTES:"snow.compute_pool.node.instance_family"::string,
     e.RESOURCE_ATTRIBUTES:"snow.compute_pool.node.id"::string,
     e.RECORD:metric.name::string,
-    e.VALUE::float,
+    -- A histogram metric carries an object here ({bucket_counts, explicit_bounds,
+    -- count, max ...}); the first one arrived 2026-08-22 and a bare ::float cast
+    -- failed every refresh until the task auto-suspended. Keep the row, with the
+    -- name, type and unit queryable, and a NULL value for anything non-scalar.
+    IFF(TYPEOF(e.VALUE) IN ('INTEGER', 'DECIMAL', 'DOUBLE'), e.VALUE::float, NULL),
     e.RECORD:metric.unit::string,
     e.RECORD:metric_type::string,
     e.RECORD:metric.description::string,
@@ -786,6 +790,7 @@ GRANT SELECT ON VIEW  DLT_DB.OPS.V_TASK_RUNS   TO ROLE DLT_DEV_ROLE;
 -- ---------------------------------------------------------------------------
 ALTER TASK IF EXISTS DLT_DB.OPS.OBS_REFRESH_SWEEP SUSPEND;
 ALTER TASK IF EXISTS DLT_DB.OPS.OBS_REFRESH SUSPEND;
+ALTER TASK IF EXISTS DLT_DB.OPS.OBS_COPY SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.OBS_REFRESH
   WAREHOUSE = DLT_OPS_WH
@@ -806,5 +811,8 @@ CREATE OR ALTER TASK DLT_DB.OPS.OBS_REFRESH_SWEEP
 AS
   CALL DLT_DB.OPS.SP_OBS_SWEEP();
 
+-- Child before parent. IF EXISTS: OBS_COPY is created by ops/11, after the
+-- standalone loader Task exists. Re-applying this file before 11 must not fail.
+ALTER TASK IF EXISTS DLT_DB.OPS.OBS_COPY RESUME;
 ALTER TASK DLT_DB.OPS.OBS_REFRESH RESUME;
 ALTER TASK DLT_DB.OPS.OBS_REFRESH_SWEEP RESUME;

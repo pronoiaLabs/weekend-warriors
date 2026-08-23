@@ -18,8 +18,8 @@ spec:
         - {{ pipeline }}
       env:
         DLT_DESTINATION: postgres
-        DLT_DATASET: app_copy
-        SNOWFLAKE_APP_DATABASE: {{ database }}
+        DLT_DATASET: {{ dataset }}
+        SNOWFLAKE_APP_DATABASE: {{ app_database }}
         DESTINATION__POSTGRES__CREDENTIALS__HOST: 3v6glchrerfzlcisoqkcjgkgxm.mcgkxfo-weekend-warriors.us-east-2.aws.postgres.snowflake.app
         DESTINATION__POSTGRES__CREDENTIALS__PORT: "5432"
         DESTINATION__POSTGRES__CREDENTIALS__DATABASE: app

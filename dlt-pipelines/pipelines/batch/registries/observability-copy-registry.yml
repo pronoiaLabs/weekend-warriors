@@ -1,0 +1,50 @@
+# DLT_DB.OPS materialized tables → Snowflake Postgres app.observability.
+#
+# Snowflake stays DLT_DB.OPS. This job replace-loads the dashboard tables
+# into the existing Weekend Warrior App instance (same EAI, secret, writer
+# as nfl_app_to_postgres). DLT_EVENTS and per-sport trigger-load tables
+# stay out.
+#
+# Laptop: make run-postgres NAME=obs_to_postgres
+# Prod:   generate_tasks emits a standalone Task (no cron, no AFTER).
+#         sql/ops/11_obs_copy_task.sql is the DAG: OBS_COPY AFTER
+#         OBS_REFRESH and DBT_OBS_COPY AFTER DBT_RUNS_REFRESH both
+#         EXECUTE TASK this loader.
+
+defaults:
+  destination: postgres
+  # telemetry _DLT_RUNS stays in NFL_PROD_DB.OPS (table exists)
+  database: NFL
+  dataset_name: observability
+  group: observability
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  secret: DLT_DB.OPS.POSTGRES_APP_COPY
+  env_var: DESTINATION__POSTGRES__CREDENTIALS__PASSWORD
+  external_access: POSTGRES_APP_EAI
+
+pipelines:
+  - name: obs_to_postgres
+    source: snowflake_app
+    # is_task + docs only; generate_tasks does not emit AFTER
+    after: DLT_DB.OPS.OBS_REFRESH
+    write_disposition: replace
+    config:
+      # Required. Stem DLT would resolve to DLT_PROD_DB.
+      database: DLT_DB
+      schema: OPS
+      # Base tables only. Copy the tables the views sit on (LOG_LINES not
+      # V_LOG_LINES, DBT_RUNS not V_DBT_RUNS). Explicit list.
+      tables:
+        - pipeline_runs
+        - task_runs
+        - log_lines
+        - metric_samples
+        - pipeline_registry
+        - dbt_builds
+        - dbt_runs
+        - dbt_runs_refresh_log
+        - dbt_query_log
+        - dbt_query_operator_stats
+        - headlines
+        - alert_state

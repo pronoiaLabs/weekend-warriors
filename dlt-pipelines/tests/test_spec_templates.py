@@ -54,7 +54,14 @@ EXPECTED_VARIABLES: dict[str, set[str]] = {
     "dlt_dev_job_nosecret.tmpl.yaml": {"args", "database", "dataset"},
     "dlt_job.tmpl.yaml": {"pipeline", "database", "secret", "env_var"},
     "dlt_job_nosecret.tmpl.yaml": {"pipeline", "database"},
-    "dlt_job_postgres.tmpl.yaml": {"pipeline", "database", "secret", "env_var"},
+    "dlt_job_postgres.tmpl.yaml": {
+        "pipeline",
+        "database",
+        "dataset",
+        "app_database",
+        "secret",
+        "env_var",
+    },
 }
 
 # A deliberately awkward argv: brackets the shell would glob, an `=` a naive split
@@ -66,6 +73,7 @@ SUBSTITUTIONS = {
     "pipeline": "nfl_plays",
     "database": "NFL_DEV_DB",
     "dataset": "DEV_JSMITH",
+    "app_database": "DLT_DB",
     "secret": "DLT_DB.OPS.NFL_API_KEY",
     "env_var": "SOURCES__NFL__API_KEY",
 }
@@ -149,8 +157,8 @@ def test_rendered_template_is_valid_yaml_with_the_expected_shape(filename: str) 
     assert env["SNOWFLAKE_DATABASE"] == "DLT_DB"
     if filename == "dlt_job_postgres.tmpl.yaml":
         assert env["DLT_DESTINATION"] == "postgres"
-        assert env["DLT_DATASET"] == "app_copy"
-        assert env["SNOWFLAKE_APP_DATABASE"] == "NFL_DEV_DB"
+        assert env["DLT_DATASET"] == "DEV_JSMITH"
+        assert env["SNOWFLAKE_APP_DATABASE"] == "DLT_DB"
         # record_run writes NFL_PROD_DB.OPS._DLT_RUNS (same as other NFL Tasks).
         # The data dest is still postgres; this is telemetry only.
         assert env["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] == "NFL_DEV_DB"

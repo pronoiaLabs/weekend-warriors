@@ -190,11 +190,12 @@ dev templates only.
 
 Tasks are created **suspended**. Generating a schedule and starting one are different decisions.
 
-`nfl_app_to_postgres` is not cron. It is `AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL`, so
-it joins the harvest graph. `make tasks-suspend` also suspends `DBT_BUILD_NFL` and
-`DBT_HARVEST_NFL` when any registry `after:` exists; resume is copy, then harvest,
-then build. Do not `ALTER TASK` those three by hand — the statements are in
-`make tasks-suspend-sql` / `make tasks-resume-sql`. Setup and laptop prove:
+`nfl_app_to_postgres` and `obs_to_postgres` are not cron. They are standalone
+Tasks in `DLT_DB.OPS`. `NFL_PROD_DB.OPS.APP_COPY_NFL` (08) sits `AFTER`
+harvest and `EXECUTE TASK`s the APP loader. `OBS_COPY` (DLT_LOADER_ROLE)
+sits after `OBS_REFRESH`; `DBT_OBS_COPY` (DBT_RUNNER_ROLE) sits after
+`DBT_RUNS_REFRESH` — one owner per graph. `make tasks-suspend` does not
+touch those graphs. Setup and laptop prove:
 [MAKE-COMMANDS-POSTGRES.md](MAKE-COMMANDS-POSTGRES.md).
 
 ```bash

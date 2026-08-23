@@ -8,6 +8,7 @@ Snowflake Postgres instance, not a Snowflake database.
 |---|---|---|
 | `02_external_access.sql` | Host-only EAI to the Postgres instance `:5432`. No `0.0.0.0/0` | `make setup-source SOURCE=postgres CONFIRM=1` |
 | `03_secrets.sql` | `DLT_DB.OPS.POSTGRES_APP_COPY` placeholder + READ/USAGE | same |
+| `04_ingress_spcs.sql` | `POSTGRES_INGRESS` rule for Snowflake egress CIDRs (SPCS source IPs) | same |
 | `apply_secret.sh` | `ALTER SECRET ... SET SECRET_STRING` from `APP_COPY_WRITER_PASSWORD` | `make setup-postgres-secret CONFIRM=1` |
 
 The ALTER is written to `.generated/03_set_secret.sql` (gitignored). You cannot

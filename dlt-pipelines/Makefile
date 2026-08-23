@@ -186,7 +186,8 @@ endef
         run-local run-snowflake run-prod run-postgres run-spcs \
         sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
         setup-base setup-dev setup-prod setup-ops setup-integrations \
-        setup-source setup-postgres setup-postgres-secret new-source \
+        setup-source setup-postgres setup-postgres-secret setup-postgres-observability \
+        setup-app-copy-trigger setup-obs-copy-trigger new-source \
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
         sync-apply tasks-apply tasks-suspend tasks-resume deploy \
@@ -312,9 +313,9 @@ run-prod: ## laptop -> Snowflake PROD RAW as DLT_LOADER_ROLE (NAME= [CONFIRM=1] 
 	  $(UV_RUN) python -m pipelines.batch.run $(if $(GROUP),--group $(GROUP),$(NAME)) $(RES_FLAGS) $(PARAM_FLAGS) && \
 	  echo "Ran '$(if $(GROUP),group $(GROUP),$(NAME))'$(if $(RESOURCE), resources [$(RESOURCE)],)$(if $(PARAM), params [$(PARAM)],) -> $$db.$$ds as $(PROD_ROLE) using snow connection '$(CONN)'."
 
-# Snowflake source (NFL_PROD_DB.APP) + Postgres dest (app.app_copy).
+# Snowflake source (APP or DLT_DB.OPS) + Postgres dest (app.<dataset_name>).
 # run-snowflake cannot do this: it forces DLT_DESTINATION=snowflake and DEV_<user>.
-run-postgres: ## laptop -> Snowflake Postgres app.app_copy (NAME= [RESOURCE=] [CONN=])
+run-postgres: ## laptop -> Snowflake Postgres app.<dataset> (NAME= [RESOURCE=] [CONN=])
 	@if [ -z "$(NAME)" ]; then \
 		echo "Set NAME=<pipeline>, e.g. make run-postgres NAME=nfl_app_to_postgres"; \
 		exit 2; \
@@ -329,10 +330,13 @@ run-postgres: ## laptop -> Snowflake Postgres app.app_copy (NAME= [RESOURCE=] [C
 	    echo "APP_COPY_WRITER_PASSWORD is empty. make setup-postgres CONFIRM=1 writes it."; \
 	    exit 2; \
 	  fi; \
+	  $(call resolve_db_or_die,$(NAME),PROD); \
+	  ds="$$($(UV_RUN) python -m pipelines.batch.models --dataset $(NAME))"; \
+	  app_db="$$($(UV_RUN) python -m pipelines.batch.models --app-database $(NAME))"; \
 	  $(snow_env_or_die); \
-	  DLT_REGISTRY_SOURCE=yaml DLT_DESTINATION=postgres DLT_DATASET=app_copy \
-	  SNOWFLAKE_APP_DATABASE=NFL_PROD_DB \
-	  DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE=NFL_PROD_DB \
+	  DLT_REGISTRY_SOURCE=yaml DLT_DESTINATION=postgres DLT_DATASET="$$ds" \
+	  SNOWFLAKE_APP_DATABASE="$$app_db" \
+	  DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE="$$db" \
 	  DESTINATION__POSTGRES__CREDENTIALS__HOST="$$PGHOST" \
 	  DESTINATION__POSTGRES__CREDENTIALS__PORT="$$PGPORT" \
 	  DESTINATION__POSTGRES__CREDENTIALS__DATABASE=app \
@@ -340,7 +344,7 @@ run-postgres: ## laptop -> Snowflake Postgres app.app_copy (NAME= [RESOURCE=] [C
 	  DESTINATION__POSTGRES__CREDENTIALS__PASSWORD="$$APP_COPY_WRITER_PASSWORD" \
 	  PGSSLMODE="$${PGSSLMODE:-require}" \
 	  $(UV_RUN) python -m pipelines.batch.run $(NAME) $(RES_FLAGS) && \
-	  echo "Ran '$(NAME)'$(if $(RESOURCE), resources [$(RESOURCE)],) -> app.app_copy as app_copy_writer."
+	  echo "Ran '$(NAME)'$(if $(RESOURCE), resources [$(RESOURCE)],) -> app.$$ds as app_copy_writer."
 
 # The container entrypoint is `python -m pipelines.batch.run`, so RESOURCE and PARAM
 # are the same CLI flags run-local and run-snowflake pass; they just have to travel
@@ -476,7 +480,12 @@ setup-ops: ## Apply observability DDL sql/ops/* -- event table + binding (guard:
 		echo "(optionally SNOW_CONN=<connection>)."; \
 		exit 2; \
 	fi
-	@for f in sql/ops/*.sql; do echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
+	@for f in sql/ops/*.sql; do \
+		case "$$f" in \
+			*/11_obs_copy_task.sql) echo "== skipping $$f (make setup-obs-copy-trigger) ==";; \
+			*) echo "== applying $$f =="; $(SNOW) -f $$f || exit 1;; \
+		esac; \
+	done
 	@echo "Observability ready, but NOT yet in effect on any warm compute pool."
 	@echo "  1. snow sql -q \"SHOW PARAMETERS LIKE 'EVENT_TABLE' IN ACCOUNT;\"   -- level must read ACCOUNT"
 	@echo "     (check ACCOUNT, not DATABASE: SPCS ignores the database-level binding)"
@@ -535,9 +544,9 @@ setup-source: ## Apply one source's DDL sql/sources/$(SOURCE)/* (SOURCE=nfl, gua
 
 # Snowflake Postgres instance: database + schema + writer role. Statements in
 # sql/postgres/; this target only sources .env.postgres and runs apply.sh.
-setup-postgres: ## Create app / app_copy / app_copy_writer (guard: CONFIRM=1)
+setup-postgres: ## Create app / app_copy / observability / app_copy_writer (guard: CONFIRM=1)
 	@if [ "$(CONFIRM)" != "1" ]; then \
-		echo "Creates database app, schema app_copy, roles, watermark table."; \
+		echo "Creates database app, schemas app_copy + observability, roles, watermarks."; \
 		echo "Reads $(POSTGRES_ENV). Re-run with CONFIRM=1."; \
 		echo "See MAKE-COMMANDS-POSTGRES.md."; \
 		exit 2; \
@@ -566,6 +575,60 @@ setup-postgres-secret: ## ALTER SECRET POSTGRES_APP_COPY from .env.postgres (gua
 	    exit 2; \
 	  fi; \
 	  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/sources/postgres/apply_secret.sh
+
+# Schema only. The instance already has `app` + app_copy_writer from setup-postgres.
+setup-postgres-observability: ## Create app.observability + watermark (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates schema observability and observability_watermark on database app."; \
+		echo "Reuses app_copy_writer. Reads $(POSTGRES_ENV). Re-run with CONFIRM=1."; \
+		echo "See MAKE-COMMANDS-POSTGRES.md."; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(POSTGRES_ENV)" ]; then \
+		echo "Missing $(POSTGRES_ENV). Run make setup-postgres CONFIRM=1 first."; \
+		exit 2; \
+	fi
+	@set -a && . "$(POSTGRES_ENV)" && set +a && \
+	  if [ -z "$$APP_COPY_WRITER_PASSWORD" ]; then \
+	    echo "APP_COPY_WRITER_PASSWORD is empty. make setup-postgres CONFIRM=1 writes it."; \
+	    exit 2; \
+	  fi; \
+	  ./sql/postgres/apply_observability.sh
+
+# Standalone copy Task in DLT_DB.OPS (no cron) plus the harvest-graph wrapper
+# in NFL_PROD_DB.OPS. Does NOT run tasks-apply on the whole fleet.
+setup-app-copy-trigger: build ## Create nfl_app_to_postgres Task + APP_COPY_NFL wrapper (CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates DLT_DB.OPS.dlt_task_nfl_app_to_postgres (standalone) and"; \
+		echo "NFL_PROD_DB.OPS.APP_COPY_NFL AFTER harvest. Does not suspend the fleet."; \
+		echo "Re-run with CONFIRM=1. See MAKE-COMMANDS-POSTGRES.md."; \
+		exit 2; \
+	fi
+	$(UV_RUN) python -c "from deploy.tasks.generate_tasks import task_sql; \
+from pipelines.batch.models import load_registry; \
+print(task_sql(load_registry().get('nfl_app_to_postgres')))" > build/app_copy_task.sql
+	@$(call hdr,Apply standalone nfl_app_to_postgres Task)
+	@$(SNOW_LOADER) -f build/app_copy_task.sql
+	@$(call hdr,Apply harvest wrapper APP_COPY_NFL)
+	@$(SNOW) -f sql/sources/nfl/08_app_copy_task.sql
+
+# Standalone obs copy Task in DLT_DB.OPS (no cron) plus OBS_COPY /
+# DBT_OBS_COPY wrappers. Does NOT run tasks-apply on the whole fleet.
+setup-obs-copy-trigger: build ## Create obs_to_postgres Task + OBS_COPY wrappers (CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates DLT_DB.OPS.dlt_task_obs_to_postgres (standalone) and"; \
+		echo "OBS_COPY / DBT_OBS_COPY AFTER the refresh tasks. Does not suspend the fleet."; \
+		echo "Re-run with CONFIRM=1. See MAKE-COMMANDS-POSTGRES.md."; \
+		exit 2; \
+	fi
+	@$(MAKE) sync-apply
+	$(UV_RUN) python -c "from deploy.tasks.generate_tasks import task_sql; \
+from pipelines.batch.models import load_registry; \
+print(task_sql(load_registry().get('obs_to_postgres')))" > build/obs_copy_task.sql
+	@$(call hdr,Apply standalone obs_to_postgres Task)
+	@$(SNOW_LOADER) -f build/obs_copy_task.sql
+	@$(call hdr,Apply OBS_COPY / DBT_OBS_COPY wrappers)
+	@$(SNOW) -f sql/ops/11_obs_copy_task.sql
 
 new-source: ## Scaffold SQL + registry for a new upstream API (NAME=weather [HOST=api.weather.com])
 	@if [ -z "$(NAME)" ]; then \
