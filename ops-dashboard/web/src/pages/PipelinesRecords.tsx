@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { fetchPipelinesIndex } from '../api/client.ts'
 import type { PipelineIndexRow, PipelinesIndexPayload } from '../api/types.ts'
-import Chips from '../components/Chips.tsx'
+import Select from '../components/Select.tsx'
 import { FormStrip } from '../components/slate/FormStrip.tsx'
 import { pctText, streakClass } from '../utils/records.ts'
 import TileFrame from '../components/TileFrame.tsx'
@@ -108,7 +108,7 @@ export default function PipelinesRecords() {
 
       <div className="filters">
         {data && sources.length > 1 && (
-          <Chips
+          <Select
             label="Source"
             active={source}
             onPick={setSource}

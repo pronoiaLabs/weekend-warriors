@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { fetchHeadlines, fetchPipelinesIndex, fetchSlate } from '../api/client.ts'
 import type { SlatePayload } from '../api/types.ts'
 import Chips from '../components/Chips.tsx'
+import Select from '../components/Select.tsx'
 import { DayStrip } from '../components/slate/DayStrip.tsx'
 import { HeadlinesPanel } from '../components/slate/HeadlinesPanel.tsx'
 import { LeagueRow } from '../components/slate/LeagueRow.tsx'
@@ -92,7 +93,8 @@ export default function Dashboard() {
                   warn: id === 'missed' && views[id] > 0,
                 }))}
               />
-              <Chips
+              {/* Kind and Source are selects, not chips: three chip rows wrap at full width */}
+              <Select
                 label="Kind"
                 active={kind}
                 onPick={(id) => setKind(id as typeof kind)}
@@ -101,9 +103,9 @@ export default function Dashboard() {
                   label: `${KIND_LABELS[id]} · ${kinds[id]}`,
                 }))}
               />
-              {/* one vendor per chip; a pick hides dbt builds, which belong to no single source */}
+              {/* one vendor per option; a pick hides dbt builds, which belong to no single source */}
               {sources.length > 2 && (
-                <Chips
+                <Select
                   label="Source"
                   active={source}
                   onPick={setSource}
