@@ -1,0 +1,312 @@
+{
+  "view": "SV_NFL_GAME_ODDS",
+  "database": "NFL_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "AWAY_TEAMS",
+      "name": "AWAY_TEAM_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Away team full name."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_SPREAD_RESULT",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Completed-game home ATS result at the closing line: cover, no cover, or push. NULL before completion."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "LINE_TIMING",
+      "data_type": "VARCHAR(7)",
+      "synonyms": null,
+      "comment": "Always closing for closing_odds; selected strictly before kickoff."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "SELECTED_SNAPSHOT_AT",
+      "data_type": "TIMESTAMP_TZ(9)",
+      "synonyms": null,
+      "comment": "Timestamp of the selected pre-kickoff closing observation."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "TOTAL_RESULT",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Completed-game result against the closing total: over, under, or push. NULL before completion."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "VENDOR",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Sportsbook vendor. Never combine vendors unless the question asks for a market consensus."
+    },
+    {
+      "table": "GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Game calendar date."
+    },
+    {
+      "table": "GAMES",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "NFL season year."
+    },
+    {
+      "table": "GAMES",
+      "name": "SEASON_TYPE_NAME",
+      "data_type": "VARCHAR(14)",
+      "synonyms": null,
+      "comment": "Preseason, Regular Season, or Postseason."
+    },
+    {
+      "table": "GAMES",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Week within the season phase."
+    },
+    {
+      "table": "HOME_TEAMS",
+      "name": "HOME_TEAM_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Home team full name."
+    },
+    {
+      "table": "OPENING_ODDS",
+      "name": "LINE_TIMING",
+      "data_type": "VARCHAR(7)",
+      "synonyms": null,
+      "comment": "Always opening for opening_odds."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "CLOSING_ODDS",
+      "name": "AVG_HOME_DEVIG_PROBABILITY",
+      "data_type": "NUMBER(38,12)",
+      "synonyms": null,
+      "comment": "Average de-vigged closing home win probability."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_COVERS",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": null,
+      "comment": "Completed games where the home team covered this vendor closing spread."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "MARKET_COUNT",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Number of game-vendor closing markets."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "OVERS",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": null,
+      "comment": "Completed games that finished over this vendor closing total."
+    }
+  ],
+  "facts": [
+    {
+      "table": "CLOSING_ODDS",
+      "name": "ACTUAL_TOTAL",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "Final combined score; NULL before completion."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "AWAY_MONEYLINE_DEVIG_PROBABILITY",
+      "data_type": "NUMBER(38,12)",
+      "synonyms": null,
+      "comment": "Closing away win probability normalized across both sides to remove vig."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "AWAY_MONEYLINE_IMPLIED_PROBABILITY",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Raw closing probability implied by away American odds, including vig."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "AWAY_MONEYLINE_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Closing away American moneyline odds."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "AWAY_SPREAD",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Closing away-team spread."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "AWAY_SPREAD_IMPLIED_PROBABILITY",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Raw probability implied by the closing away spread price."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "AWAY_TEAM_SCORE",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Final away score; NULL before completion."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_MONEYLINE_DEVIG_PROBABILITY",
+      "data_type": "NUMBER(38,12)",
+      "synonyms": null,
+      "comment": "Closing home win probability normalized across both sides to remove vig."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_MONEYLINE_IMPLIED_PROBABILITY",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Raw closing probability implied by home American odds, including vig."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_MONEYLINE_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Closing home American moneyline odds."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_SPREAD",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Closing home-team spread."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_SPREAD_IMPLIED_PROBABILITY",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Raw probability implied by the closing home spread price."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_SPREAD_MOVEMENT",
+      "data_type": "NUMBER(19,4)",
+      "synonyms": null,
+      "comment": "Closing minus opening home spread for the same vendor."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "HOME_TEAM_SCORE",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Final home score; NULL before completion."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "IMPLIED_AWAY_TEAM_TOTAL",
+      "data_type": "NUMBER(25,10)",
+      "synonyms": null,
+      "comment": "Closing implied away points from total / 2 plus home spread / 2."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "IMPLIED_HOME_TEAM_TOTAL",
+      "data_type": "NUMBER(25,10)",
+      "synonyms": null,
+      "comment": "Closing implied home points from total / 2 minus home spread / 2."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "OPENING_HOME_SPREAD",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Same-vendor opening home spread carried onto the closing row."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "OPENING_TOTAL_LINE",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Same-vendor opening total carried onto the closing row."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "OVER_IMPLIED_PROBABILITY",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Raw probability implied by the closing over price."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "TOTAL_LINE",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Closing over/under total."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "TOTAL_LINE_MOVEMENT",
+      "data_type": "NUMBER(19,4)",
+      "synonyms": null,
+      "comment": "Closing minus opening total for the same vendor."
+    },
+    {
+      "table": "CLOSING_ODDS",
+      "name": "UNDER_IMPLIED_PROBABILITY",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Raw probability implied by the closing under price."
+    },
+    {
+      "table": "OPENING_ODDS",
+      "name": "AWAY_MONEYLINE_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Opening away American moneyline odds."
+    },
+    {
+      "table": "OPENING_ODDS",
+      "name": "AWAY_SPREAD",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Opening away-team spread."
+    },
+    {
+      "table": "OPENING_ODDS",
+      "name": "HOME_MONEYLINE_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Opening home American moneyline odds."
+    },
+    {
+      "table": "OPENING_ODDS",
+      "name": "HOME_SPREAD",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Opening home-team spread."
+    },
+    {
+      "table": "OPENING_ODDS",
+      "name": "TOTAL_LINE",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Opening over/under total."
+    }
+  ]
+}

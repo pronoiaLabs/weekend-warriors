@@ -1,0 +1,480 @@
+{
+  "view": "SV_NFL_TEAM_PERFORMANCE",
+  "database": "NFL_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Calendar date the game was played."
+    },
+    {
+      "table": "GAMES",
+      "name": "VENUE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Stadium name. 40 distinct venues in the data."
+    },
+    {
+      "table": "GAMES",
+      "name": "WENT_TO_OVERTIME",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True if the game required overtime."
+    },
+    {
+      "table": "OPPONENTS",
+      "name": "OPPONENT_ABBREVIATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"opponent code\",\"against\"]",
+      "comment": "Three-letter code of the opposing team."
+    },
+    {
+      "table": "OPPONENTS",
+      "name": "OPPONENT_FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Full name of the opposing team."
+    },
+    {
+      "table": "TEAMS",
+      "name": "CONFERENCE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"afc or nfc\",\"league conference\"]",
+      "comment": "AFC or NFC."
+    },
+    {
+      "table": "TEAMS",
+      "name": "CONFERENCE_DIVISION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Conference and division combined, e.g. AFC WEST."
+    },
+    {
+      "table": "TEAMS",
+      "name": "DIVISION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Division within the conference. Uppercase in the data."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_ABBREVIATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Three-letter team code, e.g. KC, PHI, DET."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Full team name, e.g. Kansas City Chiefs."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "HAS_BOX_SCORE",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "False for 4 team-game rows whose game has no box score. Result columns are still populated for those rows; every box score measure is NULL."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "IS_HOME",
+      "data_type": "BOOLEAN",
+      "synonyms": "[\"home or away\",\"at home\",\"home game\"]",
+      "comment": "True when this team was the home team. Use for home and away splits."
+    },
+    {
+      "table": "WEEKS",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "NFL season. A season starting in year N runs through February of N+1, so the 2025 season ends in Feb 2026. Currently covers 2023 to 2025; new seasons are added as they load."
+    },
+    {
+      "table": "WEEKS",
+      "name": "SEASON_TYPE",
+      "data_type": "VARCHAR(14)",
+      "synonyms": "[\"phase\",\"part of season\",\"regular or playoff\"]",
+      "comment": "Preseason, Regular Season or Postseason. Almost all questions mean Regular Season."
+    },
+    {
+      "table": "WEEKS",
+      "name": "SEASON_WEEK_LABEL",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Human readable week, e.g. 2024 W9 or 2024 Post W1."
+    },
+    {
+      "table": "WEEKS",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Week within the season phase. Regular season is weeks 1 to 18. Week numbers restart for preseason and postseason, so always pair week with season_type."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "TEAM_GAMES",
+      "name": "AVG_POINTS_ALLOWED",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"points allowed per game\",\"defensive scoring average\"]",
+      "comment": "Average points allowed per game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "AVG_POINTS_SCORED",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"points per game\",\"scoring average\"]",
+      "comment": "Average points scored per game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "AVG_POSSESSION_MINUTES",
+      "data_type": "NUMBER(38,12)",
+      "synonyms": "[\"time of possession\",\"possession time\",\"ball control\"]",
+      "comment": "Average time of possession per game, in minutes."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "AVG_YARDS_PER_GAME",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"yards per game\",\"offensive average\"]",
+      "comment": "Average total yards per game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "FOURTH_DOWN_PCT",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": null,
+      "comment": "Fourth down conversion rate."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "GAMES_PLAYED",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Number of team-games. One game contributes 1 to each team."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "LOSSES",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": null,
+      "comment": "Games lost."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINT_DIFFERENTIAL",
+      "data_type": "NUMBER(32,0)",
+      "synonyms": "[\"point diff\",\"margin\",\"net points\"]",
+      "comment": "Total points scored minus points allowed."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "RED_ZONE_PCT",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"red zone rate\",\"red zone efficiency\",\"red zone scoring rate\"]",
+      "comment": "Share of red zone trips that produced a score."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "THIRD_DOWN_PCT",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"third down rate\",\"third down efficiency\",\"third down conversion rate\"]",
+      "comment": "Third down conversion rate, computed as total conversions over total attempts."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TIES",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": null,
+      "comment": "Games tied. Common in preseason, which has no overtime."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_FIRST_DOWNS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total first downs."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_FUMBLES_LOST",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Fumbles lost."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_INTERCEPTIONS_THROWN",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Interceptions thrown."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_PASSING_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total net passing yards."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_PENALTIES",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Penalties accepted against this team."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_PENALTY_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Yards lost to penalties."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_POINTS_ALLOWED",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"points against\",\"points conceded\"]",
+      "comment": "Total points allowed."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_POINTS_SCORED",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"points for\",\"total points\"]",
+      "comment": "Total points scored."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_RUSHING_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total rushing yards."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_SACKS_ALLOWED",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"sacks given up\",\"quarterback sacked\"]",
+      "comment": "Times this team's quarterback was sacked. This is sacks ALLOWED by this offense, not sacks recorded by its defense."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_TURNOVERS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"giveaways\",\"turnovers committed\"]",
+      "comment": "Turnovers committed: fumbles lost plus interceptions thrown."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_YARDS_GAINED",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total offensive yards."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "WINS",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": null,
+      "comment": "Games won."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "WIN_PCT",
+      "data_type": "NUMBER(22,7)",
+      "synonyms": "[\"winning percentage\",\"win rate\",\"win percentage\"]",
+      "comment": "NFL winning percentage: a tie counts as half a win. (W + 0.5T) / games."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "YARDS_PER_PLAY_CALC",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"yards per play\",\"efficiency per play\"]",
+      "comment": "Total yards divided by total offensive plays."
+    }
+  ],
+  "facts": [
+    {
+      "table": "TEAM_GAMES",
+      "name": "FIRST_DOWNS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Total first downs."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "FOURTH_DOWN_ATTEMPTS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Fourth downs attempted."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "FOURTH_DOWN_CONVERSIONS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Fourth downs converted."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "FUMBLES_LOST",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Fumbles lost to the opponent."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "INTERCEPTIONS_THROWN",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Interceptions thrown by this team."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "LOSS_FLAG",
+      "data_type": "NUMBER(1,0)",
+      "synonyms": null,
+      "comment": "Additive 1/0 loss indicator. Sum this to get losses."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "NET_PASSING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Net passing yards, after sack losses."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "PENALTIES",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Penalties accepted against this team."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "PENALTY_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Yards lost to penalties."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINTS_ALLOWED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Points this team conceded in this game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINTS_SCORED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Points this team scored in this game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINT_MARGIN",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "points_scored minus points_allowed. Negative in a loss."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POSSESSION_TIME_SECONDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Time of possession in seconds. Roughly 1800 per team per game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "RED_ZONE_ATTEMPTS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Trips inside the opponent 20."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "RED_ZONE_SCORES",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Red zone trips that resulted in a score."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "RUSHING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Rushing yards gained."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "SACKS_ALLOWED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Times this team's quarterback was sacked."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "THIRD_DOWN_ATTEMPTS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Third downs attempted."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "THIRD_DOWN_CONVERSIONS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Third downs converted."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TIE_FLAG",
+      "data_type": "NUMBER(1,0)",
+      "synonyms": null,
+      "comment": "Additive 1/0 tie indicator. NFL ties are rare but real."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_DRIVES",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Offensive drives."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_OFFENSIVE_PLAYS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Offensive plays run."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Total offensive yards. NULL for 4 team-game rows with no box score."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TURNOVERS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Turnovers committed: fumbles lost plus interceptions thrown."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "WIN_FLAG",
+      "data_type": "NUMBER(1,0)",
+      "synonyms": null,
+      "comment": "Additive 1/0 win indicator. Sum this to get wins."
+    }
+  ]
+}

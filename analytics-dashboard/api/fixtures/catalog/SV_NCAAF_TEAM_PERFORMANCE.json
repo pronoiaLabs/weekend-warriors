@@ -1,0 +1,214 @@
+{
+  "view": "SV_NCAAF_TEAM_PERFORMANCE",
+  "database": "NCAAF_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "OPPONENTS",
+      "name": "OPPONENT_COLLEGE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"opponent\",\"against team\"]",
+      "comment": "The opponent's institution."
+    },
+    {
+      "table": "OPPONENTS",
+      "name": "OPPONENT_IS_FBS",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True when the opponent is an FBS program. False marks FCS \"buy games\"."
+    },
+    {
+      "table": "TEAMS",
+      "name": "COLLEGE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"team\",\"school name\"]",
+      "comment": "The team's institution, e.g. 'Georgia'."
+    },
+    {
+      "table": "TEAMS",
+      "name": "CONFERENCE_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"conference\"]",
+      "comment": "The team's CURRENT conference; realignment history is not tracked here."
+    },
+    {
+      "table": "TEAMS",
+      "name": "IS_FBS",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True for FBS programs (~134 of 536 teams). League-wide questions almost always mean FBS."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Institution plus mascot."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Calendar date of the game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "HAS_BOX_SCORE",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "False for the handful of completed games whose yardage block is missing upstream; their scores and results are still real."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "IS_HOME",
+      "data_type": "BOOLEAN",
+      "synonyms": "[\"at home\",\"home game\"]",
+      "comment": "True when this row's team was the home side."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "IS_POSTSEASON",
+      "data_type": "BOOLEAN",
+      "synonyms": "[\"bowl game\",\"playoff\",\"CFP\"]",
+      "comment": "True for bowls and the College Football Playoff."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "RESULT",
+      "data_type": "VARCHAR(1)",
+      "synonyms": "[\"won or lost\",\"outcome\"]",
+      "comment": "W, L or T from this team's perspective. Ties are historical rarities kept for correctness."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Season, 2024-2025 today; 2026 rows appear as games complete. January bowl games belong to the prior year's season."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Week 1-16 in the regular calendar. WEEK 999 IS THE POSTSEASON MARKER, not a week; filter is_postseason instead."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "WENT_TO_OVERTIME",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True when the game needed overtime."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "TEAM_GAMES",
+      "name": "GAMES_PLAYED",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": "[\"number of games\"]",
+      "comment": "Rows counted. Correct for a single team's games; LEAGUE-WIDE this counts team-games (two per game), so halve it or count distinct games for \"how many games were played\"."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "LOSSES",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": "[\"number of losses\"]",
+      "comment": "Games lost."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINTS_ALLOWED_PER_GAME",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"defense points\",\"points given up per game\"]",
+      "comment": "Average points allowed."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINTS_PER_GAME",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"scoring average\",\"offense points\"]",
+      "comment": "Average points scored."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TURNOVERS_PER_GAME",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": null,
+      "comment": "Average turnovers committed, over games that have a box score."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "WINS",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": "[\"number of wins\"]",
+      "comment": "Games won."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "WIN_PCT",
+      "data_type": "NUMBER(19,6)",
+      "synonyms": "[\"winning percentage\",\"win rate\"]",
+      "comment": "Share of games won across the grouped rows. Ties count as losses here; the standings view carries the official percentage."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "YARDS_PER_GAME",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": null,
+      "comment": "Average total yards, over games that have a box score."
+    }
+  ],
+  "facts": [
+    {
+      "table": "TEAM_GAMES",
+      "name": "PASSING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Team passing yards in the game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINTS_ALLOWED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Points the opponent scored."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINTS_SCORED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Points this team scored in the game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "POINT_DIFFERENTIAL",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "points_scored minus points_allowed; negative in a loss."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "RUSHING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Team rushing yards in the game."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TOTAL_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Total offensive yards. NULL when the box score is missing upstream (see has_box_score)."
+    },
+    {
+      "table": "TEAM_GAMES",
+      "name": "TURNOVERS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Turnovers committed by this team."
+    }
+  ]
+}

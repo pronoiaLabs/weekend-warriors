@@ -1,0 +1,37 @@
+/* Glass Prism tokens. Ported from .brainstorm/wireframes/analytics-dashboard/sample-2
+   (theme-glass-prism). This app owns the file; ops-dashboard keeps its own. */
+:root {
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --fs-s: 11px;
+  --fs-b: 13px;
+  --fs-h: 15px;
+  --fs-d: 56px;
+
+  --bg: #050507;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.09);
+  --ink: #f4f6ff;
+  --ink-2: #cfd5ee;
+  --ink-3: #8d95b8;
+  --ink-4: #5f6789;
+  --line: rgba(255, 255, 255, 0.12);
+  --line-2: rgba(255, 255, 255, 0.26);
+
+  --accent: #19e3ff;
+  --accent-soft: rgba(25, 227, 255, 0.16);
+  --magenta: #ff2fd6;
+  --lime: #b8ff3c;
+  --pos: #b8ff3c;
+  --neg: #ff2fd6;
+  --warn: #ffd166;
+
+  --r: 18px;
+  --gap: 16px;
+  --tilt-deg: 8;
+  --glass: 0 1px 0 rgba(255, 255, 255, 0.16) inset, 0 30px 70px rgba(0, 0, 0, 0.5);
+
+  /* the one breakpoint; useViewport reads the same number */
+  --sports-narrow: 900px;
+}

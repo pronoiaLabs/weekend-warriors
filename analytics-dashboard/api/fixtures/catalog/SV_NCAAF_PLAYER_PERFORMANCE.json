@@ -1,0 +1,228 @@
+{
+  "view": "SV_NCAAF_PLAYER_PERFORMANCE",
+  "database": "NCAAF_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "PLAYERS",
+      "name": "CURRENT_TEAM_COLLEGE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"plays for\",\"current school\"]",
+      "comment": "The player's CURRENT school. For stat questions prefer the stat line's team below: they disagree across transfers."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"player\",\"player name\"]",
+      "comment": "Player full name."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "POSITION_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"position\"]",
+      "comment": "Position as the source spells it (e.g. Quarterback, Wide Receiver)."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Calendar date of the game."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "IS_HOME",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True when the player's team was home."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "IS_POSTSEASON",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True for bowl and playoff games."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Season the game belongs to (January bowls belong to the prior year)."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Week 1-16; 999 marks the postseason (use is_postseason)."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "STAT_SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Season of the rollup, 2024-2025 today."
+    },
+    {
+      "table": "TEAMS",
+      "name": "COLLEGE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"team\",\"school\"]",
+      "comment": "The stat line's school: the team the production was earned for."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "PLAYER_GAMES",
+      "name": "GAMES_PLAYED",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": "[\"games\",\"appearances\"]",
+      "comment": "Player-game rows in the grouping."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_PASSING_TOUCHDOWNS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Passing touchdowns summed from game logs."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_PASSING_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Passing yards summed from game logs. For a season total, the season fact's published number is authoritative."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RECEIVING_TOUCHDOWNS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Receiving touchdowns summed from game logs."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RECEIVING_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Receiving yards summed from game logs."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RUSHING_TOUCHDOWNS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Rushing touchdowns summed from game logs."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RUSHING_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Rushing yards summed from game logs."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_SACKS",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Sacks summed from game logs."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_TACKLES_SUM",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Tackles summed from game logs."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "AVG_PASSING_YARDS_PER_GAME",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Source-published passing yards per game."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "AVG_RECEIVING_YARDS_PER_GAME",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Source-published receiving yards per game."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "AVG_RUSHING_YARDS_PER_GAME",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Source-published rushing yards per game."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "SEASON_PASSING_YARDS_TOTAL",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Source-published season passing yards (grouped, usually per player-season)."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "SEASON_RECEIVING_YARDS_TOTAL",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Source-published season receiving yards."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "SEASON_RUSHING_YARDS_TOTAL",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Source-published season rushing yards."
+    }
+  ],
+  "facts": [
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASSING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Passing yards in the game."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "RECEIVING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Receiving yards in the game."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "RUSHING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Rushing yards in the game."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "SEASON_PASSING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Season passing yards as published by the source."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "SEASON_RECEIVING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Season receiving yards as published."
+    },
+    {
+      "table": "PLAYER_SEASONS",
+      "name": "SEASON_RUSHING_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Season rushing yards as published."
+    }
+  ]
+}

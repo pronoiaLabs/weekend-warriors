@@ -1,0 +1,305 @@
+{
+  "view": "SV_NFL_PLAYER_DEFENSE",
+  "database": "NFL_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Calendar date the game was played."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "COLLEGE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "College attended. Null for many players."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "IS_ROOKIE",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True in a player's first season."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "PLAYER_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Player full name. High cardinality -- a Cortex Search service would improve fuzzy name matching."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "POSITION",
+      "data_type": "VARCHAR(19)",
+      "synonyms": null,
+      "comment": "Clean position label derived from the position abbreviation. Unknown for players with no position on file."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "POSITION_GROUP",
+      "data_type": "VARCHAR(20)",
+      "synonyms": null,
+      "comment": "Coarse unit grouping. Defensive groups are the ones that appear in this view."
+    },
+    {
+      "table": "TEAMS",
+      "name": "CONFERENCE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "AFC or NFC."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_ABBREVIATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Three-letter code of the team the player appeared for in this game."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Full name of the team the player appeared for in this game."
+    },
+    {
+      "table": "WEEKS",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "NFL season. Currently covers 2023 to 2025; new seasons are added as they load. A season starting in year N runs through February of N+1."
+    },
+    {
+      "table": "WEEKS",
+      "name": "SEASON_TYPE",
+      "data_type": "VARCHAR(14)",
+      "synonyms": "[\"regular or playoff\"]",
+      "comment": "Preseason, Regular Season or Postseason. Almost all questions mean Regular Season."
+    },
+    {
+      "table": "WEEKS",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Week within the season phase. Regular season is weeks 1 to 18; numbering restarts for preseason and postseason."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "PLAYER_GAMES",
+      "name": "DEFENSIVE_SCORES",
+      "data_type": "NUMBER(32,0)",
+      "synonyms": "[\"defensive touchdowns\",\"scoop and score\"]",
+      "comment": "Touchdowns scored on interception or fumble returns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "GAMES_PLAYED",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Games in which the player recorded defensive production."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PRESSURES",
+      "data_type": "FLOAT",
+      "synonyms": "[\"pressures\"]",
+      "comment": "Sacks plus quarterback hits. The closest available proxy for pressure -- this source has no true pressure or hurry count."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TACKLES_PER_GAME",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": null,
+      "comment": "Average tackles per game played."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TAKEAWAYS_TOTAL",
+      "data_type": "NUMBER(32,0)",
+      "synonyms": "[\"takeaways\"]",
+      "comment": "Interceptions plus fumble recoveries. The standard combined ball-production measure."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_ASSISTED_TACKLES",
+      "data_type": "NUMBER(32,0)",
+      "synonyms": null,
+      "comment": "Total assisted tackles."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_FUMBLES_RECOVERED",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"fumble recoveries\"]",
+      "comment": "Total opponent fumbles recovered."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_INTERCEPTIONS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"interceptions\",\"picks\",\"interceptions caught\"]",
+      "comment": "Total interceptions caught. This is a defensive takeaway, not interceptions thrown by a quarterback."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_INTERCEPTION_TDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total touchdowns on interception returns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_INTERCEPTION_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total yards returned after interceptions."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_PASSES_DEFENDED",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"pass breakups\",\"passes defended\"]",
+      "comment": "Total passes broken up or deflected."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_QB_HITS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"quarterback hits\"]",
+      "comment": "Total quarterback hits that were not sacks."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_SACKS",
+      "data_type": "FLOAT",
+      "synonyms": "[\"sacks\",\"sacks recorded\"]",
+      "comment": "Total sacks recorded BY this defender. Can be fractional -- a shared sack is 0.5. Do not confuse with sacks allowed by an offense."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_SOLO_TACKLES",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total unassisted tackles."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_TACKLES_FOR_LOSS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"tfl\",\"tackles for loss\",\"stops behind the line\"]",
+      "comment": "Total tackles behind the line of scrimmage."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_TACKLES_MADE",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"tackles\"]",
+      "comment": "Total tackles, solo plus assisted."
+    }
+  ],
+  "facts": [
+    {
+      "table": "PLAYER_GAMES",
+      "name": "ASSISTED",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "Assisted tackles, derived as total minus solo."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "DEF_TDS",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "Interception plus fumble return touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "FUM_RECOVERED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Opponent fumbles recovered."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "FUM_TDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Touchdowns scored on a fumble recovery."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "HITS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Quarterback hits that were not sacks."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "INTS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Interceptions caught."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "INT_TDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Touchdowns scored on an interception return."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "INT_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Yards returned after an interception."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASS_DEFENDED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Passes broken up or deflected."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "SACKS",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Sacks recorded. FLOAT: a shared sack is 0.5."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "SOLO",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Unassisted tackles."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TACKLES",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Total tackles: solo plus assisted."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TFL",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Tackles made behind the line of scrimmage."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_TAKEAWAYS",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "Interceptions plus fumble recoveries."
+    }
+  ]
+}

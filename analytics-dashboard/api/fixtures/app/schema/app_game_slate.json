@@ -1,0 +1,366 @@
+{
+  "table": "app_game_slate",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_game_slate_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "is_postseason",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "season_week_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "game_datetime",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "game_datetime_et",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "kickoff_slot_et",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "game_status",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_completed",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "went_to_overtime",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "home_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "home_team_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_conference",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_division",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_conference",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_division",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "venue",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "stadium_key",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "stadium_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "roof",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "surface",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_weather_relevant",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_international",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "kickoff_temp_f",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "wind_mph",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "gust_mph",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "wind_dir_deg",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "precip_in",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "weather_code",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "forecast_hours_before_kickoff",
+      "type": "NUMBER(9,0)",
+      "nullable": true
+    },
+    {
+      "name": "vendor",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "game_vendor_odds_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "away_spread",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_spread_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "total_line",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "over_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "under_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_moneyline_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_moneyline_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "opening_home_spread",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "opening_total_line",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread_movement",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "total_line_movement",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "implied_home_team_total",
+      "type": "NUMBER(25,10)",
+      "nullable": true
+    },
+    {
+      "name": "implied_away_team_total",
+      "type": "NUMBER(25,10)",
+      "nullable": true
+    },
+    {
+      "name": "home_moneyline_devig_probability",
+      "type": "NUMBER(38,12)",
+      "nullable": true
+    },
+    {
+      "name": "away_moneyline_devig_probability",
+      "type": "NUMBER(38,12)",
+      "nullable": true
+    },
+    {
+      "name": "line_selected_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread_result",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "total_result",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_score",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_score",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "props_open",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "players_with_props",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "props_open_all_books",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "players_with_props_all_books",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "news_mentions_7d",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "players_in_news_7d",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    }
+  ]
+}

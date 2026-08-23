@@ -1,0 +1,108 @@
+{
+  "view": "SV_NCAAF_RANKINGS",
+  "database": "NCAAF_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "RANKINGS",
+      "name": "IS_LATEST_POLL",
+      "data_type": "BOOLEAN",
+      "synonyms": "[\"current poll\",\"latest rankings\"]",
+      "comment": "True for each season's most recent published week. THE definition of \"current\": filter this flag, never compute a max week."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "POLL_RANK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": "[\"rank\",\"ranking\",\"position\"]",
+      "comment": "Position in the Top 25, 1 to 25. Ties are possible and produce two teams at one rank."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "RANK_CHANGE",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Movement as a signed integer; positive means the team moved UP. NULL for no move or a new entry."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "RECORD_TEXT",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"record\"]",
+      "comment": "The team's W-L record as published with the poll."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Poll season, 2024 onward. The 2026 season's first poll (the preseason poll) publishes in mid-August 2026."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "TREND_TEXT",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Movement versus the prior week as the source spells it: '+3', '-1', or '-' for no move."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Poll week, 2-16. Week 2 is the preseason poll; there is no week-1 poll."
+    },
+    {
+      "table": "TEAMS",
+      "name": "COLLEGE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"team\",\"school\",\"program name\"]",
+      "comment": "The ranked institution, e.g. 'Ohio State'."
+    },
+    {
+      "table": "TEAMS",
+      "name": "CONFERENCE_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"conference\"]",
+      "comment": "The team's CURRENT conference (realignment history is not tracked on the team)."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Institution plus mascot."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "RANKINGS",
+      "name": "APPEARANCES",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": "[\"weeks ranked\",\"poll appearances\"]",
+      "comment": "Number of poll rows. Grouped by team, the number of weeks that team was ranked."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "AVERAGE_RANK",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": null,
+      "comment": "Average rank across the grouped poll rows."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "BEST_RANK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": "[\"highest ranking\",\"peak rank\"]",
+      "comment": "Best (numerically lowest) rank achieved in the grouping."
+    },
+    {
+      "table": "RANKINGS",
+      "name": "TOTAL_FIRST_PLACE_VOTES",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "First-place votes summed across the grouped rows."
+    }
+  ],
+  "facts": []
+}

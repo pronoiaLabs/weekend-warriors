@@ -1,0 +1,256 @@
+{
+  "view": "SV_NFL_SCHEDULE",
+  "database": "NFL_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "AWAY_TEAMS",
+      "name": "AWAY_TEAM_ABBREVIATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"away team code\"]",
+      "comment": "Short code of the away team."
+    },
+    {
+      "table": "AWAY_TEAMS",
+      "name": "AWAY_TEAM_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"away team\",\"visiting team\"]",
+      "comment": "Full name of the away team."
+    },
+    {
+      "table": "AWAY_TEAMS",
+      "name": "CONFERENCE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "AFC or NFC of the away team."
+    },
+    {
+      "table": "AWAY_TEAMS",
+      "name": "DIVISION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Division of the away team."
+    },
+    {
+      "table": "AWAY_TEAMS",
+      "name": "TEAM_LOCATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"away city\",\"away location\"]",
+      "comment": "Away team city or region."
+    },
+    {
+      "table": "GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": "[\"date\",\"day of game\"]",
+      "comment": "Calendar date of the game."
+    },
+    {
+      "table": "GAMES",
+      "name": "GAME_DATETIME",
+      "data_type": "TIMESTAMP_TZ(9)",
+      "synonyms": "[\"kickoff time\",\"start time\"]",
+      "comment": "Full timestamp including kickoff time, in US EASTERN time (the league's publishing convention, matching the kickoff-time status strings). Same instant as the warehouse's UTC column, shifted for display; the offset in the value shows -0400 or -0500."
+    },
+    {
+      "table": "GAMES",
+      "name": "GAME_STATUS",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "The source's own status label: 'Final' or 'Final/OT' for completed games; a kickoff-time string like '9/13 - 1:00 PM EDT' or 'TBD' for scheduled ones. Use is_completed to separate played from upcoming, never this string."
+    },
+    {
+      "table": "GAMES",
+      "name": "IS_COMPLETED",
+      "data_type": "BOOLEAN",
+      "synonyms": "[\"played\",\"finished\",\"is final\"]",
+      "comment": "True for played games, false for scheduled ones. This flag, not the date and not the status string, is the definition of upcoming."
+    },
+    {
+      "table": "GAMES",
+      "name": "IS_POSTSEASON",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True for playoff games."
+    },
+    {
+      "table": "GAMES",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "NFL season, 2023 through 2026. A season's January and February games belong to the prior year's season. 2026 is the only season with unplayed games, so schedule questions mean 2026."
+    },
+    {
+      "table": "GAMES",
+      "name": "SEASON_TYPE_NAME",
+      "data_type": "VARCHAR(14)",
+      "synonyms": "[\"phase\",\"part of season\",\"preseason or regular season\"]",
+      "comment": "Preseason, Regular Season, or Postseason. Schedule questions almost always mean Regular Season."
+    },
+    {
+      "table": "GAMES",
+      "name": "VENUE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"stadium name\",\"where is the game\"]",
+      "comment": "Stadium name as the source spells it. Every row has one; aliases such as GEHA Field at Arrowhead Stadium and Arrowhead Stadium are the same bowl."
+    },
+    {
+      "table": "GAMES",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": "[\"game week\",\"week number\"]",
+      "comment": "Week within the season phase: 1-18 in the regular season. Week 1 exists in both preseason and regular season, so pair a week filter with the season phase."
+    },
+    {
+      "table": "GAMES",
+      "name": "WENT_TO_OVERTIME",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True for completed games that needed overtime. Always false on scheduled rows."
+    },
+    {
+      "table": "HOME_TEAMS",
+      "name": "CONFERENCE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "AFC or NFC of the home team."
+    },
+    {
+      "table": "HOME_TEAMS",
+      "name": "DIVISION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Division of the home team. Uppercase in the data."
+    },
+    {
+      "table": "HOME_TEAMS",
+      "name": "HOME_TEAM_ABBREVIATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"home team code\"]",
+      "comment": "Short code of the home team."
+    },
+    {
+      "table": "HOME_TEAMS",
+      "name": "HOME_TEAM_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"home team\",\"host team\"]",
+      "comment": "Full name of the home team."
+    },
+    {
+      "table": "HOME_TEAMS",
+      "name": "TEAM_LOCATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"home city\",\"home location\"]",
+      "comment": "Home team city or region, e.g. Kansas City, New York."
+    },
+    {
+      "table": "STADIUMS",
+      "name": "ELEVATION_M",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": "[\"altitude\",\"elevation\"]",
+      "comment": "Stadium elevation in metres. Mile High is the regular-season home where this is the question."
+    },
+    {
+      "table": "STADIUMS",
+      "name": "IS_INTERNATIONAL",
+      "data_type": "BOOLEAN",
+      "synonyms": "[\"overseas\",\"neutral site abroad\",\"London game\"]",
+      "comment": "True for games in London, Europe, Brazil, Mexico, Australia. False for Canton and regular-season homes."
+    },
+    {
+      "table": "STADIUMS",
+      "name": "IS_WEATHER_RELEVANT",
+      "data_type": "BOOLEAN",
+      "synonyms": "[\"weather matters\",\"outdoor game\"]",
+      "comment": "False for fixed roofs (SoFi, Ford Field, Allegiant, Superdome, U.S. Bank). When false, do not cite wind or temperature as affecting the game."
+    },
+    {
+      "table": "STADIUMS",
+      "name": "ROOF",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"roof type\",\"dome\",\"open air\"]",
+      "comment": "open, retractable, or fixed. Outdoors questions mean roof is open or retractable."
+    },
+    {
+      "table": "STADIUMS",
+      "name": "STADIUM_DISPLAY_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"stadium\",\"bowl name\"]",
+      "comment": "Canonical stadium name after alias collapse."
+    },
+    {
+      "table": "STADIUMS",
+      "name": "SURFACE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"field surface\",\"grass or turf\"]",
+      "comment": "grass or turf."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "GAMES",
+      "name": "COMPLETED_GAMES",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": "[\"games played so far\"]",
+      "comment": "Games already played."
+    },
+    {
+      "table": "GAMES",
+      "name": "GAMES_COUNT",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": "[\"number of games\",\"games on the slate\"]",
+      "comment": "Number of games. Grain is one row per GAME, not per team-game, so this counts games directly with no doubling."
+    },
+    {
+      "table": "GAMES",
+      "name": "REMAINING_GAMES",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": "[\"games left\",\"games to play\",\"upcoming games count\"]",
+      "comment": "Games still to be played. All of them are 2026 games."
+    }
+  ],
+  "facts": [
+    {
+      "table": "WEATHER",
+      "name": "GUST_MPH",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Forecast wind gusts at kickoff, mph."
+    },
+    {
+      "table": "WEATHER",
+      "name": "HOURS_BEFORE_KICKOFF",
+      "data_type": "NUMBER(9,0)",
+      "synonyms": null,
+      "comment": "Hours between the forecast load and kickoff. Describes staleness, not a live radar."
+    },
+    {
+      "table": "WEATHER",
+      "name": "KICKOFF_TEMP_F",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Forecast temperature at kickoff, Fahrenheit. Ignore when is_weather_relevant is false."
+    },
+    {
+      "table": "WEATHER",
+      "name": "PRECIP_IN",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Forecast precipitation at the kickoff hour, inches."
+    },
+    {
+      "table": "WEATHER",
+      "name": "WIND_DIR_DEG",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Forecast wind direction at kickoff, degrees from north."
+    },
+    {
+      "table": "WEATHER",
+      "name": "WIND_MPH",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Forecast sustained wind at kickoff, mph. Ignore when is_weather_relevant is false."
+    }
+  ]
+}
