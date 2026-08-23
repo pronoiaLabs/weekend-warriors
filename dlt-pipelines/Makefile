@@ -186,7 +186,7 @@ endef
         run-local run-snowflake run-prod run-postgres run-spcs \
         sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
         setup-base setup-dev setup-prod setup-ops setup-integrations \
-        setup-source setup-postgres setup-postgres-secret setup-postgres-observability \
+        setup-source setup-postgres setup-postgres-secret setup-postgres-api-password setup-postgres-observability \
         setup-app-copy-trigger setup-obs-copy-trigger new-source \
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
@@ -575,6 +575,20 @@ setup-postgres-secret: ## ALTER SECRET POSTGRES_APP_COPY from .env.postgres (gua
 	    exit 2; \
 	  fi; \
 	  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/sources/postgres/apply_secret.sh
+
+# Password only. Role app_api already exists from setup-postgres.
+setup-postgres-api-password: ## ALTER ROLE app_api from .env.postgres (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Sets the app_api login password (analytics- and ops-dashboard reader)."; \
+		echo "Generates APP_API_PASSWORD into $(POSTGRES_ENV) if blank."; \
+		echo "Does not recreate the database. Re-run with CONFIRM=1."; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(POSTGRES_ENV)" ]; then \
+		echo "Missing $(POSTGRES_ENV). Copy .env.postgres.example to the repo root."; \
+		exit 2; \
+	fi
+	@set -a && . "$(POSTGRES_ENV)" && set +a && ./sql/postgres/apply_api_password.sh
 
 # Schema only. The instance already has `app` + app_copy_writer from setup-postgres.
 setup-postgres-observability: ## Create app.observability + watermark (guard: CONFIRM=1)
