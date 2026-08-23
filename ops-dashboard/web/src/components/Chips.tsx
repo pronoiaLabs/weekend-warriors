@@ -3,6 +3,8 @@ export interface ChipItem {
   label: string
   /** drawn rose when not active: a day with failures, a severity with lines */
   bad?: boolean
+  /** amber: a no-show slot, not a run that broke */
+  warn?: boolean
 }
 
 /** One row of toggle chips. The active id is owned by the page (usually a URL
@@ -20,18 +22,21 @@ export default function Chips({
 }) {
   if (items.length === 0) return null
   return (
-    <div className="chips" role="group" aria-label={label}>
-      {items.map((it) => (
-        <button
-          key={it.id}
-          type="button"
-          className={`chip ${it.id === active ? 'on' : ''} ${it.bad ? 'bad' : ''}`}
-          aria-pressed={it.id === active}
-          onClick={() => onPick(it.id)}
-        >
-          {it.label}
-        </button>
-      ))}
+    <div className="chip-group">
+      <span className="chip-group-label">{label}</span>
+      <div className="chips" role="group" aria-label={label}>
+        {items.map((it) => (
+          <button
+            key={it.id}
+            type="button"
+            className={`chip ${it.id === active ? 'on' : ''} ${it.bad ? 'bad' : ''} ${it.warn ? 'warn' : ''}`}
+            aria-pressed={it.id === active}
+            onClick={() => onPick(it.id)}
+          >
+            {it.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
