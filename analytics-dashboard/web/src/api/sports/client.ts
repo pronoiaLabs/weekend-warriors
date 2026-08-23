@@ -1,5 +1,13 @@
 import { get } from '../client.ts'
-import type { CapabilitiesPayload, GamePayload, HealthPayload, SlatePayload } from './types.ts'
+import type {
+  CapabilitiesPayload,
+  GamePayload,
+  HealthPayload,
+  SlatePayload,
+  Split,
+  StandingsPayload,
+  TeamPayload,
+} from './types.ts'
 
 const sportPath = (sport: string) => `/api/${encodeURIComponent(sport)}`
 
@@ -32,4 +40,24 @@ export function fetchGame(
   signal?: AbortSignal,
 ): Promise<GamePayload> {
   return get<GamePayload>(`${sportPath(sport)}/games/${encodeURIComponent(gameKey)}`, { vendor }, signal)
+}
+
+export type StandingsParams = {
+  season?: number
+  season_type?: string
+  split?: Split
+}
+
+export function fetchStandings(sport: string, params: StandingsParams, signal?: AbortSignal): Promise<StandingsPayload> {
+  return get<StandingsPayload>(`${sportPath(sport)}/teams`, params, signal)
+}
+
+export type TeamParams = {
+  season?: number
+  season_type?: string
+  vendor?: string
+}
+
+export function fetchTeam(sport: string, team: string, params: TeamParams, signal?: AbortSignal): Promise<TeamPayload> {
+  return get<TeamPayload>(`${sportPath(sport)}/teams/${encodeURIComponent(team)}`, params, signal)
 }

@@ -11,6 +11,10 @@ NFL = SportProfile(
     tables={
         C.SCHEDULE: "app_game_slate",
         C.GAME_PROP_BOARD: "app_game_prop_board",
+        C.TEAM_STANDINGS: "app_team_standings",
+        C.TEAM_WEEKS: "app_team_weeks",
+        C.TEAM_ALLOWED: "app_team_allowed",
+        C.TEAM_ATS: "app_team_ats",
     },
     extensions=("fantasy",),
     vendors=("draftkings", "fanduel", "caesars", "betmgm", "betrivers", "polymarket", "kalshi"),

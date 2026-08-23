@@ -5,7 +5,10 @@
 export type Capability =
   | 'schedule'
   | 'game_prop_board'
-  | 'team_performance'
+  | 'team_standings'
+  | 'team_weeks'
+  | 'team_allowed'
+  | 'team_ats'
   | 'player_performance'
   | 'game_odds'
   | 'player_props'
@@ -196,5 +199,246 @@ export interface GamePayload {
   vendors: string[]
   away: PropRow[]
   home: PropRow[]
+  query: string | null
+}
+
+export type Split = 'all' | 'home' | 'away'
+
+/** One team in one season type and split: record, rates and ranks. */
+export interface StandingsRow {
+  app_team_standings_key: string
+  team_key: string
+  team_id: number
+  team_label: string
+  team_name: string
+  conference: string | null
+  division: string | null
+  season: number
+  season_type: number
+  season_type_name: string
+  is_postseason: boolean | null
+  split: Split
+  games: number
+  wins: number
+  losses: number
+  ties: number
+  win_pct: number | null
+  points_for: number | null
+  points_against: number | null
+  point_diff: number | null
+  points_for_per_game: number | null
+  points_against_per_game: number | null
+  point_diff_per_game: number | null
+  total_yards: number | null
+  plays: number | null
+  yards_per_play: number | null
+  yards_per_game: number | null
+  net_passing_yards: number | null
+  rushing_yards: number | null
+  third_down_conversions: number | null
+  third_down_attempts: number | null
+  third_down_pct: number | null
+  red_zone_scores: number | null
+  red_zone_attempts: number | null
+  red_zone_pct: number | null
+  turnovers: number | null
+  takeaways: number | null
+  turnover_margin: number | null
+  sacks_allowed: number | null
+  sacks_recorded: number | null
+  opp_total_yards: number | null
+  opp_plays: number | null
+  opp_yards_per_play: number | null
+  opp_yards_per_game: number | null
+  opp_net_passing_yards: number | null
+  opp_rushing_yards: number | null
+  penalties: number | null
+  penalty_yards: number | null
+  last_game_date: string | null
+  last_results: string[] | null
+  rank_overall: number
+  rank_conference: number
+  rank_division: number
+}
+
+export interface StandingsPayload extends Envelope<StandingsRow> {
+  season_type_name: string
+  split: Split
+  season_types: string[]
+}
+
+/** One team game with the box score, the running record and one book's line
+    from the team's side (all null when that book has none). */
+export interface TeamWeekRow {
+  app_team_weeks_key: string
+  team_game_key: string
+  game_key: string
+  game_id: number
+  team_key: string
+  team_id: number
+  team_label: string
+  team_name: string
+  conference: string | null
+  division: string | null
+  opponent_team_key: string | null
+  opponent_label: string | null
+  opponent_name: string | null
+  season: number
+  week: number
+  season_type: number
+  season_type_name: string
+  is_postseason: boolean | null
+  game_date: string
+  game_datetime_et: string
+  kickoff_slot_et: string
+  is_home: boolean
+  is_completed: boolean
+  went_to_overtime: boolean | null
+  result: 'W' | 'L' | 'T' | null
+  season_game_number: number
+  wins_to_date: number
+  losses_to_date: number
+  ties_to_date: number
+  point_diff_to_date: number
+  points_for: number
+  points_against: number
+  point_margin: number
+  total_points: number
+  points_q1: number | null
+  points_q2: number | null
+  points_q3: number | null
+  points_q4: number | null
+  points_ot: number | null
+  first_downs: number | null
+  total_yards: number | null
+  plays: number | null
+  yards_per_play: number | null
+  net_passing_yards: number | null
+  passing_completions: number | null
+  passing_attempts: number | null
+  yards_per_pass: number | null
+  rushing_yards: number | null
+  rushing_attempts: number | null
+  yards_per_rush_attempt: number | null
+  third_down_conversions: number | null
+  third_down_attempts: number | null
+  third_down_pct: number | null
+  fourth_down_conversions: number | null
+  fourth_down_attempts: number | null
+  red_zone_scores: number | null
+  red_zone_attempts: number | null
+  red_zone_pct: number | null
+  total_drives: number | null
+  possession_time_seconds: number | null
+  turnovers: number | null
+  takeaways: number | null
+  turnover_margin: number | null
+  fumbles_lost: number | null
+  interceptions_thrown: number | null
+  sacks_allowed: number | null
+  sacks_recorded: number | null
+  penalties: number | null
+  penalty_yards: number | null
+  opp_total_yards: number | null
+  opp_yards_per_play: number | null
+  opp_net_passing_yards: number | null
+  opp_rushing_yards: number | null
+  opp_third_down_conversions: number | null
+  opp_third_down_attempts: number | null
+  opp_red_zone_scores: number | null
+  opp_red_zone_attempts: number | null
+  opp_turnovers: number | null
+  has_box_score: boolean | null
+  vendor: string | null
+  spread: number | null
+  spread_odds: number | null
+  moneyline_odds: number | null
+  moneyline_devig_probability: number | null
+  opening_spread: number | null
+  spread_movement: number | null
+  total_line: number | null
+  opening_total_line: number | null
+  total_line_movement: number | null
+  over_odds: number | null
+  under_odds: number | null
+  implied_team_total: number | null
+  line_selected_at: string | null
+  spread_result: 'cover' | 'push' | 'loss' | null
+  margin_vs_spread: number | null
+  total_result: 'over' | 'push' | 'under' | null
+  vendors_available: string[]
+}
+
+/** What a defense allows to one position in one stat, ranked (1 allows the most). */
+export interface AllowedRow {
+  app_team_allowed_key: string
+  team_key: string
+  team_id: number
+  team_label: string
+  team_name: string
+  conference: string | null
+  division: string | null
+  season: number
+  season_type: number
+  season_type_name: string
+  is_postseason: boolean | null
+  position: string
+  stat_key: string
+  defense_games: number
+  allowed_total: number
+  allowed_per_game: number
+  league_avg_per_game: number
+  allowed_vs_league: number
+  allowed_rank: number
+  teams_ranked: number
+}
+
+/** A team's record against one book's closing number. */
+export interface AtsRow {
+  app_team_ats_key: string
+  team_key: string
+  team_id: number
+  team_label: string
+  team_name: string
+  season: number
+  season_type: number
+  season_type_name: string
+  vendor: string
+  games_with_line: number
+  ats_wins: number
+  ats_losses: number
+  ats_pushes: number
+  ats_pct: number | null
+  overs: number
+  unders: number
+  total_pushes: number
+  over_pct: number | null
+  favourite_games: number
+  favourite_ats_wins: number
+  underdog_games: number
+  underdog_ats_wins: number
+  home_ats_wins: number
+  home_ats_losses: number
+  away_ats_wins: number
+  away_ats_losses: number
+  avg_spread: number | null
+  avg_total_line: number | null
+  avg_margin_vs_spread: number | null
+  avg_total_vs_line: number | null
+}
+
+export interface TeamPayload {
+  sport: string
+  season: number
+  as_of: string
+  team: StandingsRow
+  splits: StandingsRow[]
+  season_type_name: string
+  season_types: string[]
+  vendor: string | null
+  vendors: string[]
+  weeks: TeamWeekRow[]
+  allowed: AllowedRow[]
+  ats: AtsRow[]
   query: string | null
 }

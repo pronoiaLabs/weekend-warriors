@@ -52,6 +52,10 @@ ROUTES=(
   "/nfl/games/$GAME_KEY|Back to board"
   "/nfl/games/$GAME_KEY?vendor=fanduel|fanduel line"
   "/nfl/games/nope|No such game"
+  "/nfl/teams|By division"
+  "/nfl/teams?season=2025&season_type=Regular%20Season&split=home&group=league|League"
+  "/nfl/teams/KC?season=2025&season_type=Regular%20Season|Back to standings"
+  "/nfl/teams/xxx|No such team"
   "/ncaaf|No page marts yet"
   "/ncaaf/slate|No game day data yet"
 )

@@ -1,0 +1,156 @@
+{
+  "table": "app_team_ats",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_team_ats_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "vendor",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "games_with_line",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "ats_wins",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "ats_losses",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "ats_pushes",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "ats_pct",
+      "type": "NUMBER(20,3)",
+      "nullable": true
+    },
+    {
+      "name": "overs",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "unders",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "total_pushes",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "over_pct",
+      "type": "NUMBER(20,3)",
+      "nullable": true
+    },
+    {
+      "name": "favourite_games",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "favourite_ats_wins",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "underdog_games",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "underdog_ats_wins",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_ats_wins",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_ats_losses",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_ats_wins",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_ats_losses",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "avg_spread",
+      "type": "NUMBER(37,2)",
+      "nullable": true
+    },
+    {
+      "name": "avg_total_line",
+      "type": "NUMBER(37,2)",
+      "nullable": true
+    },
+    {
+      "name": "avg_margin_vs_spread",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "avg_total_vs_line",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    }
+  ]
+}

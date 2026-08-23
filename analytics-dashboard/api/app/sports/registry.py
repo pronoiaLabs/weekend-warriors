@@ -30,13 +30,17 @@ def get_profile(sport: str) -> SportProfile:
 Profile = Annotated[SportProfile, Depends(get_profile)]
 
 
-def require(cap: Capability) -> Callable[..., SportProfile]:
+def require(*caps: Capability) -> Callable[..., SportProfile]:
+    """A route that reads several marts names them all; the first one missing is
+    the one the 404 reports."""
+
     def dep(profile: Profile) -> SportProfile:
-        if not profile.has(cap):
-            raise HTTPException(
-                status_code=404,
-                detail=f"{profile.label} has no {cap.value} data",
-            )
+        for cap in caps:
+            if not profile.has(cap):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"{profile.label} has no {cap.value} data",
+                )
         return profile
 
     return dep

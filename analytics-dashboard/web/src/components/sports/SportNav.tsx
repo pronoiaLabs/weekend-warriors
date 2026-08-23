@@ -16,7 +16,7 @@ interface Item {
 // Explorer always does.
 const ITEMS: Item[] = [
   { to: 'slate', label: 'Game day', cap: 'schedule', also: ['games'] },
-  { to: 'teams', label: 'Teams', cap: 'team_performance' },
+  { to: 'teams', label: 'Teams', cap: 'team_standings' },
   { to: 'players', label: 'Players', cap: 'player_performance' },
   { to: 'markets', label: 'Markets', cap: 'game_odds' },
   { to: 'news', label: 'News', cap: 'news' },

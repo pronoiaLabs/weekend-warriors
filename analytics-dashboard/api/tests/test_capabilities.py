@@ -1,10 +1,17 @@
 from fastapi.testclient import TestClient
 
 
-def test_nfl_capabilities_list_the_first_two_marts(client: TestClient) -> None:
+def test_nfl_capabilities_list_the_page_marts(client: TestClient) -> None:
     body = client.get("/api/nfl/capabilities").json()
     assert body["sport"] == "nfl"
-    assert body["capabilities"] == ["schedule", "game_prop_board"]
+    assert body["capabilities"] == [
+        "schedule",
+        "game_prop_board",
+        "team_standings",
+        "team_weeks",
+        "team_allowed",
+        "team_ats",
+    ]
     assert body["default_vendor"] == "draftkings"
     assert "fantasy" in body["extensions"]
     assert body["app_location"] == "NFL_PROD_DB.APP"
