@@ -368,6 +368,246 @@ sources:
           - name: product
             tests: [not_null]
 
+      # --- nflverse: season files read through nflreadpy (dlt nflverse-registry.yml)
+      #
+      # Vendor-prefixed because BallDontLie already owns players, player_injuries
+      # and stats in this schema. gsis_id joins everything nflverse to everything
+      # nflverse; to BallDontLie there is no shared id (name + team matches ~78%
+      # of current players, see BACKLOG). Season-keyed tables merge on the keys
+      # tested below and hold 2023 onward; the all-history files are replaced
+      # weekly. Nothing models these yet.
+      - name: nflverse_pbp
+        description: >
+          nflfastR play by play, one row per play, every column the file carries
+          (372). EPA, WP, CPOE, air yards, drive and series context, the player
+          ids on every role. Keep it an archive: stage only what a mart needs.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [game_id, play_id]
+        columns:
+          - name: game_id
+            description: "nflverse game id, e.g. 2025_01_ARI_NO."
+            tests: [not_null]
+          - name: play_id
+            tests: [not_null]
+          - name: season
+            tests: [not_null]
+
+      - name: nflverse_player_stats
+        description: >
+          Player x game box score with usage and efficiency (150 columns):
+          EPA by phase, cpoe, air yards and YAC, target_share, air_yards_share,
+          wopr, racr, pacr, explosive-play buckets, first downs, the full
+          defensive line, kicking by distance, punting, returns, and
+          fantasy_points / fantasy_points_ppr. player_id is the gsis_id. The
+          file's 22 nameless all-zero placeholder rows per season are dropped
+          by the pipeline.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player_id, game_id]
+        columns:
+          - name: player_id
+            description: "gsis_id."
+            tests: [not_null]
+          - name: game_id
+            tests: [not_null]
+
+      - name: nflverse_snap_counts
+        description: >
+          Player x game snap counts and percentages on offense, defense and
+          special teams, keyed by Pro Football Reference ids (pfr_player_id
+          maps to nflverse_players.pfr_id).
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [pfr_game_id, pfr_player_id]
+        columns:
+          - name: pfr_game_id
+            tests: [not_null]
+          - name: pfr_player_id
+            tests: [not_null]
+
+      - name: nflverse_nextgen_passing
+        description: >
+          Next Gen Stats passing, player x week (week 0 is the season total).
+          Time to throw, air yards, aggressiveness, CPOE. One discipline per
+          player: no overlap with the rushing and receiving tables.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [season, season_type, week, player_gsis_id]
+        columns:
+          - name: player_gsis_id
+            tests: [not_null]
+
+      - name: nflverse_nextgen_rushing
+        description: >
+          Next Gen Stats rushing, player x week (week 0 is the season total).
+          Efficiency, time to line of scrimmage, rush yards over expected.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [season, season_type, week, player_gsis_id]
+        columns:
+          - name: player_gsis_id
+            tests: [not_null]
+
+      - name: nflverse_nextgen_receiving
+        description: >
+          Next Gen Stats receiving, player x week (week 0 is the season total).
+          Cushion, separation, intended air yards share, YAC above expectation.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [season, season_type, week, player_gsis_id]
+        columns:
+          - name: player_gsis_id
+            tests: [not_null]
+
+      - name: nflverse_injuries
+        description: >
+          The league's official weekly injury report: report status and
+          injuries plus practice status and injuries, player x team x week.
+          The published report, weekly and lagging; Sleeper's injury fields
+          are the live state.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [season, game_type, week, team, gsis_id]
+        columns:
+          - name: gsis_id
+            tests: [not_null]
+          - name: team
+            tests: [not_null]
+
+      - name: nflverse_depth_charts
+        description: >
+          Daily depth-chart snapshots, 2025 onward (the file changed shape that
+          season; earlier years are nflverse_depth_charts_weekly): one row per
+          team x position slot x rank per observation time (dt, an ISO string).
+          Around 3k rows a day, every day of the year. season is stamped by the
+          pipeline from the season file; the pipeline keeps a cursor on dt and
+          loads only new snapshots. Empty slots (no player_name) are dropped.
+          Read the latest dt for the current chart.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [dt, team, pos_id, pos_slot, pos_rank, player_name]
+        columns:
+          - name: dt
+            tests: [not_null]
+          - name: team
+            tests: [not_null]
+          - name: season
+            tests: [not_null]
+
+      - name: nflverse_depth_charts_weekly
+        description: >
+          The league's weekly depth chart through 2024: season x week x
+          game_type x club_code x formation x depth_position x depth_team
+          (1 = starter) with gsis_id. No clean natural key in the file (a few
+          hundred exact duplicate rows per season, week NULL on ~200), so the
+          pipeline merges on row_id, an md5 of the whole row, which collapses
+          the duplicates. The week-keyed chart is the one to use for
+          pre-kickoff features in 2023 and 2024.
+        columns:
+          - name: row_id
+            tests: [unique, not_null]
+          - name: season
+            tests: [not_null]
+          - name: club_code
+            tests: [not_null]
+
+      - name: nflverse_players
+        description: >
+          The id crosswalk, one row per player ever (25k): gsis_id, espn_id,
+          pfr_id, pff_id, otc_id, esb_id, smart_id, plus names, position,
+          college, draft, status, latest_team and headshot (an NFL.com static
+          URL). Replaced weekly. Joining BallDontLie onto this by name + team
+          is the images backlog item.
+        columns:
+          - name: gsis_id
+            tests: [unique, not_null]
+
+      - name: nflverse_officials
+        description: "Officiating crew per game, 2015 onward. Replaced weekly."
+
+      - name: nflverse_combine
+        description: "Combine results 2000 onward with draft outcome and pfr_id. Replaced weekly."
+
+      - name: nflverse_trades
+        description: >
+          Trade log 2002 onward, one row per asset moved (player by pfr_id, or
+          pick by season/round/number), trade_id groups the sides. Replaced
+          weekly.
+
+      # --- Sleeper: live player state and fantasy signal (dlt sleeper-registry.yml)
+      #
+      # Every run reads Sleeper's clock from /v1/state/nfl and stamps each row
+      # with fetched_at and state_season / state_week / state_season_type.
+      # Sleeper's id columns are sparse (espn_id on 769 and gsis_id on 577 of
+      # 3,183 rostered active players, measured 2026-08-23); join to nflverse by
+      # name + team and let the ids confirm the subset they cover.
+      - name: sleeper_state
+        description: "One row per pipeline run: the week clock Sleeper was on. Append."
+        columns:
+          - name: fetched_at
+            tests: [not_null]
+
+      - name: sleeper_players
+        description: >
+          Sleeper's full player dump, replaced daily (12k rows, including 32
+          team DEF rows keyed by abbreviation). Live injury_status,
+          injury_body_part, practice_participation, depth_chart_position and
+          depth_chart_order, status, team, news_updated (epoch ms),
+          search_rank, and the ids Sleeper holds (gsis_id, espn_id, kalshi_id,
+          oddsjam_id, sportradar_id, yahoo_id, ...). metadata,
+          fantasy_positions and competitions are VARIANT.
+        columns:
+          - name: player_id
+            description: "Sleeper's own id; the key of the dump."
+            tests: [unique, not_null]
+
+      - name: sleeper_trending
+        description: >
+          Adds and drops across Sleeper leagues over the last 24 hours, top
+          100 per direction, appended every pull. count is the number of
+          leagues; rank is the position in that pull.
+        columns:
+          - name: player_id
+            tests: [not_null]
+          - name: direction
+            tests:
+              - accepted_values: {values: ['add', 'drop']}
+          - name: fetched_at
+            tests: [not_null]
+
+      - name: sleeper_projections
+        description: >
+          Weekly projections for this week and next, appended every pull so
+          the table is the projection's history. Stat keys are flattened to
+          columns (pts_ppr, pts_half_ppr, pts_std, pass_yd, rush_att, rec,
+          ...); preseason pulls carry only adp_dd_ppr, the stat columns arrive
+          with the regular season. Read the latest fetched_at per player x
+          week for the current number.
+        columns:
+          - name: player_id
+            tests: [not_null]
+          - name: season
+            tests: [not_null]
+          - name: week
+            tests: [not_null]
+          - name: fetched_at
+            tests: [not_null]
+
+      - name: sleeper_stats
+        description: >
+          Sleeper's weekly player stats (sportradar-fed) with fantasy points
+          under std, half and full PPR and position ranks. Merged on player x
+          season x season_type x week, so one row per played week.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [player_id, season, season_type, week]
+        columns:
+          - name: player_id
+            tests: [not_null]
+          - name: week
+            tests: [not_null]
+
   - name: wnba_raw
     description: >
       Raw WNBA data landed by dlt from the BallDontLie API. Owned by the dlt
