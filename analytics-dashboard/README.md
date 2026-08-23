@@ -1,13 +1,38 @@
 # analytics-dashboard
 
 A sport analytics dashboard for the NFL and NCAAF data in this account: a thin FastAPI API
-over a dbt-built serving layer, rendered by a React app. It is a sibling of
-`ops-dashboard/`, copies its patterns (query cache, fixture mode, SPA mount, typed client)
-and shares no code with it.
+over a dbt-built serving layer, rendered by a React app in the Glass Prism look. It is a
+sibling of `ops-dashboard/`, copies its patterns (query cache, fixture mode, SPA mount,
+typed client) and shares no code with it. Own ports, so both run side by side.
 
-Status: Phase 0 of the development plan (canvas `semantic-view-dashboards`, page 4). This
-directory holds the role, the catalog fixtures and the findings. The dbt `APP` layer arrives
-in Phase 1, the API and web app in Phase 2.
+Status: Phase 2 of the development plan (canvas `semantic-view-dashboards`, page 4): the
+scaffold, the Prism shell, the sport profiles and the capabilities endpoint. Pages arrive
+from Phase 3.
+
+## Running it
+
+```bash
+make install            # uv sync for the api, npm install for the web
+make dev-api            # FastAPI on :8010, live data as ANALYTICS_DASHBOARD_ROLE
+make dev-api-fixtures   # the same on recorded fixtures, no Snowflake connection
+make dev-web            # Vite on :5174, proxies /api to :8010
+make serve              # build the web app and serve everything on :8010
+make test               # api tests in fixture mode (live tests skipped)
+make test-live          # includes the live contract tests (needs the role)
+make lint               # ruff + tsc -b
+```
+
+Environment, all optional (`api/app/config.py` is the contract):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `ANALYTICS_DASHBOARD_DATA` | live | `fixtures` serves recorded JSON and never imports the connector |
+| `ANALYTICS_DASHBOARD_NOW` | wall clock | pins the clock (ISO-8601) for fixture-era tests |
+| `ANALYTICS_DASHBOARD_CONNECTION` | weekend-warriors | snow CLI connection name |
+| `ANALYTICS_DASHBOARD_ROLE` | ANALYTICS_DASHBOARD_ROLE | applied with `USE ROLE` on connect, then `USE SECONDARY ROLES NONE` |
+| `ANALYTICS_DASHBOARD_WAREHOUSE` | DLT_OPS_WH | `USE WAREHOUSE` on connect |
+| `ANALYTICS_DASHBOARD_CACHE_SECONDS` | 60 | default query cache TTL; tiles can override per call |
+| `<SPORT>_APP_DB`, `<SPORT>_APP_SCHEMA` | `<SPORT>_PROD_DB`, `APP` | where a sport's marts live; point NFL at `NFL_DEV_DB` / `DEV_<user>` to read a dev build |
 
 ## Two lanes
 
@@ -17,7 +42,7 @@ marts beside `CORE`, `ANALYTICS` and `FEATURES`. Definitions live in dbt, tested
 versioned, rebuilt by the triggered prod build when data lands; the API is one `select` per
 tile with bound filters and no SQL logic. Marts carry sport-agnostic column names, so the
 differences between NFL and NCAAF are absorbed in dbt and the API's sport profile is a
-table map plus a capability list.
+table map plus a capability list (`api/app/sports/profiles/`).
 
 **The Explorer reads semantic views.** `SELECT ... FROM SEMANTIC_VIEW(...)` is the right
 tool for a metadata-driven sheet where the user picks dimensions and metrics; the catalog
@@ -33,14 +58,39 @@ becomes a dynamic table.
 
 ```
 analytics-dashboard/
+├── Makefile
 ├── deploy/sql/
-│   ├── 01_role.sql          ANALYTICS_DASHBOARD_ROLE: semantic-view SELECT, warehouse USAGE
-│   ├── 02_cost_tag.sql      cost attribution note (no dedicated compute in v1)
-│   └── 03_app_grants.sql    SELECT on all and future tables in each APP schema; run after
-│                            the first prod build creates APP, idempotent after that
-└── api/fixtures/catalog/    one JSON per semantic view: dimensions, metrics, facts as returned
-                             by SHOW SEMANTIC DIMENSIONS | METRICS | FACTS IN <view>.
-                             The Explorer's allowlist.
+│   ├── 01_role.sql            ANALYTICS_DASHBOARD_ROLE: semantic-view SELECT, warehouse USAGE
+│   ├── 02_cost_tag.sql        cost attribution note (no dedicated compute in v1)
+│   └── 03_app_grants.sql      SELECT on all and future tables in each APP schema; run after
+│                              the first prod build creates APP, idempotent after that
+├── api/
+│   ├── app/
+│   │   ├── main.py            create_app(): /api/health, the sports router, the SPA mount last
+│   │   ├── config.py          the ANALYTICS_DASHBOARD_* contract
+│   │   ├── db.py              query(sql, params, ttl=, tag=): one role, no secondary roles,
+│   │   │                      JSON query tag, per-call cache TTL
+│   │   └── sports/
+│   │       ├── capabilities.py   Capability enum, one per mart family
+│   │       ├── profile.py        SportProfile: table map + capabilities, no SQL, no columns
+│   │       ├── profiles/         nfl.py, ncaaf.py
+│   │       ├── registry.py       get_profile / require(cap) dependencies (404 by name)
+│   │       ├── fixtures.py       recorded rows and DESCRIBE TABLE schemas
+│   │       ├── router.py         /api/{sport}, includes the page routers as they land
+│   │       └── routers/          capabilities.py (more per phase)
+│   ├── fixtures/
+│   │   ├── app/schema/        DESCRIBE TABLE of each mart: the profile contract
+│   │   ├── app/<sport>/       recorded rows per mart (from Phase 3)
+│   │   └── catalog/           SHOW SEMANTIC ... per view, for the Explorer
+│   └── tests/                 fixture mode by default; `live` marker needs ANALYTICS_DASHBOARD_LIVE=1
+└── web/                       Vite + React 19 + react-router 7
+    └── src/
+        ├── api/               client.ts (get<T>), sports/client.ts + types.ts
+        ├── hooks/             api state, sport from the path, viewport (wide | narrow)
+        ├── layouts/           SportLayout: loads capabilities once, provides them, renders the chrome
+        ├── components/        Aurora, sports/SportNav (dock wide, tabs narrow)
+        ├── pages/sports/      SportHome; one module per page at every width
+        └── styles/            tokens.css (Prism palette), sports.css (primitives)
 ```
 
 ## Role
@@ -48,15 +98,14 @@ analytics-dashboard/
 `ANALYTICS_DASHBOARD_ROLE` holds USAGE on the two databases, `SELECT` on all and future
 tables in each `APP` schema (pages), `SELECT` on all and future semantic views in each
 `ANALYTICS` schema (Explorer), and USAGE on `DLT_OPS_WH`. Nothing on CORE, PREP or RAW.
-Apply `01_role.sql` and `02_cost_tag.sql` now, `03_app_grants.sql` after Phase 1
-(`snow sql -c weekend-warriors -f deploy/sql/<file>`; a `make setup CONFIRM=1` target
-lands with the Makefile in Phase 2). Marts are built with `+copy_grants` so dbt's
-`CREATE OR REPLACE` keeps the grant between runs of the grant file.
+`make setup CONFIRM=1` applies the three files in order; `03_app_grants.sql` fails until
+the first prod dbt build has created `APP` and is idempotent after that. Marts are built
+with `+copy_grants` so dbt's `CREATE OR REPLACE` keeps the grant between runs.
 
 One trap when verifying: an interactive session carries the user's secondary roles, so a
 `--role ANALYTICS_DASHBOARD_ROLE` session can still read CORE through SYSADMIN. Prove the
-boundary with `USE SECONDARY ROLES NONE` first, and the API sets the same on every
-connection (`api/app/db.py`, Phase 2) so it only ever holds the primary role. Verify:
+boundary with `USE SECONDARY ROLES NONE` first; `db.py` runs the same statement on every
+connection so the app only ever holds the primary role. Verify:
 
 ```bash
 snow sql -c weekend-warriors --role ANALYTICS_DASHBOARD_ROLE --warehouse DLT_OPS_WH --format JSON \
@@ -64,7 +113,7 @@ snow sql -c weekend-warriors --role ANALYTICS_DASHBOARD_ROLE --warehouse DLT_OPS
 # expected: Schema 'NFL_PROD_DB.CORE' does not exist or not authorized.
 
 snow sql -c weekend-warriors --role ANALYTICS_DASHBOARD_ROLE --warehouse DLT_OPS_WH --format JSON \
-  -q "use secondary roles none; select * from semantic_view(NFL_PROD_DB.ANALYTICS.SV_NFL_PLAYER_OFFENSE dimensions players.player_name metrics player_games.total_fanduel_points where weeks.season = 2025 and weeks.season_type = 'Regular Season') order by total_fanduel_points desc limit 3"
+  -q "use secondary roles none; select count(*) from NFL_PROD_DB.APP.APP_GAME_SLATE"
 ```
 
 ## Semantic SQL is stricter than the agent

@@ -1,0 +1,14 @@
+prop_type,stat_key,stat_label
+receiving_yards,receiving_yards,Receiving yards
+receptions,receptions,Receptions
+rushing_yards,rushing_yards,Rushing yards
+passing_yards,passing_yards,Passing yards
+passing_tds,passing_touchdowns,Passing touchdowns
+anytime_td,scoring_touchdowns,Touchdowns scored
+first_td,,First touchdown
+anytime_td_1h,,Touchdown in the first half
+anytime_td_2h,,Touchdown in the second half
+anytime_td_1q,,Touchdown in the first quarter
+anytime_td_2q,,Touchdown in the second quarter
+anytime_td_3q,,Touchdown in the third quarter
+anytime_td_4q,,Touchdown in the fourth quarter
