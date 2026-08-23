@@ -1,0 +1,85 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard. Page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the
+# parameters as columns; sport-agnostic column names (team_label, player_name,
+# position) so NCAAF marts can carry the same contract. Not Cortex tools.
+
+models:
+  - name: app_game_slate
+    description: >
+      The game day board. One row per game and sportsbook; a game with no closing
+      line keeps one row with vendor NULL, so every dim_game row appears at least
+      once. Teams, stadium, kickoff forecast, the closing line and its movement,
+      the score once played, and readiness counts (open props, news mentions in
+      the seven days before kickoff).
+    columns:
+      - name: app_game_slate_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: season
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: kickoff_slot_et
+        tests: [not_null]
+      - name: home_team_label
+        tests: [not_null]
+      - name: away_team_label
+        tests: [not_null]
+      - name: roof
+        tests:
+          - accepted_values: {values: ['open', 'retractable', 'fixed']}
+      - name: vendor
+        description: "Lowercase book name from the feed, or NULL when no closing line exists for the game."
+      - name: props_open
+        tests: [not_null]
+      - name: news_mentions_7d
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_key, vendor]
+
+  - name: app_game_prop_board
+    description: >
+      The game page. One row per player prop at one book (the grain of
+      fact_player_prop_closing), joined to the player's season-to-date form for
+      the stat the prop is about, the opponent's per-game yards allowed to the
+      player's position with a rank across teams, and the latest news mention in
+      the week before the game. Prop types with no box-score mapping keep their
+      line and odds with NULL form columns.
+    columns:
+      - name: app_game_prop_board_key
+        tests: [unique, not_null]
+      - name: game_player_vendor_prop_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('fact_player_prop_closing')", field: game_player_vendor_prop_key}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: player_key
+        tests: [not_null]
+      - name: vendor
+        tests: [not_null]
+      - name: prop_type
+        tests: [not_null]
+      - name: market_type
+        tests:
+          - accepted_values: {values: ['over_under', 'milestone']}
+      - name: trailing_hit_rate
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: hit_rate_over_line
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: opponent_allowed_rank
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 32}
+      - name: outcome
+        tests:
+          - accepted_values: {values: ['over', 'under', 'push', 'hit', 'miss']}
