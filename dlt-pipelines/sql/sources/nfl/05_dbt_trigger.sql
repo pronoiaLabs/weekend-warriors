@@ -52,6 +52,11 @@
 USE ROLE SYSADMIN;
 
 GRANT USAGE ON DATABASE NFL_PROD_DB TO ROLE DBT_RUNNER_ROLE;
+-- dbt creates a layer's schema on first build. PREP/CORE/FEATURES/ANALYTICS were
+-- created by SYSADMIN and transferred below, so this went unnoticed until the
+-- APP layer (2026-08): without it every triggered build fails with
+-- "must have CREATE SCHEMA granted on DATABASE" until the task auto-suspends.
+GRANT CREATE SCHEMA ON DATABASE NFL_PROD_DB TO ROLE DBT_RUNNER_ROLE;
 GRANT USAGE ON SCHEMA NFL_PROD_DB.RAW TO ROLE DBT_RUNNER_ROLE;
 GRANT SELECT ON FUTURE TABLES IN SCHEMA NFL_PROD_DB.RAW TO ROLE DBT_RUNNER_ROLE;
 

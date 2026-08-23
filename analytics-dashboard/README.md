@@ -83,10 +83,10 @@ Two facts about the data the pages show, both from the marts rather than the app
 
 - Weather columns are null until the forecast run inside the game week; the card says
   "Forecast arrives inside the week" rather than rendering zeros.
-- `team_label` on a prop row is the team of the player's last box score, so a player who
-  moved in the offseason carries the old label until a new box score lands. The page keys
-  each row to its column's team and marks the row `ex-<team>`; the column itself follows
-  the mart's `is_home`.
+- `team_label` on a prop row is the player's team as of the game: this season's most recent
+  box score, else the roster feed's current team (so offseason movers sit with the team
+  that priced them). The page still keys each row to its column's team and would mark a
+  row `ex-<team>` if the two ever disagreed, a guard that the fixtures show never firing.
 
 ## Fixtures
 

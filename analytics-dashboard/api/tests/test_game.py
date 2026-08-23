@@ -21,8 +21,10 @@ def test_game_splits_the_board_by_side(client: TestClient, game_with_props: str)
     assert body["away"] and body["home"]
     assert all(not p["is_home"] for p in body["away"])
     assert all(p["is_home"] for p in body["home"])
-    # The side comes from the mart's is_home; team_label can lag for a player whose last
-    # box score was with a previous team (an offseason move), so it is not asserted here.
+    # team_as_of prefers the roster feed before the season's first box score, so an
+    # offseason mover sits with the team that priced him, not his last box score's
+    assert all(p["team_label"] == game["away_team_label"] for p in body["away"])
+    assert all(p["team_label"] == game["home_team_label"] for p in body["home"])
     assert all(p["opponent_label"] == game["home_team_label"] for p in body["away"])
     assert all(p["opponent_label"] == game["away_team_label"] for p in body["home"])
     assert set(body["vendors"]) >= {"draftkings", "fanduel"}
