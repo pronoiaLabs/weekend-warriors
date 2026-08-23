@@ -89,6 +89,67 @@ def test_bad_seasons_are_named(bad) -> None:
         resolve_seasons(bad, DATASETS["pbp"], current_season=_clock)
 
 
+def test_depth_chart_shapes_are_split_at_2025() -> None:
+    # the file changed shape with the 2025 season: two datasets, two windows
+    assert resolve_seasons([2025], DATASETS["depth_charts"], current_season=_clock) == [2025]
+    assert resolve_seasons(
+        [2023, 2024], DATASETS["depth_charts_weekly"], current_season=_clock
+    ) == [2023, 2024]
+    with pytest.raises(ValueError, match=r"nflverse_depth_charts holds seasons 2025 to current; \[2024\]"):
+        resolve_seasons([2024, 2025], DATASETS["depth_charts"], current_season=_clock)
+    with pytest.raises(ValueError, match=r"through 2024"):
+        resolve_seasons([2025], DATASETS["depth_charts_weekly"], current_season=_clock)
+    with pytest.raises(ValueError):
+        # "current" is 2026 on the roster clock, past the weekly shape's window
+        resolve_seasons(CURRENT, DATASETS["depth_charts_weekly"], current_season=_clock)
+
+
+def test_row_hash_datasets_merge_on_row_id() -> None:
+    ds = DATASETS["depth_charts_weekly"]
+    assert ds.row_hash and ds.primary_key == ("row_id",) and ds.write_disposition == "merge"
+
+
+def test_a_dataset_entry_may_carry_its_own_seasons() -> None:
+    calls: list = []
+    src = nflverse_source(
+        name="nfl_nflverse_backfill",
+        config={
+            "seasons": [2023, 2024, 2025],
+            "datasets": [
+                "injuries",
+                {"name": "depth_charts_weekly", "seasons": [2023, 2024]},
+                {"name": "depth_charts", "seasons": [2025]},
+            ],
+        },
+        fetch=_fake_fetch(calls),
+        current_season=_clock,
+    )
+    resources = _resources(src)
+    assert set(resources) == {
+        "nflverse_injuries", "nflverse_depth_charts_weekly", "nflverse_depth_charts",
+    }
+    for r in resources.values():
+        list(r)
+    by_table: dict[str, list] = {}
+    for table, season, _ in calls:
+        by_table.setdefault(table, []).append(season)
+    assert by_table == {
+        "nflverse_injuries": [2023, 2024, 2025],
+        "nflverse_depth_charts_weekly": [2023, 2024],
+        "nflverse_depth_charts": [2025],
+    }
+
+
+def test_malformed_dataset_entry_is_named() -> None:
+    with pytest.raises(ValueError, match="name or"):
+        nflverse_source(
+            name="nfl_bad",
+            config={"datasets": [{"seasons": [2023]}]},
+            fetch=_fake_fetch([]),
+            current_season=_clock,
+        )
+
+
 def test_cursor_text_normalises_whatever_dlt_stored() -> None:
     from datetime import date, datetime, timedelta, timezone
 
@@ -241,3 +302,30 @@ def test_fetch_rows_filters_stamps_and_slices(monkeypatch) -> None:
     assert [r["player_name"] for r in everything] == ["A", "B"]
     # SLICE_ROWS is 1 here, so every surviving row is its own batch
     assert len(list(mod.fetch_rows(DATASETS["depth_charts"], 2026))) == 2
+
+
+def test_row_id_is_stable_and_collapses_exact_duplicates(monkeypatch) -> None:
+    pl = pytest.importorskip("polars")
+    import types
+
+    from pipelines.batch import nflverse_source as mod
+
+    frame = pl.DataFrame(
+        {
+            "season": [2023, 2023, 2023],
+            "week": [1, 1, None],
+            "club_code": ["ATL", "ATL", "ATL"],
+            "gsis_id": ["00-1", "00-1", "00-2"],   # rows 0 and 1 are exact duplicates
+        }
+    )
+    fake = types.SimpleNamespace(load_depth_charts=lambda seasons: frame)
+    monkeypatch.setitem(sys.modules, "nflreadpy", fake)
+
+    rows = [r for b in mod.fetch_rows(DATASETS["depth_charts_weekly"], 2023) for r in b]
+    ids = [r["row_id"] for r in rows]
+    assert len(ids) == 3 and ids[0] == ids[1] and ids[0] != ids[2]
+    assert all(len(i) == 32 for i in ids)                      # md5 hex
+    assert rows[2]["week"] is None                             # NULL is not a key column here
+    # the same rows hash the same on a second pass (no run-dependent salt)
+    again = [r["row_id"] for b in mod.fetch_rows(DATASETS["depth_charts_weekly"], 2023) for r in b]
+    assert again == ids

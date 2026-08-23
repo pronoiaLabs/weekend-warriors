@@ -95,6 +95,9 @@ class Dataset:
     roster_year: bool = False        # which nflreadpy clock "current" follows
     stamp_season: bool = False       # the file has no season column; add one
     cursor: str | None = None        # yield only rows past the last loaded value
+    row_hash: bool = False           # no natural key: merge on a hash of the row
+    seasons_from: int | None = None  # first season this file shape exists
+    seasons_to: int | None = None    # last season this file shape exists
     kwargs: tuple[tuple[str, Any], ...] = ()
 
 
@@ -147,9 +150,10 @@ DATASETS: dict[str, Dataset] = {
         write_disposition="merge",
         primary_key=("season", "game_type", "week", "team", "gsis_id"),
     ),
-    # A daily snapshot table: every row carries the `dt` it was observed at and
-    # the season file grows by one snapshot a day (~3k rows). `dt` is an ISO-8601
-    # string in the file, so string comparison orders it correctly.
+    # Depth charts changed shape with the 2025 file. From 2025 the file is a daily
+    # snapshot table: every row carries the `dt` it was observed at and the season
+    # file grows by one snapshot a day (~3k rows). `dt` is an ISO-8601 string in
+    # the file, so string comparison orders it correctly.
     "depth_charts": Dataset(
         loader="load_depth_charts",
         table="nflverse_depth_charts",
@@ -158,6 +162,20 @@ DATASETS: dict[str, Dataset] = {
         roster_year=True,
         stamp_season=True,
         cursor="dt",
+        seasons_from=2025,
+    ),
+    # Through 2024 the same loader returns the league's WEEKLY depth chart
+    # (season, week, game_type, club_code, depth_team, formation, position,
+    # depth_position, gsis_id ...), a different table. It has no clean natural
+    # key (a few hundred exact duplicate rows per season, `week` NULL on ~200),
+    # so it merges on a hash of the whole row, which collapses the duplicates.
+    "depth_charts_weekly": Dataset(
+        loader="load_depth_charts",
+        table="nflverse_depth_charts_weekly",
+        write_disposition="merge",
+        primary_key=("row_id",),
+        row_hash=True,
+        seasons_to=2024,
     ),
     # All-history files, small, replaced wholesale.
     "players": Dataset(
@@ -207,16 +225,30 @@ def resolve_seasons(
     between" from inside a container.
     """
     if value is None or value == CURRENT:
-        return [int(current_season(dataset.roster_year))]
-    if isinstance(value, bool):
+        years = [int(current_season(dataset.roster_year))]
+    elif isinstance(value, bool):
         raise ValueError(f"seasons must be 'current' or a list of years, got {value!r}")
-    if isinstance(value, int):
-        return [value]
-    if isinstance(value, (list, tuple)) and value and all(
+    elif isinstance(value, int):
+        years = [value]
+    elif isinstance(value, (list, tuple)) and value and all(
         isinstance(v, int) and not isinstance(v, bool) for v in value
     ):
-        return sorted(set(value))
-    raise ValueError(f"seasons must be 'current' or a list of years, got {value!r}")
+        years = sorted(set(value))
+    else:
+        raise ValueError(f"seasons must be 'current' or a list of years, got {value!r}")
+
+    # A file shape that only exists for a window of seasons says so here rather
+    # than as a missing-column error from deep inside the extract.
+    low, high = dataset.seasons_from, dataset.seasons_to
+    outside = [y for y in years if (low is not None and y < low) or (high is not None and y > high)]
+    if outside:
+        window = f"{low or '...'} to {high or 'current'}"
+        raise ValueError(
+            f"{dataset.table} holds seasons {window}; {outside} requested. "
+            "Depth charts are `depth_charts_weekly` through 2024 and `depth_charts` "
+            "(daily snapshots) from 2025."
+        )
+    return years
 
 
 def cursor_text(value: Any) -> str:
@@ -229,6 +261,26 @@ def cursor_text(value: Any) -> str:
     if hasattr(value, "isoformat"):
         return f"{value.isoformat()}T00:00:00"
     return str(value)[:19]
+
+
+def with_row_id(df: Any) -> Any:
+    """Add `row_id`, an md5 of every column's text joined by `|` (NULL as an
+    empty field), stable across runs and polars versions. Identical rows get
+    the same id, which is the point: the file's exact duplicates collapse."""
+    import hashlib  # noqa: PLC0415
+
+    import polars as pl  # noqa: PLC0415
+
+    text = pl.concat_str(
+        [pl.col(c).cast(pl.Utf8).fill_null("") for c in df.columns],
+        separator="|",
+    )
+    return df.with_columns(
+        text.map_elements(
+            lambda s: hashlib.md5(s.encode("utf-8")).hexdigest(),
+            return_dtype=pl.Utf8,
+        ).alias("row_id")
+    )
 
 
 def _nflreadpy_current_season(roster: bool) -> int:
@@ -273,6 +325,8 @@ def fetch_rows(
         df = df.filter(pl.col(dataset.cursor).cast(pl.Utf8).str.slice(0, 19) > floor)
     if dataset.stamp_season and season is not None:
         df = df.with_columns(pl.lit(season).alias("season"))
+    if dataset.row_hash:
+        df = with_row_id(df)
 
     # A merge key cannot be NULL. The files carry a few such rows and they are
     # placeholders, not data: player_stats has one nameless all-zero row per
@@ -349,11 +403,26 @@ def nflverse_source(
     fetch: Callable[..., Iterator[dict[str, Any]]] | None = None,
     current_season: Callable[[bool], int] | None = None,
 ) -> Any:
-    """One resource per entry in config.datasets. `fetch` and `current_season`
-    are the test seams; the defaults go through nflreadpy."""
-    keys = list(config.get("datasets") or [])
-    if not keys:
+    """One resource per entry in config.datasets. An entry is a dataset name, or
+    `{name: ..., seasons: [...]}` to override the entry-level `seasons` for that
+    one dataset (a backfill whose file shapes cover different years). `fetch`
+    and `current_season` are the test seams; the defaults go through nflreadpy."""
+    entries = list(config.get("datasets") or [])
+    if not entries:
         raise ValueError(f"pipeline '{name}': config.datasets must list at least one dataset")
+    seasons_cfg = config.get("seasons", CURRENT)
+    wanted: list[tuple[str, Any]] = []
+    for entry in entries:
+        if isinstance(entry, str):
+            wanted.append((entry, seasons_cfg))
+        elif isinstance(entry, dict) and entry.get("name"):
+            wanted.append((str(entry["name"]), entry.get("seasons", seasons_cfg)))
+        else:
+            raise ValueError(
+                f"pipeline '{name}': a datasets entry must be a name or {{name, seasons}}, "
+                f"got {entry!r}"
+            )
+    keys = [k for k, _ in wanted]
     unknown = [k for k in keys if k not in DATASETS]
     if unknown:
         raise ValueError(
@@ -364,13 +433,12 @@ def nflverse_source(
 
     fetch = fetch or fetch_rows
     current_season = current_season or _nflreadpy_current_season
-    seasons_cfg = config.get("seasons", CURRENT)
 
     resources = []
-    for key in keys:
+    for key, seasons_for in wanted:
         dataset = DATASETS[key]
         seasons = (
-            resolve_seasons(seasons_cfg, dataset, current_season=current_season)
+            resolve_seasons(seasons_for, dataset, current_season=current_season)
             if dataset.season_keyed
             else None
         )

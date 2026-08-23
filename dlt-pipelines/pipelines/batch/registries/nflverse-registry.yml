@@ -81,8 +81,12 @@ pipelines:
         - trades
 
   # Backfill: every season-keyed dataset for the BallDontLie history in the account
-  # (2023 onward). Unscheduled. Depth charts start their cursor here, so run it
-  # before the scheduled entry fires for the first time.
+  # (2023 onward). Unscheduled. A dataset entry may carry its own `seasons` when
+  # its file shape covers different years than the rest: depth charts changed
+  # shape with the 2025 file, so 2023-2024 land in nflverse_depth_charts_weekly
+  # (the league's weekly chart) and 2025 in nflverse_depth_charts (daily
+  # snapshots). The snapshot table's cursor restarts with the scheduled entry
+  # (dlt state is per pipeline), which then loads the 2026 file once in full.
   #
   #   make run-prod NAME=nfl_nflverse_backfill CONFIRM=1
   - name: nfl_nflverse_backfill
@@ -97,4 +101,5 @@ pipelines:
         - nextgen_rushing
         - nextgen_receiving
         - injuries
-        - depth_charts
+        - {name: depth_charts_weekly, seasons: [2023, 2024]}
+        - {name: depth_charts, seasons: [2025]}
