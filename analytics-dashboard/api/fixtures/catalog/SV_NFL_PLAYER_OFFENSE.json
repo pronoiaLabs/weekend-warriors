@@ -1,0 +1,543 @@
+{
+  "view": "SV_NFL_PLAYER_OFFENSE",
+  "database": "NFL_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Calendar date the game was played."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "COLLEGE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "College attended. Null for many players."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "IS_ROOKIE",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True in a player's first season."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "PLAYER_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Player full name. High cardinality -- a Cortex Search service would improve fuzzy name matching."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "POSITION",
+      "data_type": "VARCHAR(19)",
+      "synonyms": null,
+      "comment": "Clean position label derived from the position abbreviation. Unknown for players with no position on file."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "POSITION_GROUP",
+      "data_type": "VARCHAR(20)",
+      "synonyms": null,
+      "comment": "Coarse unit grouping. Offensive skill positions are the ones that appear in this view."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "HAS_PASSING",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True when this player attempted a pass in this game. Use to isolate quarterbacks by activity rather than by listed position."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "HAS_RECEIVING",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True when this player was targeted in this game."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "HAS_RUSHING",
+      "data_type": "BOOLEAN",
+      "synonyms": null,
+      "comment": "True when this player recorded a carry in this game."
+    },
+    {
+      "table": "TEAMS",
+      "name": "CONFERENCE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "AFC or NFC."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_ABBREVIATION",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Three-letter code of the team the player appeared for in this game."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Full name of the team the player appeared for in this game."
+    },
+    {
+      "table": "WEEKS",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "NFL season. Currently covers 2023 to 2025; new seasons are added as they load. A season starting in year N runs through February of N+1."
+    },
+    {
+      "table": "WEEKS",
+      "name": "SEASON_TYPE",
+      "data_type": "VARCHAR(14)",
+      "synonyms": "[\"regular or playoff\"]",
+      "comment": "Preseason, Regular Season or Postseason. Almost all questions mean Regular Season."
+    },
+    {
+      "table": "WEEKS",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Week within the season phase. Regular season is weeks 1 to 18; numbering restarts for preseason and postseason."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "PLAYER_GAMES",
+      "name": "AVG_PASSER_RATING",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Average traditional passer rating across games."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "AVG_QBR",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Average ESPN QBR across games."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "CATCH_RATE",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"catch rate\",\"catch percentage\"]",
+      "comment": "Receptions divided by targets."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "COMPLETION_PCT",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"completion percentage\",\"completion rate\"]",
+      "comment": "Completions divided by attempts. Only meaningful with enough volume -- require at least 100 attempts in a season."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "DRAFTKINGS_POINTS_PER_GAME",
+      "data_type": "NUMBER(38,8)",
+      "synonyms": "[\"draftkings points per game\",\"dk average\"]",
+      "comment": "Average DraftKings fantasy points per game played."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "FANDUEL_POINTS_PER_GAME",
+      "data_type": "NUMBER(38,8)",
+      "synonyms": "[\"fantasy points per game\",\"fanduel average\"]",
+      "comment": "Average FanDuel fantasy points per game played."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "GAMES_PLAYED",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Games in which the player recorded offensive involvement."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "LONGEST_RECEPTION",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Longest single reception."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "LONGEST_RUN",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Longest single rush."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "SCRIMMAGE_YARDS_PER_GAME",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Average scrimmage yards per game played."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TD_TO_INT_RATIO",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"td to int ratio\",\"touchdown to interception ratio\"]",
+      "comment": "Passing touchdowns per interception. Null when the player threw no interceptions."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_DRAFTKINGS_POINTS",
+      "data_type": "NUMBER(38,2)",
+      "synonyms": "[\"draftkings points\",\"dk points\",\"draftkings score\"]",
+      "comment": "Total DraftKings fantasy points. DraftKings Classic scoring: full PPR (1 per reception), 4-point passing touchdowns, -1 per interception, -1 per fumble lost, 3-point bonuses at 100 rushing or receiving yards and 300 passing yards, 2 per two-point conversion. Offensive players only; kickers and defenses are not scored here."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_FANDUEL_POINTS",
+      "data_type": "NUMBER(38,2)",
+      "synonyms": "[\"fantasy points\",\"fanduel points\",\"dfs points\",\"fantasy score\"]",
+      "comment": "Total FanDuel fantasy points. FanDuel NFL scoring: half PPR, 4-point passing touchdowns, -1 per interception, -2 per fumble lost, 3-point bonuses at 100 rushing or receiving yards and 300 passing yards, 2 per two-point conversion. Offensive players only; kickers and defenses are not scored here."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_FUMBLES",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total fumbles."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_FUMBLES_LOST",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total fumbles lost to the opponent."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_INTERCEPTIONS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"picks\",\"interceptions thrown\"]",
+      "comment": "Total interceptions thrown."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_PASS_ATTEMPTS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total pass attempts."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_PASS_COMPLETIONS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total completions."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_PASS_TDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"passing touchdowns\",\"td passes\"]",
+      "comment": "Total passing touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_PASS_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"passing yards\"]",
+      "comment": "Total passing yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RECEPTIONS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"catches\"]",
+      "comment": "Total receptions."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_REC_TDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total receiving touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_REC_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"receiving yards\"]",
+      "comment": "Total receiving yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RUSH_ATTEMPTS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"carries\"]",
+      "comment": "Total rushing attempts."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RUSH_TDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total rushing touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_RUSH_YARDS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": "[\"rushing yards\",\"ground yards\"]",
+      "comment": "Total rushing yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_SCRIMMAGE",
+      "data_type": "NUMBER(32,0)",
+      "synonyms": "[\"scrimmage yards\",\"total yards from scrimmage\"]",
+      "comment": "Rushing plus receiving yards. The standard measure for comparing skill-position production."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_SCRIMMAGE_TOUCHDOWNS",
+      "data_type": "NUMBER(32,0)",
+      "synonyms": null,
+      "comment": "Rushing plus receiving touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_TARGETS",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total times targeted."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_TIMES_SACKED",
+      "data_type": "NUMBER(31,0)",
+      "synonyms": null,
+      "comment": "Total times sacked."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOUCHES_TOTAL",
+      "data_type": "NUMBER(32,0)",
+      "synonyms": "[\"touches\"]",
+      "comment": "Carries plus receptions."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "YARDS_PER_ATTEMPT",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"yards per attempt\",\"ypa\"]",
+      "comment": "Passing yards per attempt."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "YARDS_PER_CARRY",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"yards per carry\",\"ypc\",\"rushing average\"]",
+      "comment": "Rushing yards per attempt. Require at least 50 carries in a season for this to be meaningful."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "YARDS_PER_CATCH",
+      "data_type": "NUMBER(37,6)",
+      "synonyms": "[\"yards per reception\",\"ypr\"]",
+      "comment": "Receiving yards per reception."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "YARDS_PER_TOUCH",
+      "data_type": "NUMBER(38,6)",
+      "synonyms": null,
+      "comment": "Scrimmage yards per touch."
+    }
+  ],
+  "facts": [
+    {
+      "table": "PLAYER_GAMES",
+      "name": "CATCHES",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Passes caught."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "DRAFTKINGS_PTS",
+      "data_type": "NUMBER(37,2)",
+      "synonyms": null,
+      "comment": "DraftKings fantasy points for this player-game under DraftKings Classic scoring (full PPR, -1 per fumble lost). Zero, not null, when nothing scored."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "FANDUEL_PTS",
+      "data_type": "NUMBER(37,2)",
+      "synonyms": null,
+      "comment": "FanDuel fantasy points for this player-game under FanDuel NFL scoring (half PPR, -2 per fumble lost). Zero, not null, when nothing scored."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "FUMBLES_COMMITTED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Fumbles, whether or not lost."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "FUMBLES_TURNED_OVER",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Fumbles lost to the opponent."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "LONGEST_CATCH",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Longest single reception, in yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "LONGEST_RUSH",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Longest single rush, in yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASSER_RATING",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "Traditional passer rating."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASS_ATTEMPTS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Pass attempts."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASS_COMPLETIONS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Completed passes."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASS_INTS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Interceptions thrown."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASS_TDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Passing touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "PASS_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Passing yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "REC_TDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Receiving touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "REC_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Receiving yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "RUSH_ATTEMPTS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Rushing attempts (carries)."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "RUSH_TDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Rushing touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "RUSH_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Rushing yards."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "SACKED",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Times this player was sacked."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "SACKED_YARDS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Yards lost to sacks."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TARGETS",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Times targeted by a pass."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_QBR",
+      "data_type": "FLOAT",
+      "synonyms": null,
+      "comment": "ESPN QBR, 0 to 100 scale."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_SCRIMMAGE_TDS",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "Rushing plus receiving touchdowns."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_SCRIMMAGE_YARDS",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "Rushing plus receiving yards. Zero, not null, for a player with neither."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TOTAL_TOUCHES",
+      "data_type": "NUMBER(20,0)",
+      "synonyms": null,
+      "comment": "Carries plus receptions."
+    },
+    {
+      "table": "PLAYER_GAMES",
+      "name": "TWO_PT_CONVERSIONS",
+      "data_type": "NUMBER(13,0)",
+      "synonyms": null,
+      "comment": "Two-point conversions rushed or caught, parsed from play-by-play. Zero when none."
+    }
+  ]
+}

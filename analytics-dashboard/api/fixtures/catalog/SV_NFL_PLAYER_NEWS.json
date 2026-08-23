@@ -1,0 +1,116 @@
+{
+  "view": "SV_NFL_PLAYER_NEWS",
+  "database": "NFL_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "CONTEXT",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"type of news\",\"category\"]",
+      "comment": "What the article says about the player: injury, lineup, transaction, suspension, or other."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "DETAIL",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"what was reported\",\"summary\"]",
+      "comment": "One-sentence extracted detail about the player, as reported. Quote or paraphrase with the source and time."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "FEED",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"source\",\"outlet\"]",
+      "comment": "Source feed: pft (ProFootballTalk), pfr (Pro Football Rumors), cbs, espn, or club_<abbr> for a team site."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "HEADLINE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Article headline."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "PLAYER_NAME_TEXT",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Player name exactly as the article wrote it. Use when full_name is NULL."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "PUBLISHED_AT",
+      "data_type": "TIMESTAMP_TZ(9)",
+      "synonyms": "[\"reported at\",\"time\",\"when\"]",
+      "comment": "When the article was published: the outlet timestamp, else the feed timestamp, else fetch time."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "PUBLISHED_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Calendar date of published_at."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "RESOLUTION_METHOD",
+      "data_type": "VARCHAR(15)",
+      "synonyms": null,
+      "comment": "How the name was matched to a roster player."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "URL",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Article URL."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"player\",\"player name\"]",
+      "comment": "Resolved player full name. NULL when the mention did not resolve to a roster player."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "POSITION_NAME",
+      "data_type": "VARCHAR(19)",
+      "synonyms": null,
+      "comment": "Normalized player position."
+    },
+    {
+      "table": "TEAMS",
+      "name": "TEAM_FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"team\"]",
+      "comment": "Team the article names for this mention, when recognized."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "ARTICLE_COUNT",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Number of distinct articles."
+    },
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "MENTION_COUNT",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Number of player mentions."
+    }
+  ],
+  "facts": [
+    {
+      "table": "NEWS_MENTIONS",
+      "name": "CANDIDATE_COUNT",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Roster players sharing the mentioned name. Above 1 means the team named in the article decided the match."
+    }
+  ]
+}

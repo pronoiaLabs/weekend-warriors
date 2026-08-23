@@ -1,0 +1,221 @@
+{
+  "view": "SV_NFL_PLAYER_PROPS",
+  "database": "NFL_PROD_DB",
+  "schema": "ANALYTICS",
+  "dimensions": [
+    {
+      "table": "AWAY_TEAMS",
+      "name": "AWAY_TEAM_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Away team full name."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "LINE_TIMING",
+      "data_type": "VARCHAR(7)",
+      "synonyms": null,
+      "comment": "Always closing for closing_props; selected strictly before kickoff."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "MARKET_TYPE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Provider market-side/type label when supplied."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "OUTCOME_EVALUATION_STATUS",
+      "data_type": "VARCHAR(67)",
+      "synonyms": null,
+      "comment": "Explicitly states that actual prop result grading is not modeled."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "PROP_TYPE",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"market\",\"player market\"]",
+      "comment": "Provider prop category, normalized to lowercase."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "SELECTED_SNAPSHOT_AT",
+      "data_type": "TIMESTAMP_TZ(9)",
+      "synonyms": null,
+      "comment": "Timestamp of the chosen strictly pre-kickoff snapshot."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "VENDOR",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Sportsbook vendor. Vendor is part of the grain."
+    },
+    {
+      "table": "GAMES",
+      "name": "GAME_DATE",
+      "data_type": "DATE",
+      "synonyms": null,
+      "comment": "Game calendar date."
+    },
+    {
+      "table": "GAMES",
+      "name": "SEASON",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "NFL season year."
+    },
+    {
+      "table": "GAMES",
+      "name": "SEASON_TYPE_NAME",
+      "data_type": "VARCHAR(14)",
+      "synonyms": null,
+      "comment": "Preseason, Regular Season, or Postseason."
+    },
+    {
+      "table": "GAMES",
+      "name": "WEEK",
+      "data_type": "NUMBER(19,0)",
+      "synonyms": null,
+      "comment": "Week within the season phase."
+    },
+    {
+      "table": "HOME_TEAMS",
+      "name": "HOME_TEAM_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": null,
+      "comment": "Home team full name."
+    },
+    {
+      "table": "OPENING_PROPS",
+      "name": "LINE_TIMING",
+      "data_type": "VARCHAR(7)",
+      "synonyms": null,
+      "comment": "Always opening for opening_props."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "FULL_NAME",
+      "data_type": "VARCHAR(16777216)",
+      "synonyms": "[\"player\",\"player name\"]",
+      "comment": "Player full name."
+    },
+    {
+      "table": "PLAYERS",
+      "name": "POSITION_NAME",
+      "data_type": "VARCHAR(19)",
+      "synonyms": null,
+      "comment": "Normalized player position."
+    }
+  ],
+  "metrics": [
+    {
+      "table": "CLOSING_PROPS",
+      "name": "AVG_LINE",
+      "data_type": "NUMBER(36,10)",
+      "synonyms": null,
+      "comment": "Average offered closing line; use only within one prop type."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "AVG_LINE_MOVEMENT",
+      "data_type": "NUMBER(37,10)",
+      "synonyms": null,
+      "comment": "Average closing-minus-opening movement; use only within one prop type."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "OFFER_COUNT",
+      "data_type": "NUMBER(18,0)",
+      "synonyms": null,
+      "comment": "Number of player prop offers at closing grain."
+    }
+  ],
+  "facts": [
+    {
+      "table": "CLOSING_PROPS",
+      "name": "LINE_MOVEMENT",
+      "data_type": "NUMBER(19,4)",
+      "synonyms": null,
+      "comment": "Closing line minus same-vendor opening line."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "LINE_VALUE",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Closing offered prop line, selected strictly before kickoff."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "MARKET_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Closing generic American market odds when supplied."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "OPENING_LINE_VALUE",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Same-vendor opening line carried onto the closing row."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "OVER_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Closing American odds for the over side."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "OVER_ODDS_MOVEMENT",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Closing over odds minus opening over odds."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "UNDER_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Closing American odds for the under side."
+    },
+    {
+      "table": "CLOSING_PROPS",
+      "name": "UNDER_ODDS_MOVEMENT",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Closing under odds minus opening under odds."
+    },
+    {
+      "table": "OPENING_PROPS",
+      "name": "LINE_VALUE",
+      "data_type": "NUMBER(18,4)",
+      "synonyms": null,
+      "comment": "Opening offered prop line."
+    },
+    {
+      "table": "OPENING_PROPS",
+      "name": "MARKET_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Opening generic American market odds when supplied."
+    },
+    {
+      "table": "OPENING_PROPS",
+      "name": "OVER_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Opening American odds for the over side."
+    },
+    {
+      "table": "OPENING_PROPS",
+      "name": "UNDER_ODDS",
+      "data_type": "NUMBER(38,0)",
+      "synonyms": null,
+      "comment": "Opening American odds for the under side."
+    }
+  ]
+}
