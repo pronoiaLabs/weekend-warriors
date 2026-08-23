@@ -31,6 +31,7 @@ dependencies = [
     "snowflake-telemetry-python>=0.6",   # optional import in pipelines/common/observability.py
     "firecrawl-py>=4.38",                # imported inside pipelines/batch/firecrawl_source.py
     "feedparser>=6",                     # imported inside pipelines/batch/firecrawl_source.py
+    "nflreadpy>=0.1.5",                  # imported inside pipelines/batch/nflverse_source.py; brings polars; image rebuild required
 ]
 
 [project.optional-dependencies]

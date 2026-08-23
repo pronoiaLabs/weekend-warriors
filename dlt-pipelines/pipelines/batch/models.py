@@ -65,6 +65,8 @@ SUPPORTED_SOURCES: tuple[str, ...] = (
     "firecrawl",
     "openmeteo",
     "snowflake_app",
+    "nflverse",
+    "sleeper",
 )
 
 # Dispositions dlt accepts as a plain string. `skip` is deliberately absent: a

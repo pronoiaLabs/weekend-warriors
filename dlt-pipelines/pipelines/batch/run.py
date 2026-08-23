@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import importlib
 import logging
 import os
 import sys
@@ -233,6 +234,24 @@ def _resolve_tokens(obj: Any, tokens: dict[str, Any]) -> Any:
     return obj
 
 
+# Vendor sources with no arguments beyond (name, config). Each entry is the one-line
+# reason it could not be a rest_api entry; the module docstring has the long form.
+#   firecrawl   search -> scrape -> extract, with control flow between the calls;
+#               news is dated by the search window, so no season token
+#   openmeteo   columnar hourly arrays that no data_selector can zip; the window is
+#               start_date/end_date or forecast_days, so no season token
+#   nflverse    parquet files behind a GitHub release redirect, read through
+#               nflreadpy; it keeps its own season clock, so no season token
+#   sleeper     a dict-of-dicts player dump, and every other call takes the
+#               season/week that only /state/nfl knows; no season token
+CUSTOM_SOURCES: dict[str, tuple[str, str]] = {
+    "firecrawl": ("pipelines.batch.firecrawl_source", "firecrawl_news"),
+    "openmeteo": ("pipelines.batch.openmeteo_source", "openmeteo_weather"),
+    "nflverse": ("pipelines.batch.nflverse_source", "nflverse_source"),
+    "sleeper": ("pipelines.batch.sleeper_source", "sleeper_source"),
+}
+
+
 def build_source(spec: PipelineSpec):
     """Construct a dlt source object from a registry entry, dispatching on `source`."""
     cfg: dict[str, Any] = _resolve_secrets(spec.config)
@@ -264,20 +283,13 @@ def build_source(spec: PipelineSpec):
             n_orders=cfg.get("n_orders", 5),
         )
 
-    if spec.source == "firecrawl":
-        # Search -> scrape -> extract with control flow between the calls, which the
-        # rest_api source cannot express. No season token: news is dated by the
-        # search window, not the season. See pipelines/batch/firecrawl_source.py.
-        from pipelines.batch.firecrawl_source import firecrawl_news  # noqa: PLC0415
-
-        return firecrawl_news(name=spec.name, config=cfg)
-
-    if spec.source == "openmeteo":
-        # Columnar hourly arrays cannot be a rest_api data_selector. No season
-        # token: the window is start_date/end_date or forecast_days.
-        from pipelines.batch.openmeteo_source import openmeteo_weather  # noqa: PLC0415
-
-        return openmeteo_weather(name=spec.name, config=cfg)
+    if spec.source in CUSTOM_SOURCES:
+        # Every vendor source shares one signature, (name, config), and is imported
+        # here rather than at module level: CI import-checks run.py with a minimal
+        # dependency set, and each vendor SDK is only installed for its own run.
+        module_path, factory_name = CUSTOM_SOURCES[spec.source]
+        factory = getattr(importlib.import_module(module_path), factory_name)
+        return factory(name=spec.name, config=cfg)
 
     if spec.source == "snowflake_app":
         # SELECT * from listed APP tables through the ambient Snowflake session.
