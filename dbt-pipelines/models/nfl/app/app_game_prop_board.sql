@@ -26,10 +26,15 @@
 
     Team and opponent: the prop fact carries only the game's two teams, and
     dim_player has no team by design. The player's team is the team of their
-    most recent offensive box score on or before the game, else the roster
-    feed's current team (stg_nfl__players.current_team_id, what the news fact
-    uses). The opponent is the other side of the game; a player with neither
-    source gets NULL team and opponent and still appears.
+    most recent offensive box score on or before the game when that box score
+    is from the prop's season; before the season's first box score it is the
+    roster feed's current team (stg_nfl__players.current_team_id, what the news
+    fact uses), falling back to the prior-season box score only when the roster
+    feed has no team. A prior-season box score alone would put every offseason
+    mover on the wrong side of the board (measured on the 2026 week 1 slate:
+    players priced for NE at SEA carried GB and PHI labels). The opponent is the
+    other side of the game; a player whose team is neither side, or who has no
+    team at all, keeps NULL opponent and side and still appears.
 
     Actual and outcome are filled once the game is completed and the stat is
     mapped: over / under / push against line_value for over_under markets, hit /
@@ -143,12 +148,13 @@ prop_base as (
 
 ),
 
--- the player's team as of the game: most recent box score on or before kickoff
+-- the player's most recent box score on or before kickoff, with its season
 box_score_team as (
 
     select
         pb.game_player_vendor_prop_key,
-        o.team_key
+        o.team_key,
+        o.season                                        as box_score_season
     from prop_base pb
     inner join offense o
         on o.player_key = pb.player_key
@@ -160,11 +166,16 @@ box_score_team as (
 
 ),
 
+-- the player's team as of the game: this season's box score wins; before the
+-- season's first box score the roster feed does, so offseason moves are right
 team_as_of as (
 
     select
         pb.game_player_vendor_prop_key,
-        coalesce(bt.team_key, ct.current_team_key)      as team_key
+        case
+            when bt.box_score_season = pb.season then bt.team_key
+            else coalesce(ct.current_team_key, bt.team_key)
+        end                                             as team_key
     from prop_base pb
     left join box_score_team bt
         on bt.game_player_vendor_prop_key = pb.game_player_vendor_prop_key
@@ -313,12 +324,13 @@ sided as (
         pb.*,
         t.team_key,
         case
-            when t.team_key is null then null
             when t.team_key = pb.home_team_key then pb.away_team_key
-            else pb.home_team_key
+            when t.team_key = pb.away_team_key then pb.home_team_key
         end                                             as opponent_team_key,
-        iff(t.team_key is null, null, t.team_key = pb.home_team_key)
-                                                        as is_home
+        case
+            when t.team_key = pb.home_team_key then true
+            when t.team_key = pb.away_team_key then false
+        end                                             as is_home
     from prop_base pb
     left join team_as_of t
         on t.game_player_vendor_prop_key = pb.game_player_vendor_prop_key

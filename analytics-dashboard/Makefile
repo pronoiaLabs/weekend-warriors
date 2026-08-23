@@ -20,7 +20,7 @@ endef
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install dev-api dev-web serve test test-live lint build setup
+.PHONY: help install dev dev-fixtures dev-api dev-api-fixtures dev-web serve test test-live lint build smoke fixtures setup
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<target>\033[0m\n"} \
@@ -35,6 +35,21 @@ install: ## Install api (uv) and web (npm) dependencies
 	cd api && $(UV) sync --extra dev
 	@$(call hdr,web dependencies)
 	cd web && npm install
+
+# Both services in one terminal: the API with reload on :8010 and Vite on :5174
+# proxying /api to it. Open http://localhost:5174. Ctrl-C stops both (the trap
+# kills the process group the two background jobs belong to).
+dev: ## Run the API (:8010, live data) and the Vite dev server (:5174) together
+	@trap 'kill 0' INT TERM EXIT; \
+	( cd api && $(UV_RUN) uvicorn app.main:app --reload --port 8010 ) & \
+	( cd web && npm run dev ) & \
+	wait
+
+dev-fixtures: ## The same on recorded fixtures, no Snowflake connection
+	@trap 'kill 0' INT TERM EXIT; \
+	( cd api && ANALYTICS_DASHBOARD_DATA=fixtures $(UV_RUN) uvicorn app.main:app --reload --port 8010 ) & \
+	( cd web && npm run dev ) & \
+	wait
 
 dev-api: ## Run FastAPI with reload on :8010 (live data as ANALYTICS_DASHBOARD_ROLE)
 	cd api && $(UV_RUN) uvicorn app.main:app --reload --port 8010
@@ -65,6 +80,20 @@ lint: ## Ruff on the api + type-check the web
 
 build: ## Production build of the web app into web/dist
 	cd web && npm run build
+
+smoke: build ## Walk every route in headless Chrome against fixtures; fails on console errors
+	./scripts/smoke.sh
+
+##@ Fixtures (live; reads a dev build of the APP marts)
+
+SPORT      ?= nfl
+STEM       := $(shell echo $(SPORT) | tr a-z A-Z)
+DEV_SCHEMA ?= DEV_$(shell echo $${USER} | tr a-z A-Z)
+
+fixtures: ## Recapture fixtures/app/<sport>/*.json from <SPORT>_DEV_DB.$(DEV_SCHEMA) (SPORT=nfl DEV_SCHEMA=DEV_<user>)
+	cd api && ANALYTICS_DASHBOARD_ROLE=SYSADMIN ANALYTICS_DASHBOARD_WAREHOUSE=DEVELOPMENT_WH \
+		$(STEM)_APP_DB=$(STEM)_DEV_DB $(STEM)_APP_SCHEMA=$(DEV_SCHEMA) \
+		$(UV_RUN) python scripts/capture_fixtures.py $(SPORT)
 
 ##@ Snowflake setup (live; run by a human, never CI)
 

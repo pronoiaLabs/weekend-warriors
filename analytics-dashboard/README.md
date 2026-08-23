@@ -5,14 +5,18 @@ over a dbt-built serving layer, rendered by a React app in the Glass Prism look.
 sibling of `ops-dashboard/`, copies its patterns (query cache, fixture mode, SPA mount,
 typed client) and shares no code with it. Own ports, so both run side by side.
 
-Status: Phase 2 of the development plan (canvas `semantic-view-dashboards`, page 4): the
-scaffold, the Prism shell, the sport profiles and the capabilities endpoint. Pages arrive
-from Phase 3.
+Status: Phase 3 of the development plan (canvas `semantic-view-dashboards`, page 4): the
+scaffold and Prism shell, the sport profiles and capabilities endpoint, and the first two
+pages, the game day board and the game prop board, over the `app_game_slate` and
+`app_game_prop_board` marts. The Explorer (Phase 4) and the team, market and player pages
+follow.
 
 ## Running it
 
 ```bash
 make install            # uv sync for the api, npm install for the web
+make dev                # both services: API on :8010 + Vite on :5174; open localhost:5174
+make dev-fixtures       # the same on recorded fixtures, no Snowflake connection
 make dev-api            # FastAPI on :8010, live data as ANALYTICS_DASHBOARD_ROLE
 make dev-api-fixtures   # the same on recorded fixtures, no Snowflake connection
 make dev-web            # Vite on :5174, proxies /api to :8010
@@ -20,6 +24,8 @@ make serve              # build the web app and serve everything on :8010
 make test               # api tests in fixture mode (live tests skipped)
 make test-live          # includes the live contract tests (needs the role)
 make lint               # ruff + tsc -b
+make smoke              # build, then walk every route in headless Chrome on fixtures
+make fixtures           # recapture fixtures/app/nfl from your dev build (see Fixtures)
 ```
 
 Environment, all optional (`api/app/config.py` is the contract):
@@ -54,11 +60,51 @@ Enterprise-only and refreshed by a billed background service, and the `app_*` ta
 already the materialization. If one page ever needs sub-load freshness, that one model
 becomes a dynamic table.
 
+## Pages and the tiles behind them
+
+Every page is one React module rendered at every width (the dock on wide screens, bottom
+tabs under 900px) and gated by `CapabilityGate` on the capability its mart provides. Every
+tile that reads a mart shows the SQL it ran in a "Show query" expander; the API renders the
+bound statement with literals in place of the binds for exactly that purpose.
+
+| Route | API | Mart | What the API does beyond the select |
+|---|---|---|---|
+| `/:sport/slate` | `GET /api/{sport}/slate?season&season_type&week&vendor` | `app_game_slate` | lists the season's weeks (picker + default resolution: the first week whose last kickoff is still ahead, else the last week); collapses the week's game × vendor rows to one card per game carrying the requested book's line, blank when that book has none |
+| `/:sport/games/:game_key` | `GET /api/{sport}/games/{game_key}?vendor` | `app_game_slate`, `app_game_prop_board` | the game's row at the chosen book, plus the prop board for every book split into the away and home columns; the page filters by book and stat family without another round trip |
+
+Each tile lives in `api/app/sports/tiles/<name>.py` as a pydantic row model, the
+`COLUMNS` it selects (the contract test checks them against the mart schema), and a `load`
+function that issues one select through `app/sports/source.py` (live SQL or the same
+selection over fixture rows). Pins on the game page are per-browser `localStorage`; the
+matchup notes are sentences generated on the client from the columns already on the page
+(extreme opponent ranks by position, the forecast, line movement, news headlines).
+
+Two facts about the data the pages show, both from the marts rather than the app:
+
+- Weather columns are null until the forecast run inside the game week; the card says
+  "Forecast arrives inside the week" rather than rendering zeros.
+- `team_label` on a prop row is the player's team as of the game: this season's most recent
+  box score, else the roster feed's current team (so offseason movers sit with the team
+  that priced them). The page still keys each row to its column's team and would mark a
+  row `ex-<team>` if the two ever disagreed, a guard that the fixtures show never firing.
+
+## Fixtures
+
+`api/fixtures/app/nfl/*.json` are rows captured from a dev build by
+`api/scripts/capture_fixtures.py` through `app.db.query`, so they have exactly the shape
+live tiles see. The selection is small and deliberate (2026 Regular Season weeks 1 and 2,
+2026 Preseason week 3 which is partly played, 2025 Regular Season week 18 which is complete
+with scores; every 2026 prop row), enough to exercise every branch a page has. The tests
+pin the clock to `2026-08-23T02:00:00Z` (`tests/conftest.py`) so the default week is
+stable. Recapture after a mart change with `make fixtures DEV_SCHEMA=DEV_<user>` (reads
+`NFL_DEV_DB` as `SYSADMIN` on `DEVELOPMENT_WH`) and commit the result.
+
 ## Layout
 
 ```
 analytics-dashboard/
 ├── Makefile
+├── scripts/smoke.sh           headless-Chrome route walk on fixtures (make smoke)
 ├── deploy/sql/
 │   ├── 01_role.sql            ANALYTICS_DASHBOARD_ROLE: semantic-view SELECT, warehouse USAGE
 │   ├── 02_cost_tag.sql        cost attribution note (no dedicated compute in v1)
@@ -76,21 +122,25 @@ analytics-dashboard/
 │   │       ├── profiles/         nfl.py, ncaaf.py
 │   │       ├── registry.py       get_profile / require(cap) dependencies (404 by name)
 │   │       ├── fixtures.py       recorded rows and DESCRIBE TABLE schemas
+│   │       ├── source.py         select(): one SELECT of named columns, live or over fixtures
+│   │       ├── tiles/            slate.py, game_board.py: row model + COLUMNS + load()
 │   │       ├── router.py         /api/{sport}, includes the page routers as they land
-│   │       └── routers/          capabilities.py (more per phase)
+│   │       └── routers/          capabilities.py, slate.py, games.py
+│   ├── scripts/capture_fixtures.py
 │   ├── fixtures/
 │   │   ├── app/schema/        DESCRIBE TABLE of each mart: the profile contract
-│   │   ├── app/<sport>/       recorded rows per mart (from Phase 3)
+│   │   ├── app/<sport>/       recorded rows per mart
 │   │   └── catalog/           SHOW SEMANTIC ... per view, for the Explorer
 │   └── tests/                 fixture mode by default; `live` marker needs ANALYTICS_DASHBOARD_LIVE=1
 └── web/                       Vite + React 19 + react-router 7
     └── src/
         ├── api/               client.ts (get<T>), sports/client.ts + types.ts
-        ├── hooks/             api state, sport from the path, viewport (wide | narrow)
+        ├── hooks/             api state, sport from the path, viewport, pins (localStorage), tilt
         ├── layouts/           SportLayout: loads capabilities once, provides them, renders the chrome
-        ├── components/        Aurora, sports/SportNav (dock wide, tabs narrow)
-        ├── pages/sports/      SportHome; one module per page at every width
-        └── styles/            tokens.css (Prism palette), sports.css (primitives)
+        ├── components/        Aurora, sports/ (SportNav, TileFrame, Chips, CapabilityGate, Crumbs)
+        ├── lib/format.ts      number, odds and spread formatting; null renders blank
+        ├── pages/sports/      SportHome, Slate, Game; one module per page at every width
+        └── styles/            tokens.css (palette), sports.css (primitives), pages.css (pages)
 ```
 
 ## Role
