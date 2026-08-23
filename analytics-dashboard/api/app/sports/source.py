@@ -22,6 +22,36 @@ Row = dict[str, Any]
 Predicate = Callable[[Row], bool]
 
 
+def describe_sql(profile: SportProfile, cap: Capability) -> tuple[str, dict[str, Any]]:
+    """Statement that lists a mart's columns. Postgres has no DESCRIBE TABLE."""
+    table = profile.tables[cap]
+    if config.is_snowflake():
+        return f"describe table {profile.fqn(cap)}", {}
+    _, schema = profile.location()
+    sql = (
+        "select column_name as name, data_type as type\n"
+        "from information_schema.columns\n"
+        "where table_schema = %(schema)s and table_name = %(table)s\n"
+        "order by ordinal_position"
+    )
+    return sql, {"schema": schema, "table": table}
+
+
+def describe(
+    profile: SportProfile, cap: Capability, *, ttl: float | None = 3600
+) -> tuple[list[Row], str]:
+    """Live column list (name, type), minus dlt metadata, and the rendered SQL."""
+    sql, params = describe_sql(profile, cap)
+    rows = [
+        row
+        for row in db.query(
+            sql, params, ttl=ttl, tag={"sport": profile.key, "tile": "describe"}
+        )
+        if not str(row.get("name", "")).lower().startswith("_dlt_")
+    ]
+    return rows, render(sql, params)
+
+
 def select(
     profile: SportProfile,
     cap: Capability,

@@ -1,8 +1,9 @@
 """The Explorer: flat sheets, one per grain, read column-for-column.
 
 A sheet is one app_explore_* table. Its columns are its contract, so the
-catalog is the table's own description (DESCRIBE TABLE live, the recorded
-schema in fixture mode) typed into the few kinds a grid needs, and a sheet
+catalog is the table's own description (information_schema on Postgres,
+DESCRIBE TABLE on Snowflake; the recorded schema in fixture mode) typed
+into the few kinds a grid needs, and a sheet
 request is one select with equality filters on named columns, one ORDER BY
 column, and a page. Filter and sort columns are validated against the
 catalog before any SQL is built, so a client can name only columns the table
@@ -16,7 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from app import config, db
+from app import config
 from app.sports import fixtures, source
 from app.sports.capabilities import Capability as C
 from app.sports.profile import SportProfile
@@ -137,34 +138,50 @@ def kind_of(sql_type: str) -> Kind:
     if t.startswith("NUMBER"):
         m = re.match(r"NUMBER\((\d+),(\d+)\)", t)
         return "integer" if m and m.group(2) == "0" else "number"
+    if t in (
+        "INTEGER",
+        "INT",
+        "INT2",
+        "INT4",
+        "INT8",
+        "BIGINT",
+        "SMALLINT",
+        "SERIAL",
+        "BIGSERIAL",
+    ):
+        return "integer"
     if t.startswith(("FLOAT", "DOUBLE", "REAL", "DECIMAL", "NUMERIC")):
         return "number"
-    if t.startswith("BOOLEAN"):
+    if t.startswith("BOOLEAN") or t == "BOOL":
         return "boolean"
-    if t.startswith("TIMESTAMP"):
+    if t.startswith("TIMESTAMP") or t == "TIMESTAMPTZ":
         return "datetime"
     if t == "DATE":
         return "date"
     return "text"
 
 
+def _is_dlt_column(name: str) -> bool:
+    return name.lower().startswith("_dlt_")
+
+
 def columns(profile: SportProfile, sheet: Sheet) -> tuple[list[Column], str]:
     """The sheet's columns in table order, and the statement that described them."""
     table = profile.tables[sheet.cap]
-    sql = f"describe table {profile.fqn(sheet.cap)};"
+    sql, params = source.describe_sql(profile, sheet.cap)
     if config.is_fixtures():
         spec = fixtures.schema(table)
         described = [
             {"name": c["name"], "type": c["type"]} for c in (spec or {}).get("columns", [])
         ]
+        rendered = source.render(sql, params)
     else:
-        described = db.query(
-            sql[:-1], ttl=3600, tag={"sport": profile.key, "tile": "explore_describe"}
-        )
+        described, rendered = source.describe(profile, sheet.cap)
     return [
         Column(name=str(c["name"]).lower(), kind=kind_of(str(c["type"])), type=str(c["type"]))
         for c in described
-    ], sql
+        if not _is_dlt_column(str(c["name"]))
+    ], rendered
 
 
 def catalog(profile: SportProfile) -> CatalogPayload:

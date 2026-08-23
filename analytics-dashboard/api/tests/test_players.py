@@ -16,7 +16,7 @@ def test_default_leaders_are_the_season_type_in_progress(client: TestClient) -> 
     assert body["season_types"] == ["Preseason"]
     assert body["position"] is None and body["team"] is None
     assert body["rows"], "the preseason has player games"
-    assert body["query"].count("from NFL_PROD_DB.APP.app_player_leaders") == 2
+    assert body["query"].count("from app_copy.app_player_leaders") == 2
 
 
 def test_position_leaderboard_carries_ranks_within_the_position(client: TestClient) -> None:
@@ -61,7 +61,7 @@ def test_player_page_defaults_to_the_latest_season_and_its_latest_type(client: T
     assert body["player"]["player_name"] == "Puka Nacua"
     assert len(body["weeks"]) == 3
     assert [s["season"] for s in body["seasons"]] == sorted(s["season"] for s in body["seasons"])
-    assert body["query"].count("from NFL_PROD_DB.APP.") == 3
+    assert body["query"].count("from app_copy.") == 3
 
 
 def test_player_season_carries_weeks_and_long_stats(client: TestClient) -> None:

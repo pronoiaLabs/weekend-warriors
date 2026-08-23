@@ -28,7 +28,7 @@ def test_nfl_capabilities_list_the_page_marts(client: TestClient) -> None:
     ]
     assert body["default_vendor"] == "draftkings"
     assert "fantasy" in body["extensions"]
-    assert body["app_location"] == "NFL_PROD_DB.APP"
+    assert body["app_location"] == "app.app_copy"
 
 
 def test_ncaaf_has_no_page_capabilities_yet(client: TestClient) -> None:

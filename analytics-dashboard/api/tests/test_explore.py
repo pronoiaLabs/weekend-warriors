@@ -18,7 +18,8 @@ def test_catalog_lists_every_sheet_with_typed_columns(client: TestClient) -> Non
     assert kinds["is_home"] == "boolean"
     assert kinds["game_date"] == "date"
     assert all(s["columns"][0]["name"] == "row_id" for s in body["sheets"])
-    assert body["query"].count("describe table NFL_PROD_DB.APP.app_explore_") == 7
+    assert body["query"].count("information_schema.columns") == 7
+    assert body["query"].count("table_name = 'app_explore_") == 7
 
 
 def test_sheet_pages_with_has_more(client: TestClient) -> None:

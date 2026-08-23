@@ -28,7 +28,7 @@ def test_game_splits_the_board_by_side(client: TestClient, game_with_props: str)
     assert all(p["opponent_label"] == game["home_team_label"] for p in body["away"])
     assert all(p["opponent_label"] == game["away_team_label"] for p in body["home"])
     assert set(body["vendors"]) >= {"draftkings", "fanduel"}
-    assert body["query"].count("from NFL_PROD_DB.APP.") == 2
+    assert body["query"].count("from app_copy.") == 2
 
 
 def test_prop_rows_carry_form_line_and_matchup(client: TestClient, game_with_props: str) -> None:

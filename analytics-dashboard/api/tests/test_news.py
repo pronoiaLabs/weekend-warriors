@@ -13,7 +13,7 @@ def test_default_window_is_seven_days_newest_first(client: TestClient) -> None:
     assert len(rows) == 494
     assert rows == sorted(rows, key=lambda r: r["published_at"], reverse=True)
     assert len(body["teams"]) == 32 and "pft" in body["feeds"]
-    assert body["query"].count("from NFL_PROD_DB.APP.app_news_mentions") == 1
+    assert body["query"].count("from app_copy.app_news_mentions") == 1
 
 
 def test_window_narrows_by_published_date(client: TestClient) -> None:

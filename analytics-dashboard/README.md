@@ -17,12 +17,12 @@ follow.
 make install            # uv sync for the api, npm install for the web
 make dev                # both services: API on :8010 + Vite on :5174; open localhost:5174
 make dev-fixtures       # the same on recorded fixtures, no Snowflake connection
-make dev-api            # FastAPI on :8010, live data as ANALYTICS_DASHBOARD_ROLE
-make dev-api-fixtures   # the same on recorded fixtures, no Snowflake connection
+make dev-api            # FastAPI on :8010, live data as app_api against app.app_copy
+make dev-api-fixtures   # the same on recorded fixtures, no database connection
 make dev-web            # Vite on :5174, proxies /api to :8010
 make serve              # build the web app and serve everything on :8010
 make test               # api tests in fixture mode (live tests skipped)
-make test-live          # includes the live contract tests (needs the role)
+make test-live          # includes the live contract tests against Postgres
 make lint               # ruff + tsc -b
 make smoke              # build, then walk every route in headless Chrome on fixtures
 make nav                # build, then drive the app over DevTools: back, memory, dock
@@ -33,28 +33,32 @@ Environment, all optional (`api/app/config.py` is the contract):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ANALYTICS_DASHBOARD_DATA` | live | `fixtures` serves recorded JSON and never imports the connector |
+| `ANALYTICS_DASHBOARD_DATA` | live | `fixtures` serves recorded JSON and never opens a connection |
+| `ANALYTICS_DASHBOARD_BACKEND` | postgres | live store: `postgres` (`app.app_copy` as `app_api`) or `snowflake` (rollback / `make fixtures`) |
 | `ANALYTICS_DASHBOARD_NOW` | wall clock | pins the clock (ISO-8601) for fixture-era tests |
-| `ANALYTICS_DASHBOARD_CONNECTION` | weekend-warriors | snow CLI connection name |
-| `ANALYTICS_DASHBOARD_ROLE` | ANALYTICS_DASHBOARD_ROLE | applied with `USE ROLE` on connect, then `USE SECONDARY ROLES NONE` |
-| `ANALYTICS_DASHBOARD_WAREHOUSE` | DLT_OPS_WH | `USE WAREHOUSE` on connect |
+| `ANALYTICS_DASHBOARD_CONNECTION` | weekend-warriors | snow CLI connection name (`BACKEND=snowflake` only) |
+| `ANALYTICS_DASHBOARD_ROLE` | ANALYTICS_DASHBOARD_ROLE | Snowflake `USE ROLE` on connect (`BACKEND=snowflake` only) |
+| `ANALYTICS_DASHBOARD_WAREHOUSE` | DLT_OPS_WH | `USE WAREHOUSE` on connect (`BACKEND=snowflake` only) |
 | `ANALYTICS_DASHBOARD_CACHE_SECONDS` | 60 | default query cache TTL; tiles can override per call |
-| `<SPORT>_APP_DB`, `<SPORT>_APP_SCHEMA` | `<SPORT>_PROD_DB`, `APP` | where a sport's marts live; point NFL at `NFL_DEV_DB` / `DEV_<user>` to read a dev build |
+| `<SPORT>_APP_DB`, `<SPORT>_APP_SCHEMA` | `app`, `app_copy` | mart location. Snowflake defaults are `<SPORT>_PROD_DB`, `APP`; point those at `NFL_DEV_DB` / `DEV_<user>` to capture a dev build |
+| `PGHOST`, `PGPORT`, `APP_API_PASSWORD` | from repo-root `.env.postgres` | Postgres live login. `make serve` / `make dev` source that file. User is always `app_api`; never the writer or instance admin |
+
+Live Postgres needs `APP_API_PASSWORD` in `.env.postgres`. Generate and apply it with `make -C dlt-pipelines setup-postgres-api-password CONFIRM=1`. Rollback: `ANALYTICS_DASHBOARD_BACKEND=snowflake make dev-api`.
 
 ## Two lanes
 
 **Pages read `APP` tables.** Every curated page (game day board, game prop board, teams,
-markets, players, news) is served from `<SPORT>_PROD_DB.APP`, a dbt layer of page-shaped
-marts beside `CORE`, `ANALYTICS` and `FEATURES`. Definitions live in dbt, tested and
-versioned, rebuilt by the triggered prod build when data lands; the API is one `select` per
+markets, players, news, explore) is served from the dbt `app_*` marts. Live, the API
+selects them from Snowflake Postgres `app.app_copy` (copied after each NFL dbt harvest
+by `nfl_app_to_postgres`). Definitions still live in dbt and rebuild in
+`<SPORT>_PROD_DB.APP`; the copy is what the dashboard reads. The API is one `select` per
 tile with bound filters and no SQL logic. Marts carry sport-agnostic column names, so the
 differences between NFL and NCAAF are absorbed in dbt and the API's sport profile is a
 table map plus a capability list (`api/app/sports/profiles/`).
 
-**The Explorer reads semantic views.** `SELECT ... FROM SEMANTIC_VIEW(...)` is the right
-tool for a metadata-driven sheet where the user picks dimensions and metrics; the catalog
-fixtures in this directory are its allowlist and its contract. It is the wrong tool for
-curated pages, for the reasons under "Semantic SQL is stricter than the agent" below.
+**The Explorer reads `app_explore_*` sheets.** Each sheet is one flat mart; the catalog
+is the table's own columns. Semantic views stay a design option for a future
+metadata-driven sheet (`SEMANTIC_VIEW()`), not what this page queries.
 
 No materialized views sit on top of the marts: Snowflake MVs are single-table,
 Enterprise-only and refreshed by a billed background service, and the `app_*` tables are

@@ -1,7 +1,7 @@
 """FastAPI app for the analytics dashboard.
 
-Handlers are plain `def`, not `async def`, on purpose: the Snowflake connector
-blocks, and FastAPI runs sync handlers on its threadpool. The SPA catch-all is
+Handlers are plain `def`, not `async def`, on purpose: the database drivers
+block, and FastAPI runs sync handlers on its threadpool. The SPA catch-all is
 mounted last so every API route wins; unknown /api paths stay 404s.
 """
 
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
         return HealthPayload(
             ok=True,
             data=config.data_mode(),
+            backend=config.backend(),
             role=config.role(),
             sports=sorted(PROFILES),
             as_of=config.now(),

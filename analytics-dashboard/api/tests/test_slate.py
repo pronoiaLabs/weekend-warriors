@@ -13,7 +13,7 @@ def test_default_week_is_the_one_in_progress(client: TestClient) -> None:
     assert (body["season_type_name"], body["week"]) == ("Preseason", 3)
     assert body["vendor"] == "draftkings"
     assert body["rows"], "the week has games"
-    assert body["query"].count("from NFL_PROD_DB.APP.app_game_slate") == 2
+    assert body["query"].count("from app_copy.app_game_slate") == 2
 
 
 def test_weeks_list_counts_each_game_once(client: TestClient) -> None:

@@ -40,6 +40,7 @@ export interface CapabilitiesPayload {
 export interface HealthPayload {
   ok: boolean
   data: 'fixtures' | 'live'
+  backend: 'fixtures' | 'postgres' | 'snowflake'
   role: string
   sports: string[]
   as_of: string
