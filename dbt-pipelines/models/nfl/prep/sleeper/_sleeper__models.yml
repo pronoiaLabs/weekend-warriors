@@ -1,0 +1,56 @@
+version: 2
+
+# Sleeper staging (vendor-prefixed: BallDontLie owns the plain names).
+
+models:
+
+  - name: stg_nfl__sleeper_players
+    description: >
+      Sleeper's daily player dump: CURRENT state, replaced once a day. Live
+      injury status, practice participation, depth-chart order, search_rank.
+      Grain: player (sleeper_player_id).
+    columns:
+      - name: sleeper_player_id
+        tests: [unique, not_null]
+
+  - name: stg_nfl__sleeper_projections
+    description: >
+      Weekly projections as fetched, appended snapshots; movement is the
+      point. Grain: player x season x season_type x week x fetched_at.
+    columns:
+      - name: sleeper_player_id
+        tests: [not_null]
+      - name: season_type
+        tests:
+          - accepted_values: {values: ['pre', 'regular', 'post']}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [sleeper_player_id, season, season_type, week, fetched_at]
+
+  - name: stg_nfl__sleeper_stats
+    description: >
+      Sleeper's weekly actuals with the three fantasy scorings, positional
+      ranks and snap counts. Grain: player x season x season_type x week.
+    columns:
+      - name: sleeper_player_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [sleeper_player_id, season, season_type, week]
+
+  - name: stg_nfl__sleeper_trending
+    description: "The 24h add/drop board, appended every 6 hours. Grain: fetched_at x direction x player."
+    columns:
+      - name: direction
+        tests:
+          - not_null
+          - accepted_values: {values: ['add', 'drop']}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [fetched_at, direction, sleeper_player_id]
+
+  - name: stg_nfl__sleeper_state
+    description: "Sleeper's week clock, one row per pipeline run. Grain: fetched_at."
+    columns:
+      - name: fetched_at
+        tests: [unique, not_null]

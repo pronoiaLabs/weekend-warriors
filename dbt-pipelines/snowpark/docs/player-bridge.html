@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SP_PLAYER_BRIDGE · how the player id bridge works</title>
+<meta name="description" content="Interactive walkthrough of SP_PLAYER_BRIDGE: BallDontLie and Sleeper player ids mapped onto nflverse gsis_id, decided once, free on a normal dbt build.">
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --paper: #fffefb;
+    --ink: #1c1b18;
+    --muted: #5c5a54;
+    --faint: #8a877e;
+    --line: #ddd8cc;
+    --line-strong: #c4beaf;
+    --accent: #1f4d46;
+    --accent-soft: #e4eeec;
+    --ok: #2f6b45;
+    --ok-soft: #e5f2e9;
+    --warn: #8a5a12;
+    --warn-soft: #f6edd8;
+    --bad: #8b2e2e;
+    --bad-soft: #f6e4e4;
+    --hot: #1f4d46;
+    --hot-soft: #dce8e5;
+    --code: #eef0ea;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121311;
+      --paper: #1a1b18;
+      --ink: #eeeae2;
+      --muted: #a8a49a;
+      --faint: #7a776e;
+      --line: #2e2f2a;
+      --line-strong: #45463e;
+      --accent: #8fcdc2;
+      --accent-soft: #1e2c29;
+      --ok: #7dbe90;
+      --ok-soft: #1c2a21;
+      --warn: #e0b56a;
+      --warn-soft: #2c2618;
+      --bad: #e08a8a;
+      --bad-soft: #2c1c1c;
+      --hot: #8fcdc2;
+      --hot-soft: #1e2c29;
+      --code: #242620;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 var(--sans);
+    padding: 2rem 1.1rem 4.5rem;
+  }
+  main { max-width: 68rem; margin: 0 auto; }
+  .eyebrow {
+    font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--faint); margin-bottom: .4rem;
+  }
+  h1 { font-size: 1.7rem; letter-spacing: -.02em; font-weight: 650; text-wrap: balance; }
+  h2 { font-size: 1.15rem; letter-spacing: -.015em; margin: 0 0 .45rem; }
+  h3 { font-size: .95rem; margin: 0 0 .4rem; }
+  .lede { color: var(--muted); margin-top: .55rem; max-width: 42rem; }
+  code, .mono {
+    font-family: var(--mono); font-size: .86em;
+    background: var(--code); padding: .08em .32em; border-radius: 3px;
+  }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); font-size: .82rem; }
+  .stack { display: flex; flex-direction: column; gap: 1.15rem; }
+  .stack-lg { display: flex; flex-direction: column; gap: 1.6rem; }
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; }
+  @media (max-width: 780px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  nav.tabs {
+    display: flex; gap: .15rem; margin: 1.5rem 0 0; flex-wrap: wrap;
+    border-bottom: 1px solid var(--line); position: sticky; top: 0;
+    background: var(--bg); z-index: 5; padding-top: .4rem;
+  }
+  nav.tabs button {
+    font: inherit; font-size: .84rem; color: var(--muted);
+    background: none; border: none; cursor: pointer;
+    padding: .5rem .7rem .55rem; border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  nav.tabs button:hover { color: var(--ink); }
+  nav.tabs button[aria-selected="true"] {
+    color: var(--ink); font-weight: 650; border-bottom-color: var(--accent);
+  }
+  nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .panel[hidden] { display: none; }
+  .panel { padding-top: 1.35rem; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; }
+  @media (max-width: 780px) { .stats { grid-template-columns: 1fr 1fr; } }
+  .stat {
+    background: var(--paper); border: 1px solid var(--line); padding: .75rem .85rem;
+  }
+  .stat b { display: block; font-size: 1.25rem; letter-spacing: -.02em; }
+  .stat span { display: block; margin-top: .15rem; font-size: .78rem; color: var(--muted); }
+
+  .lane {
+    background: var(--paper); border: 1px solid var(--line); padding: .75rem .85rem 1rem;
+  }
+  .lane .lbl {
+    font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--faint); margin-bottom: .55rem; font-weight: 650;
+  }
+  .vjoin { height: 16px; display: flex; justify-content: center; }
+  .vjoin::before { content: ""; width: 1px; background: var(--line-strong); }
+
+  .box, .node, .mini, .remember, .step, .diamond, .tier, .outcome {
+    background: var(--paper); border: 1px solid var(--line); padding: .7rem .8rem;
+  }
+  .box.hot, .node.hot, .mini.hot, .step.hot, .outcome.hot {
+    background: var(--hot-soft); border-color: var(--accent);
+  }
+  .box.ok { border-color: var(--ok); background: var(--ok-soft); }
+  .box.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .box b, .node b, .mini b, .tier b, .outcome b { display: block; }
+  .box p, .node p, .mini p, .tier p, .outcome p, .remember p {
+    margin-top: .3rem; font-size: .84rem; color: var(--muted);
+  }
+  .node { min-height: 5.6rem; }
+  .node.hot { background: var(--accent-soft); }
+
+  .callout {
+    border: 1px solid var(--line); background: var(--accent-soft);
+    padding: .75rem .9rem; font-size: .9rem;
+  }
+  .callout.warn { background: var(--warn-soft); border-color: var(--warn); }
+  .callout b { display: block; margin-bottom: .2rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; background: var(--paper); }
+  th, td { text-align: left; padding: .45rem .55rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--faint); font-weight: 650; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; }
+  tr.ok td:first-child::before, tr.bad td:first-child::before,
+  tr.info td:first-child::before, tr.warn td:first-child::before {
+    content: ""; display: inline-block; width: .45rem; height: .45rem;
+    border-radius: 50%; margin-right: .45rem; vertical-align: middle;
+  }
+  tr.ok td:first-child::before { background: var(--ok); }
+  tr.bad td:first-child::before { background: var(--bad); }
+  tr.info td:first-child::before { background: var(--accent); }
+  tr.warn td:first-child::before { background: var(--warn); }
+
+  .chips { display: flex; gap: .35rem; flex-wrap: wrap; }
+  .chip {
+    font: inherit; font-size: .75rem; padding: .15rem .45rem;
+    border: 1px solid var(--line); background: var(--code); border-radius: 99px;
+    color: inherit; cursor: default;
+  }
+  button.chip { cursor: pointer; }
+  button.chip:hover { border-color: var(--accent); }
+
+  .step { display: grid; grid-template-columns: 1.7rem 1fr; gap: .7rem; align-items: start; }
+  .n {
+    width: 1.5rem; height: 1.5rem; border-radius: 99px; background: var(--code);
+    color: var(--muted); font-size: .72rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: .1rem;
+  }
+  .step.hot .n { background: var(--accent); color: var(--paper); }
+  .step .title { font-weight: 650; }
+  .step .hint { font-size: .8rem; color: var(--faint); margin-top: .1rem; }
+  .diamond {
+    border-style: dashed; background: var(--code);
+    display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    align-items: center;
+  }
+  .diamond.hot { background: var(--hot-soft); border-color: var(--accent); border-style: solid; }
+
+  .scenarios { display: flex; gap: .35rem; flex-wrap: wrap; }
+  .scenarios button {
+    font: inherit; font-size: .8rem; padding: .35rem .6rem;
+    background: var(--paper); color: var(--ink); border: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .scenarios button[aria-pressed="true"] {
+    background: var(--accent); color: var(--bg); border-color: var(--accent);
+  }
+  .scenarios button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .trace {
+    background: var(--paper); border: 1px solid var(--line); padding: .85rem 1rem;
+  }
+  .trace .who { font-weight: 650; }
+  .trace .verdict { margin-top: .35rem; font-size: .9rem; }
+  .trace .verdict em { font-style: normal; color: var(--accent); font-weight: 650; }
+
+  .tier { display: grid; grid-template-columns: 4.6rem 1fr; padding: 0; overflow: hidden; }
+  .tier .pri {
+    background: var(--code); border-right: 3px solid var(--line-strong);
+    padding: .7rem .45rem; text-align: center;
+  }
+  .tier[data-p="1"] .pri { border-right-color: var(--ok); }
+  .tier[data-p="2"] .pri { border-right-color: var(--accent); }
+  .tier[data-p="3"] .pri { border-right-color: #6b5b9a; }
+  .tier[data-p="4"] .pri { border-right-color: var(--warn); }
+  .tier .body { padding: .7rem .85rem; }
+  .tier .pri small { display: block; color: var(--faint); font-size: .7rem; }
+
+  .bar {
+    height: 10px; background: var(--line); display: flex; overflow: hidden;
+  }
+  .bar i:first-child { width: 78%; background: var(--ok); }
+  .bar i:last-child { width: 22%; background: var(--warn); }
+
+  .gate {
+    display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: .5rem;
+    align-items: center;
+  }
+  @media (max-width: 700px) { .gate { grid-template-columns: 1fr; } }
+  .gate input, .play input {
+    width: 100%; font: inherit; padding: .45rem .55rem;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  }
+  .amp { color: var(--faint); font-size: .8rem; text-align: center; }
+  .badge {
+    display: inline-block; font-size: .75rem; font-weight: 650;
+    padding: .2rem .5rem; border-radius: 3px;
+  }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.bad { background: var(--bad-soft); color: var(--bad); }
+
+  footer { margin-top: 2.4rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">dbt-pipelines / snowpark / player_bridge</p>
+  <h1>The player id bridge</h1>
+  <p class="lede">
+    BallDontLie and Sleeper player ids map onto one nflverse <code>gsis_id</code>.
+    Cheap when nothing is new. Decided once. Search never overrules a
+    deterministic pick. Walk a player through the funnel, or click a section.
+  </p>
+
+  <nav class="tabs" role="tablist" aria-label="Bridge design">
+    <button role="tab" aria-selected="true" aria-controls="p-map" id="t-map">Where it sits</button>
+    <button role="tab" aria-selected="false" aria-controls="p-call" id="t-call">One call</button>
+    <button role="tab" aria-selected="false" aria-controls="p-tiers" id="t-tiers">Tier ladder</button>
+    <button role="tab" aria-selected="false" aria-controls="p-ai" id="t-ai">Search + AI</button>
+    <button role="tab" aria-selected="false" aria-controls="p-mem" id="t-mem">What is stored</button>
+    <button role="tab" aria-selected="false" aria-controls="p-rev" id="t-rev">Review</button>
+  </nav>
+
+  <!-- ============================================================ -->
+  <section class="panel stack-lg" id="p-map" role="tabpanel" aria-labelledby="t-map">
+    <div class="stats">
+      <div class="stat"><b>3</b><span>Vendor tables in RAW</span></div>
+      <div class="stat"><b>0</b><span>Shared id BDL ↔ nflverse</span></div>
+      <div class="stat"><b>78–79%</b><span>Name+team before search/AI</span></div>
+      <div class="stat"><b>0 jobs</b><span>Steady-state Cortex cost</span></div>
+    </div>
+
+    <div>
+      <h2>System placement</h2>
+      <p class="faint" style="margin-bottom:.7rem;">The procedure reads prod RAW, writes beside the dbt target, and queries one shared search service.</p>
+      <div class="lane">
+        <div class="lbl">RAW · same tables in every environment</div>
+        <div class="grid-3">
+          <div class="node hot"><b>PLAYERS</b><p>BallDontLie · no gsis / espn hint</p></div>
+          <div class="node"><b>SLEEPER_PLAYERS</b><p>active · rostered · not DEF · ~3.2k of 12k · sparse gsis / espn</p></div>
+          <div class="node"><b>NFLVERSE_PLAYERS</b><p>the spine · ~25k rows · unique gsis_id</p></div>
+        </div>
+      </div>
+      <div class="vjoin"></div>
+      <div class="lane">
+        <div class="lbl">Matching · one procedure, caller's rights</div>
+        <div class="grid-2">
+          <div class="box hot">
+            <b>DLT_DB.DEPLOY.SP_PLAYER_BRIDGE</b>
+            <p><code>target_db, target_schema, full_refresh</code> · handler <code>player_bridge.main.run</code></p>
+          </div>
+          <div class="box">
+            <b>NFL_PROD_DB.CORE.PLAYER_SEARCH</b>
+            <p>indexes nflverse · batch mode · auto-suspend 30m · filter attrs <code>LATEST_TEAM</code>, <code>POS_GROUP</code></p>
+          </div>
+        </div>
+      </div>
+      <div class="vjoin"></div>
+      <div class="lane">
+        <div class="lbl">Written into the dbt target schema</div>
+        <div class="grid-2">
+          <div class="box ok"><b>PLAYER_BRIDGE</b><p>vendor × vendor_player_id → gsis_id · stable ids only · decided once</p></div>
+          <div class="box warn"><b>PLAYER_BRIDGE_UNMATCHED</b><p>retry ledger + both verdicts · retried only when the evidence hash changes</p></div>
+        </div>
+      </div>
+      <div class="vjoin"></div>
+      <div class="lane">
+        <div class="lbl">dbt view · one row per nflverse player</div>
+        <div class="box">
+          <b>bridge_player_ids</b>
+          <p>pre_hook calls the procedure, then projects BDL + Sleeper ids onto <code>gsis_id</code>. Genuine vendor duplicates keep the strongest method, then the older vendor id.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <h3>Why a procedure, not a model</h3>
+        <p class="muted" style="font-size:.9rem;">Tiers, a batch Cortex Search job, and per-pair <code>AI_FILTER</code> are not a SELECT. dbt owns the address (the pre_hook passes <code>this.database</code> / <code>this.schema</code>); the procedure owns the content.</p>
+      </div>
+      <div>
+        <h3>Why it reads RAW</h3>
+        <p class="muted" style="font-size:.9rem;">No ordering dependency on the dbt DAG. A first-ever dest build still works. Every environment sees the same prod players.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="panel stack-lg" id="p-call" role="tabpanel" aria-labelledby="t-call" hidden>
+    <div class="callout">
+      <b>The cheap path is the point</b>
+      If nothing is pending, the procedure returns a JSON summary and does not start a search job or spend an AI token. That is why dbt can call it on every build.
+    </div>
+
+    <div>
+      <h2>Walk a player through</h2>
+      <p class="faint" style="margin-bottom:.6rem;">Pick a case. The funnel below lights up the path that player actually takes.</p>
+      <div class="scenarios" id="scenarios"></div>
+      <div class="trace" id="trace" style="margin-top:.7rem;"></div>
+    </div>
+
+    <div>
+      <h2>What one CALL does</h2>
+      <div class="stack" id="funnel" style="gap:0;">
+        <div class="step" data-step="ensure">
+          <div class="n">1</div>
+          <div>
+            <div class="title">Ensure tables</div>
+            <div class="hint">truncate both if <code>full_refresh</code></div>
+            <div class="chips" style="margin-top:.45rem;"><span class="chip">PLAYER_BRIDGE</span><span class="chip">PLAYER_BRIDGE_UNMATCHED</span></div>
+          </div>
+        </div>
+        <div class="vjoin"></div>
+        <div class="step" data-step="pending">
+          <div class="n">2</div>
+          <div>
+            <div class="title">Find pending vendor rows</div>
+            <div class="hint">this is the gate</div>
+            <div class="grid-3" style="margin-top:.5rem;">
+              <div class="mini" data-flag="bridged"><b>in PLAYER_BRIDGE</b><p>skip</p></div>
+              <div class="mini" data-flag="same-hash"><b>unmatched, same hash</b><p>skip</p></div>
+              <div class="mini" data-flag="new"><b>new, or hash changed</b><p>pending</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="vjoin"></div>
+        <div class="diamond" data-step="empty">
+          <b>pending = 0 ?</b>
+          <span class="faint">yes → return <code>{ new: 0 }</code> &nbsp;·&nbsp; no → continue</span>
+        </div>
+        <div class="vjoin"></div>
+        <div class="step" data-step="tiers">
+          <div class="n">3</div>
+          <div>
+            <div class="title">Deterministic tiers</div>
+            <div class="hint">exactly one candidate at the best tier; two at that tier is nobody</div>
+            <div class="chips" style="margin-top:.45rem;">
+              <span class="chip" data-method="id">id</span>
+              <span class="chip" data-method="exact">exact</span>
+              <span class="chip" data-method="tiebreak">tiebreak</span>
+            </div>
+          </div>
+        </div>
+        <div class="vjoin"></div>
+        <div class="step" data-step="search">
+          <div class="n">4</div>
+          <div>
+            <div class="title">One batch search over every pending row</div>
+            <div class="hint">including rows already decided — top hit is an audit, never an override</div>
+            <div class="grid-2" style="margin-top:.5rem;">
+              <div class="mini" data-flag="audit"><b>decided rows</b><p>SEARCH_AGREES stored</p></div>
+              <div class="mini" data-flag="candidates"><b>residual rows</b><p>top 5 become candidates</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="vjoin"></div>
+        <div class="step" data-step="confirm">
+          <div class="n">5</div>
+          <div>
+            <div class="title">Confirm the residual</div>
+            <div class="hint">AI_FILTER and a name gate · both must say yes</div>
+            <div class="grid-4" style="margin-top:.5rem;">
+              <div class="mini" data-reason="search_ai"><b>exactly 1 yes</b><p>search_ai</p></div>
+              <div class="mini" data-reason="no_candidates"><b>0 hits</b><p>no_candidates</p></div>
+              <div class="mini" data-reason="name_rejected"><b>AI yes, gate no</b><p>name_rejected</p></div>
+              <div class="mini" data-reason="ambiguous"><b>2+ yes</b><p>ambiguous</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="vjoin"></div>
+        <div class="step" data-step="merge">
+          <div class="n">6</div>
+          <div>
+            <div class="title">MERGE both tables · return JSON</div>
+            <div class="hint">new, bridged, unmatched, by_method, by_reason, search_disagrees, search_queries, ai_pairs</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h2>Who is pending</h2>
+      <table>
+        <thead><tr><th>Vendor row state</th><th>Pending?</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Already in PLAYER_BRIDGE</td><td>No</td><td>Decided once. Trades do not reopen it.</td></tr>
+          <tr><td>In UNMATCHED, evidence hash unchanged</td><td>No</td><td>A perpetual miss costs nothing after the first try.</td></tr>
+          <tr class="info"><td>In UNMATCHED, name / team / pos / jersey / college changed</td><td>Yes</td><td>Hash moved. Retry.</td></tr>
+          <tr class="info"><td>Never seen</td><td>Yes</td><td>New player in a vendor dump.</td></tr>
+          <tr class="warn"><td>full_refresh = true</td><td>Everyone</td><td>Both tables truncated first.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="panel stack-lg" id="p-tiers" role="tabpanel" aria-labelledby="t-tiers" hidden>
+    <div>
+      <h2>Best unique hit wins</h2>
+      <p class="muted" style="max-width:42rem;">A vendor row takes the best tier that produces exactly one nflverse candidate. Two candidates at that tier is an ambiguity: the row matches nobody here and falls to search + AI, which can say no to all of them.</p>
+    </div>
+    <div class="stack">
+      <div class="tier" data-p="1">
+        <div class="pri"><small>P1</small><b>id</b></div>
+        <div class="body">
+          <b>A shared identifier exists</b>
+          <p><code>GSIS_ID_HINT = GSIS_ID</code> or <code>ESPN_ID_HINT = ESPN_ID</code></p>
+          <p>Sleeper only. BDL has neither hint.</p>
+        </div>
+      </div>
+      <div class="tier" data-p="2">
+        <div class="pri"><small>P2</small><b>exact</b></div>
+        <div class="body">
+          <b>Normalized name + team + position group</b>
+          <p><code>NAME_NORM + TEAM + POS_GROUP</code></p>
+          <p>The workhorse. Vendors disagree on position codes (LCB vs SAF vs DB) so the compare is the group.</p>
+        </div>
+      </div>
+      <div class="tier" data-p="3">
+        <div class="pri"><small>P3</small><b>tiebreak</b></div>
+        <div class="body">
+          <b>Same name + team, plus one extra fact</b>
+          <p><code>NAME_NORM + TEAM + (JERSEY or COLLEGE or BIRTH_YEAR)</code></p>
+          <p>BDL has no birth year (age only). Two same-name teammates still fall through.</p>
+        </div>
+      </div>
+      <div class="tier" data-p="4">
+        <div class="pri"><small>P4</small><b>search_ai</b></div>
+        <div class="body">
+          <b>Nothing above produced a unique hit</b>
+          <p>Cortex Search top 5 → <code>AI_FILTER</code> ∧ name gate</p>
+          <p>Exactly one confirmed candidate. Zero or several go to the ledger.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <h3>Team folds</h3>
+        <table>
+          <thead><tr><th>Vendor</th><th>nflverse</th></tr></thead>
+          <tbody>
+            <tr><td>LAR</td><td>LA</td></tr>
+            <tr><td>WSH</td><td>WAS</td></tr>
+            <tr><td>OAK</td><td>LV</td></tr>
+            <tr><td>SD</td><td>LAC</td></tr>
+            <tr><td>STL</td><td>LA</td></tr>
+          </tbody>
+        </table>
+        <p class="faint" style="margin-top:.45rem;">29 of 32 abbreviations already agree. Anything unlisted passes through.</p>
+      </div>
+      <div>
+        <h3>Position groups</h3>
+        <table>
+          <thead><tr><th>Group</th><th>Vendor codes</th></tr></thead>
+          <tbody>
+            <tr><td>QB</td><td>QB</td></tr>
+            <tr><td>RB</td><td>RB FB HB</td></tr>
+            <tr><td>WR</td><td>WR</td></tr>
+            <tr><td>TE</td><td>TE</td></tr>
+            <tr><td>OL</td><td>OL OT T G OG C</td></tr>
+            <tr><td>DL</td><td>DL DE DT NT EDGE</td></tr>
+            <tr><td>LB</td><td>LB ILB OLB MLB WLB SLB</td></tr>
+            <tr><td>DB</td><td>DB CB S SS FS SAF LCB RCB</td></tr>
+            <tr><td>SPEC</td><td>K PK P LS KR PR</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <b>Three copies. Change one, change all.</b>
+      <code>evidence.py</code> · <code>macros/nfl/nfl_bridge_helpers.sql</code> · the <code>POS_GROUP</code> CASE in <code>09_player_bridge.sql</code>. CI unit-tests only the Python side.
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="panel stack-lg" id="p-ai" role="tabpanel" aria-labelledby="t-ai" hidden>
+    <div>
+      <h2>Candidate generation</h2>
+      <div class="stats" style="margin:.6rem 0 1rem;">
+        <div class="stat"><b>5</b><span>Hits per pending row</span></div>
+        <div class="stat"><b>OR</b><span>Filter: team or pos group</span></div>
+        <div class="stat"><b>cosine</b><span>HIT_SCORE · audit only</span></div>
+        <div class="stat"><b>batch</b><span>Works against a suspended service</span></div>
+      </div>
+      <div class="grid-2">
+        <div class="box">
+          <b>Query</b>
+          <p><code>Ja'Marr Chase WR CIN #1 LSU</code></p>
+          <p>Same shape as the indexed <code>SEARCH_TEXT</code>.</p>
+        </div>
+        <div class="box">
+          <b>Filter</b>
+          <p><code>LATEST_TEAM = CIN</code> <em>or</em> <code>POS_GROUP = WR</code></p>
+          <p>OR so a stale post-trade team still finds the player.</p>
+        </div>
+      </div>
+      <p class="faint" style="margin-top:.6rem;">One <code>CORTEX_SEARCH_BATCH</code> job, written as <code>LATERAL</code> SQL. Interactive search would keep the service warm.</p>
+    </div>
+
+    <div>
+      <h2>Two verdicts per pair</h2>
+      <p class="muted" style="max-width:44rem;margin-bottom:.7rem;">A candidate counts only when both say yes. The model alone accepted same-surname strangers (Rashod Owens → Tinker Owens). A naive prefix-only gate then blocked 91 true matches (Mike/Michael, De Cambra/Decambra, Dru/Andru).</p>
+      <div class="grid-2">
+        <div class="box">
+          <b>AI_SAME · the model</b>
+          <p><code>AI_FILTER(PROMPT(A_TEXT, B_TEXT))</code>. Surname must match; first name may be a nickname; team and jersey may be stale; college and birth year are strong when both present.</p>
+        </div>
+        <div class="box">
+          <b>NAME_OK · the rules</b>
+          <p>First names: equal, prefix (min 2), contained (min 3), or a known nickname pair. A bare initial is not evidence. Surnames: rest after the first token, spaces stripped; equal or prefix with the shorter side ≥ 4.</p>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3>Try the name gate</h3>
+      <p class="faint" style="margin-bottom:.55rem;">This is the same rule as <code>evidence.py</code> / <code>confirm.py</code>. It does not call the model.</p>
+      <div class="gate">
+        <input id="name-a" value="Mike Reid" aria-label="Record A name">
+        <span class="amp">vs</span>
+        <input id="name-b" value="Michael Reid" aria-label="Record B name">
+        <span class="amp">→</span>
+        <div id="gate-out"><span class="badge ok">NAME_OK</span></div>
+      </div>
+      <p class="faint" id="gate-detail" style="margin-top:.45rem;"></p>
+      <div class="chips" style="margin-top:.55rem;" id="gate-presets">
+        <button type="button" class="chip" data-a="Pat Mahomes" data-b="Patrick Mahomes">Pat / Patrick</button>
+        <button type="button" class="chip" data-a="Dru Phillips" data-b="Andru Phillips">Dru / Andru</button>
+        <button type="button" class="chip" data-a="Alex De Cambra" data-b="Alex Decambra">De Cambra / Decambra</button>
+        <button type="button" class="chip" data-a="Rashod Owens" data-b="Tinker Owens">Rashod / Tinker</button>
+        <button type="button" class="chip" data-a="J Smith" data-b="John Smith">J / John</button>
+      </div>
+    </div>
+
+    <div>
+      <h3>IS_SAME = AI_SAME ∧ NAME_OK</h3>
+      <table>
+        <thead><tr><th>AI_SAME</th><th>NAME_OK</th><th>Counts as a yes?</th><th>Typical miss</th></tr></thead>
+        <tbody>
+          <tr class="ok"><td>yes</td><td>yes</td><td>Yes</td><td>True match, including Mike / Michael</td></tr>
+          <tr class="warn"><td>yes</td><td>no</td><td>No → name_rejected</td><td>Rashod Owens / Tinker Owens</td></tr>
+          <tr><td>no</td><td>yes</td><td>No → ai_rejected</td><td>Compatible name, different person</td></tr>
+          <tr><td>no</td><td>no</td><td>No → ai_rejected</td><td>Unrelated candidate in the top 5</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h3>Then count the yeses per vendor row</h3>
+      <div class="grid-4">
+        <div class="outcome hot"><b>1 → search_ai</b><p>write PLAYER_BRIDGE</p></div>
+        <div class="outcome"><b>0 → rejected</b><p>name_ or ai_rejected</p></div>
+        <div class="outcome"><b>2+ → ambiguous</b><p>ledger, both verdicts</p></div>
+        <div class="outcome"><b>— → no_candidates</b><p>search returned nothing</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="panel stack-lg" id="p-mem" role="tabpanel" aria-labelledby="t-mem" hidden>
+    <div>
+      <h2>Identity is stored. Evidence is not.</h2>
+      <p class="muted">Team, jersey, position and college decide the match, then disappear. A trade rewrites nothing on the bridge.</p>
+    </div>
+    <div class="grid-2">
+      <div>
+        <h3>On PLAYER_BRIDGE</h3>
+        <table>
+          <thead><tr><th>Column</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td>VENDOR, VENDOR_PLAYER_ID</td><td>grain</td></tr>
+            <tr><td>GSIS_ID</td><td>the decision</td></tr>
+            <tr><td>MATCH_METHOD</td><td>id / exact / tiebreak / search_ai</td></tr>
+            <tr><td>MATCH_SCORE</td><td>search cosine · audit, no threshold</td></tr>
+            <tr><td>SEARCH_GSIS_ID</td><td>top search hit</td></tr>
+            <tr><td>SEARCH_AGREES</td><td>did the top hit match the decision?</td></tr>
+            <tr><td>EVIDENCE_HASH</td><td>what was true at decide time</td></tr>
+            <tr><td>DECIDED_AT</td><td>when</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>On PLAYER_BRIDGE_UNMATCHED</h3>
+        <table>
+          <thead><tr><th>Column</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td>VENDOR, VENDOR_PLAYER_ID</td><td>grain</td></tr>
+            <tr><td>EVIDENCE_HASH</td><td>retry key</td></tr>
+            <tr><td>EVIDENCE</td><td>name, team, pos, jersey, college, search_text</td></tr>
+            <tr><td>CANDIDATES</td><td>top-k with ai_same and name_ok</td></tr>
+            <tr><td>REASON</td><td>no_candidates / ai_rejected / name_rejected / ambiguous</td></tr>
+            <tr><td>LAST_TRIED_AT</td><td>when</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h2>The hash that earns a retry</h2>
+      <div class="box hot">
+        <b>sha2( concat_ws('|', upper(trim(field))… ), 256 )</b>
+        <p><code>full_name | team | position | jersey | college</code></p>
+        <p>Order is the input order. Birth year is not in the hash — BDL does not have one.</p>
+      </div>
+      <div class="grid-3" style="margin-top:.7rem;">
+        <div class="mini hot"><b>Rookie gets a team + number</b><p>hash moves · retry</p></div>
+        <div class="mini hot"><b>Vendor corrects a name</b><p>hash moves · retry</p></div>
+        <div class="mini"><b>Same miss next dump</b><p>skip · free</p></div>
+      </div>
+    </div>
+
+    <div>
+      <h2>How the dbt view keeps grain</h2>
+      <p class="muted" style="max-width:46rem;margin-bottom:.7rem;">The procedure maps many vendor rows → one gsis_id when the vendor really did import the same person twice (Vinny Testaverde, Chuck Wiley on BDL). The view ranks claims per vendor × gsis_id: strongest method, then lowest vendor id. The leftover claims are a warn-severity test — a jump there means the AI started saying yes to strangers again.</p>
+      <div class="bar" aria-hidden="true"><i></i><i></i></div>
+      <p class="faint" style="margin-top:.4rem;">Deterministic-only floor, measured before search/AI existed: ~78% BDL · ~79% Sleeper. Test floor is 75%. Search + AI exist to eat the remainder without inventing matches.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="panel stack-lg" id="p-rev" role="tabpanel" aria-labelledby="t-rev" hidden>
+    <div>
+      <h2>What this design gets right</h2>
+      <table>
+        <thead><tr><th>Choice</th><th>Why it is the right shape</th></tr></thead>
+        <tbody>
+          <tr><td>Decide once, store ids only</td><td>A crosswalk is identity, not a roster snapshot. Trades are a non-event.</td></tr>
+          <tr><td>Pending gate before Cortex</td><td>Makes a pre_hook on every dbt build free. The expensive path is the exception.</td></tr>
+          <tr><td>Ambiguity falls through</td><td>Two John Smiths at exact do not coin-flip. Search + AI see every candidate and can reject all.</td></tr>
+          <tr><td>Search audits, never overrides</td><td>Deterministic uniqueness stays authoritative. SEARCH_AGREES is a drift alarm.</td></tr>
+          <tr><td>Two-gate confirm</td><td>Each gate exists because the other failed in measurement, not in theory.</td></tr>
+          <tr><td>Evidence-hash retry</td><td>Unmatched players are not re-prompted forever. A real data change is the only retry.</td></tr>
+          <tr><td>Read RAW, write to the target</td><td>No DAG coupling. Dev and prod share the index. Caller's rights write locally.</td></tr>
+          <tr><td>Temp-table cache, not cache_result</td><td>A CLI CALL may have no current database. Frames used twice must not rerun search or AI.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h2>Watch these</h2>
+      <table>
+        <thead><tr><th>Risk</th><th>What breaks</th><th>How you will see it</th></tr></thead>
+        <tbody>
+          <tr class="warn"><td>Triple-mirrored vocabularies</td><td>A new vendor code matches nobody at exact / search filter</td><td>Match-rate test drops. Python tests catch <code>evidence.py</code> only.</td></tr>
+          <tr class="warn"><td>Search / AI outage</td><td>The whole procedure fails, so the dbt model fails</td><td>Suspended <code>PLAYER_SEARCH</code> is the kill switch. Residual is not optional once pending &gt; 0.</td></tr>
+          <tr class="warn"><td>Session-bound logic untested in CI</td><td>A join or MERGE regression ships</td><td>Only <code>evidence.py</code> is pytest-covered. The rest is proven by hand.</td></tr>
+          <tr><td>MATCH_SCORE looks like a threshold</td><td>Someone later filters cosine &gt; 0.x</td><td>Comments say audit only. No code enforces that reading.</td></tr>
+          <tr><td>Birth year omitted from the hash</td><td>A Sleeper DOB correction will not retry</td><td>Deliberate (BDL has no year).</td></tr>
+          <tr class="warn"><td>Warn-only 1:1 test</td><td>AI starts aliasing strangers onto one gsis_id</td><td><code>assert_player_bridge_is_one_to_one</code> row count jumps.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h2>Cost shape</h2>
+      <div class="grid-2">
+        <div class="box ok">
+          <b>Steady state · every dbt build</b>
+          <p>pending = 0 → return. No search job. No AI_FILTER. This is the normal Sunday.</p>
+        </div>
+        <div class="box warn">
+          <b>Full refresh or a new dump of players</b>
+          <p>One <code>CORTEX_SEARCH_BATCH</code> job over every pending row, plus one short <code>AI_FILTER</code> per residual × hit (up to 5).</p>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h2>If you only remember four rules</h2>
+      <div class="grid-2">
+        <div class="remember"><b>1</b><p>nflverse <code>gsis_id</code> is the spine. Everyone else maps onto it.</p></div>
+        <div class="remember"><b>2</b><p>Exactly one candidate decides. Two candidates decide nothing.</p></div>
+        <div class="remember"><b>3</b><p>Search is an auditor on the easy rows and a candidate source on the hard ones.</p></div>
+        <div class="remember"><b>4</b><p>A miss is cheap forever, until the evidence itself changes.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="faint">
+    Source: <code>dbt-pipelines/snowpark/player_bridge/</code>,
+    <code>models/nfl/core/bridges/bridge_player_ids.sql</code>,
+    <code>dlt-pipelines/sql/sources/nfl/09_player_bridge.sql</code>.
+    Measured rates and examples are from 2026-08-23, not a live query.
+    Open this file in a browser; nothing is served.
+  </footer>
+</main>
+
+<script>
+(function () {
+  const tabs = [...document.querySelectorAll('nav.tabs [role="tab"]')];
+  const panels = [...document.querySelectorAll("[role=tabpanel]")];
+
+  function showTab(id) {
+    tabs.forEach((t) => {
+      const on = t.id === id;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    panels.forEach((p) => {
+      p.hidden = p.getAttribute("aria-labelledby") !== id;
+    });
+    history.replaceState(null, "", "#" + id.slice(2));
+  }
+
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => showTab(t.id));
+    t.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") tabs[(i + 1) % tabs.length].focus();
+      if (e.key === "ArrowLeft") tabs[(i - 1 + tabs.length) % tabs.length].focus();
+    });
+  });
+
+  const hash = location.hash.replace("#", "");
+  const fromHash = tabs.find((t) => t.id === "t-" + hash);
+  if (fromHash) showTab(fromHash.id);
+
+  const NICKNAMES = new Set([
+    "ABE|ABRAHAM","ANDY|ANDREW","BILL|WILLIAM","BILLY|WILLIAM","BOB|ROBERT",
+    "BOBBY|ROBERT","CHARLIE|CHARLES","CHUCK|CHARLES","DAVE|DAVID","DICK|RICHARD",
+    "DONNIE|DONALD","DREW|ANDREW","EDDIE|EDWARD","FREDDIE|FREDERICK","GABE|GABRIEL",
+    "GREG|GREGORY","HANK|HENRY","JAKE|JACOB","JEFF|JEFFREY","JERRY|GERALD",
+    "JIM|JAMES","JIMMY|JAMES","JOE|JOSEPH","JOEY|JOSEPH","KENNY|KENNETH",
+    "LARRY|LAWRENCE","MIKE|MICHAEL","NATE|NATHAN","NATE|NATHANIEL","NICK|NICHOLAS",
+    "RICK|RICHARD","RICKY|RICHARD","ROB|ROBERT","RONNIE|RONALD","STEVE|STEPHEN",
+    "TED|THEODORE","TERRY|TERRENCE","TOM|THOMAS","TOMMY|THOMAS","TONY|ANTHONY",
+    "VINNY|VINCENT","ZAK|ZACHARY"
+  ]);
+
+  function normalizeName(name) {
+    if (!name) return null;
+    let out = name.toUpperCase().replace(/\s+(JR\.?|SR\.?|II|III|IV)$/, "");
+    out = out.replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+    return out || null;
+  }
+  function firstToken(n) { return n ? n.split(" ")[0] : null; }
+  function surnameKey(n) {
+    if (!n) return null;
+    const parts = n.split(" ");
+    if (parts.length < 2) return n;
+    return parts.slice(1).join("") || null;
+  }
+  function firstOk(a, b) {
+    if (!a || !b) return { ok: false, why: "missing first name" };
+    if (a === b || a.startsWith(b) || b.startsWith(a)) {
+      return Math.min(a.length, b.length) >= 2
+        ? { ok: true, why: a === b ? "first names equal" : "first-name prefix (≥2)" }
+        : { ok: false, why: "a bare initial is not evidence" };
+    }
+    const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+    if (s.length >= 3 && l.includes(s)) return { ok: true, why: "first-name containment (≥3)" };
+    const pair = [a, b].sort().join("|");
+    if (NICKNAMES.has(pair)) return { ok: true, why: "nickname pair" };
+    return { ok: false, why: "first names incompatible" };
+  }
+  function surnameOk(a, b) {
+    if (!a || !b) return { ok: false, why: "missing surname" };
+    if (a === b) return { ok: true, why: "surnames equal" };
+    const short = Math.min(a.length, b.length);
+    if (short >= 4 && (a.startsWith(b) || b.startsWith(a)))
+      return { ok: true, why: "surname prefix (≥4), spaces stripped" };
+    return { ok: false, why: "surnames incompatible" };
+  }
+  function runGate() {
+    const a = normalizeName(document.getElementById("name-a").value);
+    const b = normalizeName(document.getElementById("name-b").value);
+    const f = firstOk(firstToken(a), firstToken(b));
+    const s = surnameOk(surnameKey(a), surnameKey(b));
+    const ok = f.ok && s.ok;
+    document.getElementById("gate-out").innerHTML =
+      `<span class="badge ${ok ? "ok" : "bad"}">${ok ? "NAME_OK" : "rejected"}</span>`;
+    document.getElementById("gate-detail").textContent =
+      `${a || "—"}  vs  ${b || "—"}  ·  ${f.why}; ${s.why}`;
+  }
+  ["name-a", "name-b"].forEach((id) => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", runGate);
+  });
+  document.getElementById("gate-presets").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-a]");
+    if (!btn) return;
+    document.getElementById("name-a").value = btn.dataset.a;
+    document.getElementById("name-b").value = btn.dataset.b;
+    runGate();
+  });
+  runGate();
+
+  const scenarios = [
+    {
+      id: "bridged",
+      label: "Already decided",
+      who: "Any previously bridged player",
+      verdict: "Pending is empty. Return immediately. No search, no AI.",
+      dest: "skip",
+      hot: ["pending", "empty"],
+      flags: ["bridged"],
+    },
+    {
+      id: "sleeper-id",
+      label: "Sleeper + GSIS id",
+      who: "Patrick Mahomes · sleeper · KC · QB · gsis_id already on the dump",
+      verdict: "Tier id produces one candidate. Search still runs as an audit. Lands in PLAYER_BRIDGE as id.",
+      dest: "bridge",
+      method: "id",
+      hot: ["ensure", "pending", "tiers", "search", "merge"],
+      flags: ["new", "audit"],
+    },
+    {
+      id: "exact",
+      label: "Name + team + group",
+      who: "Ja'Marr Chase · bdl · CIN · WR  (normalized JAMARR CHASE)",
+      verdict: "No shared id on BDL. exact is unique. Search audits. Lands as exact.",
+      dest: "bridge",
+      method: "exact",
+      hot: ["ensure", "pending", "tiers", "search", "merge"],
+      flags: ["new", "audit"],
+    },
+    {
+      id: "ambiguous",
+      label: "Two John Smiths",
+      who: "John Smith · same team · two nflverse rows at exact",
+      verdict: "Best tier has two candidates, so exact decides nobody. Residual goes to search + AI. Two yeses → ambiguous ledger.",
+      dest: "unmatched",
+      reason: "ambiguous",
+      hot: ["ensure", "pending", "tiers", "search", "confirm", "merge"],
+      flags: ["new", "candidates"],
+    },
+    {
+      id: "nickname",
+      label: "Mike / Michael",
+      who: "Mike Reid vs Michael Reid · residual pair",
+      verdict: "Model said yes; a prefix-only gate used to say no. Nickname table + both verdicts → search_ai.",
+      dest: "bridge",
+      method: "search_ai",
+      reason: "search_ai",
+      hot: ["ensure", "pending", "tiers", "search", "confirm", "merge"],
+      flags: ["new", "candidates"],
+    },
+    {
+      id: "stranger",
+      label: "Same-surname stranger",
+      who: "Rashod Owens vs Tinker Owens",
+      verdict: "AI_SAME was yes on the first full refresh. NAME_OK is no. Ledger reason name_rejected.",
+      dest: "unmatched",
+      reason: "name_rejected",
+      hot: ["ensure", "pending", "tiers", "search", "confirm", "merge"],
+      flags: ["new", "candidates"],
+    },
+    {
+      id: "trade",
+      label: "Stale team after a trade",
+      who: "Vendor still has last year's club; nflverse has the new one",
+      verdict: "exact misses (team differs). Search filter is OR, so POS_GROUP still finds him. Prompt says a team may be stale. Can land as search_ai.",
+      dest: "bridge",
+      method: "search_ai",
+      reason: "search_ai",
+      hot: ["ensure", "pending", "tiers", "search", "confirm", "merge"],
+      flags: ["new", "candidates"],
+    },
+    {
+      id: "retry",
+      label: "Rookie gets a jersey",
+      who: "Unmatched last week; vendor now has a team and a number",
+      verdict: "Evidence hash moved, so the row is pending again. Same funnel, new evidence.",
+      dest: "retry",
+      hot: ["ensure", "pending", "tiers", "search", "confirm", "merge"],
+      flags: ["new"],
+    },
+  ];
+
+  const scNav = document.getElementById("scenarios");
+  const trace = document.getElementById("trace");
+
+  function paint(s) {
+    document.querySelectorAll("#funnel .step, #funnel .diamond").forEach((el) => {
+      el.classList.toggle("hot", s.hot.includes(el.dataset.step));
+    });
+    document.querySelectorAll("#funnel .mini").forEach((el) => {
+      const flag = el.dataset.flag;
+      const reason = el.dataset.reason;
+      el.classList.toggle("hot",
+        (flag && s.flags.includes(flag)) || (reason && reason === s.reason));
+    });
+    document.querySelectorAll("#funnel [data-method]").forEach((el) => {
+      el.style.background = el.dataset.method === s.method ? "var(--accent)" : "";
+      el.style.color = el.dataset.method === s.method ? "var(--bg)" : "";
+    });
+    scNav.querySelectorAll("button").forEach((b) => {
+      b.setAttribute("aria-pressed", b.dataset.id === s.id ? "true" : "false");
+    });
+    const dest =
+      s.dest === "bridge" ? `PLAYER_BRIDGE · ${s.method}` :
+      s.dest === "unmatched" ? `PLAYER_BRIDGE_UNMATCHED · ${s.reason}` :
+      s.dest === "retry" ? "pending again (hash changed)" :
+      "return { new: 0 }";
+    trace.innerHTML =
+      `<div class="who">${s.who}</div>` +
+      `<div class="verdict">${s.verdict} <em>${dest}</em></div>`;
+  }
+
+  scenarios.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.id = s.id;
+    b.textContent = s.label;
+    b.setAttribute("aria-pressed", i === 1 ? "true" : "false");
+    b.addEventListener("click", () => paint(s));
+    scNav.appendChild(b);
+  });
+  paint(scenarios[1]);
+})();
+</script>
+</body>
+</html>

@@ -28,6 +28,9 @@ make -C dbt-pipelines deploy-snowpark     # build, upload, CREATE OR REPLACE, re
 
 ## SP_PLAYER_BRIDGE
 
+Interactive walkthrough of the design (funnel, tiers, name gate):
+[docs/player-bridge.html](docs/player-bridge.html).
+
 `DLT_DB.DEPLOY.SP_PLAYER_BRIDGE(target_db, target_schema, full_refresh)` maps
 BallDontLie and Sleeper player ids onto nflverse `gsis_id` and writes two tables
 into `target_db.target_schema`:

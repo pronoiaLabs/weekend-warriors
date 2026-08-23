@@ -1,5 +1,9 @@
 version: 2
 
+# BallDontLie staging. Prep is organized by vendor: bdl/ (this file, moved to
+# bdl/ alongside its models), odds/, news/, weather/, nflverse/, sleeper/,
+# each with its own models yml.
+
 models:
 
   # ---------------------------------------------------------------------------
@@ -171,77 +175,6 @@ models:
       - name: player_key
         tests: [not_null]
 
-  - name: stg_nfl__odds
-    description: "Game betting line history. Grain: API odds id x SCD2 version."
-    columns:
-      - name: game_odds_snapshot_key
-        tests: [unique, not_null]
-      - name: game_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_game')", field: game_key}
-      - name: vendor
-        tests: [not_null]
-      - name: snapshot_observed_at
-        description: "Later of provider updated_at and dlt valid_from; the leakage-safe closing timestamp."
-        tests: [not_null]
-      - name: dlt_load_id_numeric
-        tests: [not_null]
-
-  - name: stg_nfl__odds_opening
-    description: "Immutable game opening lines. Grain: one API opening row."
-    columns:
-      - name: game_odds_opening_key
-        tests: [unique, not_null]
-      - name: source_odds_id
-        tests: [unique, not_null]
-      - name: game_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_game')", field: game_key}
-      - name: vendor
-        tests: [not_null]
-
-  - name: stg_nfl__player_props
-    description: "Player prop history. Grain: API prop id x SCD2 version."
-    columns:
-      - name: player_prop_snapshot_key
-        tests: [unique, not_null]
-      - name: game_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_game')", field: game_key}
-      - name: player_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: vendor
-        tests: [not_null]
-      - name: prop_type
-        tests: [not_null]
-      - name: snapshot_observed_at
-        tests: [not_null]
-
-  - name: stg_nfl__player_props_opening
-    description: "Immutable player prop openings. Grain: one API opening row."
-    columns:
-      - name: player_prop_opening_key
-        tests: [unique, not_null]
-      - name: source_prop_id
-        tests: [unique, not_null]
-      - name: game_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_game')", field: game_key}
-      - name: player_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: vendor
-        tests: [not_null]
-      - name: prop_type
-        tests: [not_null]
-
   # ---------------------------------------------------------------------------
   # Next Gen Stats -- player x season-week grain, no game_id
   # ---------------------------------------------------------------------------
@@ -280,69 +213,3 @@ models:
       - name: catch_percentage
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
-
-  # ---------------------------------------------------------------------------
-  # News (Firecrawl source, hourly)
-  # ---------------------------------------------------------------------------
-  - name: stg_nfl__news_articles
-    description: "Scraped news articles with feed provenance and raw extraction. Grain: article URL."
-    columns:
-      - name: article_key
-        tests: [unique, not_null]
-      - name: url
-        tests: [unique, not_null]
-      - name: feed
-        tests: [not_null]
-      - name: published_at_effective
-        description: "Outlet timestamp, else feed timestamp, else fetch time. Never NULL."
-        tests: [not_null]
-
-  - name: stg_nfl__news_player_mentions
-    description: "Extracted player mentions, name as written plus its normalized form. Grain: url x player name."
-    columns:
-      - name: mention_key
-        tests: [unique, not_null]
-      - name: article_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('stg_nfl__news_articles')", field: article_key}
-      - name: player_name_text
-        tests: [not_null]
-      - name: player_name_normalized
-        description: "NULL only when the extracted name had no letters or digits at all."
-        tests:
-          - not_null: {config: {severity: warn}}
-
-  # ---------------------------------------------------------------------------
-  # Weather (Open-Meteo source)
-  # ---------------------------------------------------------------------------
-  - name: stg_nfl__weather_hourly
-    description: "Open-Meteo hourly weather. Grain: stadium x hour x product. hour_at is UTC."
-    columns:
-      - name: stadium_id
-        tests: [not_null]
-      - name: hour_at
-        tests: [not_null]
-      - name: product
-        tests:
-          - not_null
-          - accepted_values: {values: ['archive', 'forecast', 'hist_forecast']}
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [stadium_id, hour_at, product]
-
-  # ---------------------------------------------------------------------------
-  # nflverse (vendor-prefixed: BallDontLie owns the plain names)
-  # ---------------------------------------------------------------------------
-  - name: stg_nfl__nflverse_players
-    description: >
-      nflverse's all-history players table, the id crosswalk. Grain: player
-      (gsis_id). Carries espn_id, pfr_id, pff_id, the headshot URL and the
-      latest team in both nflverse's and dim_team's abbreviations.
-    columns:
-      - name: gsis_id
-        tests: [unique, not_null]
-      - name: display_name
-        tests: [not_null]
-      - name: team_abbreviation
-        description: "latest_team mapped onto dim_team's vocabulary (LA -> LAR, WAS -> WSH); NULL for players without a club."

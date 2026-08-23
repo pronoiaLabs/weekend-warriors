@@ -348,6 +348,8 @@ The macros that do the heavy lifting:
 for work dbt cannot express as a model: the first one, `player_bridge/`, matches
 BallDontLie and Sleeper player ids onto nflverse `gsis_id` with deterministic
 tiers, a batch Cortex Search for candidates, and `AI_FILTER` to confirm the rest.
+How the matching works, as a walkthrough:
+[snowpark/docs/player-bridge.html](snowpark/docs/player-bridge.html).
 Each is a `snow snowpark` project: `snowflake.yml` is the source of truth for the
 `CREATE PROCEDURE`, `src/` is zipped onto the `DLT_DB.DEPLOY.SNOWPARK` stage, and
 the procedure imports it from there.

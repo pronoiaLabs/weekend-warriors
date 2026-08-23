@@ -1,0 +1,103 @@
+version: 2
+
+# nflverse facts (joined through the bridges; player_key and game_key are
+# NULL where a bridge has no row).
+
+models:
+
+  - name: fact_nflverse_player_week
+    description: >
+      nflverse's player week: usage shares, EPA by phase, CPOE, fantasy
+      points. Grain: player (gsis) x season x season_type x week; a bye week
+      has no row. Week grain from a different provider: deliberately not
+      row-reconciled with fact_player_game_offense.
+    columns:
+      - name: player_week_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: game_key
+        tests:
+          - relationships: {to: "ref('dim_game')", field: game_key}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [gsis_id, season, season_type, week]
+
+  - name: fact_player_week_snaps
+    description: "Snap participation per player per game, pfr-keyed; gsis and player_key via the crosswalk."
+    columns:
+      - name: player_game_snap_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - relationships: {to: "ref('dim_game')", field: game_key}
+
+  - name: fact_team_game_epa
+    description: >
+      Play-by-play rolled up to team x game: EPA, success rate, explosive
+      rate, CPOE, pass rate over expected, offense and defense. Same
+      team_game_key as fact_team_game_offense, so the two join 1:1. Rates
+      are from this grain's own sums; re-aggregate from the sums.
+    columns:
+      - name: team_game_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_key
+        tests: [not_null]
+
+  - name: fact_nextgen_passing
+    description: "Next Gen passing, weekly; week-0 season totals excluded; no game_key (source has no game id)."
+    columns:
+      - name: nextgen_passing_key
+        tests: [unique, not_null]
+
+  - name: fact_nextgen_rushing
+    description: "Next Gen rushing, same conventions as passing."
+    columns:
+      - name: nextgen_rushing_key
+        tests: [unique, not_null]
+
+  - name: fact_nextgen_receiving
+    description: "Next Gen receiving, same conventions as passing."
+    columns:
+      - name: nextgen_receiving_key
+        tests: [unique, not_null]
+
+  - name: fact_injury_report
+    description: >
+      The official injury report, game-anchored: report_status is the game
+      designation, practice_status the participation line;
+      modified_before_kickoff is the FEATURES leakage guard.
+    columns:
+      - name: injury_report_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: report_status
+        tests:
+          - accepted_values:
+              values: ['Out', 'Doubtful', 'Questionable']
+              config: {severity: warn}
+
+  - name: fact_depth_chart
+    description: >
+      The chart in effect at kickoff, one row per slot per team-game. Weekly
+      file (2023-24) mapped by season and week; daily snapshots (2025-) take
+      the last chart on or before the game's Eastern date, at most 14 days
+      old. The player closes the key because the weekly file doubles up.
+    columns:
+      - name: depth_chart_key
+        tests: [unique, not_null]
+      - name: chart_source
+        tests:
+          - not_null
+          - accepted_values: {values: ['weekly', 'daily']}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}

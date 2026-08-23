@@ -1,0 +1,44 @@
+version: 2
+
+# Sleeper facts (joined through the bridges; player_key and game_key are
+# NULL where a bridge has no row).
+
+models:
+
+  - name: fact_sleeper_projection_snapshot
+    description: >
+      The path each Sleeper weekly projection took, consecutive identical
+      observations collapsed: a row means it moved. Grain: player x season x
+      season_type x week x snapshot. is_pre_kickoff rather than a hard
+      pregame filter.
+    columns:
+      - name: projection_snapshot_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - relationships: {to: "ref('dim_game')", field: game_key}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [sleeper_player_id, season, season_type, week, snapshot_number]
+
+  - name: fact_sleeper_player_week
+    description: >
+      Sleeper's weekly actuals: the three fantasy scorings, positional ranks,
+      snap share. Grain: player x season x season_type x week; DEF team rows
+      carried with is_team_defense = true.
+    columns:
+      - name: sleeper_player_week_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - relationships: {to: "ref('dim_game')", field: game_key}
+
+  - name: fact_sleeper_trending
+    description: "The add/drop board, one row per appearance. Grain: fetched_at x direction x player."
+    columns:
+      - name: trending_key
+        tests: [unique, not_null]
+      - name: direction
+        tests:
+          - not_null
+          - accepted_values: {values: ['add', 'drop']}
