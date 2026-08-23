@@ -33,7 +33,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY pipelines/ ./pipelines/
 # uv pip install into the system environment (no venv); far faster than pip.
-# No extras: the runner only needs dlt[snowflake] + pyyaml for REST sources.
+# No extras: the runner needs dlt[snowflake] + dlt[postgres] (pyproject deps).
 RUN uv pip install --system --no-cache "."
 
 COPY .dlt/config.toml ./.dlt/config.toml

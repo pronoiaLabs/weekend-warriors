@@ -1,0 +1,47 @@
+# SPCS job spec for a pipeline whose destination is Snowflake Postgres.
+#
+# Same renderer rules as dlt_job.tmpl.yaml: every delimiter is live. Describe
+# variables in prose, not braces. generate_tasks.py picks this file when
+# spec.destination == postgres.
+#
+# Source Snowflake stays the ambient OAuth session (SNOWFLAKE_* / token file).
+# Destination password is the only secret, bound to
+# DESTINATION__POSTGRES__CREDENTIALS__PASSWORD — not SOURCES__NFL__API_KEY.
+#
+# Host / user / database are env, not secrets. Change the host here AND in
+# sql/sources/postgres/02_external_access.sql together.
+spec:
+  containers:
+    - name: dlt
+      image: /DLT_DB/DEPLOY/IMAGES/dlt-pipeline:latest
+      args:
+        - {{ pipeline }}
+      env:
+        DLT_DESTINATION: postgres
+        DLT_DATASET: app_copy
+        SNOWFLAKE_APP_DATABASE: {{ database }}
+        DESTINATION__POSTGRES__CREDENTIALS__HOST: 3v6glchrerfzlcisoqkcjgkgxm.mcgkxfo-weekend-warriors.us-east-2.aws.postgres.snowflake.app
+        DESTINATION__POSTGRES__CREDENTIALS__PORT: "5432"
+        DESTINATION__POSTGRES__CREDENTIALS__DATABASE: app
+        DESTINATION__POSTGRES__CREDENTIALS__USERNAME: app_copy_writer
+        PGSSLMODE: require
+        DESTINATION__SNOWFLAKE__CREDENTIALS__AUTHENTICATOR: oauth
+        DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE: {{ database }}
+        DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE: DLT_WH
+        SNOWFLAKE_WAREHOUSE: DLT_WH
+        SNOWFLAKE_DATABASE: DLT_DB
+        DLT_REGISTRY_SOURCE: auto
+        LOG_LEVEL: INFO
+        DLT_ALERTS: "1"
+      secrets:
+        - snowflakeSecret: {{ secret }}
+          secretKeyRef: secret_string
+          envVarName: {{ env_var }}
+  platformMonitor:
+    metricConfig:
+      groups:
+        - system
+        - system_limits
+        - status
+        - network
+        - storage

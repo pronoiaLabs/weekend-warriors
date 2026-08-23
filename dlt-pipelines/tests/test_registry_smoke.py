@@ -232,6 +232,7 @@ def test_sample_smoke_to_duckdb(
     monkeypatch.setenv("DLT_DATA_DIR", str(tmp_path))
     # Ensure run_pipeline() (and any dlt-internal collector) targets duckdb, not Snowflake.
     monkeypatch.setenv("DLT_DESTINATION", "duckdb")
+    monkeypatch.delenv("DLT_DATASET", raising=False)
 
     # ── Build the spec directly (bypasses registry.yml for isolation) ─────────
     spec = PipelineSpec(

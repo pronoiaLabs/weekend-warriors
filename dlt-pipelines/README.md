@@ -201,7 +201,8 @@ ALTER TASK DLT_DB.OPS.dlt_task_nfl_reference RESUME;
 A Task passes no arguments, so a scheduled pipeline must also declare `secret`, `env_var` and
 `external_access`, and its season comes from a `{current_season}` token the runner resolves. See
 [MAKE-COMMANDS-PROD.md](MAKE-COMMANDS-PROD.md) for the cadence, the calendar behind it, and how to
-read a failed Task.
+read a failed Task. APP marts → Snowflake Postgres is a different destination and a child of
+`DBT_HARVEST_NFL`, not a cron: [MAKE-COMMANDS-POSTGRES.md](MAKE-COMMANDS-POSTGRES.md).
 
 ---
 
@@ -301,6 +302,7 @@ python -m pipelines.batch.registry_sync --emit-sql --prune
 ├── MAKE-COMMANDS.md      # runbook: laptop runs and backfills
 ├── MAKE-COMMANDS-SPCS.md # runbook: container runs by hand
 ├── MAKE-COMMANDS-PROD.md # runbook: scheduled Tasks
+├── MAKE-COMMANDS-POSTGRES.md # runbook: APP → Snowflake Postgres copy
 ├── AGENTS.md             # verified capabilities + template gotchas
 └── pyproject.toml
 ```

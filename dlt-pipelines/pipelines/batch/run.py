@@ -59,7 +59,12 @@ from typing import Any, Iterator
 
 import dlt
 
-from pipelines.batch.models import PipelineSpec, current_season, load_registry
+from pipelines.batch.models import (
+    PipelineSpec,
+    current_season,
+    load_registry,
+    resolve_database,
+)
 from pipelines.common import alerts
 from pipelines.common.observability import configure_logging, record_run
 
@@ -273,6 +278,23 @@ def build_source(spec: PipelineSpec):
         from pipelines.batch.openmeteo_source import openmeteo_weather  # noqa: PLC0415
 
         return openmeteo_weather(name=spec.name, config=cfg)
+
+    if spec.source == "snowflake_app":
+        # SELECT * from listed APP tables through the ambient Snowflake session.
+        # sql_database is not a supported source. See snowflake_app_source.py.
+        from pipelines.batch.snowflake_app_source import snowflake_app  # noqa: PLC0415
+
+        database = (
+            cfg.get("database")
+            or os.environ.get("SNOWFLAKE_APP_DATABASE")
+            or resolve_database(spec, "PROD")
+        )
+        return snowflake_app(
+            name=spec.name,
+            tables=list(cfg.get("tables") or []),
+            database=database,
+            schema=cfg.get("schema") or "APP",
+        )
 
     # models.validate() guards this; this branch is a defensive fallback.
     raise ValueError(f"unhandled source type: {spec.source!r}")
@@ -578,6 +600,13 @@ def run_pipeline(
             if pipeline.last_trace
             else {}
         )
+
+        if spec.source == "snowflake_app":
+            from pipelines.batch.app_copy_watermark import (  # noqa: PLC0415
+                write_app_copy_watermark,
+            )
+
+            write_app_copy_watermark(spec, row_counts)
 
         pipeline_log.info("load complete: %s", info)
         if row_counts:

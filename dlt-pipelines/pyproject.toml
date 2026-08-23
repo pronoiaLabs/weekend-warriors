@@ -25,6 +25,7 @@ requires-python = ">=3.11"
 # path permanently; this only makes the small slice authoritative.
 dependencies = [
     "dlt[snowflake]>=1.0",
+    "dlt[postgres]>=1.0",            # nfl_app_to_postgres dest; image rebuild required
     "snowflake-connector-python>=3.7",   # imported directly by pipelines/common/snowflake_session.py
     "pyyaml>=6",                         # imported directly by pipelines/batch/models.py
     "snowflake-telemetry-python>=0.6",   # optional import in pipelines/common/observability.py

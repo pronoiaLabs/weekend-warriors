@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.postgres.example
 **/.dlt/secrets.toml
 *.p8
 *.pem
@@ -90,3 +91,7 @@ OBS-LINEAGE.html
 # consumed elsewhere. Not part of this codebase.
 /OPS-PORT.md
 .brainstorm/
+
+# Generated from env (passwords). Applied by make setup-postgres /
+# setup-postgres-secret; never commit.
+**/.generated/

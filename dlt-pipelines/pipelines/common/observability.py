@@ -185,7 +185,21 @@ def record_run(
 
         # Follow the caller's destination override so the run record lands beside the
         # data it describes, rather than wherever the spec's default points.
+        # Postgres is the exception: _DLT_RUNS is a Snowflake table, and
+        # app_copy_writer cannot create an OPS schema in database `app`.
         destination: str = os.environ.get("DLT_DESTINATION") or spec.destination
+        if destination == "postgres":
+            destination = "snowflake"
+            # Laptop run-postgres does not set a Snowflake dest database (the
+            # data dest is postgres). Prod sets it in dlt_job_postgres.tmpl.yaml.
+            # Without this, record_run dies on ConfigFieldMissingException: database.
+            if not os.environ.get("DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"):
+                from pipelines.batch.models import resolve_database  # noqa: PLC0415
+
+                os.environ["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] = (
+                    os.environ.get("SNOWFLAKE_APP_DATABASE")
+                    or resolve_database(spec, "PROD")
+                )
 
         ops_pipeline = dlt.pipeline(
             pipeline_name="ops_meta",
