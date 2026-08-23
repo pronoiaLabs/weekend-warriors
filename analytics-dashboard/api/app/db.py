@@ -1,20 +1,22 @@
-"""Snowflake session for the analytics dashboard API.
+"""Database session for the analytics dashboard API.
 
 Copied from ops-dashboard/api/app/db.py rather than imported (separate uv project,
-separate origin), then changed in three ways that matter here:
+separate origin), then changed in ways that matter here:
 
-  - the session is pinned to ONE role: USE ROLE <ANALYTICS_DASHBOARD_ROLE> and
-    USE SECONDARY ROLES NONE on connect. An interactive session carries the
-    user's secondary roles, so without the second statement a dashboard role
-    would silently read CORE through SYSADMIN and the least-privilege boundary
-    would never be tested by the app itself;
-  - every query carries a JSON QUERY_TAG ({"app": "analytics-dashboard",
-    "sport": ..., "tile": ...}) for cost attribution, read with TRY_PARSE_JSON;
+  - live default is Snowflake Postgres (`ANALYTICS_DASHBOARD_BACKEND=postgres`)
+    as role app_api against database `app`. Snowflake warehouse SQL remains
+    available as `BACKEND=snowflake` for fixture capture and rollback;
+  - the Snowflake session is pinned to ONE role: USE ROLE <ANALYTICS_DASHBOARD_ROLE>
+    and USE SECONDARY ROLES NONE on connect;
+  - every Snowflake query carries a JSON QUERY_TAG ({"app": "analytics-dashboard",
+    "sport": ..., "tile": ...}) for cost attribution;
   - the cache TTL can be set per call, because a slate tile and a standings tile
     go stale at different rates.
 
-Two auth branches, decided by the presence of /snowflake/session/token, never by
-an env var: the token file only exists inside an SPCS container.
+Two Snowflake auth branches, decided by the presence of /snowflake/session/token,
+never by an env var: the token file only exists inside an SPCS container.
+Postgres auth is APP_API_PASSWORD (see config.py). Fixture mode never imports a
+driver.
 """
 
 import json
@@ -39,8 +41,8 @@ def in_spcs() -> bool:
     return _SPCS_TOKEN.is_file()
 
 
-def _connect() -> Any:
-    import snowflake.connector  # lazy: fixture mode never imports the connector
+def _connect_snowflake() -> Any:
+    import snowflake.connector  # lazy: fixture / postgres never import this
 
     common: dict[str, Any] = {
         "session_parameters": {"TIMEZONE": "UTC"},
@@ -64,6 +66,29 @@ def _connect() -> Any:
     finally:
         cur.close()
     return conn
+
+
+def _connect_postgres() -> Any:
+    import psycopg
+    from psycopg.rows import dict_row
+
+    if not config.pg_host():
+        raise RuntimeError("postgres backend needs PGHOST (source repo-root .env.postgres)")
+    if not config.pg_password():
+        raise RuntimeError(
+            "postgres backend needs APP_API_PASSWORD "
+            "(make -C dlt-pipelines setup-postgres-api-password CONFIRM=1)"
+        )
+    return psycopg.connect(
+        host=config.pg_host(),
+        port=config.pg_port(),
+        dbname=config.pg_database(),
+        user=config.pg_user(),
+        password=config.pg_password(),
+        sslmode=config.pg_sslmode(),
+        row_factory=dict_row,
+        autocommit=True,
+    )
 
 
 def query(
@@ -96,6 +121,37 @@ def query(
 def _query_live(
     sql: str, params: dict[str, Any] | None, tag: dict[str, Any] | None
 ) -> list[dict[str, Any]]:
+    if config.is_postgres():
+        return _query_live_postgres(sql, params)
+    return _query_live_snowflake(sql, params, tag)
+
+
+def _query_live_postgres(sql: str, params: dict[str, Any] | None) -> list[dict[str, Any]]:
+    global _conn
+    import psycopg
+
+    with _lock:
+        for attempt in (1, 2):
+            if _conn is None:
+                _conn = _connect_postgres()
+            try:
+                with _conn.cursor() as cur:
+                    cur.execute(sql, params or {})
+                    return [{str(k).lower(): v for k, v in row.items()} for row in cur.fetchall()]
+            except psycopg.Error:
+                try:
+                    _conn.close()
+                except Exception:  # noqa: BLE001, S110
+                    pass
+                _conn = None
+                if attempt == 2:
+                    raise
+    raise AssertionError("unreachable")
+
+
+def _query_live_snowflake(
+    sql: str, params: dict[str, Any] | None, tag: dict[str, Any] | None
+) -> list[dict[str, Any]]:
     global _conn
     import snowflake.connector
 
@@ -103,7 +159,7 @@ def _query_live(
     with _lock:
         for attempt in (1, 2):
             if _conn is None:
-                _conn = _connect()
+                _conn = _connect_snowflake()
             try:
                 cur = _conn.cursor(snowflake.connector.DictCursor)
                 try:
@@ -124,7 +180,7 @@ def _query_live(
 
 
 def parse_variant(value: Any) -> Any:
-    """VARIANT and ARRAY columns arrive as JSON strings; None passes through."""
+    """VARIANT, ARRAY, and jsonb columns: JSON strings parse; dicts/lists pass through."""
     if value is None or not isinstance(value, str):
         return value
     try:

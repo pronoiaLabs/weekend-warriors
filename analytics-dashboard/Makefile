@@ -14,8 +14,22 @@ SNOW_CONN ?=
 SNOW_CLI := snow $(if $(SNOW_CONN),--connection $(SNOW_CONN),)
 SNOW := $(SNOW_CLI) sql
 
+# Repo-root Snowflake Postgres env. Live targets source PGHOST / APP_API_PASSWORD.
+# The API logs in as app_api; it does not use the admin PGUSER / PGPASSWORD pair.
+# ANALYTICS_DASHBOARD_BACKEND=snowflake skips this (fixture capture / rollback).
+POSTGRES_ENV ?= ../.env.postgres
+
 define hdr
 printf '\n\033[1;36m== %s ==\033[0m\n' "$(1)"
+endef
+
+# Source .env.postgres into the recipe shell unless BACKEND=snowflake.
+define with_live_env
+set -a; \
+if [ "$${ANALYTICS_DASHBOARD_BACKEND:-postgres}" != "snowflake" ] && [ -f "$(POSTGRES_ENV)" ]; then \
+  . "$(POSTGRES_ENV)"; \
+fi; \
+set +a
 endef
 
 .DEFAULT_GOAL := help
@@ -39,22 +53,23 @@ install: ## Install api (uv) and web (npm) dependencies
 # Both services in one terminal: the API with reload on :8010 and Vite on :5174
 # proxying /api to it. Open http://localhost:5174. Ctrl-C stops both (the trap
 # kills the process group the two background jobs belong to).
-dev: ## Run the API (:8010, live data) and the Vite dev server (:5174) together
+dev: ## Run the API (:8010, live Postgres) and the Vite dev server (:5174) together
 	@trap 'kill 0' INT TERM EXIT; \
-	( cd api && $(UV_RUN) uvicorn app.main:app --reload --port 8010 ) & \
+	( $(with_live_env); cd api && ANALYTICS_DASHBOARD_BACKEND=$${ANALYTICS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) uvicorn app.main:app --reload --port 8010 ) & \
 	( cd web && npm run dev ) & \
 	wait
 
-dev-fixtures: ## The same on recorded fixtures, no Snowflake connection
+dev-fixtures: ## The same on recorded fixtures, no database connection
 	@trap 'kill 0' INT TERM EXIT; \
 	( cd api && ANALYTICS_DASHBOARD_DATA=fixtures $(UV_RUN) uvicorn app.main:app --reload --port 8010 ) & \
 	( cd web && npm run dev ) & \
 	wait
 
-dev-api: ## Run FastAPI with reload on :8010 (live data as ANALYTICS_DASHBOARD_ROLE)
-	cd api && $(UV_RUN) uvicorn app.main:app --reload --port 8010
+dev-api: ## Run FastAPI with reload on :8010 (live data as app_api)
+	@$(with_live_env); \
+	cd api && ANALYTICS_DASHBOARD_BACKEND=$${ANALYTICS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) uvicorn app.main:app --reload --port 8010
 
-dev-api-fixtures: ## Run FastAPI on :8010 against recorded fixtures (no Snowflake)
+dev-api-fixtures: ## Run FastAPI on :8010 against recorded fixtures (no database)
 	cd api && ANALYTICS_DASHBOARD_DATA=fixtures $(UV_RUN) uvicorn app.main:app --reload --port 8010
 
 dev-web: ## Run the Vite dev server on :5174 (proxies /api to :8010)
@@ -62,15 +77,17 @@ dev-web: ## Run the Vite dev server on :5174 (proxies /api to :8010)
 
 serve: build ## Build the web app and serve api + web together on :8010
 	@$(call hdr,dashboard on http://localhost:8010)
-	cd api && $(UV_RUN) uvicorn app.main:app --port 8010
+	@$(with_live_env); \
+	cd api && ANALYTICS_DASHBOARD_BACKEND=$${ANALYTICS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) uvicorn app.main:app --port 8010
 
 ##@ Quality
 
 test: ## Run the api test suite (fixture mode; live tests skipped)
 	cd api && $(UV_RUN) pytest -q
 
-test-live: ## Run the suite including live contract tests against Snowflake
-	cd api && ANALYTICS_DASHBOARD_LIVE=1 $(UV_RUN) pytest -q
+test-live: ## Run the suite including live contract tests against Postgres
+	@$(with_live_env); \
+	cd api && ANALYTICS_DASHBOARD_LIVE=1 ANALYTICS_DASHBOARD_BACKEND=$${ANALYTICS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) pytest -q
 
 lint: ## Ruff on the api + type-check the web
 	@$(call hdr,api ruff)
@@ -94,7 +111,8 @@ STEM       := $(shell echo $(SPORT) | tr a-z A-Z)
 DEV_SCHEMA ?= DEV_$(shell echo $${USER} | tr a-z A-Z)
 
 fixtures: ## Recapture fixtures/app/<sport>/*.json from <SPORT>_DEV_DB.$(DEV_SCHEMA) (SPORT=nfl DEV_SCHEMA=DEV_<user>)
-	cd api && ANALYTICS_DASHBOARD_ROLE=SYSADMIN ANALYTICS_DASHBOARD_WAREHOUSE=DEVELOPMENT_WH \
+	cd api && ANALYTICS_DASHBOARD_BACKEND=snowflake \
+		ANALYTICS_DASHBOARD_ROLE=SYSADMIN ANALYTICS_DASHBOARD_WAREHOUSE=DEVELOPMENT_WH \
 		$(STEM)_APP_DB=$(STEM)_DEV_DB $(STEM)_APP_SCHEMA=$(DEV_SCHEMA) \
 		$(UV_RUN) python scripts/capture_fixtures.py $(SPORT)
 

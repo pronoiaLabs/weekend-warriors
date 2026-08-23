@@ -17,6 +17,7 @@ from app.sports.capabilities import Capability
 class HealthPayload(BaseModel):
     ok: bool
     data: str
+    backend: str
     role: str
     sports: list[str]
     as_of: dt.datetime

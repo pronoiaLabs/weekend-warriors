@@ -40,7 +40,10 @@ class SportProfile(BaseModel):
 
     def fqn(self, cap: Capability) -> str:
         db, schema = self.location()
-        return f"{db}.{schema}.{self.tables[cap]}"
+        table = self.tables[cap]
+        if config.is_snowflake():
+            return f"{db}.{schema}.{table}"
+        return f"{schema}.{table}"
 
     def describe(self, as_of: dt.datetime, data: str) -> CapabilitiesPayload:
         db, schema = self.location()

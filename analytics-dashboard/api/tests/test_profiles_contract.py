@@ -53,10 +53,10 @@ def test_required_columns_exist_in_fixture_schema(table: str, required: set[str]
 @pytest.mark.parametrize("sport,cap,table", _profile_tables())
 def test_required_columns_exist_live(sport: str, cap: C, table: str) -> None:
     assert os.environ.get("ANALYTICS_DASHBOARD_LIVE") == "1"
-    from app import db
+    from app.sports import source
 
     profile = PROFILES[sport]
-    rows = db.query(f"describe table {profile.fqn(cap)}", ttl=0, tag={"sport": sport, "tile": "contract"})
+    rows, _ = source.describe(profile, cap, ttl=0)
     live_cols = {r["name"].lower() for r in rows}
     missing = REQUIRED.get(table, set()) - live_cols
     assert not missing, f"{profile.fqn(cap)} lacks {sorted(missing)}"

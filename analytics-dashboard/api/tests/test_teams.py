@@ -15,7 +15,7 @@ def test_default_standings_are_the_season_type_in_progress(client: TestClient) -
     assert body["season_types"] == ["Preseason"]
     assert body["split"] == "all"
     assert len(body["rows"]) == 32
-    assert body["query"].count("from NFL_PROD_DB.APP.app_team_standings") == 1
+    assert body["query"].count("from app_copy.app_team_standings") == 1
 
 
 def test_completed_season_ranks_every_team(client: TestClient) -> None:
@@ -67,7 +67,7 @@ def test_team_page_carries_the_whole_season(client: TestClient) -> None:
     assert len(allowed) == 11
     assert all(1 <= a["allowed_rank"] <= a["teams_ranked"] == 32 for a in allowed)
     assert body["ats"] == [], "no book priced a 2025 game"
-    assert body["query"].count("from NFL_PROD_DB.APP.") == 4
+    assert body["query"].count("from app_copy.") == 4
 
 
 def test_team_defaults_to_the_season_type_in_progress(client: TestClient) -> None:

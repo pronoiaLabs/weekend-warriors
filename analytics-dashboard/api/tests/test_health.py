@@ -5,6 +5,7 @@ def test_health_reports_fixture_mode_and_sports(client: TestClient) -> None:
     body = client.get("/api/health").json()
     assert body["ok"] is True
     assert body["data"] == "fixtures"
+    assert body["backend"] == "fixtures"
     assert body["sports"] == ["ncaaf", "nfl"]
 
 

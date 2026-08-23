@@ -7,6 +7,7 @@ Goes through app.db.query, so the fixtures have exactly the shape live tiles see
 the dev build and use a role that can read it:
 
     cd analytics-dashboard/api
+    ANALYTICS_DASHBOARD_BACKEND=snowflake \
     ANALYTICS_DASHBOARD_ROLE=SYSADMIN ANALYTICS_DASHBOARD_WAREHOUSE=DEVELOPMENT_WH \
     NFL_APP_DB=NFL_DEV_DB NFL_APP_SCHEMA=DEV_<user> \
       uv run python scripts/capture_fixtures.py nfl

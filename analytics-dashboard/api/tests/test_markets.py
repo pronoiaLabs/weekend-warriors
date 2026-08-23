@@ -16,7 +16,7 @@ def test_default_week_is_the_first_with_a_line_ahead_of_the_clock(client: TestCl
     assert body["vendor"] == "draftkings"
     assert [(w["season_type_name"], w["week"]) for w in body["weeks"]] == [("Regular Season", 1), ("Regular Season", 2)]
     assert body["weeks"][0]["games"] == 16, "seven book rows per game count the game once"
-    assert body["query"].count("from NFL_PROD_DB.APP.app_line_history") == 2
+    assert body["query"].count("from app_copy.app_line_history") == 2
 
 
 def test_week_at_a_book_lists_every_snapshot_in_order(client: TestClient) -> None:
@@ -54,7 +54,7 @@ def test_game_markets_carry_every_book_and_the_chosen_books_props(client: TestCl
     props = body["props"]
     assert len(props) == 71 and all(p["vendor"] == "draftkings" for p in props)
     assert props == sorted(props, key=lambda p: (p["player_name"], p["prop_type"], p["snapshot_number"]))
-    assert body["query"].count("from NFL_PROD_DB.APP.") == 2
+    assert body["query"].count("from app_copy.") == 2
 
 
 def test_props_are_bound_to_one_book(client: TestClient) -> None:
