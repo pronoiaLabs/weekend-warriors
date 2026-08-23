@@ -602,11 +602,19 @@ def run_pipeline(
         )
 
         if spec.source == "snowflake_app":
-            from pipelines.batch.app_copy_watermark import (  # noqa: PLC0415
-                write_app_copy_watermark,
+            from pipelines.batch.obs_copy_watermark import (  # noqa: PLC0415
+                is_obs_copy,
+                write_obs_copy_watermark,
             )
 
-            write_app_copy_watermark(spec, row_counts)
+            if is_obs_copy(spec):
+                write_obs_copy_watermark(spec, row_counts)
+            else:
+                from pipelines.batch.app_copy_watermark import (  # noqa: PLC0415
+                    write_app_copy_watermark,
+                )
+
+                write_app_copy_watermark(spec, row_counts)
 
         pipeline_log.info("load complete: %s", info)
         if row_counts:

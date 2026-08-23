@@ -570,9 +570,9 @@ def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m pipelines.batch.models",
         description=(
-            "Resolve one registry-derived value for a pipeline: its database, its "
-            "Snowflake SECRET, the env var that secret binds to, or its external "
-            "access integration."
+            "Resolve one registry-derived value for a pipeline: its database, "
+            "dataset_name, snowflake_app source database, Snowflake SECRET, "
+            "the env var that secret binds to, or its external access integration."
         ),
     )
     what = parser.add_mutually_exclusive_group(required=True)
@@ -595,6 +595,16 @@ def _main(argv: list[str] | None = None) -> int:
         "--external-access",
         metavar="PIPELINE",
         help="print the external access integration granting egress",
+    )
+    what.add_argument(
+        "--dataset",
+        metavar="PIPELINE",
+        help="print the registry dataset_name (Postgres schema for a copy job)",
+    )
+    what.add_argument(
+        "--app-database",
+        metavar="PIPELINE",
+        help="print the snowflake_app source database (config.database or resolved PROD)",
     )
     what.add_argument(
         "--current-season",
@@ -625,6 +635,15 @@ def _main(argv: list[str] | None = None) -> int:
         if not args.env:
             parser.error("--database requires --env")
         print(resolve_database(load_registry().get(args.database), args.env))
+        return 0
+
+    if args.dataset:
+        print(load_registry().get(args.dataset).dataset_name)
+        return 0
+
+    if args.app_database:
+        spec = load_registry().get(args.app_database)
+        print(spec.config.get("database") or resolve_database(spec, "PROD"))
         return 0
 
     name = args.secret or args.env_var or args.external_access

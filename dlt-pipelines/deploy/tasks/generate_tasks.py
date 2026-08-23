@@ -167,9 +167,15 @@ def render_spec(spec: PipelineSpec, database: str, template: str | None = None) 
             )
     else:
         text = template
+    # app_database is the Snowflake source the snowflake_app SELECT reads.
+    # config.database is an already-resolved name (DLT_DB); otherwise the
+    # composed stem (NFL_PROD_DB). dataset is the Postgres schema.
+    app_database = str(spec.config.get("database") or database)
     values = {
         "pipeline": spec.name,
         "database": database,
+        "dataset": spec.dataset_name,
+        "app_database": app_database,
         "secret": spec.secret or "",
         "env_var": spec.env_var or "",
     }

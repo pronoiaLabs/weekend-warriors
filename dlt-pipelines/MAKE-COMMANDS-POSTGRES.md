@@ -4,12 +4,18 @@ Laptop and first-time-account runbook. Every statement is a file under
 `sql/postgres/` or `sql/sources/`. Do not type `CREATE` / `ALTER` / `GRANT` by
 hand — the next person will not know what you ran.
 
-Destination: Snowflake Postgres database `app`, schema `app_copy`.
-Source: `NFL_PROD_DB.APP` (the 20 tables in
-`analytics-dashboard/api/app/sports/profiles/nfl.py`).
-Trigger in prod: child of `NFL_PROD_DB.OPS.DBT_HARVEST_NFL`, not a cron.
+Destination: Snowflake Postgres database `app`. Two schemas:
 
-Out of scope here: `app_state`, RLS, NCAAF/WNBA, FEATURES/ML, `0.0.0.0/0`.
+- `app_copy` — NFL APP marts (`NFL_PROD_DB.APP`)
+- `observability` — materialized `DLT_DB.OPS` tables (Snowflake itself is unchanged)
+
+APP trigger in prod: child of `NFL_PROD_DB.OPS.DBT_HARVEST_NFL`, not a cron.
+Obs trigger: `OBS_COPY` after `OBS_REFRESH` and `DBT_OBS_COPY` after
+`DBT_RUNS_REFRESH`, both `EXECUTE TASK` the same loader.
+
+Out of scope here: `app_state`, RLS, NCAAF/WNBA, FEATURES/ML, `0.0.0.0/0`,
+rewiring `ops-dashboard` to Postgres, `DLT_EVENTS`, per-sport trigger-load
+tables.
 
 ---
 
@@ -22,7 +28,7 @@ Copy [`.env.postgres.example`](../.env.postgres.example) to the repo-root
 ```bash
 cd dlt-pipelines
 
-# 1. database app, schema app_copy, roles, watermark table, writer password
+# 1. database app, schemas app_copy + observability, roles, watermarks, writer password
 make setup-postgres CONFIRM=1
 
 # 2. EAI (host:5432 only) + SECRET object (placeholder value)
@@ -57,13 +63,15 @@ that times out on `:5432` is this policy, not a missing EAI.
 make run-postgres NAME=nfl_app_to_postgres
 # one mart:
 make run-postgres NAME=nfl_app_to_postgres RESOURCE=app_game_slate
+# observability (writes app.observability from the spec's dataset_name):
+make run-postgres NAME=obs_to_postgres
 ```
 
 That target:
 
-- reuses your `snow` connection to **read** `NFL_PROD_DB.APP` (never writes Snowflake)
+- reuses your `snow` connection to **read** Snowflake (never writes it)
 - writes Postgres as `app_copy_writer` using `.env.postgres`
-- sets `DLT_DESTINATION=postgres` and `DLT_DATASET=app_copy`
+- sets `DLT_DESTINATION=postgres` and `DLT_DATASET` from the spec (`app_copy` or `observability`)
 
 `make run-snowflake` forces `DLT_DESTINATION=snowflake` and a `DEV_<user>`
 schema. It is the wrong target for this pipeline.
@@ -145,6 +153,77 @@ is the production proof. The laptop run is not.
 
 ---
 
+## Observability copy (`DLT_DB.OPS` → `app.observability`)
+
+Snowflake stays `DLT_DB.OPS`. The dashboard keeps reading Snowflake. This
+job only replace-loads the materialized OPS tables into the existing
+Postgres instance (same EAI, secret, `app_copy_writer`).
+
+If `setup-postgres` already ran before observability existed:
+
+```bash
+make setup-postgres-observability CONFIRM=1
+```
+
+Laptop prove (uses the spec's `dataset_name`, so this writes `observability`
+not `app_copy`):
+
+```bash
+make run-postgres NAME=obs_to_postgres
+```
+
+```sql
+-- on the Postgres instance, database app
+SELECT table_name, row_count, source_ref, copied_at
+FROM observability.observability_watermark
+ORDER BY table_name;
+```
+
+Do not reuse `app_copy.app_copy_watermark` or `DBT_BUILDS`. An obs run
+must not fail looking up an NFL build id.
+
+```bash
+# syncs PIPELINE_REGISTRY (the container reads the table, not YAML),
+# then the standalone loader Task + OBS_COPY / DBT_OBS_COPY wrappers
+# (does not suspend the fleet, does not run tasks-apply)
+make setup-obs-copy-trigger CONFIRM=1
+```
+
+```
+OBS_REFRESH      → OBS_COPY      → EXECUTE TASK dlt_task_obs_to_postgres
+                                   (DLT_LOADER_ROLE; same owner as the root)
+DBT_RUNS_REFRESH → DBT_OBS_COPY  → EXECUTE TASK dlt_task_obs_to_postgres
+                                   (DBT_RUNNER_ROLE; same owner as that root)
+```
+
+Same schema is not enough: Snowflake also requires one owner per graph
+(`091405`). `DBT_RUNS_REFRESH` is `DBT_RUNNER_ROLE`, so its wrapper cannot
+be created as `DLT_LOADER_ROLE`.
+
+The copy job writes SPCS events, which re-fire `OBS_REFRESH`. Both
+wrappers share `DLT_DB.OPS.OBS_COPY_LATCH` and no-op for 10 minutes after
+a fire so that is not an infinite loop. `DBT_RUNS` / query-log tables are
+owned by `DBT_RUNNER_ROLE`; 11 grants `SELECT` to `DLT_LOADER_ROLE`
+(laptop SYSADMIN hid this). The observability watermark branch lives in
+this repo; the container uses it after the next image roll.
+
+`HEADLINES_DAILY` is often suspended; headlines update in Postgres on the
+next obs/dbt copy (full table replace).
+
+```bash
+# loader stays SUSPENDED — RESUME without SCHEDULE/AFTER is 091453
+snow sql -c weekend-warriors --role DLT_LOADER_ROLE -q \
+  "EXECUTE TASK DLT_DB.OPS.dlt_task_obs_to_postgres;"
+```
+
+Copied (base tables, not views): `PIPELINE_RUNS`, `TASK_RUNS`, `LOG_LINES`,
+`METRIC_SAMPLES`, `PIPELINE_REGISTRY`, `DBT_BUILDS`, `DBT_RUNS`,
+`DBT_RUNS_REFRESH_LOG`, `DBT_QUERY_LOG`, `DBT_QUERY_OPERATOR_STATS`,
+`HEADLINES`, `ALERT_STATE`. Out: `DLT_EVENTS`, per-sport `_DLT_RUNS` /
+`DBT_TRIGGER_LOADS`.
+
+---
+
 ## Files a new user should read, in order
 
 1. This runbook
@@ -152,4 +231,6 @@ is the production proof. The laptop run is not.
 3. `sql/sources/postgres/README.md` — EAI + secret
 4. `sql/sources/nfl/07_app_copy_grants.sql` — APP SELECT
 5. `sql/sources/nfl/08_app_copy_task.sql` — harvest wrapper
-6. `pipelines/batch/registries/app-copy-registry.yml` — table list
+6. `pipelines/batch/registries/app-copy-registry.yml` — APP table list
+7. `pipelines/batch/registries/observability-copy-registry.yml` — OPS table list
+8. `sql/ops/11_obs_copy_task.sql` — obs refresh wrappers

@@ -381,6 +381,38 @@ def test_nfl_app_to_postgres_is_an_after_task_with_twenty_tables() -> None:
     assert "app_explore_line_moves" in spec.config["tables"]
 
 
+def test_obs_to_postgres_reads_dlt_db_ops() -> None:
+    spec = load_registry().get("obs_to_postgres")
+    assert spec.source == "snowflake_app"
+    assert spec.destination == "postgres"
+    assert spec.dataset_name == "observability"
+    assert spec.schedule is None
+    assert spec.after == "DLT_DB.OPS.OBS_REFRESH"
+    assert spec.external_access == "POSTGRES_APP_EAI"
+    assert spec.secret == "DLT_DB.OPS.POSTGRES_APP_COPY"
+    assert spec.env_var == "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD"
+    assert spec.write_disposition == "replace"
+    assert spec.config["database"] == "DLT_DB"
+    assert spec.config["schema"] == "OPS"
+    assert spec.config["tables"] == [
+        "pipeline_runs",
+        "task_runs",
+        "log_lines",
+        "metric_samples",
+        "pipeline_registry",
+        "dbt_builds",
+        "dbt_runs",
+        "dbt_runs_refresh_log",
+        "dbt_query_log",
+        "dbt_query_operator_stats",
+        "headlines",
+        "alert_state",
+    ]
+    # Stem NFL is telemetry only; the SELECT source is config.database.
+    assert spec.database == "NFL"
+    assert "dlt_events" not in spec.config["tables"]
+
+
 # ---------------------------------------------------------------------------
 # The season token: what a scheduled run substitutes before dlt sees the config
 # ---------------------------------------------------------------------------
@@ -455,6 +487,7 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_weather_archive",
         "nfl_weather_hist_forecast",
         "nfl_app_to_postgres",
+        "obs_to_postgres",
     }
     assert {s.name for s in registry.pipelines} == checked, (
         "a pipeline is neither asserted to carry a season token nor asserted to have "
@@ -480,6 +513,7 @@ def test_pipelines_with_no_season_have_no_token() -> None:
         "nfl_weather_archive",
         "nfl_weather_hist_forecast",
         "nfl_app_to_postgres",
+        "obs_to_postgres",
     ):
         assert "{current_season}" not in json.dumps(load_registry().get(name).config)
 

@@ -77,7 +77,20 @@ echo "== applying $ROOT/04_grant_admin_select.sql as app_copy_writer =="
 PGUSER=app_copy_writer PGPASSWORD="$APP_COPY_WRITER_PASSWORD" \
   psql -d app -v ON_ERROR_STOP=1 -f "$ROOT/04_grant_admin_select.sql"
 
-echo "Postgres app / app_copy / app_copy_writer ready."
+# Same instance, same writer. Schema only; copy tables arrive on first
+# obs_to_postgres run.
+echo "== applying $ROOT/05_observability.sql =="
+psql -d app -v ON_ERROR_STOP=1 -f "$ROOT/05_observability.sql"
+
+echo "== applying $ROOT/05b_observability_default_privileges.sql as app_copy_writer =="
+PGUSER=app_copy_writer PGPASSWORD="$APP_COPY_WRITER_PASSWORD" \
+  psql -d app -v ON_ERROR_STOP=1 -f "$ROOT/05b_observability_default_privileges.sql"
+
+echo "== applying $ROOT/06_grant_observability_select.sql as app_copy_writer =="
+PGUSER=app_copy_writer PGPASSWORD="$APP_COPY_WRITER_PASSWORD" \
+  psql -d app -v ON_ERROR_STOP=1 -f "$ROOT/06_grant_observability_select.sql"
+
+echo "Postgres app / app_copy / observability / app_copy_writer ready."
 echo "Next: make setup-source SOURCE=postgres CONFIRM=1"
 echo "      make setup-postgres-secret CONFIRM=1"
 echo "      snow sql -f sql/sources/nfl/07_app_copy_grants.sql"
