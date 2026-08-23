@@ -18,6 +18,13 @@ const LABELS: Record<Capability, string> = {
   line_history: 'line history',
   prop_line_history: 'prop line history',
   news: 'news',
+  explore_player_games: 'player games sheet',
+  explore_defender_games: 'defender games sheet',
+  explore_team_games: 'team games sheet',
+  explore_game_lines: 'game lines sheet',
+  explore_player_props: 'player props sheet',
+  explore_news: 'news sheet',
+  explore_line_moves: 'line moves sheet',
 }
 
 /** Renders its page only when the sport has the capability. The nav already

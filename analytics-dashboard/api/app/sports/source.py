@@ -33,14 +33,19 @@ def select(
     order: Iterable[str],
     tag: str,
     ttl: float | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> tuple[list[Row], str]:
-    """Rows from the mart behind `cap`, and the rendered SQL."""
+    """Rows from the mart behind `cap`, and the rendered SQL. `limit` and
+    `offset` page a sheet; they are validated integers, written as literals."""
     cols = list(columns)
     order_cols = list(order)
     sql = (
         f"select {', '.join(cols)}\nfrom {profile.fqn(cap)}\nwhere {where}\n"
         f"order by {', '.join(order_cols)}"
     )
+    if limit is not None:
+        sql += f"\nlimit {int(limit)} offset {int(offset)}"
     if config.is_fixtures():
         table = profile.tables[cap]
         rows = [
@@ -54,6 +59,8 @@ def select(
                 key=lambda r, c=name: _sort_key(r.get(c)),
                 reverse=direction.strip().lower() == "desc",
             )
+        if limit is not None:
+            rows = rows[offset : offset + limit]
     else:
         rows = db.query(sql, params, ttl=ttl, tag={"sport": profile.key, "tile": tag})
     return rows, render(sql, params)

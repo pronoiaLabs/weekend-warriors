@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import SportLayout from './layouts/SportLayout.tsx'
+import Explore from './pages/sports/Explore.tsx'
 import Game from './pages/sports/Game.tsx'
 import Market from './pages/sports/Market.tsx'
 import Markets from './pages/sports/Markets.tsx'
@@ -31,7 +32,7 @@ export default function App() {
           <Route path="markets" element={<Markets />} />
           <Route path="markets/:gameKey" element={<Market />} />
           <Route path="news" element={<News />} />
-          <Route path="explore" element={<Placeholder title="Explorer" phase="Phase 4" />} />
+          <Route path="explore" element={<Explore />} />
           <Route path="*" element={<Placeholder title="Not found" phase="" />} />
         </Route>
       </Routes>

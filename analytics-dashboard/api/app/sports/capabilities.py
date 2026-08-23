@@ -19,3 +19,11 @@ class Capability(StrEnum):
     LINE_HISTORY = "line_history"          # app_line_history
     PROP_LINE_HISTORY = "prop_line_history"  # app_prop_line_history
     NEWS = "news"                          # app_news_mentions
+    # the Explorer's sheets: flat, one table per grain
+    EXPLORE_PLAYER_GAMES = "explore_player_games"      # app_explore_player_games
+    EXPLORE_DEFENDER_GAMES = "explore_defender_games"  # app_explore_defender_games
+    EXPLORE_TEAM_GAMES = "explore_team_games"          # app_explore_team_games
+    EXPLORE_GAME_LINES = "explore_game_lines"          # app_explore_game_lines
+    EXPLORE_PLAYER_PROPS = "explore_player_props"      # app_explore_player_props
+    EXPLORE_NEWS = "explore_news"                      # app_explore_news
+    EXPLORE_LINE_MOVES = "explore_line_moves"          # app_explore_line_moves

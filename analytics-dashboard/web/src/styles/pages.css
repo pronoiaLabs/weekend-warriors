@@ -199,6 +199,26 @@ button.trow.current { background: var(--surface-2); }
 .shell-narrow .cols-markets { grid-template-columns: minmax(0, 1fr); }
 .shell-narrow .mention { grid-template-columns: 1fr; gap: 6px; }
 
+/* explorer: the sheet grid with a sticky header, the stats and pivot tiles */
+.cols-explore { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-bottom: var(--gap); }
+.line-strip.stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sheet-tile .tile-body { overflow: auto; max-height: 70vh; border: 1px solid var(--line); border-radius: 12px; }
+.sheet table { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 100%; }
+.sheet th, .sheet td { padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; }
+.sheet th { position: sticky; top: 0; z-index: 2; background: var(--bg); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-4); cursor: pointer; user-select: none; }
+.sheet th:hover { color: var(--ink); }
+.sheet th.sorted { color: var(--accent); }
+.sheet th.picked, .sheet td.picked { background: var(--accent-soft); }
+.sheet th.num, .sheet td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.sheet .idx { color: var(--ink-4); text-align: right; position: sticky; left: 0; background: var(--bg); z-index: 1; }
+.sheet th.idx { z-index: 3; }
+.sheet tr:hover td { background: var(--surface); }
+.sheet tr:hover td.picked { background: var(--accent-soft); }
+.sheet-actions { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pivot .hint { grid-column: 1 / -1; padding-top: 8px; }
+.shell-narrow .cols-explore { grid-template-columns: minmax(0, 1fr); }
+.shell-narrow .line-strip.stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
 /* team page: the head, the two-column tiles, the margin chart */
 .team-head { position: relative; display: grid; grid-template-columns: 1.1fr 2fr; gap: var(--gap); align-items: end; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px 24px; margin-bottom: 16px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--glass); }
 .team-head .kick { display: inline-block; font-size: var(--fs-s); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }

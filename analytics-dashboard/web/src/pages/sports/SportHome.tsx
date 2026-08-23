@@ -18,6 +18,13 @@ const LABELS: Record<string, string> = {
   line_history: 'Markets',
   prop_line_history: 'Prop line history',
   news: 'News',
+  explore_player_games: 'Explorer: player games',
+  explore_defender_games: 'Explorer: defender games',
+  explore_team_games: 'Explorer: team games',
+  explore_game_lines: 'Explorer: game lines',
+  explore_player_props: 'Explorer: player props',
+  explore_news: 'Explorer: news',
+  explore_line_moves: 'Explorer: line moves',
 }
 
 export default function SportHome() {
@@ -72,6 +79,8 @@ export default function SportHome() {
                   <Link to={`/${sport}/markets`}>{LABELS[c]}</Link>
                 ) : c === 'news' ? (
                   <Link to={`/${sport}/news`}>{LABELS[c]}</Link>
+                ) : c.startsWith('explore_') ? (
+                  <Link to={`/${sport}/explore?sheet=${c.slice('explore_'.length)}`}>{LABELS[c]}</Link>
                 ) : (
                   <b>{LABELS[c] ?? c}</b>
                 )}

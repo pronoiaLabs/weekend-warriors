@@ -1,0 +1,176 @@
+{
+  "table": "app_explore_player_props",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "row_id",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "opponent",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "vendor",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "prop_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "market_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "stat",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "line_value",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "opening_line_value",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "line_movement",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "over_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "under_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "market_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "trailing_games",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "trailing_avg",
+      "type": "NUMBER(38,6)",
+      "nullable": true
+    },
+    {
+      "name": "trailing_over_line",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "trailing_hit_rate",
+      "type": "NUMBER(19,6)",
+      "nullable": true
+    },
+    {
+      "name": "gap_to_line",
+      "type": "NUMBER(38,6)",
+      "nullable": true
+    },
+    {
+      "name": "games_played_to_date",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "stat_avg_to_date",
+      "type": "NUMBER(38,6)",
+      "nullable": true
+    },
+    {
+      "name": "hit_rate_over_line",
+      "type": "NUMBER(19,6)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_allowed_per_game",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_allowed_rank",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_allowed_season",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "is_completed",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "actual_value",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "outcome",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    }
+  ]
+}

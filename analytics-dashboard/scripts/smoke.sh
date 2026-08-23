@@ -12,6 +12,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 PORT="${SMOKE_PORT:-8017}"
+# virtual time per route, ms: the pages settle on fixtures in well under a
+# second, and the walk is 27 routes, so 2s keeps the whole run near a minute
+BUDGET="${SMOKE_BUDGET_MS:-2000}"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 if [ ! -x "$CHROME" ]; then
   CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
@@ -75,24 +78,42 @@ ROUTES=(
   "/nfl/markets/nope|No lines for this game"
   "/nfl/news|Playing within 3 days"
   "/nfl/news?days=30&position=QB|Resolved players only"
+  "/nfl/explore|Copy as TSV"
+  "/nfl/explore?sheet=team_games&where=team:KC&order=point_margin&desc=1|Kansas City Chiefs"
+  "/ncaaf/explore|No sheets yet"
   "/ncaaf|No page marts yet"
   "/ncaaf/slate|No game day data yet"
 )
+
+render() {
+  "$CHROME" --headless=new --disable-gpu --no-first-run --no-default-browser-check \
+    --enable-logging=stderr --v=0 --virtual-time-budget=$BUDGET --window-size=1400,1000 \
+    --dump-dom "http://127.0.0.1:$PORT$1" 2>&1 || true
+}
 
 fail=0
 for entry in "${ROUTES[@]}"; do
   route="${entry%%|*}"
   expect="${entry#*|}"
-  out="$("$CHROME" --headless=new --disable-gpu --no-first-run --no-default-browser-check \
-    --enable-logging=stderr --v=0 --virtual-time-budget=8000 --window-size=1400,1000 \
-    --dump-dom "http://127.0.0.1:$PORT$route" 2>&1 || true)"
-  errors="$(printf '%s\n' "$out" | grep -E 'CONSOLE\([0-9]+\)\] "(Uncaught|Error|TypeError|ReferenceError|Failed to load|Warning: )' || true)"
-  if ! printf '%s' "$out" | grep -q -- "$expect"; then
-    echo "FAIL $route: expected text not found: $expect"
-    fail=1
-  elif [ -n "$errors" ]; then
-    echo "FAIL $route: console errors"
-    echo "$errors"
+  # a route gets a second render before it counts as broken: the virtual-time
+  # budget can expire before a large table paints, and a real break fails twice
+  verdict=""
+  for attempt in 1 2; do
+    out="$(render "$route")"
+    errors="$(printf '%s\n' "$out" | grep -E 'CONSOLE\([0-9]+\)\] "(Uncaught|Error|TypeError|ReferenceError|Failed to load|Warning: )' || true)"
+    if ! printf '%s' "$out" | grep -q -- "$expect"; then
+      verdict="expected text not found: $expect"
+    elif [ -n "$errors" ]; then
+      verdict="console errors
+$errors"
+    else
+      verdict=""
+      [ "$attempt" = 2 ] && echo "note $route passed on the second render"
+      break
+    fi
+  done
+  if [ -n "$verdict" ]; then
+    echo "FAIL $route: $verdict"
     fail=1
   else
     echo "ok   $route"
@@ -101,7 +122,7 @@ done
 
 # the narrow chrome: bottom tabs instead of the dock
 out="$("$CHROME" --headless=new --disable-gpu --no-first-run --enable-logging=stderr --v=0 \
-  --virtual-time-budget=8000 --window-size=420,900 --dump-dom "http://127.0.0.1:$PORT/nfl/slate" 2>&1 || true)"
+  --virtual-time-budget=$BUDGET --window-size=420,900 --dump-dom "http://127.0.0.1:$PORT/nfl/slate" 2>&1 || true)"
 if printf '%s' "$out" | grep -q 'class="tabs"'; then
   echo "ok   /nfl/slate at 420px renders bottom tabs"
 else

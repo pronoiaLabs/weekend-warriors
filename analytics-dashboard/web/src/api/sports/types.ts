@@ -16,6 +16,13 @@ export type Capability =
   | 'line_history'
   | 'prop_line_history'
   | 'news'
+  | 'explore_player_games'
+  | 'explore_defender_games'
+  | 'explore_team_games'
+  | 'explore_game_lines'
+  | 'explore_player_props'
+  | 'explore_news'
+  | 'explore_line_moves'
 
 export interface CapabilitiesPayload {
   sport: string
@@ -809,4 +816,48 @@ export interface NewsPayload extends Envelope<MentionRow> {
   team: string | null
   feeds: string[]
   teams: string[]
+}
+
+/** The Explorer: a sheet is one flat table, its columns typed for a grid. */
+export type Kind = 'integer' | 'number' | 'text' | 'boolean' | 'date' | 'datetime'
+
+export interface SheetColumn {
+  name: string
+  kind: Kind
+  type: string
+}
+
+export interface SheetRef {
+  id: string
+  cap: Capability
+  table: string
+  label: string
+  description: string
+  columns: SheetColumn[]
+}
+
+export interface CatalogPayload {
+  sport: string
+  as_of: string
+  sheets: SheetRef[]
+  query: string | null
+}
+
+export type Cell = string | number | boolean | null
+
+export interface SheetPayload {
+  sport: string
+  season: number
+  as_of: string
+  sheet: string
+  table: string
+  columns: SheetColumn[]
+  filters: { column: string; value: Cell }[]
+  order: string
+  desc: boolean
+  limit: number
+  offset: number
+  has_more: boolean
+  rows: Record<string, Cell>[]
+  query: string | null
 }

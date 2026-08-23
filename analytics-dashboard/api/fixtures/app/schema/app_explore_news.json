@@ -1,0 +1,96 @@
+{
+  "table": "app_explore_news",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "row_id",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "published_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "published_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "feed",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_player_resolved",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "headline",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "context",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "detail",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "resolution_method",
+      "type": "VARCHAR(15)",
+      "nullable": true
+    },
+    {
+      "name": "next_game_week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "next_game_datetime_et",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "next_opponent",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "next_game_is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "days_to_next_game",
+      "type": "NUMBER(9,0)",
+      "nullable": true
+    }
+  ]
+}
