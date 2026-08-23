@@ -1,9 +1,12 @@
 import { get } from '../client.ts'
 import type {
   CapabilitiesPayload,
+  GameMarketsPayload,
   GamePayload,
   HealthPayload,
   LeadersPayload,
+  MarketsPayload,
+  NewsPayload,
   PlayerPayload,
   SlatePayload,
   Split,
@@ -82,4 +85,26 @@ export type PlayerParams = {
 
 export function fetchPlayer(sport: string, playerKey: string, params: PlayerParams, signal?: AbortSignal): Promise<PlayerPayload> {
   return get<PlayerPayload>(`${sportPath(sport)}/players/${encodeURIComponent(playerKey)}`, params, signal)
+}
+
+export function fetchMarkets(sport: string, params: SlateParams, signal?: AbortSignal): Promise<MarketsPayload> {
+  return get<MarketsPayload>(`${sportPath(sport)}/markets`, params, signal)
+}
+
+export function fetchGameMarkets(
+  sport: string,
+  gameKey: string,
+  vendor: string | undefined,
+  signal?: AbortSignal,
+): Promise<GameMarketsPayload> {
+  return get<GameMarketsPayload>(`${sportPath(sport)}/markets/${encodeURIComponent(gameKey)}`, { vendor }, signal)
+}
+
+export type NewsParams = {
+  days?: number
+  team?: string
+}
+
+export function fetchNews(sport: string, params: NewsParams, signal?: AbortSignal): Promise<NewsPayload> {
+  return get<NewsPayload>(`${sportPath(sport)}/news`, params, signal)
 }

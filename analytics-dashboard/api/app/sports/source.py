@@ -46,7 +46,14 @@ def select(
         rows = [
             {c: r.get(c) for c in cols} for r in fixtures.rows(profile.key, table) if matches(r)
         ]
-        rows.sort(key=lambda r: tuple(_sort_key(r.get(c)) for c in order_cols))
+        # an ORDER BY item is "col" or "col desc"; sorts are stable, so applying
+        # them last-key-first yields the same order as the SQL
+        for item in reversed(order_cols):
+            name, _, direction = item.partition(" ")
+            rows.sort(
+                key=lambda r, c=name: _sort_key(r.get(c)),
+                reverse=direction.strip().lower() == "desc",
+            )
     else:
         rows = db.query(sql, params, ttl=ttl, tag={"sport": profile.key, "tile": tag})
     return rows, render(sql, params)

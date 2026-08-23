@@ -76,6 +76,9 @@ bound statement with literals in place of the binds for exactly that purpose.
 | `/:sport/teams/:team` | `GET /api/{sport}/teams/{team}?season&season_type&vendor` | `app_team_standings`, `app_team_weeks`, `app_team_allowed`, `app_team_ats` | four selects on the team's label: the splits, the weeks collapsed to one row per game carrying the chosen book's line from the team's side, the defense-allowed rows by position and stat, and the against-the-spread row per book; `team` is the label (KC), case-insensitive. The roster tile is the leaders route with `team` bound |
 | `/:sport/players` | `GET /api/{sport}/players?season&season_type&position&team` | `app_player_leaders` | the season's season types (default resolution), then the rows for the season type, narrowed to a position or a team when asked; ranks are mart columns so the page sorts without a round trip |
 | `/:sport/players/:player_key` | `GET /api/{sport}/players/{player_key}?season&season_type` | `app_player_leaders`, `app_player_weeks`, `app_player_week_stats` | three selects on the key: every season (the career table; the season defaults to the latest), the games in the chosen season, and the long stat rows with trailing and prior-season columns that the chart and the year-over-year strip read |
+| `/:sport/markets` | `GET /api/{sport}/markets?season&season_type&week&vendor` | `app_line_history` | the weeks with a line at any book (picker and default week, through the slate tile's helper), then the chosen week's snapshots at the chosen book; the page groups by game into open, close and a sparkline |
+| `/:sport/markets/:game_key` | `GET /api/{sport}/markets/{game_key}?vendor` | `app_line_history`, `app_prop_line_history` | every book's path for the game, and the chosen book's prop snapshots (bound to one book: FanDuel re-snapshots every tick, so one game there is thousands of rows); the page draws step lines per book and ranks props by movement since open |
+| `/:sport/news` | `GET /api/{sport}/news?days&team` | `app_news_mentions` | mentions in the window before the clock (default 7 days, max 90), one team when asked, newest first; position, feed and "resolved only" filter on the page |
 
 Each tile lives in `api/app/sports/tiles/<name>.py` as a pydantic row model, the
 `COLUMNS` it selects (the contract test checks them against the mart schema), and a `load`
@@ -126,7 +129,8 @@ with scores; every 2026 prop row; 2025 and 2026 standings for every split; KC an
 weeks and defense-allowed rows for both seasons; the 2025 regulars and the 2026 skill
 positions on the leaderboard; Puka Nacua's and Patrick Mahomes' games and long stat rows,
 with 2024 included so their 2025 prior-season columns have rows behind them in the same
-set), enough to exercise every branch a page has. The same script writes `fixtures/app/schema/<table>.json` from `DESCRIBE TABLE`, the
+set; line history for 2026 weeks 1 and 2, DraftKings' week 1 prop snapshots plus FanDuel's
+QB props for one game, and every news mention), enough to exercise every branch a page has. The same script writes `fixtures/app/schema/<table>.json` from `DESCRIBE TABLE`, the
 column contract the tiles are tested against. No 2025 game carries a closing line (the odds
 feed begins with the 2026 regular season), so the team weeks' vendor collapse is covered by
 a unit test on synthetic rows and `app_team_ats` is captured empty. The tests pin the clock

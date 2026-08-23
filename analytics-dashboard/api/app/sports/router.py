@@ -4,7 +4,7 @@ sport by name."""
 
 from fastapi import APIRouter
 
-from app.sports.routers import capabilities, games, players, slate, teams
+from app.sports.routers import capabilities, games, markets, news, players, slate, teams
 
 router = APIRouter(prefix="/api/{sport}")
 router.include_router(capabilities.router)
@@ -12,3 +12,5 @@ router.include_router(slate.router)
 router.include_router(games.router)
 router.include_router(teams.router)
 router.include_router(players.router)
+router.include_router(markets.router)
+router.include_router(news.router)

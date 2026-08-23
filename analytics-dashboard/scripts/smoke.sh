@@ -69,6 +69,12 @@ ROUTES=(
   "/nfl/players?season=2025&season_type=Regular%20Season&position=WR&sort=rank_receptions|Jaxon Smith-Njigba"
   "/nfl/players/daca41214b39c5dc66674d09081940f0?season=2025&season_type=Regular%20Season|Back to leaders"
   "/nfl/players/nope|No such player"
+  "/nfl/markets|Biggest spread move"
+  "/nfl/markets?season_type=Regular%20Season&week=1&vendor=fanduel|Click a game"
+  "/nfl/markets/$GAME_KEY|Back to markets"
+  "/nfl/markets/nope|No lines for this game"
+  "/nfl/news|Playing within 3 days"
+  "/nfl/news?days=30&position=QB|Resolved players only"
   "/ncaaf|No page marts yet"
   "/ncaaf/slate|No game day data yet"
 )

@@ -135,11 +135,13 @@ function SlateBoard() {
   )
 }
 
-function WeekPicker({
+/** Season type and week chips over a payload's week list; the markets board
+    uses it over the weeks with a line. */
+export function WeekPicker({
   data,
   onPick,
 }: {
-  data: SlatePayload
+  data: { weeks: WeekRef[]; season_type_name: string; week: number }
   onPick: (patch: Record<string, string | undefined>) => void
 }) {
   const types: string[] = []
