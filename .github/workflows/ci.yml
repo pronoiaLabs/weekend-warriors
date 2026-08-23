@@ -87,6 +87,34 @@ jobs:
           test "$scheduled" -gt 0
           test "$scheduled" = "$resumes"
 
+  # The Snowpark procedures dbt calls (dbt-pipelines/snowpark/). Only
+  # evidence.py is unit-tested: it is pure Python, and it holds every
+  # vocabulary the tiers, the dbt macros and the search service share. The
+  # session-bound modules are import-checked and linted; they are proven
+  # against the account by hand (snowpark/README.md).
+  snowpark:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dbt-pipelines/snowpark
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Lint
+        run: uv run --extra dev ruff check .
+
+      - name: Tests
+        run: uv run --extra dev pytest -q
+
+      - name: Import check
+        run: |
+          uv run python -c "import sys; sys.path.insert(0, 'player_bridge/src'); \
+            import player_bridge.main; print('ok')"
+
   # The dashboard API. Tests run in fixture mode (OPS_DASHBOARD_DATA is set by
   # the tests themselves), so the connector is never imported and the Snowflake
   # invariant above holds.

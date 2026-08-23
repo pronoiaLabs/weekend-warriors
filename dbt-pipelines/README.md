@@ -339,6 +339,43 @@ The macros that do the heavy lifting:
 | `alter_agent` | Helper called by a wrapper: `alter_agent(agent_name, spec)` -> ALTER live version | (called by `deploy_<agent>`, not directly) |
 | `create_eval_stage` | Creates the stage and file format required for evaluation configs | `dbt run-operation create_eval_stage` |
 | `run_evaluation` | Creates the stage (if needed) and starts an evaluation run | `dbt run-operation run_evaluation --args '{agent_name: example_agent, run_name: v1, config_file: example_eval_config.yml}'` |
+| `nfl_team_abbr_nflverse` / `nfl_position_group` | The vendor vocabularies the player bridge compares on; mirrored in the Snowpark package and the search service | `{{ nfl_team_abbr_nflverse('team_abbreviation') }}` |
+| `nfl_player_bridge_fqn` | Where `SP_PLAYER_BRIDGE` writes for the current target (CORE in prod, the developer's schema in dev) | `{{ nfl_player_bridge_fqn('PLAYER_BRIDGE_UNMATCHED') }}` |
+
+## Snowpark procedures
+
+`snowpark/` holds Python stored procedures that dbt calls from hooks. They exist
+for work dbt cannot express as a model: the first one, `player_bridge/`, matches
+BallDontLie and Sleeper player ids onto nflverse `gsis_id` with deterministic
+tiers, a batch Cortex Search for candidates, and `AI_FILTER` to confirm the rest.
+Each is a `snow snowpark` project: `snowflake.yml` is the source of truth for the
+`CREATE PROCEDURE`, `src/` is zipped onto the `DLT_DB.DEPLOY.SNOWPARK` stage, and
+the procedure imports it from there.
+
+```bash
+make snowpark-test      # ruff + pytest, pure Python, no Snowflake
+make deploy-snowpark    # snow snowpark build + deploy --replace, then the re-grants
+```
+
+Two contracts the bridge keeps, which is why dbt can call it on every build:
+
+- **It decides a player once.** `PLAYER_BRIDGE` holds stable ids only (no team, no
+  jersey), so a trade changes nothing, and a decided row is never re-evaluated. A
+  call with no undecided player returns in milliseconds without touching Cortex.
+  A new player is decided on the first build after he appears in a vendor table.
+  Unmatched players are retried only when their match evidence changes.
+- **dbt owns the address, the procedure owns the content.** `bridge_player_ids`'
+  pre_hook passes its own database and schema, so the tables land beside the
+  model (`DEV_<user>` in dev, `CORE` in prod), and `nfl_player_bridge_fqn` gives
+  tests the same address. To re-decide everything, call it by hand:
+  `CALL DLT_DB.DEPLOY.SP_PLAYER_BRIDGE('NFL_DEV_DB', 'DEV_<user>', TRUE)`.
+
+Account prerequisites are one human-run file,
+`dlt-pipelines/sql/sources/nfl/09_player_bridge.sql` (the stage, the Cortex
+grants, the search service over `RAW.NFLVERSE_PLAYERS`). Cortex spend shows in
+`SNOWFLAKE.ACCOUNT_USAGE.CORTEX_SEARCH_BATCH_QUERY_USAGE_HISTORY` and
+`CORTEX_FUNCTIONS_USAGE_HISTORY`; the steady state is zero rows. Developer detail
+in [snowpark/README.md](snowpark/README.md).
 
 ## Customization
 

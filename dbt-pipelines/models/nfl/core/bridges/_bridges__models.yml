@@ -1,0 +1,43 @@
+version: 2
+
+# Bridges: the id crosswalks between BallDontLie (dim_*) and the other
+# vendors. Neither is a dimension (no attributes of its own) nor a fact.
+
+models:
+  - name: bridge_player_ids
+    description: >
+      One row per nflverse player (gsis_id) with the BallDontLie player_key and
+      Sleeper player_id the bridge tied to it. Written by
+      DLT_DB.DEPLOY.SP_PLAYER_BRIDGE from this model's pre_hook: stable ids only,
+      decided once per player, self-correcting when a new player appears.
+      player_key is NULL for players BallDontLie does not carry.
+    columns:
+      - name: gsis_id
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: bdl_match_method
+        tests:
+          - accepted_values: {values: ['id', 'exact', 'tiebreak', 'search_ai']}
+      - name: sleeper_match_method
+        tests:
+          - accepted_values: {values: ['id', 'exact', 'tiebreak', 'search_ai']}
+
+  - name: bridge_game_ids
+    description: >
+      dim_game's game_key beside the nflverse game id (season_week_away_home),
+      observed from play-by-play when the game has been played and composed
+      from the week and abbreviation rules otherwise. Preseason games carry a
+      NULL nflverse id. Grain: game.
+    columns:
+      - name: game_key
+        tests:
+          - unique
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: nflverse_game_id
+        tests:
+          - unique
+      - name: nflverse_week
+        description: "nflverse's week number: 1 to 18, then 19 to 22 for the playoffs."

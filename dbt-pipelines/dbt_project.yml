@@ -56,6 +56,11 @@ models:
           +materialized: table
         facts:
           +materialized: table
+        # Id crosswalks to the other vendors. bridge_player_ids overrides to a
+        # view in its own config: its pre_hook calls SP_PLAYER_BRIDGE, which
+        # writes the underlying table into this same schema.
+        bridges:
+          +materialized: table
 
       # FEATURES -- ML marts. Train and score only; not a Cortex tool.
       # Prod: NFL_PROD_DB.FEATURES. Dev collapses into DEV_<user>.

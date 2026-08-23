@@ -330,3 +330,19 @@ models:
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [stadium_id, hour_at, product]
+
+  # ---------------------------------------------------------------------------
+  # nflverse (vendor-prefixed: BallDontLie owns the plain names)
+  # ---------------------------------------------------------------------------
+  - name: stg_nfl__nflverse_players
+    description: >
+      nflverse's all-history players table, the id crosswalk. Grain: player
+      (gsis_id). Carries espn_id, pfr_id, pff_id, the headshot URL and the
+      latest team in both nflverse's and dim_team's abbreviations.
+    columns:
+      - name: gsis_id
+        tests: [unique, not_null]
+      - name: display_name
+        tests: [not_null]
+      - name: team_abbreviation
+        description: "latest_team mapped onto dim_team's vocabulary (LA -> LAR, WAS -> WSH); NULL for players without a club."
