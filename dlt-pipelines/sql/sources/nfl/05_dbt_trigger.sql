@@ -16,6 +16,10 @@
 --     tasks-apply / tasks-resume do not touch it. Suspend-before-alter is
 --     built into this file instead, and the RESUME at the bottom is not
 --     redundant: CREATE OR ALTER TASK leaves a task suspended.
+--   * APP_COPY_NFL (08_app_copy_task.sql) is a grandchild of this graph.
+--     Suspend and resume it here so a later apply of this file does not
+--     fail with 091421 on a started child. The wrapper itself is created
+--     in 08, not here.
 --   * The DML drain in the procedure is mandatory, not an audit nicety: a
 --     stream that is only read keeps SYSTEM$STREAM_HAS_DATA true and the task
 --     re-fires every interval forever, billing DBT_WH (measured: 4 fires in
@@ -243,9 +247,12 @@ END;
 $$;
 
 -- CREATE OR ALTER TASK refuses to touch a started task; suspend first.
--- The whole graph (root AND child) must be suspended to alter either.
-ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL SUSPEND;
+-- The whole graph (root, child, and 08 grandchild) must be suspended to
+-- alter any node. Root first: suspending a child while the root is started
+-- is 091421.
 ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND;
+ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL SUSPEND;
+ALTER TASK IF EXISTS NFL_PROD_DB.OPS.APP_COPY_NFL SUSPEND;
 
 CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL
   WAREHOUSE = DBT_WH
@@ -271,5 +278,8 @@ AS
 
 -- Not redundant: CREATE OR ALTER TASK leaves tasks suspended. Children
 -- resume BEFORE the root; a resumed root with a suspended child skips it.
+-- APP_COPY_NFL is created by 08; IF EXISTS so this file still applies
+-- on a fresh account before 08 has run.
+ALTER TASK IF EXISTS NFL_PROD_DB.OPS.APP_COPY_NFL RESUME;
 ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME;
 ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL RESUME;

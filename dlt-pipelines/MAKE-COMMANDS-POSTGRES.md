@@ -33,14 +33,21 @@ make setup-postgres-secret CONFIRM=1
 
 # 4. DLT_LOADER_ROLE SELECT on NFL_PROD_DB.APP + DLT_DB.OPS.DBT_BUILDS
 snow sql -c weekend-warriors -f sql/sources/nfl/07_app_copy_grants.sql
+
+# 5. standalone copy Task + APP_COPY_NFL AFTER harvest (does not suspend the fleet)
+make setup-app-copy-trigger CONFIRM=1
 ```
 
 Step 4 is that one file, not `make setup-source SOURCE=nfl`, so you do not
-re-apply the rest of the NFL source tree.
+re-apply the rest of the NFL source tree. Step 5 creates the loader Task
+and the harvest wrapper; it does not run `tasks-apply`.
 
-Laptop access is the instance-level `POSTGRES_INGRESS` network policy in
-Snowsight, not the EAI. If `psql` fails with a network-policy error, add your
-current public IP there. Do not open `0.0.0.0/0`.
+Laptop access is the instance-level `POSTGRES_INGRESS` policy (IPv4 only),
+not the EAI. If `psql` fails with a network-policy error, add your current
+public IP there. SPCS jobs need the Snowflake egress CIDRs from
+`SYSTEM$GET_SNOWFLAKE_EGRESS_IP_RANGES()` — apply
+`sql/sources/postgres/04_ingress_spcs.sql`. Do not open `0.0.0.0/0`. A Task
+that times out on `:5432` is this policy, not a missing EAI.
 
 ---
 
@@ -78,27 +85,26 @@ exited non-zero.
 ## Production Task
 
 The registry entry is `pipelines/batch/registries/app-copy-registry.yml`.
-`generate_tasks.py` emits `AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL` (no cron).
-
-The copy Task joins the harvest graph:
+`generate_tasks.py` emits a **standalone** Task in `DLT_DB.OPS` (no cron, no
+`AFTER`). Snowflake rejects `AFTER` when the predecessor is in another schema
+(`091413`) and a graph must share one owner, so the DAG edge is
+`sql/sources/nfl/08_app_copy_task.sql`:
 
 ```
-_DLT_LOADS → DBT_BUILD_NFL → DBT_HARVEST_NFL → dlt_task_nfl_app_to_postgres
+_DLT_LOADS → DBT_BUILD_NFL → DBT_HARVEST_NFL → APP_COPY_NFL
+                                              └─ EXECUTE TASK dlt_task_nfl_app_to_postgres
 ```
 
-`CREATE OR ALTER` fails if that graph's root is started. `make tasks-suspend`
-therefore also suspends `DBT_BUILD_NFL` and `DBT_HARVEST_NFL` when any
-registry `after:` exists. Resume order is copy, then harvest, then build.
+`make tasks-suspend` / `tasks-apply` / `tasks-resume` do **not** touch the
+harvest graph. Do not hang `AFTER harvest` on the loader Task again.
 
 ```bash
-make sync-apply
-make tasks-sql            # read build/tasks.sql: AFTER, not USING CRON
-make deploy               # suspend (incl. harvest graph) → apply → resume
+make setup-app-copy-trigger CONFIRM=1
 ```
 
 The container image needs `dlt[postgres]`. That is a dependency change, so it
 needs an image rebuild (prefer CI amd64, not an Apple Silicon laptop). **Do not
-resume the copy Task until `:latest` is the new image** — a harvest fire against
+fire the copy Task until `:latest` is the new image** — a harvest fire against
 the old image dies on `No module named 'psycopg2'` / missing postgres dest and
 pages Slack (`DLT_ALERTS=1`).
 
@@ -110,25 +116,25 @@ pages Slack (`DLT_ALERTS=1`).
 | Write `app.app_copy` as `app_copy_writer` | `.env.postgres` | SECRET + EAI (already applied) |
 | Watermark UPSERT | same writer | same |
 | `dlt[postgres]` installed | local venv | **image rebuild** |
-| Spec + AFTER harvest | YAML on disk | `sync-apply` + `tasks-apply` |
+| Spec + harvest wrapper | YAML + 08 on disk | `make setup-app-copy-trigger` |
 
-### After this branch merges
-
-`deploy.yml` rebuilds the image (`pyproject.toml` / `uv.lock`) and reapplies
-Tasks (`app-copy-registry.yml`, `generate_tasks.py`, `dlt_job_postgres.tmpl.yaml`).
-That apply suspends `DBT_BUILD_NFL` / `DBT_HARVEST_NFL` for the duration.
+### After the image is `:latest`
 
 Then prove the Task, not only the laptop:
 
 ```bash
-# spec is AFTER harvest, not cron
-rg "AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL" dlt-pipelines/build/tasks.sql
+# loader Task is standalone (no AFTER, no cron)
+rg "dlt_task_nfl_app_to_postgres" dlt-pipelines/build/tasks.sql
 
-# Task exists and is started (after deploy resume)
-snow sql -c weekend-warriors --role DLT_LOADER_ROLE -q \
+# Wrapper is the DAG edge
+rg "AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL" dlt-pipelines/sql/sources/nfl/08_app_copy_task.sql
+
+snow sql -c weekend-warriors -q \
   "SHOW TASKS LIKE 'dlt_task_nfl_app_to_postgres' IN SCHEMA DLT_DB.OPS;"
+snow sql -c weekend-warriors -q \
+  "SHOW TASKS LIKE 'APP_COPY_NFL' IN SCHEMA NFL_PROD_DB.OPS;"
 
-# First fire without waiting for a dbt build
+# First fire without waiting for a dbt build (wrapper or the loader Task)
 snow sql -c weekend-warriors --role DLT_LOADER_ROLE -q \
   "EXECUTE TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres;"
 ```
@@ -144,4 +150,5 @@ is the production proof. The laptop run is not.
 2. `sql/postgres/README.md` — init statements
 3. `sql/sources/postgres/README.md` — EAI + secret
 4. `sql/sources/nfl/07_app_copy_grants.sql` — APP SELECT
-5. `pipelines/batch/registries/app-copy-registry.yml` — table list
+5. `sql/sources/nfl/08_app_copy_task.sql` — harvest wrapper
+6. `pipelines/batch/registries/app-copy-registry.yml` — table list

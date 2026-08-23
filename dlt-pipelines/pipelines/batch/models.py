@@ -111,9 +111,10 @@ class PipelineSpec:
     source: str
     config: dict[str, Any]
     schedule: str | None = None
-    # Child of another Task instead of a cron. Mutually exclusive with `schedule`.
-    # generate_tasks.py emits `AFTER <fqn>` and joins that graph's suspend/resume.
-    # A Snowflake Task cannot have both SCHEDULE and AFTER.
+    # Execute-only Task instead of a cron. Mutually exclusive with `schedule`.
+    # generate_tasks.py emits a standalone Task (no SCHEDULE, no AFTER): Snowflake
+    # rejects AFTER across schemas (091413) and a graph must share one owner.
+    # The value names who fires it (a same-schema wrapper EXECUTE TASKs this).
     after: str | None = None
     # Database STEM, not a full name: `NFL` resolves to NFL_DEV_DB / NFL_PROD_DB via
     # resolve_database(). `DLT` is the default so a pipeline that declares no sport
@@ -194,15 +195,17 @@ class PipelineSpec:
             )
 
     def _validate_task_trigger(self) -> None:
-        """A Task is cron or a child, never both, and `after` must be interpolatable.
+        """A Task is cron or execute-only, never both, and `after` names who fires it.
 
-        Snowflake rejects a Task that sets SCHEDULE and AFTER together. The value is
-        dropped straight into Task DDL, so it has to be DATABASE.SCHEMA.NAME.
+        The value is a fully-qualified Task name (DATABASE.SCHEMA.NAME) so the
+        sport wrapper can EXECUTE TASK this pipeline after that predecessor.
+        generate_tasks does not interpolate it into AFTER — Snowflake rejects
+        AFTER across schemas.
         """
         if self.schedule and self.after:
             raise RegistryError(
                 f"pipeline '{self.name}': schedule and after are mutually exclusive. "
-                "A Task is either cron or a child of another Task, not both."
+                "A Task is either cron or execute-only, not both."
             )
         if not self.after:
             return

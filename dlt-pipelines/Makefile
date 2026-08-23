@@ -186,7 +186,7 @@ endef
         run-local run-snowflake run-prod run-postgres run-spcs \
         sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
         setup-base setup-dev setup-prod setup-ops setup-integrations \
-        setup-source setup-postgres setup-postgres-secret new-source \
+        setup-source setup-postgres setup-postgres-secret setup-app-copy-trigger new-source \
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
         sync-apply tasks-apply tasks-suspend tasks-resume deploy \
@@ -566,6 +566,23 @@ setup-postgres-secret: ## ALTER SECRET POSTGRES_APP_COPY from .env.postgres (gua
 	    exit 2; \
 	  fi; \
 	  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/sources/postgres/apply_secret.sh
+
+# Standalone copy Task in DLT_DB.OPS (no cron) plus the harvest-graph wrapper
+# in NFL_PROD_DB.OPS. Does NOT run tasks-apply on the whole fleet.
+setup-app-copy-trigger: build ## Create nfl_app_to_postgres Task + APP_COPY_NFL wrapper (CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates DLT_DB.OPS.dlt_task_nfl_app_to_postgres (standalone) and"; \
+		echo "NFL_PROD_DB.OPS.APP_COPY_NFL AFTER harvest. Does not suspend the fleet."; \
+		echo "Re-run with CONFIRM=1. See MAKE-COMMANDS-POSTGRES.md."; \
+		exit 2; \
+	fi
+	$(UV_RUN) python -c "from deploy.tasks.generate_tasks import task_sql; \
+from pipelines.batch.models import load_registry; \
+print(task_sql(load_registry().get('nfl_app_to_postgres')))" > build/app_copy_task.sql
+	@$(call hdr,Apply standalone nfl_app_to_postgres Task)
+	@$(SNOW_LOADER) -f build/app_copy_task.sql
+	@$(call hdr,Apply harvest wrapper APP_COPY_NFL)
+	@$(SNOW) -f sql/sources/nfl/08_app_copy_task.sql
 
 new-source: ## Scaffold SQL + registry for a new upstream API (NAME=weather [HOST=api.weather.com])
 	@if [ -z "$(NAME)" ]; then \

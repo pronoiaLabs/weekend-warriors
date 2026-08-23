@@ -6,7 +6,9 @@
 # rebuilds it.
 #
 # Laptop: make run-postgres NAME=nfl_app_to_postgres
-# Prod:   generate_tasks emits AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL
+# Prod:   generate_tasks emits a standalone Task (no cron). Snowflake
+#         rejects AFTER across schemas, so sql/sources/nfl/08_app_copy_task.sql
+#         is the DAG edge: APP_COPY_NFL AFTER harvest EXECUTE TASKs this.
 
 defaults:
   destination: postgres
