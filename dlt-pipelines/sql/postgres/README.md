@@ -12,7 +12,9 @@ Statements live in this directory. Do not invent `psql -c` one-liners.
 | `05b_observability_default_privileges.sql` | writer-created obs tables are SELECT to `app_api` and `snowflake_admin` | same |
 | `06_grant_observability_select.sql` | SELECT on obs tables that already exist | same |
 | `03_set_writer_password.sql.example` | documents the only statement that cannot be committed with a real password | rendered to `.generated/` |
+| `07_set_api_password.sql.example` | same, for `app_api` (dashboard reader) | rendered to `.generated/` |
 | `apply.sh` | applies APP then observability from repo-root `.env.postgres` | `make setup-postgres CONFIRM=1` |
 | `apply_observability.sh` | observability schema only (instance already has `app` + writer) | `make setup-postgres-observability CONFIRM=1` |
+| `apply_api_password.sh` | `ALTER ROLE app_api` from `APP_API_PASSWORD` | `make setup-postgres-api-password CONFIRM=1` |
 
 `.generated/` is gitignored. Full runbook: [MAKE-COMMANDS-POSTGRES.md](../../MAKE-COMMANDS-POSTGRES.md).

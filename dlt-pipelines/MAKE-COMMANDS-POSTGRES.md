@@ -224,6 +224,36 @@ Copied (base tables, not views): `PIPELINE_RUNS`, `TASK_RUNS`, `LOG_LINES`,
 
 ---
 
+## Dashboard reader (`app_api`)
+
+Both dashboards SELECT as `app_api` (`app.app_copy` for analytics,
+`app.observability` for ops). That role has LOGIN from `setup-postgres`
+but no password until:
+
+```bash
+make setup-postgres-api-password CONFIRM=1
+```
+
+That target generates `APP_API_PASSWORD` into repo-root `.env.postgres` if
+blank, `ALTER ROLE app_api`, and proves `SELECT` on `app_copy.app_copy_watermark`.
+It does not recreate the database and does not touch the writer password.
+
+`make -C analytics-dashboard serve` / `dev` / `test-live` (and the same
+targets under `ops-dashboard`) source the same `.env.postgres` for `PGHOST`
+/ `PGPORT` / `APP_API_PASSWORD`. The APIs hard-code user `app_api` and
+database `app`; they will not use the admin `PGUSER` / `PGPASSWORD` pair.
+
+```bash
+# after the password exists
+make -C ../analytics-dashboard test-live
+make -C ../ops-dashboard test-live
+```
+
+Rollback (warehouse SQL):
+`ANALYTICS_DASHBOARD_BACKEND=snowflake make -C ../analytics-dashboard test-live`.
+
+---
+
 ## Files a new user should read, in order
 
 1. This runbook
