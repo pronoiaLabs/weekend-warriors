@@ -4,7 +4,9 @@ sport by name."""
 
 from fastapi import APIRouter
 
-from app.sports.routers import capabilities
+from app.sports.routers import capabilities, games, slate
 
 router = APIRouter(prefix="/api/{sport}")
 router.include_router(capabilities.router)
+router.include_router(slate.router)
+router.include_router(games.router)

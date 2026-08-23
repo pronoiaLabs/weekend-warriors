@@ -1,0 +1,105 @@
+/* Page-level styles: the filter row, breadcrumbs, page grids, the query
+   expander, the game day board and the game page. Ported from the Glass Prism
+   wireframe; primitives (tile, kpi, chip, dock) stay in sports.css. */
+
+/* shared page chrome */
+.filters { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 20px; align-items: center; }
+.crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--fs-s); color: var(--ink-4); margin-bottom: 10px; }
+.crumbs a { color: var(--ink-3); }
+.crumbs a:hover { color: var(--accent); }
+.crumbs .sep { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-4); display: inline-block; }
+.grid { display: grid; gap: var(--gap); align-items: start; }
+/* the two team columns side by side, the rail (pins, notes) beneath them: seven
+   cells per prop row need the width more than the rail needs the height */
+.cols-game { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.rail { display: grid; gap: var(--gap); grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
+.caption { margin-top: 12px; font-size: var(--fs-s); color: var(--ink-4); }
+.note-tile p { color: var(--ink-2); max-width: 960px; }
+.kpis.five { grid-template-columns: repeat(5, 1fr); }
+
+/* the query expander every mart tile carries */
+.q { margin-top: 12px; font-size: var(--fs-s); }
+.q summary { cursor: pointer; color: var(--ink-3); list-style: none; display: inline-block; padding: 4px 8px; border-radius: 6px; border: 1px dashed var(--line-2); }
+.q summary::-webkit-details-marker { display: none; }
+.q pre { margin: 10px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); color: var(--ink-2); font-family: var(--mono); font-size: var(--fs-s); line-height: 1.5; overflow-x: auto; white-space: pre; }
+
+/* game day board: one column per kickoff slot, the board scrolls both ways */
+.board { height: 600px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); padding: 0 12px 12px; margin-bottom: 20px; background: var(--surface-2); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.slots { display: grid; grid-template-columns: repeat(var(--n), minmax(240px, 1fr)); gap: 14px; }
+.slot-head { position: sticky; top: 0; z-index: 2; margin: 0; padding: 12px 4px 8px; font-size: var(--fs-s); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); background: var(--bg); }
+.slot-games { display: grid; gap: 12px; }
+.game { position: relative; display: grid; gap: 10px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); color: inherit; }
+.game:hover { border-color: var(--line-2); }
+.game-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.team { display: flex; flex-direction: column; min-width: 0; }
+.team.home { text-align: right; }
+.team .abbr { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.team .name { font-size: var(--fs-s); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.at { font-size: var(--fs-s); color: var(--ink-4); text-transform: uppercase; }
+.game-venue { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-s); color: var(--ink-3); }
+.roof { color: var(--ink-4); white-space: nowrap; }
+.game-wx, .game-line { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.game-line { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
+.wx, .ln { display: flex; flex-direction: column; min-width: 0; }
+.wx .v, .ln .v { font-size: 15px; font-weight: 600; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wx .v small, .ln .v small { font-size: 10px; color: var(--ink-4); margin-left: 2px; font-weight: 500; }
+.wx .l, .ln .l { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
+.wx.warn .v { color: var(--warn); }
+.game-line.none, .game-wx.none { display: block; color: var(--ink-4); font-size: var(--fs-s); }
+.ln.pos .v, .stat.pos .v, .pnum.pos .v { color: var(--pos); }
+.ln.neg .v, .stat.neg .v, .pnum.neg .v { color: var(--neg); }
+.ready { display: flex; flex-wrap: wrap; gap: 6px; }
+.flag { font-size: 10px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-3); white-space: nowrap; }
+.flag.news { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); white-space: normal; }
+.flag.wx { color: var(--warn); }
+.flag.props { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* game page: the head and the prop board */
+.game-head { position: relative; display: grid; grid-template-columns: 1.2fr 2fr; gap: var(--gap); align-items: end; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px 24px; margin-bottom: 16px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--glass); }
+.matchup .kick { display: inline-block; font-size: var(--fs-s); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.matchup h1 { font-size: 30px; letter-spacing: -.03em; font-weight: 700; line-height: 1.05; }
+.matchup h1 .at { font-size: 14px; color: var(--ink-4); margin: 0 6px; }
+.line-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.stat { display: flex; flex-direction: column; min-width: 0; }
+.stat .v { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.05; overflow-wrap: anywhere; }
+.stat .l { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
+.team-col .tile-head h2 { font-size: 16px; }
+.prows { display: grid; overflow-x: auto; }
+.prow { display: grid; grid-template-columns: minmax(150px, 1.6fr) minmax(60px, .7fr) minmax(88px, 1fr) minmax(92px, 1fr) repeat(2, minmax(56px, .7fr)) minmax(72px, .8fr) 56px; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); min-width: 640px; }
+.prow .pid { display: flex; flex-direction: column; min-width: 0; }
+.prow .pid b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.prow .pid small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .pid .flag { align-self: flex-start; margin-top: 3px; white-space: normal; }
+.pnum { display: flex; flex-direction: column; text-align: right; min-width: 0; }
+.pnum .v { font-size: 14px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnum .v small { font-size: 10px; color: var(--ink-4); font-weight: 500; }
+.pnum .l { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnum.last3 .v { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.prow .pin { justify-self: end; }
+.pin { font-size: 10px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-3); white-space: nowrap; }
+.pin.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pins li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.pins li small { grid-column: 1; }
+.pins li:last-child { border-bottom: 0; }
+.pins b { font-weight: 600; }
+.unpin { font-size: 10px; color: var(--ink-4); grid-row: span 2; }
+.unpin:hover { color: var(--neg); }
+.notes li { padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); font-size: 12.5px; }
+.notes li:last-child { border-bottom: 0; }
+
+/* narrow: one column, the board scrolls sideways by slot, rows scroll in their tile */
+.shell-narrow .kpis.five { grid-template-columns: 1fr 1fr; }
+.shell-narrow .cols-game { grid-template-columns: minmax(0, 1fr); }
+.shell-narrow .board { height: auto; max-height: 72vh; }
+.shell-narrow .slots { grid-template-columns: repeat(var(--n), minmax(260px, 80vw)); }
+.shell-narrow .game-head { grid-template-columns: 1fr; align-items: start; padding: 18px; }
+.shell-narrow .matchup h1 { font-size: 24px; }
+.shell-narrow .rail { grid-template-columns: 1fr; }
+.shell-narrow .prow { min-width: 600px; }
+.shell-narrow .line-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* tilt: the hovered element only, no transition while the pointer drives it */
+[data-tilt].tilting { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-tilt].tilting { transform: none !important; }
+}

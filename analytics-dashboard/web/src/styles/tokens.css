@@ -1,5 +1,7 @@
-/* Glass Prism tokens. Ported from .brainstorm/wireframes/analytics-dashboard/sample-2
-   (theme-glass-prism). This app owns the file; ops-dashboard keeps its own. */
+/* Design tokens. Glass Prism structure (aurora, glass tiles, dock) on a neutral
+   palette: graphite ground, off-white ink, one muted steel accent for active
+   states, sage and rose for positive and negative. Every colour in the app comes
+   from here; the other stylesheets only reference tokens. */
 :root {
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -9,28 +11,33 @@
   --fs-h: 15px;
   --fs-d: 56px;
 
-  --bg: #050507;
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-2: rgba(255, 255, 255, 0.09);
-  --ink: #f4f6ff;
-  --ink-2: #cfd5ee;
-  --ink-3: #8d95b8;
-  --ink-4: #5f6789;
-  --line: rgba(255, 255, 255, 0.12);
-  --line-2: rgba(255, 255, 255, 0.26);
+  --bg: #0d0e11;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-2: rgba(255, 255, 255, 0.075);
+  --ink: #ececef;
+  --ink-2: #c6c8ce;
+  --ink-3: #8b8e97;
+  --ink-4: #61646d;
+  --line: rgba(255, 255, 255, 0.10);
+  --line-2: rgba(255, 255, 255, 0.22);
 
-  --accent: #19e3ff;
-  --accent-soft: rgba(25, 227, 255, 0.16);
-  --magenta: #ff2fd6;
-  --lime: #b8ff3c;
-  --pos: #b8ff3c;
-  --neg: #ff2fd6;
-  --warn: #ffd166;
+  /* the one accent, muted steel; -rgb for alpha mixes in the other sheets */
+  --accent: #9db3c8;
+  --accent-rgb: 157, 179, 200;
+  --accent-soft: rgba(157, 179, 200, 0.14);
+  --pos: #8fbf9c;
+  --neg: #d08a8e;
+  --warn: #d4b26c;
+
+  /* aurora layers: near-monochrome, low opacity, a hint of the accent and of warmth */
+  --aurora-1: rgba(255, 255, 255, 0.10);
+  --aurora-2: rgba(157, 179, 200, 0.16);
+  --aurora-3: rgba(214, 200, 180, 0.10);
 
   --r: 18px;
   --gap: 16px;
-  --tilt-deg: 8;
-  --glass: 0 1px 0 rgba(255, 255, 255, 0.16) inset, 0 30px 70px rgba(0, 0, 0, 0.5);
+  --tilt-deg: 6;
+  --glass: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 24px 60px rgba(0, 0, 0, 0.45);
 
   /* the one breakpoint; useViewport reads the same number */
   --sports-narrow: 900px;
