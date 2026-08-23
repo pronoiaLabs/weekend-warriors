@@ -6,6 +6,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "snowflake-connector-python",
+    "psycopg[binary]",
     "croniter",
 ]
 
@@ -24,3 +25,4 @@ line-length = 100
 # pytest able to import it the same way uvicorn does.
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = ["live: describes the live store; runs only with OPS_DASHBOARD_LIVE=1"]

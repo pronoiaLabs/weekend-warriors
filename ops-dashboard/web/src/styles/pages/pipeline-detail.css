@@ -1,0 +1,130 @@
+/* Pipeline detail. The shared primitives carry the crumbs, the head tile, the
+   KPI plates and the two data tiles; four things they cannot express live here.
+
+   The head is a tile laid as an identity block beside a line-strip of schedule
+   facts, the same shape the analytics team page uses, because TASK_NAME and
+   COMPUTE_POOL are long mono strings that would blow out a KPI plate.
+
+   The run history is a master-detail split: the list scrolls in its own window
+   and the evidence pane stays pinned beside it, so history depth grows the list
+   and never the page. Selecting a run swaps the pane in place; only the
+   selected run's evidence is mounted.
+
+   Everything is scoped under .page-pipeline so these names cannot collide with
+   the other pages' ports of the same vocabulary. */
+
+/* ---- head ---- */
+.page-pipeline .pipe-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr);
+  gap: var(--gap);
+  align-items: end;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+}
+/* A pipeline that is not healthy carries the wash, so the head reads as a
+   verdict before the badges are read. */
+.page-pipeline .pipe-head.attn { background: var(--fail-wash); }
+.page-pipeline .pipe-head .kick { display: inline-block; font-size: var(--fs-s); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.page-pipeline .pipe-head .kick a:hover { color: var(--ink); }
+.page-pipeline .pipe-head h1 { font-size: 30px; letter-spacing: -.03em; font-weight: 600; line-height: 1.05; }
+.page-pipeline .pipe-head .badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.page-pipeline .pipe-head .lede { margin-top: 10px; }
+
+.page-pipeline .line-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.page-pipeline .stat { display: flex; flex-direction: column; min-width: 0; }
+.page-pipeline .stat .v { font-size: 15px; font-weight: 600; letter-spacing: -.01em; line-height: 1.15; overflow-wrap: anywhere; }
+.page-pipeline .stat .v.mono { font-family: var(--mono); font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
+.page-pipeline .stat .l { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
+
+/* the strip is wider than a narrow tile: let it scroll rather than squeeze */
+.page-pipeline .heat-tile .tile-body { overflow-x: auto; }
+
+/* ---- run history: master-detail split ---- */
+.page-pipeline .runsplit {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.page-pipeline .runlist {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  max-height: 640px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+.page-pipeline .runitem {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  text-align: left;
+  color: var(--ink-3);
+}
+.page-pipeline .runitem:last-child { border-bottom: 0; }
+.page-pipeline .runitem:hover { background: var(--surface); }
+.page-pipeline .runitem.on { background: var(--surface-2); border-left-color: var(--ink); }
+/* After .on so a selected failure keeps the rose rail: failure outranks
+   selection on the edge, the background still marks the selection. */
+.page-pipeline .runitem.bad { border-left-color: var(--neg); }
+.page-pipeline .runitem .outcome { font-weight: 700; font-size: var(--fs-s); letter-spacing: .03em; color: var(--ink-2); min-width: 86px; }
+.page-pipeline .runitem .outcome.fail { color: var(--neg); }
+.page-pipeline .runitem .ts { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.page-pipeline .runitem .dur { margin-left: auto; font-family: var(--mono); font-size: var(--fs-s); color: var(--ink-4); white-space: nowrap; }
+/* Compact stand-ins for the flag chips; the full chips live in the pane head. */
+.page-pipeline .runitem .flagdot { width: 7px; height: 7px; border-radius: 50%; align-self: center; flex: none; }
+.page-pipeline .runitem .flagdot.missing { background: var(--neg); }
+.page-pipeline .runitem .flagdot.disagrees { background: var(--surface-2); border: 1px solid var(--line-2); }
+
+.page-pipeline .runpane {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.page-pipeline .runpane.bad { border-left: 3px solid var(--neg); }
+.page-pipeline .runpane-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+}
+.page-pipeline .runpane-head .outcome { font-weight: 700; font-size: 12px; letter-spacing: .03em; color: var(--ink-2); }
+.page-pipeline .runpane-head .outcome.fail { color: var(--neg); }
+.page-pipeline .runpane-head .ts { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.page-pipeline .runpane-head .flag { font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 2px 7px; border-radius: var(--r-sm); }
+.page-pipeline .runpane-head .flag.missing { background: var(--neg); color: var(--bg); }
+/* A disagreement is a finding, not a failure, so its chip stays neutral. */
+.page-pipeline .runpane-head .flag.disagrees { background: var(--surface-2); border: 1px solid var(--line-2); color: var(--ink-2); }
+.page-pipeline .runpane-head .cells { display: flex; gap: 18px; font-size: 12px; color: var(--ink-4); margin-left: auto; flex-wrap: wrap; }
+.page-pipeline .runpane-head .cells b { color: var(--ink-2); font-weight: 600; }
+.page-pipeline .runpane-body { padding: 16px 18px; }
+.page-pipeline .runpane-foot { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: var(--fs-s); color: var(--ink-4); }
+.page-pipeline .runpane-foot a { color: var(--accent); }
+
+/* ---- the metrics tab's cards ---- */
+.page-pipeline .metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.page-pipeline .mcard { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg); }
+.page-pipeline .mcard .mv { font-size: 17px; font-weight: 600; }
+.page-pipeline .mcard .mk { font-size: var(--fs-s); color: var(--ink-4); text-transform: uppercase; letter-spacing: .04em; }
+.page-pipeline .pane-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-4); margin: 12px 0 4px; }
+
+/* the closing note runs to two paragraphs; ops.css strips paragraph margins */
+.page-pipeline .note-tile p + p { margin-top: 10px; }
+
+/* narrow: the head stacks, and the run list becomes a short scroller above the
+   pane rather than a column beside it */
+.shell-narrow .page-pipeline .pipe-head { grid-template-columns: minmax(0, 1fr); align-items: start; padding: 18px; }
+.shell-narrow .page-pipeline .pipe-head h1 { font-size: 24px; }
+.shell-narrow .page-pipeline .runsplit { grid-template-columns: minmax(0, 1fr); }
+.shell-narrow .page-pipeline .runlist { max-height: 260px; }

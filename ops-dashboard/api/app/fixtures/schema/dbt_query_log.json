@@ -1,0 +1,120 @@
+{
+  "object": "DLT_DB.OPS.DBT_QUERY_LOG",
+  "columns": [
+    {
+      "name": "query_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "build_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "sport",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "environment",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "node",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "query_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "execution_status",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "error_code",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "error_message",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "start_time",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "end_time",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "total_elapsed_time",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "compilation_time",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "execution_time",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "queued_overload_time",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "bytes_scanned",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "rows_produced",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "rows_inserted",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "credits_used_cloud_services",
+      "type": "NUMBER(38,9)",
+      "nullable": true
+    },
+    {
+      "name": "warehouse_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "query_tag",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "stats_captured",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "harvested_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    }
+  ]
+}

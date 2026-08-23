@@ -1,0 +1,50 @@
+{
+  "object": "DLT_DB.OPS.DBT_QUERY_OPERATOR_STATS",
+  "columns": [
+    {
+      "name": "query_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "step_id",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "operator_id",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "parent_operators",
+      "type": "ARRAY",
+      "nullable": true
+    },
+    {
+      "name": "operator_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "operator_statistics",
+      "type": "VARIANT",
+      "nullable": true
+    },
+    {
+      "name": "execution_time_breakdown",
+      "type": "VARIANT",
+      "nullable": true
+    },
+    {
+      "name": "operator_attributes",
+      "type": "VARIANT",
+      "nullable": true
+    },
+    {
+      "name": "captured_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    }
+  ]
+}

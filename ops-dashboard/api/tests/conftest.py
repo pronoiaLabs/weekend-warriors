@@ -14,6 +14,8 @@ The two env pins matter more than the fixture itself:
                                   updating ONE literal, here.
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -27,3 +29,13 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("OPS_DASHBOARD_DATA", "fixtures")
     monkeypatch.setenv("OPS_DASHBOARD_NOW", SNAPSHOT_NOW)
     return TestClient(create_app())
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Live tests describe the real objects; they run only with OPS_DASHBOARD_LIVE=1."""
+    if os.environ.get("OPS_DASHBOARD_LIVE") == "1":
+        return
+    skip = pytest.mark.skip(reason="live test; set OPS_DASHBOARD_LIVE=1")
+    for item in items:
+        if "live" in item.keywords:
+            item.add_marker(skip)

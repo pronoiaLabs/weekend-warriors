@@ -1,11 +1,17 @@
 /** Narrow mirrors of the FastAPI payloads, limited to what the UI reads today. */
 
+/** Every payload carries the SQL the request built, rendered with literals, for
+    the tile's "Show query" expander; null only when nothing was queried. */
+export interface Traced {
+  query: string | null
+}
+
 export interface SportSummary {
   sport: string
   pipelines: number
 }
 
-export interface SportsPayload {
+export interface SportsPayload extends Traced {
   sports: SportSummary[]
 }
 
@@ -110,7 +116,7 @@ export interface HeatCell {
   query_id: string | null
 }
 
-export interface PipelineDetailPayload {
+export interface PipelineDetailPayload extends Traced {
   pipeline: string
   sport: string
   schedule: string
@@ -134,7 +140,7 @@ export interface PriorRun {
   state: BlockState
 }
 
-export interface RunDetailPayload extends RunRow {
+export interface RunDetailPayload extends RunRow, Traced {
   prev_row_counts: Record<string, number> | null
   prior_runs: PriorRun[]
 }
@@ -148,7 +154,7 @@ export interface LogLine {
   message: string
 }
 
-export interface LogsPayload {
+export interface LogsPayload extends Traced {
   query_id: string
   total_log_lines: number | null
   error_lines: number | null
@@ -174,7 +180,7 @@ export interface MetricSummary {
   group: string | null
 }
 
-export interface MetricsPayload {
+export interface MetricsPayload extends Traced {
   query_id: string
   metric_samples: number | null
   cpu_samples: number | null
@@ -186,7 +192,7 @@ export interface MetricsPayload {
   metrics: Record<string, MetricSummary>
 }
 
-export interface RowCountsPayload {
+export interface RowCountsPayload extends Traced {
   query_id: string
   rows_loaded: number | null
   row_counts: Record<string, number> | null
@@ -230,7 +236,7 @@ export interface PipelineIndexRow {
   avg_duration_s: number | null
 }
 
-export interface PipelinesIndexPayload {
+export interface PipelinesIndexPayload extends Traced {
   now: string
   window_days: number
   pipelines: PipelineIndexRow[]
@@ -265,7 +271,7 @@ export interface DbtBuildRow {
   sum_rows_produced: number | null
 }
 
-export interface DbtBuildsPayload {
+export interface DbtBuildsPayload extends Traced {
   /** Newest first. */
   builds: DbtBuildRow[]
 }
@@ -280,7 +286,7 @@ export interface DbtLoadRow {
   drained_at: string
 }
 
-export interface DbtBuildDetailPayload {
+export interface DbtBuildDetailPayload extends Traced {
   build: DbtBuildRow
   loads: DbtLoadRow[]
 }
@@ -306,7 +312,7 @@ export interface DbtQueryRow {
   stats_captured: boolean
 }
 
-export interface DbtBuildQueriesPayload {
+export interface DbtBuildQueriesPayload extends Traced {
   /** Slowest first. */
   queries: DbtQueryRow[]
 }
@@ -324,7 +330,7 @@ export interface DbtQueryOperator {
   operator_attributes: Record<string, unknown> | null
 }
 
-export interface DbtQueryOperatorsPayload {
+export interface DbtQueryOperatorsPayload extends Traced {
   query_id: string
   operators: DbtQueryOperator[]
 }
@@ -414,7 +420,7 @@ export interface SlateLeague {
   cards: SlateCard[]
 }
 
-export interface SlatePayload {
+export interface SlatePayload extends Traced {
   date: string
   now: string
   window_days: number
@@ -436,7 +442,7 @@ export interface Headline {
 
 /** The AI wire. `stale` is informational, never an error: the wire regenerates
     once a day, so a morning request legitimately serves yesterday's edition. */
-export interface HeadlinesPayload {
+export interface HeadlinesPayload extends Traced {
   requested_date: string
   served_date: string | null
   stale: boolean

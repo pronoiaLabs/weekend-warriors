@@ -1,98 +1,121 @@
-/* Design tokens lifted from the approved option-4-hybrid wireframe:
-   light theme, grayscale plus a single red accent. */
-
+/* Design tokens, the same palette as the analytics dashboard: graphite ground,
+   off-white ink, one muted steel accent for active states, sage and rose for
+   good and bad. Every colour in the app comes from here; the other stylesheets
+   only reference tokens. The ops-specific additions are the run-state
+   vocabulary at the bottom: one treatment per state, reused by timeline
+   blocks, heat cells, form strips and legend swatches. */
 :root {
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #fbfbfa;
-  --surface-3: #f8f8f8;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --ink: #18181b;
-  --ink-2: #3f3f46;
-  --ink-3: #52525b;
-  --ink-4: #71717a;
-  --ink-5: #a1a1aa;
+  --fs-s: 11px;
+  --fs-b: 13px;
+  --fs-h: 15px;
+  --fs-d: 56px;
 
-  --line: #e4e4e7;
-  --line-soft: #f4f4f5;
-  --line-strong: #d4d4d8;
+  --bg: #0d0e11;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-2: rgba(255, 255, 255, 0.075);
+  --ink: #ececef;
+  --ink-2: #c6c8ce;
+  --ink-3: #8b8e97;
+  --ink-4: #61646d;
+  --line: rgba(255, 255, 255, 0.10);
+  --line-2: rgba(255, 255, 255, 0.22);
 
-  --red: #dc2626;
-  --red-ink: #b91c1c;
-  --red-line: #fecaca;
-  --red-edge: #fca5a5;
-  --red-lite: #f87171;
-  --red-wash: #fef2f2;
+  /* the one accent, muted steel; -rgb for alpha mixes in the other sheets */
+  --accent: #9db3c8;
+  --accent-rgb: 157, 179, 200;
+  --accent-soft: rgba(157, 179, 200, 0.14);
+  --pos: #8fbf9c;
+  --neg: #d08a8e;
+  --warn: #d4b26c;
 
-  /* Warning tier for the rolled-up "degraded" health (succeeding now, but
-     under 80% over the window). Deliberately a second accent: red stays
-     reserved for real failure, and folding degraded into red would dilute it. */
-  --amber: #d97706;
+  /* run states, one colour each so a glance tells them apart:
+       succeeded  sage, the quiet fill
+       failure    rose: a run happened and broke
+       missed     amber: the slot passed and nothing fired; not a failure, a
+                  no-show, which is usually a task or schedule question
+       missing    rose hatched: the run happened but never recorded itself
+       upcoming   grey dotted: still ahead, nothing to say yet */
+  --ok: var(--pos);
+  --ok-fill: rgba(143, 191, 156, 0.28);
+  --fail: var(--neg);
+  --fail-wash: rgba(208, 138, 142, 0.12);
+  --missed: var(--warn);
+  --missed-wash: rgba(212, 178, 108, 0.10);
+  --hatch: repeating-linear-gradient(45deg, var(--neg) 0 3px, transparent 3px 6px);
 
-  --fill-ok: #d4d4d8;
-  --hatch: repeating-linear-gradient(45deg, var(--red) 0 3px, #ffffff 3px 6px);
+  /* aurora layers: near-monochrome, low opacity, a hint of the accent and of warmth */
+  --aurora-1: rgba(255, 255, 255, 0.10);
+  --aurora-2: rgba(157, 179, 200, 0.16);
+  --aurora-3: rgba(214, 200, 180, 0.10);
 
-  --font: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* the glass ring and the dock backing, which are the two places a light
+     theme needs different alphas rather than different hues */
+  --ring-1: rgba(255, 255, 255, 0.28);
+  --ring-2: rgba(255, 255, 255, 0.08);
+  --ring-3: rgba(255, 255, 255, 0.05);
+  --dock: rgba(13, 14, 17, 0.7);
 
-  --r-sm: 4px;
-  --r: 6px;
-  --r-md: 8px;
-  --r-lg: 10px;
+  --r: 18px;
+  --r-sm: 8px;
+  --gap: 16px;
+  --tilt-deg: 6;
+  --glass: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 24px 60px rgba(0, 0, 0, 0.45);
+
+  /* the one breakpoint; useViewport reads the same number */
+  --ops-narrow: 900px;
+  color-scheme: dark;
+}
+
+/* ---- the light theme ----
+   Same structure, inverted ground: paper instead of graphite, the same accent
+   and the same state hues (darkened a step so they hold contrast on white).
+   useTheme always stamps data-theme on the root: the stored choice, else the
+   OS preference, so this block is the only other palette and nothing here
+   needs a media query. */
+:root[data-theme="light"] {
+    --bg: #f3f4f6;
+    --surface: rgba(0, 0, 0, 0.035);
+    --surface-2: rgba(0, 0, 0, 0.06);
+    --ink: #17181c;
+    --ink-2: #33353c;
+    --ink-3: #5f636d;
+    --ink-4: #8a8e98;
+    --line: rgba(0, 0, 0, 0.10);
+    --line-2: rgba(0, 0, 0, 0.22);
+    --accent: #4f6b86;
+    --accent-rgb: 79, 107, 134;
+    --accent-soft: rgba(79, 107, 134, 0.14);
+    --pos: #3f8a55;
+    --neg: #b9494f;
+    --warn: #a3761c;
+    --ok-fill: rgba(63, 138, 85, 0.20);
+    --fail-wash: rgba(185, 73, 79, 0.08);
+    --missed-wash: rgba(163, 118, 28, 0.08);
+    --aurora-1: rgba(0, 0, 0, 0.04);
+    --aurora-2: rgba(79, 107, 134, 0.10);
+    --aurora-3: rgba(180, 150, 90, 0.08);
+    --ring-1: rgba(255, 255, 255, 0.9);
+    --ring-2: rgba(255, 255, 255, 0.5);
+    --ring-3: rgba(0, 0, 0, 0.04);
+    --dock: rgba(243, 244, 246, 0.8);
+    --glass: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 40px rgba(0, 0, 0, 0.10);
+    color-scheme: light;
 }
 
 /* ---- status vocabulary ----
-   One treatment per state, reused by timeline blocks, legend swatches and
-   anywhere else a state is drawn. Applied as `.st st-<state>`; the state class
-   comes later in the file so its border shorthand wins at equal specificity.
-   A disagreement is deliberately absent: it is a finding, never drawn red. */
-
-.st {
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  border-radius: 3px;
-}
-
-.st-succeeded {
-  background: var(--fill-ok);
-  border: 1px solid var(--ink-5);
-  color: var(--ink);
-}
-
-.st-failure {
-  background: var(--red);
-  border: 1px solid var(--red-ink);
-  color: #ffffff;
-}
-
-.st-missing {
-  background: var(--hatch);
-  border: 1px solid var(--red-ink);
-  color: var(--red-ink);
-}
-
-.st-missed {
-  background: var(--surface);
-  border: 2px dashed var(--red);
-  color: var(--red-ink);
-}
-
-.st-upcoming {
-  background: var(--surface);
-  border: 1px dotted var(--ink-5);
-  color: var(--ink-5);
-}
-
-.st-notsched {
-  background: var(--line-soft);
-  border: 1px solid var(--line);
-  color: var(--ink-5);
-}
-
-/* The API lowercases any TASK_STATE it does not classify; render it neutrally
-   rather than guessing at a severity. */
-.st-unknown {
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  color: var(--ink-3);
-}
+   Applied as `.st st-<state>`; the state class comes later so its border
+   shorthand wins at equal specificity. A disagreement is deliberately absent:
+   it is a finding, never drawn rose. */
+.st { border: 1px solid var(--line-2); background: var(--surface); border-radius: 3px; }
+.st-succeeded { background: var(--ok-fill); border: 1px solid var(--ok); color: var(--ink); }
+.st-failure { background: var(--fail); border: 1px solid var(--fail); color: var(--bg); }
+.st-missing { background: var(--hatch); border: 1px solid var(--fail); color: var(--fail); }
+.st-missed { background: var(--missed-wash); border: 2px dashed var(--missed); color: var(--missed); }
+.st-upcoming { background: transparent; border: 1px dotted var(--ink-4); color: var(--ink-4); }
+.st-scheduled { background: transparent; border: 1px dotted var(--ink-4); color: var(--ink-4); }
+.st-notsched, .st-none { background: var(--surface); border: 1px solid var(--line); color: var(--ink-4); }
+/* the API lowercases any TASK_STATE it does not classify; neutral, no severity guessed */
+.st-unknown { background: var(--surface); border: 1px solid var(--line-2); color: var(--ink-3); }

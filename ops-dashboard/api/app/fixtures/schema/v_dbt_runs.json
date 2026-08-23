@@ -1,0 +1,125 @@
+{
+  "object": "DLT_DB.OPS.V_DBT_RUNS",
+  "columns": [
+    {
+      "name": "sport",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "task_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "run_query_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "build_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "return_value",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "state",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "error_message",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "args",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "environment",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "project_fqn",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "drained_loads",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "exec_query_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "scheduled_time",
+      "type": "TIMESTAMP_LTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "started_at",
+      "type": "TIMESTAMP_LTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "completed_time",
+      "type": "TIMESTAMP_LTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "duration_s",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "n_queries",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "n_failed_queries",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "n_node_queries",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "sum_elapsed_ms",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "max_elapsed_ms",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "sum_bytes_scanned",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "sum_rows_produced",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "refreshed_at",
+      "type": "TIMESTAMP_LTZ(9)",
+      "nullable": true
+    }
+  ]
+}

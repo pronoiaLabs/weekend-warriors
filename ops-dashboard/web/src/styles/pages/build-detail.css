@@ -1,0 +1,94 @@
+/* The dbt build detail page only. Everything structural is a primitive (tile,
+   kpis, standings, grid); what is left here is the head tile's identity block,
+   the fact grid, and the two behaviours the queries table adds on top of
+   .standings: a row that expands into its operator breakdown, and a wash on a
+   query that failed. */
+
+.page-build .build-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+}
+.page-build .build-head .kick {
+  font-family: var(--mono);
+  font-size: var(--fs-s);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-4);
+}
+.page-build .build-head h1 {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+  margin-top: 2px;
+}
+.page-build .build-head h1 .at {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--ink-4);
+}
+.page-build .build-head .lede { margin-top: 6px; }
+.shell-narrow .page-build .build-head { flex-direction: column; }
+
+/* The facts: every column of the row under its own uppercase column name, so
+   the page and a SELECT * read the same. */
+.page-build .facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px 18px;
+}
+.page-build .facts .k {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--ink-4);
+}
+.page-build .facts .v {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.page-build .facts .v.bad { color: var(--neg); font-weight: 700; }
+
+/* Queries: the caret column, the node cell that has to hold a long name and a
+   longer error, and the drawer the operator table opens into. */
+.page-build .standings td.caretcell { width: 26px; padding-right: 0; }
+.page-build .standings .qnode {
+  font-weight: 600;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.page-build .standings .qerr {
+  font-family: var(--mono);
+  font-size: var(--fs-s);
+  color: var(--neg);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.page-build .standings td.fail { color: var(--neg); font-weight: 600; }
+.page-build .standings tr.qrow.bad td { background: var(--fail-wash); }
+.page-build .standings tr.opsrow > td {
+  background: var(--surface);
+  white-space: normal;
+  padding: 10px 12px;
+}
+.page-build .standings .muted { color: var(--ink-4); }
+.page-build .hint.bad { color: var(--neg); }
+
+/* The task's error text, verbatim and wrapped: it is the reason the build
+   failed and is never worth truncating. */
+.page-build .error-tile .tile-body {
+  font-family: var(--mono);
+  font-size: var(--fs-s);
+  line-height: 1.5;
+  color: var(--neg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

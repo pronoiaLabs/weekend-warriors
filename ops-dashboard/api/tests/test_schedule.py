@@ -26,8 +26,6 @@ def test_slot_state_grace() -> None:
     assert schedule.slot_state(slot, True, past_grace) == "matched"
 
 
-
-
 def test_next_fire_is_tz_aware_and_future() -> None:
     now = datetime(2026, 8, 8, 12, tzinfo=UTC)
     nxt = schedule.next_fire("0 10 * * *", now)

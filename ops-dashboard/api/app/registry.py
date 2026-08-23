@@ -36,14 +36,9 @@ def load_registry() -> list[Pipeline]:
     now = time.monotonic()
     if _cache is not None and now - _cache[0] < _TTL_SECONDS:
         return _cache[1]
-    rows = db.query(
-        """
-        SELECT NAME, SCHEDULE, TARGET_DATABASE, ENABLED
-        FROM DLT_DB.OPS.PIPELINE_REGISTRY
-        WHERE SCHEDULE IS NOT NULL
-        ORDER BY TARGET_DATABASE, NAME
-        """
-    )
+    from app import datasource
+
+    rows = db.query(datasource.registry_sql(), tag={"tile": "registry"})
     pipelines = [
         Pipeline(
             name=r["name"],

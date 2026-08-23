@@ -36,15 +36,25 @@ export function fetchSports(signal?: AbortSignal): Promise<SportsPayload> {
   return get<SportsPayload>('/api/sports', {}, signal)
 }
 
+/** The viewer's IANA zone: the slate's day is cut at local midnight, so the
+    first card of "Sunday" is not Saturday evening. Only the browser knows it. */
+export function viewerZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
+
 /** `date` is omitted rather than sent empty when the caller means today: the API
-    resolves the missing parameter against its own clock, which is the one the
-    OPS_DASHBOARD_NOW pin moves. */
+    resolves the missing parameter against its own clock (in the viewer's zone),
+    which is the one the OPS_DASHBOARD_NOW pin moves. */
 export function fetchSlate(
   sport: string,
   date: string | null,
   signal?: AbortSignal,
 ): Promise<SlatePayload> {
-  const params: Record<string, string> = { sport }
+  const params: Record<string, string> = { sport, tz: viewerZone() }
   if (date) params.date = date
   return get<SlatePayload>('/api/slate', params, signal)
 }
