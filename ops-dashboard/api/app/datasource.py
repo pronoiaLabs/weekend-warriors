@@ -81,7 +81,7 @@ RUN_COLUMNS: tuple[str, ...] = (
     "restarts", "telemetry_available", "container_never_started",
 )  # fmt: skip
 REGISTRY_COLUMNS: tuple[str, ...] = (
-    "name", "schedule", "target_database", "enabled", "updated_at",
+    "name", "schedule", "target_database", "enabled", "updated_at", "source",
 )  # fmt: skip
 LOG_COLUMNS: tuple[str, ...] = (
     "event_ts", "severity", "logger_name", "container_name", "log_format", "message",
@@ -257,6 +257,7 @@ def pipelines() -> list[dict[str, Any]]:
                 "sport": r["target_database"],
                 "schedule": r["schedule"],
                 "enabled": r["enabled"],
+                "source": r.get("source"),
                 "live_from": live_from(r.get("updated_at"), first.get(r["name"])),
             }
             for r in _fixture("registry")
@@ -271,6 +272,7 @@ def pipelines() -> list[dict[str, Any]]:
             "sport": p.sport,
             "schedule": p.schedule,
             "enabled": p.enabled,
+            "source": p.source,
             "live_from": live_from(p.updated_at, first.get(p.name)),
         }
         for p in registry.load_registry()

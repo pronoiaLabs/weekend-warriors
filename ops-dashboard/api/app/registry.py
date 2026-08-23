@@ -27,6 +27,7 @@ class Pipeline:
     schedule: str  # 5-field cron, UTC
     enabled: bool
     updated_at: str | None = None  # last registry sync, ISO UTC
+    source: str | None = None  # registry SOURCE: rest_api, nflverse, sleeper, firecrawl, ...
 
 
 _cache: tuple[float, list[Pipeline]] | None = None
@@ -48,6 +49,7 @@ def load_registry() -> list[Pipeline]:
             schedule=r["schedule"],
             enabled=bool(r["enabled"]),
             updated_at=datasource._iso_utc(r.get("updated_at")),
+            source=r.get("source"),
         )
         for r in rows
     ]

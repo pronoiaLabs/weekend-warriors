@@ -219,6 +219,8 @@ export interface FormCell {
 export interface PipelineIndexRow {
   pipeline: string
   sport: string
+  /** the registry's source: rest_api (BallDontLie), nflverse, sleeper ... */
+  source: string | null
   enabled: boolean
   schedule: string
   cron: string
@@ -361,6 +363,8 @@ export interface SlateRunCard {
   schedule: string
   cron: string
   prev: SlatePrevRun | null
+  /** the registry's source: rest_api (BallDontLie), nflverse, sleeper ... */
+  source: string | null
 }
 
 /** A cron slot with no run row: already passed (missed) or still ahead
@@ -377,6 +381,7 @@ export interface SlateSlotCard {
   schedule: string
   cron: string
   prev: SlatePrevRun | null
+  source: string | null
 }
 
 /** One event-driven dbt build, which has no slot: it fired when data landed. */

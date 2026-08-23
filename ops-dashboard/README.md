@@ -64,6 +64,12 @@ Three conventions the colours and the clock follow:
   the floor are not slots: the morning before a new Task existed is not a row of
   no-shows, an old pipeline floors at a run weeks ago and is unaffected, and a new
   Task whose first fire never came still shows it.
+- **Every card and row names its source.** The registry's `source` (the vendor: `rest_api`
+  is BallDontLie, then `nflverse`, `sleeper`, `firecrawl`, `openmeteo`) rides on each
+  pipeline row and each slot or run card, and the Source chips on the dashboard and the
+  pipelines page slice by it, persisted as `?source=` beside `view` and `kind`. A dbt
+  build belongs to no single source (it fired because data landed), so picking one hides
+  builds; the chip row only appears once the day spans more than one source.
 - **The slate's day is the viewer's day.** The page sends the browser's IANA zone
   (`tz=`), and the API cuts the day at local midnight, so the first card of "Sunday" is
   not Saturday evening. Crons stay UTC (they are the Task definitions); only the day's

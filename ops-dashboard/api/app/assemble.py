@@ -163,6 +163,7 @@ def pipelines_index(
             {
                 "pipeline": pipe["name"],
                 "sport": pipe["sport"],
+                "source": pipe.get("source"),
                 "enabled": pipe["enabled"],
                 "schedule": pipe["schedule"],
                 "cron": pipe["schedule"],
@@ -208,6 +209,7 @@ def pipeline_detail(
     return {
         "pipeline": pipe["name"],
         "sport": pipe["sport"],
+        "source": pipe.get("source"),
         "schedule": cron,
         "cron": cron,
         "next_fire": _iso(schedule.next_fire(cron, now)),
@@ -315,6 +317,7 @@ def _slate_day(
             run = matched.get(slot)
             if run is not None:
                 card = _block_for_run(run)
+                card["source"] = pipe.get("source")
                 card["schedule"] = cron
                 card["cron"] = cron
                 card["prev"] = _prev(pipe["name"], run["run_started_at"])
@@ -332,6 +335,7 @@ def _slate_day(
                     "kind": kind,
                     "state": kind,
                     "pipeline": pipe["name"],
+                    "source": pipe.get("source"),
                     "at": slot_iso,
                     "duration_s": None,
                     "rows_loaded": None,
