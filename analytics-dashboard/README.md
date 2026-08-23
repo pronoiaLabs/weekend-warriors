@@ -73,7 +73,9 @@ bound statement with literals in place of the binds for exactly that purpose.
 | `/:sport/slate` | `GET /api/{sport}/slate?season&season_type&week&vendor` | `app_game_slate` | lists the season's weeks (picker + default resolution: the first week whose last kickoff is still ahead, else the last week); collapses the week's game × vendor rows to one card per game carrying the requested book's line, blank when that book has none |
 | `/:sport/games/:game_key` | `GET /api/{sport}/games/{game_key}?vendor` | `app_game_slate`, `app_game_prop_board` | the game's row at the chosen book, plus the prop board for every book split into the away and home columns; the page filters by book and stat family without another round trip |
 | `/:sport/teams` | `GET /api/{sport}/teams?season&season_type&split` | `app_team_standings` | one select of the season (every season type and split), filtered to the chosen season type and split; the season type defaults to the one in progress (latest last game); the page groups by division or shows the league |
-| `/:sport/teams/:team` | `GET /api/{sport}/teams/{team}?season&season_type&vendor` | `app_team_standings`, `app_team_weeks`, `app_team_allowed`, `app_team_ats` | four selects on the team's label: the splits, the weeks collapsed to one row per game carrying the chosen book's line from the team's side, the defense-allowed rows by position and stat, and the against-the-spread row per book; `team` is the label (KC), case-insensitive |
+| `/:sport/teams/:team` | `GET /api/{sport}/teams/{team}?season&season_type&vendor` | `app_team_standings`, `app_team_weeks`, `app_team_allowed`, `app_team_ats` | four selects on the team's label: the splits, the weeks collapsed to one row per game carrying the chosen book's line from the team's side, the defense-allowed rows by position and stat, and the against-the-spread row per book; `team` is the label (KC), case-insensitive. The roster tile is the leaders route with `team` bound |
+| `/:sport/players` | `GET /api/{sport}/players?season&season_type&position&team` | `app_player_leaders` | the season's season types (default resolution), then the rows for the season type, narrowed to a position or a team when asked; ranks are mart columns so the page sorts without a round trip |
+| `/:sport/players/:player_key` | `GET /api/{sport}/players/{player_key}?season&season_type` | `app_player_leaders`, `app_player_weeks`, `app_player_week_stats` | three selects on the key: every season (the career table; the season defaults to the latest), the games in the chosen season, and the long stat rows with trailing and prior-season columns that the chart and the year-over-year strip read |
 
 Each tile lives in `api/app/sports/tiles/<name>.py` as a pydantic row model, the
 `COLUMNS` it selects (the contract test checks them against the mart schema), and a `load`
@@ -121,8 +123,10 @@ Two facts about the data the pages show, both from the marts rather than the app
 live tiles see. The selection is small and deliberate (2026 Regular Season weeks 1 and 2,
 2026 Preseason week 3 which is partly played, 2025 Regular Season week 18 which is complete
 with scores; every 2026 prop row; 2025 and 2026 standings for every split; KC and DET's
-weeks and defense-allowed rows for both seasons), enough to exercise every branch a page
-has. The same script writes `fixtures/app/schema/<table>.json` from `DESCRIBE TABLE`, the
+weeks and defense-allowed rows for both seasons; the 2025 regulars and the 2026 skill
+positions on the leaderboard; Puka Nacua's and Patrick Mahomes' games and long stat rows,
+with 2024 included so their 2025 prior-season columns have rows behind them in the same
+set), enough to exercise every branch a page has. The same script writes `fixtures/app/schema/<table>.json` from `DESCRIBE TABLE`, the
 column contract the tiles are tested against. No 2025 game carries a closing line (the odds
 feed begins with the 2026 regular season), so the team weeks' vendor collapse is covered by
 a unit test on synthetic rows and `app_team_ats` is captured empty. The tests pin the clock

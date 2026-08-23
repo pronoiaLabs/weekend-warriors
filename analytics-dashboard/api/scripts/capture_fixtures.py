@@ -45,6 +45,21 @@ SELECTION: dict[str, dict[C, str]] = {
         C.TEAM_WEEKS: "season in (2025, 2026) and team_label in ('KC', 'DET')",
         C.TEAM_ALLOWED: "season in (2025, 2026) and team_label in ('KC', 'DET')",
         C.TEAM_ATS: "season in (2025, 2026)",
+        # a completed season's regulars at the four skill positions (the
+        # leaderboard), the skill positions in the season in progress, and the
+        # two sample players' every season (the player page's career table)
+        C.PLAYER_LEADERS: (
+            "(season = 2025 and season_type_name = 'Regular Season'"
+            " and position in ('QB', 'RB', 'WR', 'TE') and games >= 8)"
+            " or (season = 2026 and position in ('QB', 'RB', 'WR', 'TE') and games >= 3)"
+            " or player_name in ('Puka Nacua', 'Patrick Mahomes')"
+        ),
+        # two players' seasons, 2024 included so the prior-season columns on
+        # their 2025 rows have something behind them in the same fixture set
+        C.PLAYER_WEEKS: "season in (2024, 2025, 2026) and player_name in ('Puka Nacua', 'Patrick Mahomes')",
+        C.PLAYER_WEEK_STATS: "season in (2025, 2026) and player_name in ('Puka Nacua', 'Patrick Mahomes')",
+        # the defender sheet is Explorer-only; a small sample keeps the table shape
+        C.PLAYER_DEFENSE_WEEKS: "season = 2025 and season_type_name = 'Regular Season' and team_label = 'KC' and week = 1",
     },
 }
 

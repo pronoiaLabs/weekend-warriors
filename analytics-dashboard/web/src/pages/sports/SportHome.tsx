@@ -11,7 +11,10 @@ const LABELS: Record<string, string> = {
   team_weeks: 'Team weeks',
   team_allowed: 'Defense allowed by position',
   team_ats: 'Against the spread',
-  player_performance: 'Players',
+  player_leaders: 'Player leaderboards',
+  player_weeks: 'Player weeks',
+  player_week_stats: 'Player stats, week by week',
+  player_defense_weeks: 'Defender weeks',
   game_odds: 'Markets',
   player_props: 'Props edge',
   news: 'News',
@@ -63,6 +66,8 @@ export default function SportHome() {
                   <Link to={`/${sport}/slate`}>{LABELS[c]}</Link>
                 ) : c === 'team_standings' ? (
                   <Link to={`/${sport}/teams`}>{LABELS[c]}</Link>
+                ) : c === 'player_leaders' ? (
+                  <Link to={`/${sport}/players`}>{LABELS[c]}</Link>
                 ) : (
                   <b>{LABELS[c] ?? c}</b>
                 )}

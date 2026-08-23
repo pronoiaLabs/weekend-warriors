@@ -11,7 +11,10 @@
     with the player's identity, the team he played for that game, the opponent,
     the game result from his team's side, fantasy points at both books, and
     running counts within the season type (games_to_date, fantasy_to_date).
-    Offensive players only, completed games only. The long companion,
+    Running counts order by week (one game per week within a season type):
+    the fact's date_key is a surrogate, not a calendar order, and ordering by
+    it scrambled games_to_date. Offensive players only, completed games only.
+    The long companion,
     app_player_week_stats, is the same rows one stat at a time with trailing
     and prior-season comparisons for charts and the year-over-year columns.
 */
@@ -59,18 +62,18 @@ running as (
     select
         player_game_key,
         row_number() over (
-            partition by player_key, season, season_type order by date_key, game_key
+            partition by player_key, season, season_type order by week, game_key
         )                                               as games_to_date,
         sum(fanduel_points) over (
-            partition by player_key, season, season_type order by date_key, game_key
+            partition by player_key, season, season_type order by week, game_key
             rows between unbounded preceding and current row
         )                                               as fanduel_points_to_date,
         sum(draftkings_points) over (
-            partition by player_key, season, season_type order by date_key, game_key
+            partition by player_key, season, season_type order by week, game_key
             rows between unbounded preceding and current row
         )                                               as draftkings_points_to_date,
         sum(scrimmage_yards) over (
-            partition by player_key, season, season_type order by date_key, game_key
+            partition by player_key, season, season_type order by week, game_key
             rows between unbounded preceding and current row
         )                                               as scrimmage_yards_to_date
     from offense

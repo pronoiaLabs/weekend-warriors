@@ -25,6 +25,11 @@ if [ ! -f web/dist/index.html ]; then
   exit 2
 fi
 
+if lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "nav: port $PORT is in use (pid $(lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN | tr '\n' ' ')); stop it or set NAV_PORT" >&2
+  exit 2
+fi
+
 PROFILE="$(mktemp -d -t ww-nav-profile.XXXXXX)"
 (
   cd api
@@ -35,7 +40,9 @@ API_PID=$!
 "$CHROME" --headless=new --disable-gpu --no-first-run --remote-debugging-port="$CDP_PORT" \
   --user-data-dir="$PROFILE" --window-size=1400,1000 about:blank >/dev/null 2>&1 &
 CHROME_PID=$!
-trap 'kill $API_PID $CHROME_PID 2>/dev/null || true; wait $API_PID $CHROME_PID 2>/dev/null || true' EXIT
+# uv run leaves uvicorn as a grandchild that outlives the subshell: stop the
+# port's listener, not just the subshell
+trap 'kill $API_PID $CHROME_PID 2>/dev/null || true; lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true; wait $API_PID $CHROME_PID 2>/dev/null || true' EXIT
 
 for _ in $(seq 1 50); do
   curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1 && curl -fsS "http://127.0.0.1:$CDP_PORT/json" >/dev/null 2>&1 && break

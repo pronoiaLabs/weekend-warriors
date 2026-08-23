@@ -1,6 +1,6 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { fetchTeam } from '../../api/sports/client.ts'
-import type { AllowedRow, AtsRow, StandingsRow, TeamWeekRow } from '../../api/sports/types.ts'
+import { fetchLeaders, fetchTeam } from '../../api/sports/client.ts'
+import type { AllowedRow, AtsRow, LeadersRow, StandingsRow, TeamWeekRow } from '../../api/sports/types.ts'
 import CapabilityGate from '../../components/sports/CapabilityGate.tsx'
 import Chips from '../../components/sports/Chips.tsx'
 import Crumbs from '../../components/sports/Crumbs.tsx'
@@ -10,6 +10,7 @@ import { useBack } from '../../hooks/useBack.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
 import { fmt, ordinal, pct, signed, spreadText, titleCase, tone } from '../../lib/format.ts'
+import { LEADER_COLS, groupOf } from '../../lib/positions.ts'
 import { useView } from '../../state/view.tsx'
 import { record } from './Teams.tsx'
 
@@ -47,6 +48,17 @@ function TeamPage() {
   const res = useApi(
     (signal) => fetchTeam(sport, team, { season, season_type: seasonType, vendor }, signal),
     [sport, team, season, seasonType, vendor],
+  )
+  // the roster: the leaders route with the team bound, once the team's own
+  // payload has resolved which season type is being shown
+  const resolvedType = res.data?.season_type_name
+  const hasLeaders = caps?.capabilities.includes('player_leaders') ?? false
+  const roster = useApi(
+    (signal) =>
+      hasLeaders && resolvedType
+        ? fetchLeaders(sport, { season, season_type: resolvedType, team }, signal)
+        : Promise.resolve(null),
+    [sport, team, season, resolvedType, hasLeaders],
   )
 
   const standingsSearch = (() => {
@@ -185,6 +197,18 @@ function TeamPage() {
           )}
         </TileFrame>
       </div>
+
+      {hasLeaders && (
+        <TileFrame
+          title="Roster"
+          meta={roster.data ? `${roster.data.rows.length} players with a game` : '...'}
+          className="table-tile"
+          query={roster.data?.query}
+          caption="Everyone with a box score for this team in the season type, by position. Ranks are within the position across the league."
+        >
+          {roster.data ? <RosterTable rows={roster.data.rows} sport={sport} seasonType={data.season_type_name} season={data.season} /> : <p className="hint">{roster.error ?? 'Loading the roster...'}</p>}
+        </TileFrame>
+      )}
 
       <TileFrame title="How this page is built" className="note-tile" query={data.query}>
         <p>
@@ -355,6 +379,58 @@ function AllowedTable({ rows }: { rows: AllowedRow[] }) {
               <small> of {r.teams_ranked}</small>
             </span>
           </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const ROSTER_ORDER = ['QB', 'RB', 'WR', 'TE']
+
+function RosterTable({ rows, sport, season, seasonType }: { rows: LeadersRow[]; sport: string; season: number; seasonType: string }) {
+  if (rows.length === 0) return <p className="hint">No box scores yet.</p>
+  const sorted = [...rows].sort((a, b) => {
+    const ga = ROSTER_ORDER.indexOf(a.position ?? ''),
+      gb = ROSTER_ORDER.indexOf(b.position ?? '')
+    return (ga === -1 ? 9 : ga) - (gb === -1 ? 9 : gb) || (b.fanduel_points ?? 0) - (a.fanduel_points ?? 0)
+  })
+  const href = (r: LeadersRow) => `/${sport}/players/${r.player_key}?season=${season}&season_type=${encodeURIComponent(seasonType)}`
+  return (
+    <div className="trows" style={{ '--cols': 'minmax(150px, 1.8fr) 40px 40px repeat(4, minmax(70px, 1fr))' } as React.CSSProperties}>
+      <div className="trow head">
+        <span>Player</span>
+        <span>Pos</span>
+        <span className="n">G</span>
+        <span className="n">Headline</span>
+        <span className="n">Second</span>
+        <span className="n">FD pts</span>
+        <span className="n">FD rank</span>
+      </div>
+      {sorted.map((r) => {
+        const cols = LEADER_COLS[groupOf(r.position)].filter((c) => c.rank)
+        const [first, second] = [cols[0], cols[1]]
+        return (
+          <Link key={r.player_key} className="trow" to={href(r)}>
+            <span className="tm">
+              <b>{r.player_name}</b>
+              <small>{r.position_name ?? r.position}</small>
+            </span>
+            <span className="rk">{r.position}</span>
+            <span className="n">{r.games}</span>
+            <span className="n">
+              {first ? fmt(r[first.key] as number | null, first.digits ?? 0) : ''}
+              <small> {first?.label}</small>
+            </span>
+            <span className="n">
+              {second ? fmt(r[second.key] as number | null, second.digits ?? 0) : ''}
+              <small> {second?.label}</small>
+            </span>
+            <span className="n">{fmt(r.fanduel_points, 1)}</span>
+            <span className="n">
+              {ordinal(r.rank_fanduel_points)}
+              <small> of {r.players_at_position}</small>
+            </span>
+          </Link>
         )
       })}
     </div>

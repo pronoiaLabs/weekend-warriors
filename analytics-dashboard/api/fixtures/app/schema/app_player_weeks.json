@@ -1,0 +1,341 @@
+{
+  "table": "app_player_weeks",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_player_weeks_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "player_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position_name",
+      "type": "VARCHAR(19)",
+      "nullable": true
+    },
+    {
+      "name": "position_group",
+      "type": "VARCHAR(20)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "is_postseason",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "game_datetime_et",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "is_completed",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "team_result",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_points",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_points",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "games_to_date",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_completions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "yards_per_pass_attempt",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "passing_touchdowns",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_interceptions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "times_sacked",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "sack_yards_lost",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "qb_rating",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "qbr",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "rushing_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "rushing_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "yards_per_rush_attempt",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "rushing_touchdowns",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "long_rushing",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "receiving_targets",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "receptions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "receiving_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "yards_per_reception",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "receiving_touchdowns",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "long_reception",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "fumbles",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "fumbles_lost",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "scrimmage_yards",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "scrimmage_touchdowns",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "scoring_touchdowns",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "touches",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "has_passing",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "has_rushing",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "has_receiving",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "two_point_conversions",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "two_point_conversions_thrown",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "fanduel_points",
+      "type": "NUMBER(37,2)",
+      "nullable": true
+    },
+    {
+      "name": "draftkings_points",
+      "type": "NUMBER(37,2)",
+      "nullable": true
+    },
+    {
+      "name": "fanduel_points_to_date",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "draftkings_points_to_date",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "scrimmage_yards_to_date",
+      "type": "NUMBER(32,0)",
+      "nullable": true
+    }
+  ]
+}

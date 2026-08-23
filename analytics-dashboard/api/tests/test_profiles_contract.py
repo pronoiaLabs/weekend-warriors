@@ -14,7 +14,7 @@ import pytest
 from app.sports import fixtures
 from app.sports.capabilities import Capability as C
 from app.sports.registry import PROFILES
-from app.sports.tiles import game_board, slate, teams
+from app.sports.tiles import game_board, players, slate, teams
 
 REQUIRED: dict[str, set[str]] = {
     "app_game_slate": set(slate.COLUMNS),
@@ -23,6 +23,9 @@ REQUIRED: dict[str, set[str]] = {
     "app_team_weeks": set(teams.WEEK_COLUMNS),
     "app_team_allowed": set(teams.ALLOWED_COLUMNS),
     "app_team_ats": set(teams.ATS_COLUMNS),
+    "app_player_leaders": set(players.LEADERS_COLUMNS),
+    "app_player_weeks": set(players.WEEK_COLUMNS),
+    "app_player_week_stats": set(players.STAT_COLUMNS),
 }
 
 
