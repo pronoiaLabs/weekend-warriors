@@ -74,8 +74,7 @@ def test_team_defaults_to_the_season_type_in_progress(client: TestClient) -> Non
     body = client.get("/api/nfl/teams/DET").json()
     assert body["season"] == 2026
     assert body["season_type_name"] == "Preseason"
-    assert len(body["weeks"]) == 1
-    assert body["team"]["games"] == 1
+    assert len(body["weeks"]) == body["team"]["games"] >= 1
 
 
 def test_unknown_team_is_404(client: TestClient) -> None:

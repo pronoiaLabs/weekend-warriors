@@ -17,7 +17,7 @@ interface Item {
 const ITEMS: Item[] = [
   { to: 'slate', label: 'Game day', cap: 'schedule', also: ['games'] },
   { to: 'teams', label: 'Teams', cap: 'team_standings' },
-  { to: 'players', label: 'Players', cap: 'player_performance' },
+  { to: 'players', label: 'Players', cap: 'player_leaders' },
   { to: 'markets', label: 'Markets', cap: 'game_odds' },
   { to: 'news', label: 'News', cap: 'news' },
   { to: 'explore', label: 'Explorer', cap: null },

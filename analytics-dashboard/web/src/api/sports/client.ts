@@ -3,6 +3,8 @@ import type {
   CapabilitiesPayload,
   GamePayload,
   HealthPayload,
+  LeadersPayload,
+  PlayerPayload,
   SlatePayload,
   Split,
   StandingsPayload,
@@ -60,4 +62,24 @@ export type TeamParams = {
 
 export function fetchTeam(sport: string, team: string, params: TeamParams, signal?: AbortSignal): Promise<TeamPayload> {
   return get<TeamPayload>(`${sportPath(sport)}/teams/${encodeURIComponent(team)}`, params, signal)
+}
+
+export type LeadersParams = {
+  season?: number
+  season_type?: string
+  position?: string
+  team?: string
+}
+
+export function fetchLeaders(sport: string, params: LeadersParams, signal?: AbortSignal): Promise<LeadersPayload> {
+  return get<LeadersPayload>(`${sportPath(sport)}/players`, params, signal)
+}
+
+export type PlayerParams = {
+  season?: number
+  season_type?: string
+}
+
+export function fetchPlayer(sport: string, playerKey: string, params: PlayerParams, signal?: AbortSignal): Promise<PlayerPayload> {
+  return get<PlayerPayload>(`${sportPath(sport)}/players/${encodeURIComponent(playerKey)}`, params, signal)
 }

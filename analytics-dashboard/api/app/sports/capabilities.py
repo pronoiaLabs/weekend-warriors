@@ -12,7 +12,10 @@ class Capability(StrEnum):
     TEAM_WEEKS = "team_weeks"              # app_team_weeks
     TEAM_ALLOWED = "team_allowed"          # app_team_allowed
     TEAM_ATS = "team_ats"                  # app_team_ats
-    PLAYER_PERFORMANCE = "player_performance"  # app_player_* (later phase)
+    PLAYER_LEADERS = "player_leaders"      # app_player_leaders
+    PLAYER_WEEKS = "player_weeks"          # app_player_weeks
+    PLAYER_WEEK_STATS = "player_week_stats"  # app_player_week_stats
+    PLAYER_DEFENSE_WEEKS = "player_defense_weeks"  # app_player_defense_weeks
     GAME_ODDS = "game_odds"                # app_market_lines (later phase)
     PLAYER_PROPS = "player_props"          # app_props_edge, app_prop_history (later phase)
     NEWS = "news"                          # app_news_mentions (later phase)

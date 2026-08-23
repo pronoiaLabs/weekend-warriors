@@ -1,0 +1,371 @@
+{
+  "table": "app_player_leaders",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_player_leaders_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position_name",
+      "type": "VARCHAR(19)",
+      "nullable": true
+    },
+    {
+      "name": "position_group",
+      "type": "VARCHAR(20)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "teams_count",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "is_postseason",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "games",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "first_game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "last_game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "passing_attempts",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_completions",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_yards",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_touchdowns",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_interceptions",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "times_sacked",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "completion_pct",
+      "type": "NUMBER(38,3)",
+      "nullable": true
+    },
+    {
+      "name": "yards_per_pass_attempt",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "rushing_attempts",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "rushing_yards",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "rushing_touchdowns",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "long_rushing",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "yards_per_rush_attempt",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "receiving_targets",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "receptions",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "receiving_yards",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "receiving_touchdowns",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "long_reception",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "yards_per_reception",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "catch_rate",
+      "type": "NUMBER(38,3)",
+      "nullable": true
+    },
+    {
+      "name": "fumbles",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "fumbles_lost",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "scrimmage_yards",
+      "type": "NUMBER(32,0)",
+      "nullable": true
+    },
+    {
+      "name": "scrimmage_touchdowns",
+      "type": "NUMBER(32,0)",
+      "nullable": true
+    },
+    {
+      "name": "scoring_touchdowns",
+      "type": "NUMBER(32,0)",
+      "nullable": true
+    },
+    {
+      "name": "touches",
+      "type": "NUMBER(32,0)",
+      "nullable": true
+    },
+    {
+      "name": "two_point_conversions",
+      "type": "NUMBER(25,0)",
+      "nullable": true
+    },
+    {
+      "name": "fanduel_points",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "draftkings_points",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "games_with_passing",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "games_with_rushing",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "games_with_receiving",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_yards_per_game",
+      "type": "NUMBER(38,1)",
+      "nullable": true
+    },
+    {
+      "name": "rushing_yards_per_game",
+      "type": "NUMBER(38,1)",
+      "nullable": true
+    },
+    {
+      "name": "receiving_yards_per_game",
+      "type": "NUMBER(38,1)",
+      "nullable": true
+    },
+    {
+      "name": "receptions_per_game",
+      "type": "NUMBER(38,1)",
+      "nullable": true
+    },
+    {
+      "name": "targets_per_game",
+      "type": "NUMBER(38,1)",
+      "nullable": true
+    },
+    {
+      "name": "scrimmage_yards_per_game",
+      "type": "NUMBER(38,1)",
+      "nullable": true
+    },
+    {
+      "name": "touches_per_game",
+      "type": "NUMBER(38,1)",
+      "nullable": true
+    },
+    {
+      "name": "fanduel_points_per_game",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "draftkings_points_per_game",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "rank_passing_yards",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_passing_touchdowns",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_rushing_yards",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_rushing_touchdowns",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_receiving_yards",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_receptions",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_receiving_touchdowns",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_scrimmage_yards",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_scoring_touchdowns",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_fanduel_points",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_draftkings_points",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_fanduel_points_per_game",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_draftkings_points_per_game",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "players_at_position",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    }
+  ]
+}

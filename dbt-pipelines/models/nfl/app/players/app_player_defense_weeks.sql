@@ -49,14 +49,14 @@ running as (
     select
         player_game_key,
         row_number() over (
-            partition by player_key, season, season_type order by date_key, game_key
+            partition by player_key, season, season_type order by week, game_key
         )                                               as games_to_date,
         sum(total_tackles) over (
-            partition by player_key, season, season_type order by date_key, game_key
+            partition by player_key, season, season_type order by week, game_key
             rows between unbounded preceding and current row
         )                                               as total_tackles_to_date,
         sum(defensive_sacks) over (
-            partition by player_key, season, season_type order by date_key, game_key
+            partition by player_key, season, season_type order by week, game_key
             rows between unbounded preceding and current row
         )                                               as sacks_to_date
     from defense

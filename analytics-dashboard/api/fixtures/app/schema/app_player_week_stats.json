@@ -1,0 +1,121 @@
+{
+  "table": "app_player_week_stats",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_player_week_stats_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "stat_key",
+      "type": "VARCHAR(21)",
+      "nullable": true
+    },
+    {
+      "name": "value",
+      "type": "NUMBER(37,2)",
+      "nullable": true
+    },
+    {
+      "name": "games_through",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "trailing3_avg",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "season_avg_through",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "season_total_through",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "prior_season_same_week",
+      "type": "NUMBER(37,2)",
+      "nullable": true
+    },
+    {
+      "name": "prior_season_avg",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "prior_season_games",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "avg_vs_prior_season",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    }
+  ]
+}

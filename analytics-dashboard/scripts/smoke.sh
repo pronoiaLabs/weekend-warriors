@@ -25,6 +25,13 @@ if [ ! -f web/dist/index.html ]; then
   exit 2
 fi
 
+# A server already on the port would be served instead of this build and the
+# walk would test stale code, so refuse rather than proceed.
+if lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "smoke: port $PORT is in use (pid $(lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN | tr '\n' ' ')); stop it or set SMOKE_PORT" >&2
+  exit 2
+fi
+
 LOG="$(mktemp -t ww-smoke.XXXXXX)"
 (
   cd api
@@ -32,7 +39,9 @@ LOG="$(mktemp -t ww-smoke.XXXXXX)"
     uv run --extra dev uvicorn app.main:app --port "$PORT" --log-level warning >"$LOG" 2>&1
 ) &
 API_PID=$!
-trap 'kill $API_PID 2>/dev/null || true; wait $API_PID 2>/dev/null || true; rm -f "$LOG"' EXIT
+# uv run leaves uvicorn as a grandchild that outlives the subshell, so stop
+# whatever listens on the port, not just the subshell
+trap 'kill $API_PID 2>/dev/null || true; lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true; wait $API_PID 2>/dev/null || true; rm -f "$LOG"' EXIT
 
 for _ in $(seq 1 50); do
   if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then break; fi
@@ -56,6 +65,10 @@ ROUTES=(
   "/nfl/teams?season=2025&season_type=Regular%20Season&split=home&group=league|League"
   "/nfl/teams/KC?season=2025&season_type=Regular%20Season|Back to standings"
   "/nfl/teams/xxx|No such team"
+  "/nfl/players|Player leaders"
+  "/nfl/players?season=2025&season_type=Regular%20Season&position=WR&sort=rank_receptions|Jaxon Smith-Njigba"
+  "/nfl/players/daca41214b39c5dc66674d09081940f0?season=2025&season_type=Regular%20Season|Back to leaders"
+  "/nfl/players/nope|No such player"
   "/ncaaf|No page marts yet"
   "/ncaaf/slate|No game day data yet"
 )

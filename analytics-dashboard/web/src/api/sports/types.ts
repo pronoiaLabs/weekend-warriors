@@ -9,7 +9,10 @@ export type Capability =
   | 'team_weeks'
   | 'team_allowed'
   | 'team_ats'
-  | 'player_performance'
+  | 'player_leaders'
+  | 'player_weeks'
+  | 'player_week_stats'
+  | 'player_defense_weeks'
   | 'game_odds'
   | 'player_props'
   | 'news'
@@ -440,5 +443,200 @@ export interface TeamPayload {
   weeks: TeamWeekRow[]
   allowed: AllowedRow[]
   ats: AtsRow[]
+  query: string | null
+}
+
+/** One player's season totals, rates and ranks within the position (1 = most). */
+export interface LeadersRow {
+  app_player_leaders_key: string
+  player_key: string
+  player_id: number | null
+  player_name: string
+  position: string | null
+  position_name: string | null
+  position_group: string | null
+  team_key: string | null
+  team_label: string | null
+  team_name: string | null
+  teams_count: number
+  season: number
+  season_type: number
+  season_type_name: string
+  is_postseason: boolean | null
+  games: number
+  first_game_date: string
+  last_game_date: string
+  passing_attempts: number | null
+  passing_completions: number | null
+  passing_yards: number | null
+  passing_touchdowns: number | null
+  passing_interceptions: number | null
+  times_sacked: number | null
+  completion_pct: number | null
+  yards_per_pass_attempt: number | null
+  rushing_attempts: number | null
+  rushing_yards: number | null
+  rushing_touchdowns: number | null
+  long_rushing: number | null
+  yards_per_rush_attempt: number | null
+  receiving_targets: number | null
+  receptions: number | null
+  receiving_yards: number | null
+  receiving_touchdowns: number | null
+  long_reception: number | null
+  yards_per_reception: number | null
+  catch_rate: number | null
+  fumbles: number | null
+  fumbles_lost: number | null
+  scrimmage_yards: number | null
+  scrimmage_touchdowns: number | null
+  scoring_touchdowns: number | null
+  touches: number | null
+  two_point_conversions: number | null
+  fanduel_points: number | null
+  draftkings_points: number | null
+  games_with_passing: number
+  games_with_rushing: number
+  games_with_receiving: number
+  passing_yards_per_game: number | null
+  rushing_yards_per_game: number | null
+  receiving_yards_per_game: number | null
+  receptions_per_game: number | null
+  targets_per_game: number | null
+  scrimmage_yards_per_game: number | null
+  touches_per_game: number | null
+  fanduel_points_per_game: number | null
+  draftkings_points_per_game: number | null
+  rank_passing_yards: number
+  rank_passing_touchdowns: number
+  rank_rushing_yards: number
+  rank_rushing_touchdowns: number
+  rank_receiving_yards: number
+  rank_receptions: number
+  rank_receiving_touchdowns: number
+  rank_scrimmage_yards: number
+  rank_scoring_touchdowns: number
+  rank_fanduel_points: number
+  rank_draftkings_points: number
+  rank_fanduel_points_per_game: number
+  rank_draftkings_points_per_game: number
+  players_at_position: number
+}
+
+export interface LeadersPayload extends Envelope<LeadersRow> {
+  season_type_name: string
+  season_types: string[]
+  position: string | null
+  team: string | null
+}
+
+/** One player game: the box score, the team result and running fantasy totals. */
+export interface PlayerWeekRow {
+  app_player_weeks_key: string
+  player_game_key: string
+  game_key: string
+  game_id: number
+  player_key: string
+  player_id: number | null
+  player_name: string
+  position: string | null
+  position_name: string | null
+  position_group: string | null
+  team_key: string | null
+  team_id: number | null
+  team_label: string | null
+  team_name: string | null
+  opponent_team_key: string | null
+  opponent_label: string | null
+  opponent_name: string | null
+  is_home: boolean | null
+  season: number
+  week: number
+  season_type: number
+  season_type_name: string
+  is_postseason: boolean | null
+  game_date: string
+  game_datetime_et: string
+  is_completed: boolean
+  team_result: 'W' | 'L' | 'T' | null
+  team_points: number | null
+  opponent_points: number | null
+  games_to_date: number
+  passing_attempts: number | null
+  passing_completions: number | null
+  passing_yards: number | null
+  yards_per_pass_attempt: number | null
+  passing_touchdowns: number | null
+  passing_interceptions: number | null
+  times_sacked: number | null
+  sack_yards_lost: number | null
+  qb_rating: number | null
+  qbr: number | null
+  rushing_attempts: number | null
+  rushing_yards: number | null
+  yards_per_rush_attempt: number | null
+  rushing_touchdowns: number | null
+  long_rushing: number | null
+  receiving_targets: number | null
+  receptions: number | null
+  receiving_yards: number | null
+  yards_per_reception: number | null
+  receiving_touchdowns: number | null
+  long_reception: number | null
+  fumbles: number | null
+  fumbles_lost: number | null
+  scrimmage_yards: number | null
+  scrimmage_touchdowns: number | null
+  scoring_touchdowns: number | null
+  touches: number | null
+  has_passing: boolean | null
+  has_rushing: boolean | null
+  has_receiving: boolean | null
+  two_point_conversions: number | null
+  two_point_conversions_thrown: number | null
+  fanduel_points: number | null
+  draftkings_points: number | null
+  fanduel_points_to_date: number | null
+  draftkings_points_to_date: number | null
+  scrimmage_yards_to_date: number | null
+}
+
+/** One stat in one game with the trailing and prior-season comparisons. */
+export interface PlayerStatRow {
+  app_player_week_stats_key: string
+  player_game_key: string
+  game_key: string
+  player_key: string
+  player_name: string
+  position: string | null
+  team_key: string | null
+  team_label: string | null
+  season: number
+  week: number
+  season_type: number
+  season_type_name: string
+  game_date: string
+  stat_key: string
+  value: number
+  games_through: number
+  trailing3_avg: number | null
+  season_avg_through: number | null
+  season_total_through: number | null
+  prior_season_same_week: number | null
+  prior_season_avg: number | null
+  prior_season_games: number | null
+  avg_vs_prior_season: number | null
+}
+
+export interface PlayerPayload {
+  sport: string
+  season: number
+  as_of: string
+  player: LeadersRow
+  seasons: LeadersRow[]
+  season_type_name: string
+  season_types: string[]
+  weeks: PlayerWeekRow[]
+  stats: PlayerStatRow[]
   query: string | null
 }
