@@ -7,7 +7,10 @@ import { useCapabilities } from '../../layouts/SportLayout.tsx'
 const LABELS: Record<Capability, string> = {
   schedule: 'game day',
   game_prop_board: 'game prop board',
-  team_performance: 'team',
+  team_standings: 'standings',
+  team_weeks: 'team week',
+  team_allowed: 'defense allowed',
+  team_ats: 'against the spread',
   player_performance: 'player',
   game_odds: 'market',
   player_props: 'props',

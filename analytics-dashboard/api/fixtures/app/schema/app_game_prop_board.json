@@ -259,12 +259,12 @@
     },
     {
       "name": "opponent_allowed_stat_key",
-      "type": "VARCHAR(15)",
+      "type": "VARCHAR(18)",
       "nullable": true
     },
     {
       "name": "opponent_allowed_per_game",
-      "type": "NUMBER(38,6)",
+      "type": "NUMBER(38,2)",
       "nullable": true
     },
     {

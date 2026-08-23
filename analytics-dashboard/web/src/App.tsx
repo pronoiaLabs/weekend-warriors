@@ -4,6 +4,8 @@ import Game from './pages/sports/Game.tsx'
 import Placeholder from './pages/sports/Placeholder.tsx'
 import Slate from './pages/sports/Slate.tsx'
 import SportHome from './pages/sports/SportHome.tsx'
+import Team from './pages/sports/Team.tsx'
+import Teams from './pages/sports/Teams.tsx'
 
 // The sport lives in the path: /nfl/... and /ncaaf/... are different pages that
 // share components. Page routes are added under /:sport as their phases land;
@@ -17,6 +19,8 @@ export default function App() {
           <Route index element={<SportHome />} />
           <Route path="slate" element={<Slate />} />
           <Route path="games/:gameKey" element={<Game />} />
+          <Route path="teams" element={<Teams />} />
+          <Route path="teams/:team" element={<Team />} />
           <Route path="explore" element={<Placeholder title="Explorer" phase="Phase 4" />} />
           <Route path="*" element={<Placeholder title="Not found" phase="" />} />
         </Route>

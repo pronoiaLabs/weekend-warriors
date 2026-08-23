@@ -1,0 +1,106 @@
+{
+  "table": "app_team_allowed",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_team_allowed_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "conference",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "division",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "is_postseason",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(2)",
+      "nullable": true
+    },
+    {
+      "name": "stat_key",
+      "type": "VARCHAR(18)",
+      "nullable": true
+    },
+    {
+      "name": "defense_games",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "allowed_total",
+      "type": "NUMBER(32,0)",
+      "nullable": true
+    },
+    {
+      "name": "allowed_per_game",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "league_avg_per_game",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "allowed_vs_league",
+      "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "allowed_rank",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "teams_ranked",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    }
+  ]
+}

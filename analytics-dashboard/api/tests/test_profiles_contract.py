@@ -14,11 +14,15 @@ import pytest
 from app.sports import fixtures
 from app.sports.capabilities import Capability as C
 from app.sports.registry import PROFILES
-from app.sports.tiles import game_board, slate
+from app.sports.tiles import game_board, slate, teams
 
 REQUIRED: dict[str, set[str]] = {
     "app_game_slate": set(slate.COLUMNS),
     "app_game_prop_board": set(game_board.COLUMNS),
+    "app_team_standings": set(teams.STANDINGS_COLUMNS),
+    "app_team_weeks": set(teams.WEEK_COLUMNS),
+    "app_team_allowed": set(teams.ALLOWED_COLUMNS),
+    "app_team_ats": set(teams.ATS_COLUMNS),
 }
 
 

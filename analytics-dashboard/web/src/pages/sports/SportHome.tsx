@@ -7,7 +7,10 @@ import { useCapabilities } from '../../layouts/SportLayout.tsx'
 const LABELS: Record<string, string> = {
   schedule: 'Game day board',
   game_prop_board: 'Game prop board',
-  team_performance: 'Teams',
+  team_standings: 'Standings',
+  team_weeks: 'Team weeks',
+  team_allowed: 'Defense allowed by position',
+  team_ats: 'Against the spread',
   player_performance: 'Players',
   game_odds: 'Markets',
   player_props: 'Props edge',
@@ -56,7 +59,13 @@ export default function SportHome() {
           <ul className="links">
             {caps.capabilities.map((c) => (
               <li key={c}>
-                {c === 'schedule' ? <Link to={`/${sport}/slate`}>{LABELS[c]}</Link> : <b>{LABELS[c] ?? c}</b>}
+                {c === 'schedule' ? (
+                  <Link to={`/${sport}/slate`}>{LABELS[c]}</Link>
+                ) : c === 'team_standings' ? (
+                  <Link to={`/${sport}/teams`}>{LABELS[c]}</Link>
+                ) : (
+                  <b>{LABELS[c] ?? c}</b>
+                )}
                 <small>{c}</small>
               </li>
             ))}

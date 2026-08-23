@@ -1,4 +1,6 @@
-"""Record rows from a dev build of the APP marts into fixtures/app/<sport>/<table>.json.
+"""Record rows from a dev build of the APP marts into fixtures/app/<sport>/<table>.json,
+and each mart's DESCRIBE TABLE into fixtures/app/schema/<table>.json (the column
+contract the tiles are tested against).
 
 Goes through app.db.query, so the fixtures have exactly the shape live tiles see
 (lowercase keys, Decimal and timestamp values serialised here). Point the sport at
@@ -36,6 +38,13 @@ SELECTION: dict[str, dict[C, str]] = {
             " or (season = 2025 and season_type_name = 'Regular Season' and week = 18)"
         ),
         C.GAME_PROP_BOARD: "season = 2026",
+        # a completed season with every split, and the season in progress
+        C.TEAM_STANDINGS: "season in (2025, 2026)",
+        # two teams' seasons: no 2025 lines (the odds feed starts in 2026), so the
+        # vendor collapse is exercised by a unit test rather than by these rows
+        C.TEAM_WEEKS: "season in (2025, 2026) and team_label in ('KC', 'DET')",
+        C.TEAM_ALLOWED: "season in (2025, 2026) and team_label in ('KC', 'DET')",
+        C.TEAM_ATS: "season in (2025, 2026)",
     },
 }
 
@@ -65,6 +74,25 @@ def main(sport: str) -> None:
         body = ",\n".join(json.dumps(r, default=_json_default, separators=(",", ":")) for r in rows)
         out.write_text(f'{head}, "rows": [\n{body}\n]}}\n')
         print(f"{out.relative_to(FIXTURES.parents[1])}: {len(rows)} rows from {fqn}")
+        write_schema(sport, table, fqn)
+
+
+def write_schema(sport: str, table: str, fqn: str) -> None:
+    """DESCRIBE TABLE as the contract test reads it. The source is named by
+    database only: the dev schema carries a username and the file is public."""
+    described = db.query(f"describe table {fqn}", ttl=0, tag={"sport": sport, "tile": "capture"})
+    db_name = fqn.split(".")[0]
+    spec = {
+        "table": table,
+        "captured_from": f"{db_name}.DEV_<user> dev build",
+        "columns": [
+            {"name": r["name"].lower(), "type": r["type"], "nullable": r["null?"] == "Y"}
+            for r in described
+        ],
+    }
+    out = FIXTURES / "schema" / f"{table}.json"
+    out.write_text(json.dumps(spec, indent=2) + "\n")
+    print(f"{out.relative_to(FIXTURES.parents[1])}: {len(spec['columns'])} columns")
 
 
 if __name__ == "__main__":
