@@ -6,7 +6,7 @@ cells) is answered here by expanding the registry's cron strings. All crons are
 UTC, matching the Snowflake Task definitions.
 """
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from croniter import croniter
 
@@ -35,9 +35,19 @@ def slots_between(schedule: str, start: datetime, end: datetime) -> list[datetim
             out.append(nxt)
 
 
-def day_slots(schedule: str, day: date) -> list[datetime]:
-    start = datetime.combine(day, time.min, tzinfo=UTC)
-    return slots_between(schedule, start, start + timedelta(days=1))
+def day_bounds(day: date, tz: tzinfo = UTC) -> tuple[datetime, datetime]:
+    """The UTC instants a calendar day spans in `tz`: local midnight to the next
+    local midnight, so a DST day is 23 or 25 hours rather than a fixed 24."""
+    start = datetime.combine(day, time.min, tzinfo=tz).astimezone(UTC)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz).astimezone(UTC)
+    return start, end
+
+
+def day_slots(schedule: str, day: date, tz: tzinfo = UTC) -> list[datetime]:
+    """The cron's fire times on one calendar day of `tz`. The cron itself is
+    UTC (the Task definition); only the day's edges move with the viewer."""
+    start, end = day_bounds(day, tz)
+    return slots_between(schedule, start, end)
 
 
 def next_fire(schedule: str, after: datetime) -> datetime:

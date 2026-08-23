@@ -4,19 +4,23 @@ import { fetchPipelineDetail, fetchRunMetrics } from '../api/client.ts'
 import type { AnomalyKind, MetricsPayload, PipelineDetailPayload, RunRow } from '../api/types.ts'
 import { AnnotationNote } from '../components/AnnotationNote.tsx'
 import { AnomalyBadge } from '../components/AnomalyBadge.tsx'
+import Crumbs from '../components/Crumbs.tsx'
 import { HeatLegend, HeatStrip } from '../components/HeatStrip.tsx'
 import { LogTable } from '../components/LogTable.tsx'
 import { MetricDotStrip } from '../components/MetricDotStrip.tsx'
 import { EmptyState } from '../components/QuietNote.tsx'
-import { SectionHead } from '../components/SectionHead.tsx'
 import { SegmentedDurationBar } from '../components/SegmentedDurationBar.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import type { TabSpec } from '../components/Tabs.tsx'
 import { Tabs } from '../components/Tabs.tsx'
+import TileFrame from '../components/TileFrame.tsx'
 import { VerdictPair } from '../components/VerdictPair.tsx'
-import { Chrome } from '../components/slate/Chrome.tsx'
-import { useSportFilter } from '../hooks/useSportFilter.ts'
+import { useApi } from '../hooks/useApi.ts'
+import { useBack } from '../hooks/useBack.ts'
+import { useOpsSearch } from '../hooks/useDayParam.ts'
 import { bytes, cores, cronProse, dayHhmm, hhmm, num, relativeTo, shortDate } from '../utils/format.ts'
+import { leagueLabel } from '../utils/leagues.ts'
+import '../styles/pages/pipeline-detail.css'
 
 // The list scrolls in its own window and only the selected run mounts its
 // evidence, so depth costs neither page length nor fetches. The API caps at 50.
@@ -25,6 +29,9 @@ const RUN_LIMIT = 30
 // longer prices the limit. The API caps at 2000; container runs log a few
 // hundred lines.
 const LOG_LIMIT = 1000
+// The placeholder for a number the window never produced. A middle dot, so it
+// cannot be read as a zero.
+const NONE = '·'
 
 const PILL_STATE: Record<string, AnomalyKind> = {
   succeeded: 'ok',
@@ -43,7 +50,9 @@ function message(error: unknown): string {
 
 /** The instant every relative time on this page is measured against. The
     payload carries no `now`, so the newest thing it describes stands in for
-    one: the browser clock would age a stale tab all by itself. */
+    one: the browser clock would age a stale tab all by itself. This is also
+    why the page never calls setNow, since it has no clock of the API's to
+    publish to the shell. */
 function reference(detail: PipelineDetailPayload): string {
   const candidates = [detail.runs[0]?.run_started_at, detail.heatmap.at(-1)?.date]
     .filter((value): value is string => value != null)
@@ -51,11 +60,11 @@ function reference(detail: PipelineDetailPayload): string {
   return candidates.reduce((latest, at) => (Date.parse(at) > Date.parse(latest) ? at : latest))
 }
 
-function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Stat({ v, l, mono }: { v: string; l: string; mono?: boolean }) {
   return (
-    <div className="f">
-      <div className={mono ? 'v mono' : 'v'}>{value}</div>
-      <div className="k">{label}</div>
+    <div className="stat">
+      <span className={mono ? 'v mono' : 'v'}>{v}</span>
+      <span className="l">{l}</span>
     </div>
   )
 }
@@ -203,7 +212,7 @@ function RunListItem({
   )
 }
 
-function RunEvidence({ run }: { run: RunRow }) {
+function RunEvidence({ run, search }: { run: RunRow; search: string }) {
   const failed = run.state === 'failure' || run.state === 'missing'
   const scrapes = (run.cpu_samples ?? 0) + (run.mem_samples ?? 0)
 
@@ -255,7 +264,7 @@ function RunEvidence({ run }: { run: RunRow }) {
         />
         <Tabs tabs={tabs} defaultTab={failed ? 'error' : 'logs'} scope={run.query_id} />
         <div className="runpane-foot">
-          <Link to={`/runs/${run.query_id}`}>Open full run detail</Link>
+          <Link to={{ pathname: `/runs/${run.query_id}`, search }}>Open full run detail</Link>
           <span>QUERY_ID {run.query_id}</span>
         </div>
       </div>
@@ -263,45 +272,43 @@ function RunEvidence({ run }: { run: RunRow }) {
   )
 }
 
+/** One ingestion pipeline read as a season: the schedule and the window's
+    record up top, a cell per day of the window, then the run-by-run history
+    with the selected run's evidence beside it. */
 export default function PipelineDetail() {
   const { sport = '', name = '' } = useParams()
-  const { search } = useSportFilter()
-  const [detail, setDetail] = useState<PipelineDetailPayload | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const search = useOpsSearch()
+  const back = useBack({ pathname: '/pipelines', search })
+  const res = useApi((signal) => fetchPipelineDetail(sport, name, RUN_LIMIT, signal), [sport, name])
+  // The selection is a query id, so it simply misses when the payload changes
+  // pipeline and the newest run takes over again; nothing needs resetting.
   const [selectedRun, setSelectedRun] = useState<string | null>(null)
 
-  useEffect(() => {
-    const control = new AbortController()
-    setError(null)
-    setDetail(null)
-    setSelectedRun(null)
-    fetchPipelineDetail(sport, name, RUN_LIMIT, control.signal)
-      .then(setDetail)
-      .catch((cause: unknown) => {
-        if (!isAbort(cause)) setError(message(cause))
-      })
-    return () => control.abort()
-  }, [sport, name])
-
-  if (error) {
-    return (
-      <>
-        <Chrome />
-        <main className="wrap detail">
-          <EmptyState message={`Could not load ${sport}/${name}`} detail={error} bad />
-        </main>
-      </>
-    )
-  }
-
+  const detail = res.data
   if (!detail) {
     return (
-      <>
-        <Chrome />
-        <main className="wrap detail">
-          <EmptyState message={`Loading ${name}`} />
-        </main>
-      </>
+      <div className="page page-pipeline">
+        <div className="crumb-row">
+          <Crumbs
+            items={[
+              { label: 'Pipelines', to: { pathname: '/pipelines', search } },
+              { label: res.error ? 'No such pipeline' : name },
+            ]}
+          />
+          <button type="button" className="back" onClick={back}>
+            <span aria-hidden="true">←</span> Back to pipelines
+          </button>
+        </div>
+        <div className="page-head">
+          <h1>{res.error ? `Could not load ${sport}/${name}` : `Loading ${name}`}</h1>
+          {res.error && (
+            <p className="lede">
+              {res.error}. Pick a pipeline from the{' '}
+              <Link to={{ pathname: '/pipelines', search }}>records table</Link>.
+            </p>
+          )}
+        </div>
+      </div>
     )
   }
 
@@ -317,108 +324,135 @@ export default function PipelineDetail() {
   // is counted over the run rows instead.
   const dayCount = (kind: string) => detail.heatmap.filter((cell) => cell.state === kind).length
   const disagreements = detail.runs.filter((run) => run.outcome_disagrees)
+  const failures = detail.runs_in_window - detail.succeeded
 
   return (
-    <>
-      {/* No `now`: this payload carries no clock of its own, and `reference()`
-          below is the newest thing described rather than a refresh time, so
-          feeding it to Chrome would date the page wrongly. The old top bar's
-          source list moved nowhere; the sections already name their views. */}
-      <Chrome />
-      <main className="wrap detail">
-        <div className="crumb">
-          <Link to={{ pathname: '/', search }}>Dashboard</Link> /{' '}
-          {/* The sport segment goes to the records table scoped to that league,
-              never to the dashboard with a silently stamped filter: that exact
-              surprise is why this crumb was rewritten. */}
-          <Link to={{ pathname: '/pipelines', search: `?sport=${detail.sport}` }}>
-            {detail.sport}
-          </Link>{' '}
-          / {detail.pipeline}
-        </div>
+    <div className="page page-pipeline">
+      <div className="crumb-row">
+        <Crumbs
+          items={[
+            { label: 'Pipelines', to: { pathname: '/pipelines', search } },
+            { label: detail.pipeline },
+          ]}
+        />
+        <button type="button" className="back" onClick={back}>
+          <span aria-hidden="true">←</span> Back to pipelines
+        </button>
+      </div>
 
-        <section className={state === 'ok' ? 'headcard' : 'headcard attn'}>
-          <div className="row1">
-            <h1>{detail.pipeline}</h1>
+      <section className={state === 'ok' ? 'tile pipe-head' : 'tile pipe-head attn'} data-tilt="">
+        <div className="ident">
+          <span className="kick">
+            {/* The sport goes to the records table scoped to that league, never
+                to the dashboard with a silently stamped filter: that exact
+                surprise is why this link was rewritten. */}
+            <Link to={{ pathname: '/pipelines', search: `?sport=${detail.sport}` }}>
+              {leagueLabel(detail.sport)}
+            </Link>{' '}
+            · ingestion
+          </span>
+          <h1>{detail.pipeline}</h1>
+          <div className="badges">
             <StatusPill state={state} />
-            <div className="badges">
-              {dayCount('missing') > 0 ? (
-                <AnomalyBadge
-                  kind="missing"
-                  count={dayCount('missing')}
-                  windowDays={detail.window_days}
-                />
-              ) : null}
-              {dayCount('failure') > 0 ? (
-                <AnomalyBadge
-                  kind="failure"
-                  count={dayCount('failure')}
-                  windowDays={detail.window_days}
-                />
-              ) : null}
-              {dayCount('missed') > 0 ? (
-                <AnomalyBadge kind="missed" count={dayCount('missed')} />
-              ) : null}
-              {disagreements.length > 0 ? (
-                <AnomalyBadge
-                  kind="disagree"
-                  count={disagreements.length}
-                  lastAt={disagreements[0].run_started_at}
-                />
-              ) : null}
-            </div>
+            {dayCount('missing') > 0 ? (
+              <AnomalyBadge
+                kind="missing"
+                count={dayCount('missing')}
+                windowDays={detail.window_days}
+              />
+            ) : null}
+            {dayCount('failure') > 0 ? (
+              <AnomalyBadge
+                kind="failure"
+                count={dayCount('failure')}
+                windowDays={detail.window_days}
+              />
+            ) : null}
+            {dayCount('missed') > 0 ? (
+              <AnomalyBadge kind="missed" count={dayCount('missed')} />
+            ) : null}
+            {disagreements.length > 0 ? (
+              <AnomalyBadge
+                kind="disagree"
+                count={disagreements.length}
+                lastAt={disagreements[0].run_started_at}
+              />
+            ) : null}
           </div>
+          <p className="lede">
+            Runs {cronProse(detail.cron)}, next {dayHhmm(detail.next_fire)}. One Snowflake Task per
+            pipeline, one container per fire, and every fact below comes from that Task's own run
+            rows over the last {detail.window_days} days.
+          </p>
+        </div>
+        <div className="line-strip">
+          <Stat v={detail.cron} l={`Schedule · ${cronProse(detail.cron)}`} mono />
+          <Stat v={dayHhmm(detail.next_fire)} l="Next fire" />
+          <Stat v={detail.task_name ?? 'not on any run row'} l="TASK_NAME" mono />
+          <Stat v={detail.compute_pool ?? 'not on any run row'} l="COMPUTE_POOL" mono />
+        </div>
+      </section>
 
-          <div className="facts">
-            <Fact label="TASK_NAME" value={detail.task_name ?? 'not on any run row'} mono />
-            <Fact label="COMPUTE_POOL" value={detail.compute_pool ?? 'not on any run row'} mono />
-            <Fact label={`Schedule · ${detail.cron}`} value={cronProse(detail.cron)} />
-            <Fact
-              label={`Succeeded · ${detail.window_days} days`}
-              value={`${detail.succeeded} / ${detail.runs_in_window} succeeded · ${detail.window_days} days`}
-            />
-            <Fact
-              label="Median DURATION_S"
-              value={
-                detail.median_duration_s == null
-                  ? 'no successful run'
-                  : `Median DURATION_S ${detail.median_duration_s}s`
-              }
-            />
-            <Fact
-              label="Last success"
-              value={
-                detail.last_success_at
-                  ? `${relativeTo(detail.last_success_at, now)} · ${dayHhmm(detail.last_success_at)}`
-                  : `none in ${detail.window_days} days`
-              }
-            />
-            <Fact label="Next fire" value={dayHhmm(detail.next_fire)} />
-          </div>
-        </section>
+      <div className="kpis four">
+        <div className={failures > 0 ? 'kpi bad' : 'kpi good'}>
+          <span className="l">Succeeded</span>
+          <span className="v">
+            {detail.succeeded}/{detail.runs_in_window}
+          </span>
+          <span className="s">
+            {failures > 0 ? `${failures} did not succeed` : 'every run in the window'}
+          </span>
+        </div>
+        <div className="kpi">
+          <span className="l">Median duration</span>
+          <span className="v">
+            {detail.median_duration_s == null ? NONE : `${detail.median_duration_s}s`}
+          </span>
+          <span className="s">
+            {detail.median_duration_s == null ? 'no successful run' : 'DURATION_S, middle run'}
+          </span>
+        </div>
+        <div className="kpi">
+          <span className="l">Last success</span>
+          <span className="v">
+            {detail.last_success_at ? relativeTo(detail.last_success_at, now) : 'none'}
+          </span>
+          <span className="s">
+            {detail.last_success_at
+              ? dayHhmm(detail.last_success_at)
+              : `nothing succeeded in ${detail.window_days} days`}
+          </span>
+        </div>
+        <div className="kpi">
+          <span className="l">Window</span>
+          <span className="v">{detail.window_days}</span>
+          <span className="s">days, one heat cell each</span>
+        </div>
+      </div>
 
-        <section className="heatcard">
-          <div className="hh">
-            Last {detail.window_days} days, one cell per day
-            <small>worst state of the day, linked to that day's run</small>
-          </div>
-          <HeatStrip cells={detail.heatmap} />
-          <HeatLegend />
-        </section>
-
+      <TileFrame
+        title={`Last ${detail.window_days} days`}
+        meta="one cell per day"
+        className="heat-tile"
+      >
+        <HeatStrip cells={detail.heatmap} />
+        <HeatLegend />
         <AnnotationNote label="Annotation, read across:">
           The strip sits above the run history so a streak is visible without leaving the page. Read
           across rather than down: cells of the same class landing on the same weekday point at an
           upstream refresh cadence rather than at the container, and {detail.window_days} days are
           shown because a weekly pattern needs at least two data points. A cell with no run row is
-          drawn dashed and links nowhere, since there is nothing to open.
+          drawn dashed and links nowhere, since there is nothing to open. Each cell carries the worst
+          state of its day and opens that day's run.
         </AnnotationNote>
+      </TileFrame>
 
-        <SectionHead
-          title="Run history"
-          count={`last ${detail.runs.length} of ${detail.runs_in_window} runs in the window · select a run for its evidence`}
-        />
-
+      <TileFrame
+        title="Run history"
+        meta={`last ${detail.runs.length} of ${detail.runs_in_window} in the window`}
+        className="runs-tile"
+        caption="Select a run for its evidence: the error and both verdicts, the container's logs, the metric scrapes."
+      >
         {currentRun == null ? (
           <EmptyState message={`No run row in the last ${detail.window_days} days.`} />
         ) : (
@@ -433,18 +467,25 @@ export default function PipelineDetail() {
                 />
               ))}
             </div>
-            <RunEvidence run={currentRun} />
+            <RunEvidence run={currentRun} search={search} />
           </div>
         )}
+      </TileFrame>
 
-        <AnnotationNote label="Annotation, two zoom levels:">
+      <TileFrame title="How this page is built" className="note-tile" query={detail.query}>
+        <p>
+          One select on the pipeline's run rows in DLT_DB.OPS: the heatmap is the worst state of each
+          day of the window, the record is TASK_HISTORY joined to what the pipeline itself recorded
+          in _DLT_RUNS, and the two verdicts are always shown side by side rather than merged.
+        </p>
+        <p>
           The duration bar splits STARTUP_OVERHEAD_S from CONTAINER_SPAN_S because the two fail
           differently: a run that dies inside the hatched zone is an infrastructure or spec problem,
-          one that dies in the solid zone is a data or API problem. The heatmap up top and this bar
-          down here answer the same question at two zoom levels, when this pipeline breaks and how
+          one that dies in the solid zone is a data or API problem. The heatmap up top and that bar
+          down there answer the same question at two zoom levels, when this pipeline breaks and how
           far into a run.
-        </AnnotationNote>
-      </main>
-    </>
+        </p>
+      </TileFrame>
+    </div>
   )
 }

@@ -35,6 +35,8 @@ pipelines:
       schema: OPS
       # Base tables only. Copy the tables the views sit on (LOG_LINES not
       # V_LOG_LINES, DBT_RUNS not V_DBT_RUNS). Explicit list.
+      # VARIANT columns copy as text: write_disposition is a JSON string
+      # (replace), not an object, and Postgres jsonb rejects that.
       tables:
         - pipeline_runs
         - task_runs

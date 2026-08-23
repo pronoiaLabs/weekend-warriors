@@ -25,6 +25,8 @@ interface Shell {
   under: string | null
   meta: string
   err: string | null
+  /** the amber note a no-show carries in place of an error */
+  why?: string
 }
 
 function prevContext(rows: number | null | undefined): string {
@@ -63,17 +65,20 @@ function shell(card: SlateCard, sport: string): Shell {
 
   const pipelineLink = `/ingestion/${encodeURIComponent(sport)}/${encodeURIComponent(card.pipeline)}`
 
+  // A no-show is amber, not rose: the slot passed and nothing fired, which is
+  // a task or schedule question, not a run that broke.
   if (card.kind === 'missed') {
     return {
       to: pipelineLink,
-      variant: 'upset missed',
-      status: <span className="st fail">No show</span>,
+      variant: 'missed',
+      status: <span className="st miss">No show</span>,
       at: `${hhmm(card.at)} slot`,
       team: card.pipeline,
       score: <span className="score dash">·</span>,
       under: null,
       meta: cronProse(card.schedule),
-      err: 'slot passed, no run row at all',
+      err: null,
+      why: 'slot passed, nothing fired',
     }
   }
 
@@ -138,10 +143,11 @@ export function ScoreCard({ card, sport }: ScoreCardProps) {
         <span className="mono">{parts.meta}</span>
       </div>
       {parts.err ? <div className="err">{parts.err}</div> : null}
+      {parts.why ? <div className="why">{parts.why}</div> : null}
     </>
   )
 
-  const className = parts.variant ? `sl-game ${parts.variant}` : 'sl-game'
+  const className = parts.variant ? `card ${parts.variant}` : 'card'
 
   // A card with nowhere to go stays a plain block rather than a dead link: there
   // is no run row and no build to open.

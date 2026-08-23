@@ -19,6 +19,8 @@ spec:
       image: /DLT_DB/DEPLOY/IMAGES/ops-dashboard:{{ tag }}
       env:
         SNOWFLAKE_WAREHOUSE: DLT_OPS_WH
+        OPS_DASHBOARD_ROLE: OPS_DASHBOARD_ROLE
+        OPS_DASHBOARD_BACKEND: snowflake
       readinessProbe:
         port: 8000
         path: /api/health

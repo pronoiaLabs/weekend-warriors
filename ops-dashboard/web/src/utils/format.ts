@@ -71,6 +71,17 @@ export function num(value: number | null | undefined): string {
   return value == null ? '0' : value.toLocaleString('en-US')
 }
 
+/** A KPI-sized number: exact below ten thousand, one decimal and a unit above
+    (40,976 -> "41.0k", 2,300,000 -> "2.3M"), so the value never wraps and
+    every plate stays the same size. The exact count belongs in the sub-line. */
+export function compact(value: number | null | undefined): string {
+  if (value == null) return '0'
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (abs >= 10_000) return `${(value / 1_000).toFixed(1)}k`
+  return value.toLocaleString('en-US')
+}
+
 export function duration(seconds: number | null | undefined): string | null {
   return seconds == null ? null : `${seconds} s`
 }

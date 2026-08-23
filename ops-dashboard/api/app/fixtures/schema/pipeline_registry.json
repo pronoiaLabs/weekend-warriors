@@ -1,0 +1,75 @@
+{
+  "object": "DLT_DB.OPS.PIPELINE_REGISTRY",
+  "columns": [
+    {
+      "name": "name",
+      "type": "VARCHAR(16777216)",
+      "nullable": false
+    },
+    {
+      "name": "source",
+      "type": "VARCHAR(16777216)",
+      "nullable": false
+    },
+    {
+      "name": "schedule",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "dataset_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "write_disposition",
+      "type": "VARIANT",
+      "nullable": true
+    },
+    {
+      "name": "pipeline_group",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "config",
+      "type": "VARIANT",
+      "nullable": true
+    },
+    {
+      "name": "enabled",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "updated_at",
+      "type": "TIMESTAMP_NTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "target_database",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "season_rollover_month",
+      "type": "NUMBER(2,0)",
+      "nullable": true
+    },
+    {
+      "name": "secret",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "env_var",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "external_access",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    }
+  ]
+}

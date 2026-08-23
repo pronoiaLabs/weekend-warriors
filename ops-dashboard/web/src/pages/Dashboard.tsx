@@ -1,108 +1,155 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { fetchHeadlines, fetchPipelinesIndex, fetchSlate } from '../api/client.ts'
-import type { HeadlinesPayload, PipelineIndexRow, SlatePayload } from '../api/types.ts'
-import { EmptyState } from '../components/QuietNote.tsx'
-import { Chrome } from '../components/slate/Chrome.tsx'
+import type { SlatePayload } from '../api/types.ts'
+import { DayStrip } from '../components/slate/DayStrip.tsx'
 import { HeadlinesPanel } from '../components/slate/HeadlinesPanel.tsx'
 import { LeagueRow } from '../components/slate/LeagueRow.tsx'
 import { RecordsPanel } from '../components/slate/RecordsPanel.tsx'
+import TileFrame from '../components/TileFrame.tsx'
+import { useApi } from '../hooks/useApi.ts'
 import { useDayParam } from '../hooks/useDayParam.ts'
 import { useSportFilter } from '../hooks/useSportFilter.ts'
+import { useChrome } from '../state/chrome.tsx'
+import { compact, longDayTitle, num } from '../utils/format.ts'
 
-function isAbort(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError'
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
+/** One day of the schedule read as a scoreboard: score cards grouped by league,
+    the surrounding week as a day strip, the AI wire and the worst records in
+    the rail. The day and the sport live in the URL; today is the default, so
+    selecting it clears ?date= rather than pinning a date that would go stale
+    in a tab left open overnight. */
 export default function Dashboard() {
   const { sport } = useSportFilter()
   const { day, setDay } = useDayParam()
-  const [slate, setSlate] = useState<SlatePayload | null>(null)
-  const [wire, setWire] = useState<HeadlinesPayload | null>(null)
-  const [pipelines, setPipelines] = useState<PipelineIndexRow[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const { setNow } = useChrome()
+
+  const slate = useApi((signal) => fetchSlate(sport, day, signal), [sport, day])
+  // the wire is commentary on the slate and the records a teaser: the page stands without either
+  const wire = useApi((signal) => fetchHeadlines(day, signal), [day])
+  const index = useApi((signal) => fetchPipelinesIndex(sport, signal), [sport])
 
   useEffect(() => {
-    const control = new AbortController()
-    setError(null)
-    setSlate(null)
-    fetchSlate(sport, day, control.signal)
-      .then(setSlate)
-      .catch((cause: unknown) => {
-        if (!isAbort(cause)) setError(message(cause))
-      })
-    return () => control.abort()
-  }, [sport, day])
+    setNow(slate.data?.now ?? null)
+    return () => setNow(null)
+  }, [slate.data?.now, setNow])
 
-  useEffect(() => {
-    const control = new AbortController()
-    setWire(null)
-    fetchHeadlines(day, control.signal)
-      .then(setWire)
-      // The wire is commentary on the slate, so the page still stands without it.
-      .catch(() => undefined)
-    return () => control.abort()
-  }, [day])
-
-  useEffect(() => {
-    const control = new AbortController()
-    setPipelines([])
-    fetchPipelinesIndex(sport, control.signal)
-      .then((payload) => setPipelines(payload.pipelines))
-      .catch(() => undefined)
-    return () => control.abort()
-  }, [sport])
-
-  if (error) {
-    return (
-      <>
-        <Chrome />
-        <main className="sl-page">
-          <EmptyState message="Could not load the slate" detail={error} bad />
-        </main>
-      </>
-    )
-  }
-
-  if (!slate) {
-    return (
-      <>
-        <Chrome />
-        <main className="sl-page">
-          <EmptyState message="Loading the slate" />
-        </main>
-      </>
-    )
-  }
-
-  // Today is the default view, so selecting it clears ?date= rather than pinning
-  // a date that would go stale in a tab left open overnight.
-  const today = slate.days.find((entry) => entry.is_today)?.date ?? null
+  const data = slate.data
+  const today = data?.days.find((d) => d.is_today)?.date ?? null
+  const selected = data?.days.find((d) => d.date === data.date) ?? null
 
   return (
-    <>
-      <Chrome
-        now={slate.now}
-        days={slate.days}
-        selected={slate.date}
-        onSelect={(date) => setDay(date === today ? null : date)}
-      />
-      <main className="sl-page split">
-        <div>
-          {slate.leagues.length > 0 ? (
-            slate.leagues.map((league) => <LeagueRow key={league.sport} league={league} />)
-          ) : (
-            <EmptyState message="Nothing on the slate for this day" />
-          )}
+    <div className="page page-dashboard">
+      <div className="page-head">
+        <h1>Dashboard</h1>
+        <p className="lede">
+          {data
+            ? `${longDayTitle(data.date)}${sport === 'all' ? '' : `, ${sport}`}. Every cron slot of the day as a score card: what ran, what failed, what never fired and what is still ahead, with the dbt builds that data landing set off.`
+            : slate.error
+              ? slate.error
+              : 'Loading the slate...'}
+        </p>
+      </div>
+
+      {data && selected && <Kpis data={data} day={selected} />}
+
+      <div className="filters">
+        {data && <DayStrip days={data.days} selected={data.date} onSelect={(date) => setDay(date === today ? null : date)} />}
+        <span className="hint">Click a card for the run, a build or the pipeline.</span>
+      </div>
+      <div className="filters">
+        <span className="slot-legend" aria-label="What the colours mean">
+          <span>
+            <i className="st st-succeeded" /> final
+          </span>
+          <span>
+            <i className="st st-failure" /> failed
+          </span>
+          <span>
+            <i className="st st-missed" /> no show: the slot passed, nothing fired
+          </span>
+          <span>
+            <i className="st st-missing" /> ran but never recorded itself
+          </span>
+          <span>
+            <i className="st st-upcoming" /> still ahead
+          </span>
+        </span>
+      </div>
+
+      {slate.error && !data && (
+        <section className="tile">
+          <header className="tile-head">
+            <h2>Could not load the slate</h2>
+          </header>
+          <p className="hint">{slate.error}</p>
+        </section>
+      )}
+
+      {data && (
+        <div className="grid cols-slate">
+          <div>
+            {data.leagues.length > 0 ? (
+              data.leagues.map((league) => <LeagueRow key={league.sport} league={league} />)
+            ) : (
+              <TileFrame title="Nothing on the slate" meta={data.date}>
+                <p className="hint">No slot, run or build on this day for {sport === 'all' ? 'any sport' : sport}.</p>
+              </TileFrame>
+            )}
+          </div>
+          <aside className="rail">
+            <HeadlinesPanel wire={wire.data} />
+            <RecordsPanel rows={index.data?.pipelines ?? []} />
+          </aside>
         </div>
-        <aside className="sl-rail">
-          <HeadlinesPanel wire={wire} />
-          <RecordsPanel rows={pipelines} />
-        </aside>
-      </main>
-    </>
+      )}
+
+      <TileFrame title="How this board is built" className="note-tile" query={data?.query}>
+        <p>
+          The registry says which pipelines exist and when they fire; the run table says what happened. The API
+          expands each cron over the day, matches runs to slots, and emits one card per slot: final, failed, a
+          no-show when the slot passed with no run row, or still ahead. dbt builds have no slot, so their league
+          is whatever fired when data landed. The day strip tallies the same cards for the days around it.
+        </p>
+      </TileFrame>
+    </div>
+  )
+}
+
+function Kpis({ data, day }: { data: SlatePayload; day: SlatePayload['days'][number] }) {
+  const rows = data.leagues.reduce((n, l) => n + (l.rows_loaded ?? 0), 0)
+  const builds = data.leagues.filter((l) => l.kind === 'dbt').reduce((n, l) => n + l.cards.length, 0)
+  const failedBuilds = data.leagues.filter((l) => l.kind === 'dbt').reduce((n, l) => n + l.cards.filter((c) => c.state === 'failure').length, 0)
+  return (
+    <div className="kpis six">
+      <div className="kpi">
+        <span className="l">Ran</span>
+        <span className="v">{day.ran}</span>
+        <span className="s">of {day.slots} slots on the day</span>
+      </div>
+      <div className={`kpi ${day.failed ? 'bad' : 'good'}`}>
+        <span className="l">Failed</span>
+        <span className="v">{day.failed}</span>
+        <span className="s">{day.failed ? 'runs that broke' : 'no run broke'}</span>
+      </div>
+      <div className={`kpi ${day.missed ? 'warn' : ''}`}>
+        <span className="l">No show</span>
+        <span className="v">{day.missed}</span>
+        <span className="s">{day.missed ? 'slots that passed with nothing fired' : 'every slot so far fired'}</span>
+      </div>
+      <div className="kpi">
+        <span className="l">Still ahead</span>
+        <span className="v">{day.upcoming}</span>
+        <span className="s">slots yet to fire</span>
+      </div>
+      <div className="kpi">
+        <span className="l">Rows in</span>
+        <span className="v">{compact(rows)}</span>
+        <span className="s">{num(rows)} rows across the ingestion leagues</span>
+      </div>
+      <div className={`kpi ${failedBuilds ? 'bad' : ''}`}>
+        <span className="l">dbt builds</span>
+        <span className="v">{builds}</span>
+        <span className="s">{failedBuilds ? `${failedBuilds} failed` : 'fired by data landing'}</span>
+      </div>
+    </div>
   )
 }

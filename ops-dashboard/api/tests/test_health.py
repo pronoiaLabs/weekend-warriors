@@ -1,10 +1,14 @@
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+
+def test_health(client: TestClient) -> None:
+    body = client.get("/api/health").json()
+    assert body["status"] == "ok"
+    assert body["service"] == "ops-dashboard"
+    assert body["data"] == "fixtures"
+    assert body["backend"] == "fixtures"
 
 
-def test_health() -> None:
-    client = TestClient(create_app())
-    resp = client.get("/api/health")
-    assert resp.status_code == 200
-    assert resp.json() == {"status": "ok", "service": "ops-dashboard"}
+def test_unknown_api_path_is_404_not_html(client: TestClient) -> None:
+    response = client.get("/api/nope")
+    assert response.status_code == 404

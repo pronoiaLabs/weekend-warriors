@@ -1,0 +1,65 @@
+{
+  "object": "DLT_DB.OPS.V_METRICS",
+  "columns": [
+    {
+      "name": "event_ts",
+      "type": "TIMESTAMP_NTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "query_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "service_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "compute_pool",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "node_instance_family",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "node_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "metric_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "metric_value",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "metric_unit",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "metric_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "metric_description",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "metric_group",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    }
+  ]
+}

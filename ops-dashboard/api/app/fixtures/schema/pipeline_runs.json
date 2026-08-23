@@ -1,0 +1,185 @@
+{
+  "object": "DLT_DB.OPS.PIPELINE_RUNS",
+  "columns": [
+    {
+      "name": "sport",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "pipeline",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "task_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "query_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "service_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "compute_pool",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "run_started_at",
+      "type": "TIMESTAMP_LTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "run_ended_at",
+      "type": "TIMESTAMP_LTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "duration_s",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "container_span_s",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "startup_overhead_s",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "task_state",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "dlt_status",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "outcome_disagrees",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "dlt_record_missing",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "rows_loaded",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "row_counts",
+      "type": "VARIANT",
+      "nullable": true
+    },
+    {
+      "name": "load_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "resources",
+      "type": "VARIANT",
+      "nullable": true
+    },
+    {
+      "name": "error_text",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "exit_status",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "log_lines",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "error_lines",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "warning_lines",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "unparsed_lines",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "metric_samples",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "cpu_cores_max",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "cpu_samples",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "cpu_cores_limit",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "mem_bytes_max",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "mem_samples",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "mem_bytes_requested",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "restarts",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "telemetry_available",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "container_never_started",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "refreshed_at",
+      "type": "TIMESTAMP_LTZ(9)",
+      "nullable": true
+    }
+  ]
+}

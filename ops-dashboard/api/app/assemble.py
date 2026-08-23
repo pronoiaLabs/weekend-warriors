@@ -8,7 +8,7 @@ Timestamps: run rows carry ISO-8601 UTC strings with trailing Z (datasource
 normalizes them); everything here parses and emits that same shape.
 """
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from typing import Any
 
 from app import derive, schedule
@@ -151,9 +151,7 @@ def pipelines_index(
                 "days": _day_states(pipe["schedule"], history, now),
                 "record": record,
                 "form": form,
-                "avg_duration_s": round(sum(durations) / len(durations), 1)
-                if durations
-                else None,
+                "avg_duration_s": round(sum(durations) / len(durations), 1) if durations else None,
             }
         )
     return {"now": _iso(now), "window_days": WINDOW_DAYS, "pipelines": rows}
@@ -250,11 +248,19 @@ def headlines(rows: list[dict[str, Any]], requested_day: date) -> dict[str, Any]
     }
 
 
+def _local_day(iso: str | None, tz: tzinfo) -> date | None:
+    """The calendar day of a UTC ISO timestamp in `tz`; None for no timestamp."""
+    if not iso:
+        return None
+    return _parse_ts(iso).astimezone(tz).date()
+
+
 def _slate_day(
     pipelines: list[dict[str, Any]],
     by_pipe: dict[str, list[dict[str, Any]]],
     day_: date,
     now: datetime,
+    tz: tzinfo = UTC,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Cards + tallies for one day over an already-filtered pipeline set.
 
@@ -279,7 +285,7 @@ def _slate_day(
         cron = pipe.get("schedule")
         if not cron:
             continue
-        slots = schedule.day_slots(cron, day_)
+        slots = schedule.day_slots(cron, day_, tz)
         tally["slots"] += len(slots)
         matched, missed, _pending = _match_slots(slots, by_pipe.get(pipe["name"], []), now)
         for slot in slots:
@@ -324,21 +330,28 @@ def slate(
     now: datetime,
     day_: date,
     radius: int = 3,
+    tz: tzinfo = UTC,
 ) -> dict[str, Any]:
-    """The day's slate: league-grouped score cards + a +/-radius day strip."""
+    """The day's slate: league-grouped score cards + a +/-radius day strip.
+
+    `day_` is a calendar day of `tz`, the viewer's zone: its edges are local
+    midnights, so a slot at 00:00 UTC sits on the previous local evening where
+    the viewer expects it. Every instant in the payload stays UTC.
+    """
     by_pipe: dict[str, list[dict[str, Any]]] = {}
     for r in sorted(runs, key=lambda r: r["run_started_at"], reverse=True):
         by_pipe.setdefault(r["pipeline"], []).append(r)
 
+    today = now.astimezone(tz).date()
     days: list[dict[str, Any]] = []
     for off in range(-radius, radius + 1):
         d = day_ + timedelta(days=off)
-        _cards, tally = _slate_day(pipelines, by_pipe, d, now)
+        _cards, tally = _slate_day(pipelines, by_pipe, d, now, tz)
         days.append(
             {
                 "date": d.isoformat(),
                 "dow": d.strftime("%a"),
-                "is_today": d == now.date(),
+                "is_today": d == today,
                 **tally,
             }
         )
@@ -346,7 +359,7 @@ def slate(
     leagues: list[dict[str, Any]] = []
     for sport in sorted({p["sport"] for p in pipelines}):
         sport_pipes = [p for p in pipelines if p["sport"] == sport]
-        cards, tally = _slate_day(sport_pipes, by_pipe, day_, now)
+        cards, tally = _slate_day(sport_pipes, by_pipe, day_, now, tz)
         if not cards:
             continue
         leagues.append(
@@ -374,13 +387,19 @@ def slate(
             "drained_loads": b.get("drained_loads"),
         }
         for b in builds
-        if (b.get("started_at") or "").startswith(day_iso)
+        if _local_day(b.get("started_at"), tz) == day_
     ]
     if build_cards:
         build_cards.sort(key=lambda c: c["at"])
         leagues.append({"sport": "dbt", "kind": "dbt", "cards": build_cards})
 
-    return {"date": day_iso, "now": _iso(now), "window_days": WINDOW_DAYS, "days": days, "leagues": leagues}
+    return {
+        "date": day_iso,
+        "now": _iso(now),
+        "window_days": WINDOW_DAYS,
+        "days": days,
+        "leagues": leagues,
+    }
 
 
 _RECORD_STATES = ("SUCCEEDED", "FAILED", "FAILED_AND_AUTO_SUSPENDED")

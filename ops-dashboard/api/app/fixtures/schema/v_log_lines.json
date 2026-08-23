@@ -1,0 +1,55 @@
+{
+  "object": "DLT_DB.OPS.V_LOG_LINES",
+  "columns": [
+    {
+      "name": "event_ts",
+      "type": "TIMESTAMP_NTZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "query_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "service_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "container_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "log_format",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "severity",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "logger_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "pipeline",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "message",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "raw_line",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    }
+  ]
+}

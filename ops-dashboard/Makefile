@@ -20,18 +20,34 @@ SNOW_CLI := snow $(if $(SNOW_CONN),--connection $(SNOW_CONN),)
 # For SQL files that pick their own role via USE ROLE.
 SNOW := $(SNOW_CLI) sql
 
+# Repo-root Snowflake Postgres env. Live targets source PGHOST / APP_API_PASSWORD.
+# The API logs in as app_api. OPS_DASHBOARD_BACKEND=snowflake skips this.
+POSTGRES_ENV ?= ../.env.postgres
+
 # Terminal banner helper: `@$(call hdr,message)` prints a bold cyan section header.
 # (Keep messages comma-free -- commas split $(call) arguments.)
 define hdr
 printf '\n\033[1;36m== %s ==\033[0m\n' "$(1)"
 endef
 
+define with_live_env
+set -a; \
+if [ "$${OPS_DASHBOARD_BACKEND:-postgres}" != "snowflake" ] && [ -f "$(POSTGRES_ENV)" ]; then \
+  . "$(POSTGRES_ENV)"; \
+fi; \
+set +a
+endef
+
 .DEFAULT_GOAL := help
 
-.PHONY: help install dev-api dev-web serve \
-        test lint build \
+.PHONY: help install dev dev-fixtures dev-api dev-api-fixtures dev-web serve \
+        test test-live lint build smoke schema fixtures \
         setup spec-upload image-build image-login image-push \
         deploy endpoint service-status service-logs
+
+# The fixture snapshot's era: every "last N days" window is measured from this
+# pin when serving fixtures, the same literal tests/conftest.py uses.
+FIXTURE_NOW := 2026-08-09T18:00:00+00:00
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<target>\033[0m\n"} \
@@ -47,20 +63,43 @@ install: ## Install api (uv) and web (npm) dependencies
 	@$(call hdr,web dependencies)
 	cd web && npm install
 
-dev-api: ## Run FastAPI with reload on :8000
-	cd api && $(UV_RUN) uvicorn app.main:app --reload --port 8000
+dev: ## Run the API (:8000, live Postgres) and the Vite dev server (:5173) together
+	@$(call hdr,api on :8000 and web on :5173)
+	@trap 'kill 0' EXIT; \
+	  ( $(with_live_env); cd api && OPS_DASHBOARD_BACKEND=$${OPS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) uvicorn app.main:app --reload --port 8000 ) & \
+	  (cd web && npm run dev) & \
+	  wait
+
+dev-fixtures: ## The same on recorded fixtures, no database connection
+	@$(call hdr,api on :8000 [fixtures] and web on :5173)
+	@trap 'kill 0' EXIT; \
+	  (cd api && OPS_DASHBOARD_DATA=fixtures OPS_DASHBOARD_NOW=$(FIXTURE_NOW) $(UV_RUN) uvicorn app.main:app --reload --port 8000) & \
+	  (cd web && npm run dev) & \
+	  wait
+
+dev-api: ## Run FastAPI with reload on :8000 (live data as app_api)
+	@$(with_live_env); \
+	cd api && OPS_DASHBOARD_BACKEND=$${OPS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) uvicorn app.main:app --reload --port 8000
+
+dev-api-fixtures: ## Run FastAPI on :8000 against recorded fixtures (no Snowflake)
+	cd api && OPS_DASHBOARD_DATA=fixtures OPS_DASHBOARD_NOW=$(FIXTURE_NOW) $(UV_RUN) uvicorn app.main:app --reload --port 8000
 
 dev-web: ## Run the Vite dev server (proxies /api to :8000)
 	cd web && npm run dev
 
 serve: build ## Build the web app and serve api + web together on :8000
 	@$(call hdr,dashboard on http://localhost:8000)
-	cd api && $(UV_RUN) uvicorn app.main:app --port 8000
+	@$(with_live_env); \
+	cd api && OPS_DASHBOARD_BACKEND=$${OPS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) uvicorn app.main:app --port 8000
 
 ##@ Quality
 
-test: ## Run the api test suite
+test: ## Run the api test suite (fixture mode; live tests skipped)
 	cd api && $(UV_RUN) pytest -q
+
+test-live: ## The suite plus the live contract test against Postgres
+	@$(with_live_env); \
+	cd api && OPS_DASHBOARD_LIVE=1 OPS_DASHBOARD_BACKEND=$${OPS_DASHBOARD_BACKEND:-postgres} $(UV_RUN) pytest -q
 
 lint: ## Ruff on the api + type-check the web (tsc -b: the root tsconfig only holds references)
 	@$(call hdr,api ruff)
@@ -70,6 +109,23 @@ lint: ## Ruff on the api + type-check the web (tsc -b: the root tsconfig only ho
 
 build: ## Production build of the web app into web/dist
 	cd web && npm run build
+
+smoke: build ## Walk every route in headless Chrome against fixtures; fails on console errors
+	./scripts/smoke.sh
+
+##@ Fixtures (live reads of DLT_DB.OPS through the snow connection)
+
+schema: ## Record DESCRIBE of every object the datasource reads into api/app/fixtures/schema/
+	cd api && OPS_DASHBOARD_BACKEND=snowflake $(UV_RUN) python scripts/capture_fixtures.py schema
+
+fixtures: ## Re-snapshot the row fixtures (CONFIRM=1: the endpoint tests pin the current snapshot)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Replaces api/app/fixtures/*.json with a fresh snapshot. The endpoint tests and"; \
+		echo "FIXTURE_NOW pin the current one, so re-pin them in the same change."; \
+		echo "Re-run with CONFIRM=1"; \
+		exit 2; \
+	fi
+	cd api && $(UV_RUN) python scripts/capture_fixtures.py rows
 
 ##@ Snowflake setup (live; run by a human, never CI)
 

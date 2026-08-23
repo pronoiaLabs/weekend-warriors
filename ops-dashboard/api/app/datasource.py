@@ -1,26 +1,56 @@
 """The seam between routes and data.
 
-OPS_DASHBOARD_DATA selects the implementation: "live" (default) queries Snowflake,
-"fixtures" serves recorded JSON from app/fixtures/ and never imports the connector.
+OPS_DASHBOARD_DATA selects the implementation: "live" (default) queries the
+configured backend, "fixtures" serves recorded JSON from app/fixtures/ and
+never opens a connection. Live default is Postgres app.observability.
 Routes call these functions and know nothing about which is active, which is what
 lets tests and offline dev run with zero network.
+
+Every function builds its statement once, then branches: live runs it, fixtures
+apply the same predicate to the recorded rows. Both record the statement on the
+request's trace, so a page shows the SQL it would have run whichever mode served
+it. The column lists are explicit rather than SELECT *: they are the contract
+the schema fixtures are tested against.
 """
 
 import json
-import os
+from contextvars import ContextVar
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-_FIXTURES = Path(__file__).parent / "fixtures"
+from app import config
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+# ---- the request trace: every statement a request built, rendered for display
+
+_TRACE: ContextVar[list[str] | None] = ContextVar("ops_trace", default=None)
 
 
-def _mode() -> str:
-    return os.environ.get("OPS_DASHBOARD_DATA", "live")
+def begin_trace() -> None:
+    _TRACE.set([])
+
+
+def record(sql: str, params: dict[str, Any] | None = None) -> None:
+    """Append a rendered statement to the request's trace, if one is open."""
+    trace = _TRACE.get()
+    if trace is None:
+        return
+    from app import db
+
+    rendered = db.render(sql, params)
+    if rendered not in trace:
+        trace.append(rendered)
+
+
+def trace_sql() -> str | None:
+    trace = _TRACE.get()
+    return "\n\n".join(trace) if trace else None
 
 
 def _fixture(name: str) -> Any:
-    return json.loads((_FIXTURES / f"{name}.json").read_text())
+    return json.loads((FIXTURES / f"{name}.json").read_text())
 
 
 def _iso_utc(value: Any) -> Any:
@@ -39,57 +69,148 @@ def _iso_utc(value: Any) -> Any:
     return value
 
 
+# ---- column contracts, one per object the dashboard reads
+
+RUN_COLUMNS: tuple[str, ...] = (
+    "sport", "pipeline", "task_name", "query_id", "service_name", "compute_pool",
+    "run_started_at", "run_ended_at", "duration_s", "container_span_s", "startup_overhead_s",
+    "task_state", "dlt_status", "outcome_disagrees", "dlt_record_missing", "rows_loaded",
+    "row_counts", "load_id", "resources", "error_text", "exit_status", "log_lines",
+    "error_lines", "warning_lines", "unparsed_lines", "metric_samples", "cpu_cores_max",
+    "cpu_samples", "cpu_cores_limit", "mem_bytes_max", "mem_samples", "mem_bytes_requested",
+    "restarts", "telemetry_available", "container_never_started",
+)  # fmt: skip
+REGISTRY_COLUMNS: tuple[str, ...] = ("name", "schedule", "target_database", "enabled")
+LOG_COLUMNS: tuple[str, ...] = (
+    "event_ts", "severity", "logger_name", "container_name", "log_format", "message",
+)  # fmt: skip
+METRIC_COLUMNS: tuple[str, ...] = (
+    "event_ts", "metric_name", "metric_value", "metric_unit", "metric_group",
+    "node_instance_family",
+)  # fmt: skip
+BUILD_COLUMNS: tuple[str, ...] = (
+    "sport", "task_name", "run_query_id", "build_id", "state", "error_message", "args",
+    "environment", "project_fqn", "drained_loads", "exec_query_id", "scheduled_time",
+    "started_at", "completed_time", "duration_s", "n_queries", "n_failed_queries",
+    "n_node_queries", "sum_elapsed_ms", "max_elapsed_ms", "sum_bytes_scanned",
+    "sum_rows_produced",
+)  # fmt: skip
+LOAD_COLUMNS: tuple[str, ...] = ("load_id", "pipeline", "status", "inserted_at", "drained_at")
+QUERY_COLUMNS: tuple[str, ...] = (
+    "query_id", "node", "query_type", "execution_status", "error_message", "start_time",
+    "end_time", "total_elapsed_time", "compilation_time", "execution_time",
+    "queued_overload_time", "bytes_scanned", "rows_produced", "rows_inserted",
+    "warehouse_name", "stats_captured",
+)  # fmt: skip
+OPERATOR_COLUMNS: tuple[str, ...] = (
+    "step_id", "operator_id", "parent_operators", "operator_type", "operator_statistics",
+    "execution_time_breakdown", "operator_attributes",
+)  # fmt: skip
+HEADLINE_COLUMNS: tuple[str, ...] = (
+    "generated_at", "day", "seq", "severity", "kind", "entity", "headline", "detail", "model",
+)  # fmt: skip
+
+# object name -> (Snowflake FQN, columns); the contract test reads this
+OBJECTS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "pipeline_runs": ("DLT_DB.OPS.PIPELINE_RUNS", RUN_COLUMNS),
+    "pipeline_registry": ("DLT_DB.OPS.PIPELINE_REGISTRY", REGISTRY_COLUMNS),
+    "v_log_lines": ("DLT_DB.OPS.V_LOG_LINES", LOG_COLUMNS),
+    "v_metrics": ("DLT_DB.OPS.V_METRICS", METRIC_COLUMNS),
+    "v_dbt_runs": ("DLT_DB.OPS.V_DBT_RUNS", BUILD_COLUMNS),
+    "dbt_trigger_loads": ("NFL_PROD_DB.OPS.DBT_TRIGGER_LOADS", LOAD_COLUMNS),
+    "dbt_query_log": ("DLT_DB.OPS.DBT_QUERY_LOG", QUERY_COLUMNS),
+    "dbt_query_operator_stats": ("DLT_DB.OPS.DBT_QUERY_OPERATOR_STATS", OPERATOR_COLUMNS),
+    "headlines": ("DLT_DB.OPS.HEADLINES", HEADLINE_COLUMNS),
+}
+
+# obs_to_postgres copies the tables the views sit on, not the views.
+# dbt_trigger_loads is per-sport in <SPORT>_PROD_DB.OPS and is not copied.
+PG_OBJECTS: dict[str, str] = {
+    "pipeline_runs": "pipeline_runs",
+    "pipeline_registry": "pipeline_registry",
+    "v_log_lines": "log_lines",
+    "v_metrics": "metric_samples",
+    "v_dbt_runs": "dbt_runs",
+    "dbt_query_log": "dbt_query_log",
+    "dbt_query_operator_stats": "dbt_query_operator_stats",
+    "headlines": "headlines",
+}
+
+
+def object_fqn(name: str) -> str | None:
+    """Live store FQN, or None when this object is not on the postgres copy."""
+    snow, _ = OBJECTS[name]
+    if not config.is_postgres():
+        return snow
+    table = PG_OBJECTS.get(name)
+    if table is None:
+        return None
+    return f"{config.obs_schema()}.{table}"
+
+
+def _from(name: str) -> str:
+    fqn = object_fqn(name)
+    if fqn is None:
+        raise RuntimeError(f"{name} is not in app.observability")
+    return fqn
+
+
+def _cols(columns: tuple[str, ...]) -> str:
+    return ", ".join(c.upper() for c in columns)
+
+
+def _since_days(bind: str) -> str:
+    """Timestamp *bind* days ago. DATEADD is Snowflake-only."""
+    if config.is_postgres():
+        return f"(now() - make_interval(days => %({bind})s))"
+    return f"DATEADD('day', -%({bind})s, CURRENT_TIMESTAMP())"
+
+
+def describe_sql(name: str) -> tuple[str, dict[str, Any]] | None:
+    """Statement that lists an object's columns, or None if it is not on this store."""
+    fqn = object_fqn(name)
+    if fqn is None:
+        return None
+    if config.is_snowflake():
+        return f"DESCRIBE TABLE {fqn}", {}
+    schema, table = fqn.split(".", 1)
+    sql = (
+        "select column_name as name, data_type as type\n"
+        "from information_schema.columns\n"
+        "where table_schema = %(schema)s and table_name = %(table)s\n"
+        "order by ordinal_position"
+    )
+    return sql, {"schema": schema, "table": table}
+
+
+def _run_rows(fixture: str = "runs") -> list[dict[str, Any]]:
+    return _fixture(fixture)["runs"]
+
+
+# ---- registry
+
+
 def list_sports() -> list[str]:
-    if _mode() == "fixtures":
+    if config.is_fixtures():
+        record(registry_sql())
         rows = _fixture("registry")
-        return sorted(
-            {
-                r["target_database"]
-                for r in rows
-                if r.get("schedule") is not None
-            }
-        )
+        return sorted({r["target_database"] for r in rows if r.get("schedule") is not None})
     from app import registry
 
     return registry.sports()
 
 
-def recent_runs(sport: str | None, limit: int) -> list[dict[str, Any]]:
-    """Recent runs newest first, each row tagged with its sport."""
-    if _mode() == "fixtures":
-        runs = _fixture("runs")["runs"]
-        if sport:
-            runs = [r for r in runs if r["sport"] == sport]
-        return runs[:limit]
-
-    from app import db
-
-    # One table for every sport (DLT_DB.OPS.PIPELINE_RUNS, SPORT column holds
-    # the uppercase registry stem), so sport scoping is a bind, not a UNION of
-    # per-sport views.
-    sql = "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
-    params: dict[str, Any] = {"limit": limit}
-    if sport:
-        sql += "WHERE SPORT = %(sport)s "
-        params["sport"] = sport
-    sql += "ORDER BY RUN_STARTED_AT DESC LIMIT %(limit)s"
-    rows = db.query(sql, params)
-    return [_normalize(row) for row in rows]
-
-
-def _normalize(row: dict[str, Any]) -> dict[str, Any]:
-    from app import db
-
-    row["row_counts"] = db.parse_variant(row.get("row_counts"))
-    row["resources"] = db.parse_variant(row.get("resources"))
-    for key in ("run_started_at", "run_ended_at"):
-        row[key] = _iso_utc(row.get(key))
-    return row
+def registry_sql() -> str:
+    return (
+        f"SELECT {_cols(REGISTRY_COLUMNS)} FROM {_from('pipeline_registry')} "
+        "WHERE SCHEDULE IS NOT NULL ORDER BY TARGET_DATABASE, NAME"
+    )
 
 
 def pipelines() -> list[dict[str, Any]]:
     """Registry pipelines as dicts: name, sport, schedule, enabled."""
-    if _mode() == "fixtures":
+    if config.is_fixtures():
+        record(registry_sql())
         return [
             {
                 "name": r["name"],
@@ -108,106 +229,164 @@ def pipelines() -> list[dict[str, Any]]:
     ]
 
 
-def run_by_query_id(query_id: str) -> dict[str, Any] | None:
-    if _mode() == "fixtures":
-        runs = _fixture("runs")["runs"]
-        return next((r for r in runs if r["query_id"] == query_id), None)
+# ---- pipeline runs
 
+
+def _normalize(row: dict[str, Any]) -> dict[str, Any]:
     from app import db
 
-    rows = db.query(
-        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS WHERE QUERY_ID = %(qid)s",
-        {"qid": query_id},
-    )
-    return _normalize(rows[0]) if rows else None
+    row["row_counts"] = db.parse_variant(row.get("row_counts"))
+    row["resources"] = db.parse_variant(row.get("resources"))
+    for key in ("run_started_at", "run_ended_at"):
+        row[key] = _iso_utc(row.get(key))
+    return row
+
+
+def _runs(sql: str, params: dict[str, Any], tag: str) -> list[dict[str, Any]]:
+    from app import db
+
+    return [_normalize(r) for r in db.query(sql, params, tag={"tile": tag})]
+
+
+def recent_runs(sport: str | None, limit: int) -> list[dict[str, Any]]:
+    """Recent runs newest first, each row tagged with its sport."""
+    # One table for every sport (SPORT holds the uppercase registry stem), so
+    # sport scoping is a bind, not a UNION of per-sport views.
+    sql = f"SELECT {_cols(RUN_COLUMNS)} FROM {_from('pipeline_runs')} "
+    params: dict[str, Any] = {"limit": limit}
+    if sport:
+        sql += "WHERE SPORT = %(sport)s "
+        params["sport"] = sport
+    sql += "ORDER BY RUN_STARTED_AT DESC LIMIT %(limit)s"
+    if config.is_fixtures():
+        record(sql, params)
+        runs = _run_rows()
+        if sport:
+            runs = [r for r in runs if r["sport"] == sport]
+        return runs[:limit]
+    return _runs(sql, params, "runs")
+
+
+def run_by_query_id(query_id: str) -> dict[str, Any] | None:
+    sql = f"SELECT {_cols(RUN_COLUMNS)} FROM {_from('pipeline_runs')} WHERE QUERY_ID = %(qid)s"
+    params = {"qid": query_id}
+    if config.is_fixtures():
+        record(sql, params)
+        return next((r for r in _run_rows() if r["query_id"] == query_id), None)
+    rows = _runs(sql, params, "run")
+    return rows[0] if rows else None
 
 
 def pipeline_history(sport: str, name: str, days: int) -> list[dict[str, Any]]:
-    if _mode() == "fixtures":
-        runs = _fixture("runs")["runs"]
-        return [r for r in runs if r["sport"] == sport and r["pipeline"] == name]
-
-    from app import db
-
     sql = (
-        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
+        f"SELECT {_cols(RUN_COLUMNS)} FROM {_from('pipeline_runs')} "
         "WHERE SPORT = %(sport)s AND PIPELINE = %(name)s "
-        "AND RUN_STARTED_AT >= DATEADD('day', -%(days)s, CURRENT_TIMESTAMP()) "
+        f"AND RUN_STARTED_AT >= {_since_days('days')} "
         "ORDER BY RUN_STARTED_AT DESC"
     )
-    return [_normalize(r) for r in db.query(sql, {"sport": sport, "name": name, "days": days})]
+    params = {"sport": sport, "name": name, "days": days}
+    if config.is_fixtures():
+        record(sql, params)
+        return [r for r in _run_rows() if r["sport"] == sport and r["pipeline"] == name]
+    return _runs(sql, params, "pipeline")
 
 
 def runs_before(sport: str, name: str, before_iso: str, limit: int) -> list[dict[str, Any]]:
     """Prior runs of one pipeline, for the run-detail context strip."""
-    if _mode() == "fixtures":
-        runs = [
-            r
-            for r in _fixture("runs")["runs"]
-            if r["sport"] == sport and r["pipeline"] == name and r["run_started_at"] <= before_iso
-        ]
-        return runs[: limit + 1]
-
-    from app import db
-
     sql = (
-        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
+        f"SELECT {_cols(RUN_COLUMNS)} FROM {_from('pipeline_runs')} "
         "WHERE SPORT = %(sport)s AND PIPELINE = %(name)s AND RUN_STARTED_AT <= %(before)s "
         "ORDER BY RUN_STARTED_AT DESC LIMIT %(limit)s"
     )
-    rows = db.query(
-        sql,
-        {"sport": sport, "name": name, "before": before_iso.replace("Z", ""), "limit": limit + 1},
+    params = {
+        "sport": sport,
+        "name": name,
+        "before": before_iso.replace("Z", ""),
+        "limit": limit + 1,
+    }
+    if config.is_fixtures():
+        record(sql, params)
+        runs = [
+            r
+            for r in _run_rows()
+            if r["sport"] == sport and r["pipeline"] == name and r["run_started_at"] <= before_iso
+        ]
+        return runs[: limit + 1]
+    return _runs(sql, params, "run_history")
+
+
+def runs_between(start: datetime, end: datetime, sport: str | None) -> list[dict[str, Any]]:
+    """Runs with start <= RUN_STARTED_AT < end, newest first.
+
+    Bounds are explicit UTC datetimes rather than a now-anchored day count so
+    the slate can be rewound to any day, and so fixture mode applies the SAME
+    window as live. Bound strings carry milliseconds so the lexicographic
+    compare against the fixtures' .SSSZ timestamps is exact at day edges.
+    """
+    start_iso = start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
+    end_iso = end.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
+    sql = (
+        f"SELECT {_cols(RUN_COLUMNS)} FROM {_from('pipeline_runs')} "
+        "WHERE RUN_STARTED_AT >= %(start)s AND RUN_STARTED_AT < %(end)s "
     )
-    return [_normalize(r) for r in rows]
+    params: dict[str, Any] = {"start": start_iso.replace("Z", ""), "end": end_iso.replace("Z", "")}
+    if sport:
+        sql += "AND SPORT = %(sport)s "
+        params["sport"] = sport
+    sql += "ORDER BY RUN_STARTED_AT DESC"
+    if config.is_fixtures():
+        record(sql, params)
+        runs = [r for r in _run_rows() if start_iso <= r["run_started_at"] < end_iso]
+        if sport:
+            runs = [r for r in runs if r["sport"] == sport]
+        return sorted(runs, key=lambda r: r["run_started_at"], reverse=True)
+    return _runs(sql, params, "runs_window")
+
+
+# ---- logs and metrics
 
 
 def logs(query_id: str, severity: str | None, limit: int) -> list[dict[str, Any]]:
-    if _mode() == "fixtures":
-        rows = _fixture(f"logs_{query_id}") if (_FIXTURES / f"logs_{query_id}.json").exists() else []
-        if severity:
-            rows = [r for r in rows if r.get("severity") == severity]
-        return rows[:limit]
-
-    from app import db
-
-    sql = (
-        "SELECT EVENT_TS, SEVERITY, LOGGER_NAME, CONTAINER_NAME, LOG_FORMAT, MESSAGE "
-        "FROM DLT_DB.OPS.V_LOG_LINES WHERE QUERY_ID = %(qid)s "
-    )
+    sql = f"SELECT {_cols(LOG_COLUMNS)} FROM {_from('v_log_lines')} WHERE QUERY_ID = %(qid)s "
     params: dict[str, Any] = {"qid": query_id, "limit": limit}
     if severity:
         sql += "AND SEVERITY = %(sev)s "
         params["sev"] = severity
     sql += "ORDER BY EVENT_TS LIMIT %(limit)s"
-    rows = db.query(sql, params)
+    if config.is_fixtures():
+        record(sql, params)
+        path = FIXTURES / f"logs_{query_id}.json"
+        rows = _fixture(f"logs_{query_id}") if path.exists() else []
+        if severity:
+            rows = [r for r in rows if r.get("severity") == severity]
+        return rows[:limit]
+    from app import db
+
+    rows = db.query(sql, params, tag={"tile": "logs"})
     for row in rows:
         row["event_ts"] = _iso_utc(row.get("event_ts"))
     return rows
 
 
-def dbt_builds(sport: str | None, limit: int) -> list[dict[str, Any]]:
-    """Event-driven dbt build attempts, newest first.
-
-    V_DBT_RUNS spells sport lowercase ('nfl'), unlike the registry-derived
-    database stems ('NFL') the dlt endpoints use; the route lowercases before
-    calling, so nothing here re-maps.
-    """
-    if _mode() == "fixtures":
-        rows = _fixture("dbt_builds")
-        if sport:
-            rows = [r for r in rows if r["sport"] == sport]
-        return rows[:limit]
-
+def metrics(query_id: str) -> list[dict[str, Any]]:
+    sql = (
+        f"SELECT {_cols(METRIC_COLUMNS)} FROM {_from('v_metrics')} "
+        "WHERE QUERY_ID = %(qid)s ORDER BY EVENT_TS"
+    )
+    params = {"qid": query_id}
+    if config.is_fixtures():
+        record(sql, params)
+        path = FIXTURES / f"metrics_{query_id}.json"
+        return _fixture(f"metrics_{query_id}") if path.exists() else []
     from app import db
 
-    sql = "SELECT * FROM DLT_DB.OPS.V_DBT_RUNS "
-    params: dict[str, Any] = {"limit": limit}
-    if sport:
-        sql += "WHERE SPORT = %(sport)s "
-        params["sport"] = sport
-    sql += "ORDER BY STARTED_AT DESC LIMIT %(limit)s"
-    return [_normalize_build(r) for r in db.query(sql, params)]
+    rows = db.query(sql, params, tag={"tile": "metrics"})
+    for row in rows:
+        row["event_ts"] = _iso_utc(row.get("event_ts"))
+    return rows
+
+
+# ---- dbt builds
 
 
 def _normalize_build(row: dict[str, Any]) -> dict[str, Any]:
@@ -216,20 +395,41 @@ def _normalize_build(row: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def dbt_builds(sport: str | None, limit: int) -> list[dict[str, Any]]:
+    """Event-driven dbt build attempts, newest first. V_DBT_RUNS spells sport
+    lowercase ('nfl'), unlike the registry stems ('NFL'); the route lowercases
+    before calling, so nothing here re-maps."""
+    sql = f"SELECT {_cols(BUILD_COLUMNS)} FROM {_from('v_dbt_runs')} "
+    params: dict[str, Any] = {"limit": limit}
+    if sport:
+        sql += "WHERE SPORT = %(sport)s "
+        params["sport"] = sport
+    sql += "ORDER BY STARTED_AT DESC LIMIT %(limit)s"
+    if config.is_fixtures():
+        record(sql, params)
+        rows = _fixture("dbt_builds")
+        if sport:
+            rows = [r for r in rows if r["sport"] == sport]
+        return rows[:limit]
+    from app import db
+
+    return [_normalize_build(r) for r in db.query(sql, params, tag={"tile": "dbt_builds"})]
+
+
 def dbt_build_by_id(build_id: str) -> dict[str, Any] | None:
     """One build attempt. BUILD_ID is null for runs that died before the proc
     recorded one, so those rows are unreachable here by construction."""
-    if _mode() == "fixtures":
-        rows = _fixture("dbt_builds")
-        return next((r for r in rows if r.get("build_id") == build_id), None)
-
+    sql = (
+        f"SELECT {_cols(BUILD_COLUMNS)} FROM {_from('v_dbt_runs')} WHERE BUILD_ID = %(bid)s "
+        "ORDER BY STARTED_AT DESC LIMIT 1"
+    )
+    params = {"bid": build_id}
+    if config.is_fixtures():
+        record(sql, params)
+        return next((r for r in _fixture("dbt_builds") if r.get("build_id") == build_id), None)
     from app import db
 
-    rows = db.query(
-        "SELECT * FROM DLT_DB.OPS.V_DBT_RUNS WHERE BUILD_ID = %(bid)s "
-        "ORDER BY STARTED_AT DESC LIMIT 1",
-        {"bid": build_id},
-    )
+    rows = db.query(sql, params, tag={"tile": "dbt_build"})
     return _normalize_build(rows[0]) if rows else None
 
 
@@ -243,24 +443,25 @@ def dbt_build_loads(sport: str, started_at: Any, completed_time: Any) -> list[di
     """
     if not started_at or not completed_time:
         return []
+    if config.is_postgres():
+        # Per-sport table, not in the observability copy.
+        return []
     start = _shift_iso(started_at, -120)
-
-    if _mode() == "fixtures":
-        rows = _fixture("dbt_loads").get(sport, [])
-        return [r for r in rows if start <= (r.get("drained_at") or "") <= completed_time]
-
-    from app import db
-
     # sport comes from a V_DBT_RUNS row, never from the request path, so the
     # database name below is view-derived rather than caller-supplied.
     sql = (
-        f"SELECT LOAD_ID, PIPELINE, STATUS, INSERTED_AT, DRAINED_AT "
-        f"FROM {sport.upper()}_PROD_DB.OPS.DBT_TRIGGER_LOADS "
+        f"SELECT {_cols(LOAD_COLUMNS)} FROM {sport.upper()}_PROD_DB.OPS.DBT_TRIGGER_LOADS "
         "WHERE DRAINED_AT >= %(start)s::TIMESTAMP_LTZ "
-        "AND DRAINED_AT <= %(end)s::TIMESTAMP_LTZ "
-        "ORDER BY DRAINED_AT"
+        "AND DRAINED_AT <= %(end)s::TIMESTAMP_LTZ ORDER BY DRAINED_AT"
     )
-    rows = db.query(sql, {"start": start.replace("Z", ""), "end": completed_time.replace("Z", "")})
+    params = {"start": start.replace("Z", ""), "end": completed_time.replace("Z", "")}
+    if config.is_fixtures():
+        record(sql, params)
+        rows = _fixture("dbt_loads").get(sport, [])
+        return [r for r in rows if start <= (r.get("drained_at") or "") <= completed_time]
+    from app import db
+
+    rows = db.query(sql, params, tag={"tile": "dbt_loads"})
     for row in rows:
         row["inserted_at"] = _iso_utc(row.get("inserted_at"))
         row["drained_at"] = _iso_utc(row.get("drained_at"))
@@ -275,19 +476,17 @@ def _shift_iso(value: str, seconds: int) -> str:
 def dbt_queries(build_id: str, limit: int) -> list[dict[str, Any]]:
     """Per-node queries of one build, slowest first: the point of the page is
     which node cost the time, so the limit truncates the tail, not the head."""
-    if _mode() == "fixtures":
+    sql = (
+        f"SELECT {_cols(QUERY_COLUMNS)} FROM {_from('dbt_query_log')} WHERE BUILD_ID = %(bid)s "
+        "ORDER BY TOTAL_ELAPSED_TIME DESC LIMIT %(limit)s"
+    )
+    params = {"bid": build_id, "limit": limit}
+    if config.is_fixtures():
+        record(sql, params)
         return _fixture("dbt_queries").get(build_id, [])[:limit]
-
     from app import db
 
-    rows = db.query(
-        "SELECT QUERY_ID, NODE, QUERY_TYPE, EXECUTION_STATUS, ERROR_MESSAGE, START_TIME, "
-        "END_TIME, TOTAL_ELAPSED_TIME, COMPILATION_TIME, EXECUTION_TIME, QUEUED_OVERLOAD_TIME, "
-        "BYTES_SCANNED, ROWS_PRODUCED, ROWS_INSERTED, WAREHOUSE_NAME, STATS_CAPTURED "
-        "FROM DLT_DB.OPS.DBT_QUERY_LOG WHERE BUILD_ID = %(bid)s "
-        "ORDER BY TOTAL_ELAPSED_TIME DESC LIMIT %(limit)s",
-        {"bid": build_id, "limit": limit},
-    )
+    rows = db.query(sql, params, tag={"tile": "dbt_queries"})
     for row in rows:
         row["start_time"] = _iso_utc(row.get("start_time"))
         row["end_time"] = _iso_utc(row.get("end_time"))
@@ -305,18 +504,17 @@ _OPERATOR_VARIANTS = (
 def dbt_operators(query_id: str) -> list[dict[str, Any]]:
     """Query-profile operator tree for one query. Only queries the harvester
     profiled have rows; STATS_CAPTURED on the query row says which."""
-    if _mode() == "fixtures":
+    sql = (
+        f"SELECT {_cols(OPERATOR_COLUMNS)} FROM {_from('dbt_query_operator_stats')} "
+        "WHERE QUERY_ID = %(qid)s ORDER BY STEP_ID, OPERATOR_ID"
+    )
+    params = {"qid": query_id}
+    if config.is_fixtures():
+        record(sql, params)
         return _fixture("dbt_operators").get(query_id, [])
-
     from app import db
 
-    rows = db.query(
-        "SELECT STEP_ID, OPERATOR_ID, PARENT_OPERATORS, OPERATOR_TYPE, OPERATOR_STATISTICS, "
-        "EXECUTION_TIME_BREAKDOWN, OPERATOR_ATTRIBUTES "
-        "FROM DLT_DB.OPS.DBT_QUERY_OPERATOR_STATS WHERE QUERY_ID = %(qid)s "
-        "ORDER BY STEP_ID, OPERATOR_ID",
-        {"qid": query_id},
-    )
+    rows = db.query(sql, params, tag={"tile": "dbt_operators"})
     for row in rows:
         # ARRAY and VARIANT both arrive as JSON text; the payload must carry
         # real structures so the UI can walk the operator tree.
@@ -325,22 +523,7 @@ def dbt_operators(query_id: str) -> list[dict[str, Any]]:
     return rows
 
 
-def metrics(query_id: str) -> list[dict[str, Any]]:
-    if _mode() == "fixtures":
-        f = _FIXTURES / f"metrics_{query_id}.json"
-        return _fixture(f"metrics_{query_id}") if f.exists() else []
-
-    from app import db
-
-    rows = db.query(
-        "SELECT EVENT_TS, METRIC_NAME, METRIC_VALUE, METRIC_UNIT, METRIC_GROUP, "
-        "NODE_INSTANCE_FAMILY FROM DLT_DB.OPS.V_METRICS "
-        "WHERE QUERY_ID = %(qid)s ORDER BY EVENT_TS",
-        {"qid": query_id},
-    )
-    for row in rows:
-        row["event_ts"] = _iso_utc(row.get("event_ts"))
-    return rows
+# ---- the AI wire
 
 
 def headlines_for_day(day: date) -> list[dict[str, Any]]:
@@ -351,60 +534,24 @@ def headlines_for_day(day: date) -> list[dict[str, Any]]:
     one place with identical semantics in both modes, so fixture and live can
     never drift: newest day <= requested, else nothing.
     """
-    if _mode() == "fixtures":
+    sql = (
+        f"SELECT {_cols(HEADLINE_COLUMNS)} FROM {_from('headlines')} "
+        f"WHERE DAY = (SELECT MAX(DAY) FROM {_from('headlines')} WHERE DAY <= %(day)s) "
+        "ORDER BY SEQ"
+    )
+    params = {"day": day.isoformat()}
+    if config.is_fixtures():
+        record(sql, params)
         rows = [r for r in _fixture("headlines") if r["day"] <= day.isoformat()]
         if not rows:
             return []
         served = max(r["day"] for r in rows)
         return sorted((r for r in rows if r["day"] == served), key=lambda r: r["seq"])
-
     from app import db
 
-    sql = (
-        "SELECT GENERATED_AT, DAY, SEQ, SEVERITY, KIND, ENTITY, HEADLINE, DETAIL, MODEL "
-        "FROM DLT_DB.OPS.HEADLINES "
-        "WHERE DAY = (SELECT MAX(DAY) FROM DLT_DB.OPS.HEADLINES WHERE DAY <= %(day)s) "
-        "ORDER BY SEQ"
-    )
-    rows = db.query(sql, {"day": day.isoformat()})
+    rows = db.query(sql, params, tag={"tile": "headlines"})
     for row in rows:
         row["generated_at"] = _iso_utc(row.get("generated_at"))
         d = row.get("day")
         row["day"] = d.isoformat() if hasattr(d, "isoformat") else d
     return rows
-
-
-def runs_between(start: datetime, end: datetime, sport: str | None) -> list[dict[str, Any]]:
-    """Runs with start <= RUN_STARTED_AT < end, newest first.
-
-    Bounds are explicit UTC datetimes rather than a now-anchored day count so
-    the slate can be rewound to any day, and so fixture mode applies the SAME
-    window as live: the day-count predecessor ignored its argument in fixture
-    mode entirely, which is the trap this function exists to avoid. Bound
-    strings carry milliseconds so the lexicographic compare against the
-    fixtures' .SSSZ timestamps is exact at day edges.
-    """
-    start_iso = start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
-    end_iso = end.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000") + "Z"
-
-    if _mode() == "fixtures":
-        runs = [r for r in _fixture("runs")["runs"] if start_iso <= r["run_started_at"] < end_iso]
-        if sport:
-            runs = [r for r in runs if r["sport"] == sport]
-        return sorted(runs, key=lambda r: r["run_started_at"], reverse=True)
-
-    from app import db
-
-    sql = (
-        "SELECT * FROM DLT_DB.OPS.PIPELINE_RUNS "
-        "WHERE RUN_STARTED_AT >= %(start)s AND RUN_STARTED_AT < %(end)s "
-    )
-    params: dict[str, Any] = {
-        "start": start_iso.replace("Z", ""),
-        "end": end_iso.replace("Z", ""),
-    }
-    if sport:
-        sql += "AND SPORT = %(sport)s "
-        params["sport"] = sport
-    sql += "ORDER BY RUN_STARTED_AT DESC"
-    return [_normalize(r) for r in db.query(sql, params)]

@@ -1,0 +1,28 @@
+/* Pipelines page: everything the records table needs beyond the shared
+   `.standings` primitive in pages.css. That primitive is a flat table; this
+   page groups its rows by league, which is the one thing it has no vocabulary
+   for, so the divider row is the only real addition here. */
+
+/* One divider per league, read as a heading inside the table body rather than
+   as a data row: no cell padding on the right, uppercase, ink-4. */
+.page-pipelines .standings tr.divider td {
+  padding: 16px 8px 6px 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+/* The first league opens the table, so it does not need the gap that separates
+   one league's block from the next. */
+.page-pipelines .standings tbody tr.divider:first-child td {
+  padding-top: 2px;
+}
+
+/* The whole row navigates, but the name is also a real link (keyboard, new
+   tab), so it takes the accent on hover to say so. */
+.page-pipelines .standings .pname a:hover {
+  color: var(--accent);
+}

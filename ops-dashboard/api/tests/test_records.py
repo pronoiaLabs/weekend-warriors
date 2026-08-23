@@ -29,9 +29,7 @@ def test_index_rows_carry_records(client: TestClient) -> None:
 def test_all_green_pipeline_has_perfect_record(client: TestClient) -> None:
     body = client.get("/api/pipelines").json()
     perfect = [
-        r
-        for r in body["pipelines"]
-        if r["record"]["losses"] == 0 and r["record"]["wins"] > 0
+        r for r in body["pipelines"] if r["record"]["losses"] == 0 and r["record"]["wins"] > 0
     ]
     assert perfect, "fixture fleet should include at least one clean pipeline"
     for row in perfect:

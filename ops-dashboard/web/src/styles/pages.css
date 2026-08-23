@@ -1,0 +1,85 @@
+/* Page-level styles: the dashboard's day strip, league rails and score cards,
+   the rail panels, and the grids the other pages lay their tiles on. The
+   primitives (tile, kpi, chip, dock) stay in ops.css; the investigation
+   components (heat strip, log table, tabs ...) in components.css. */
+
+/* day strip: seven chips, each a date over its tally */
+.day-strip { display: inline-flex; gap: 6px; align-items: stretch; flex-wrap: wrap; }
+.day-strip .chip { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; padding: 6px 12px; min-width: 74px; }
+.day-strip .chip .dow { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
+.day-strip .chip.on .dow { color: var(--bg); opacity: .7; }
+.day-strip .chip .dnum { font-weight: 600; }
+.day-strip .chip .tally { font-size: 10px; color: var(--ink-3); }
+.day-strip .chip.on .tally { color: var(--bg); opacity: .8; }
+.day-strip .chip .tally.bad { color: var(--neg); }
+.day-strip .chip .tally.warn { color: var(--missed); }
+.day-strip .chip.on .tally.bad, .day-strip .chip.on .tally.warn { color: var(--bg); }
+.day-strip .chip.today:not(.on) { border-color: var(--accent); }
+.day-strip .nav { min-width: 0; padding: 6px 10px; display: flex; align-items: center; color: var(--ink-3); }
+
+/* the slate: one tile per league, a horizontal rail of score cards inside */
+.cols-slate { grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); }
+.league { margin-bottom: var(--gap); }
+.league .tile-head h2 { font-size: 17px; }
+.league .car-nav { display: inline-flex; gap: 4px; margin-left: 8px; }
+.league .car-nav button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center; }
+.league .car-nav button:hover { color: var(--ink); border-color: var(--line-2); }
+.cards { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 6px; }
+.card { flex: 0 0 250px; scroll-snap-align: start; display: grid; gap: 8px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); color: inherit; min-width: 0; }
+.card:hover { border-color: var(--line-2); }
+.card.upset { border-color: color-mix(in srgb, var(--neg) 45%, transparent); background: var(--fail-wash); }
+.card.missed { border-style: dashed; border-color: color-mix(in srgb, var(--missed) 55%, transparent); background: var(--missed-wash); }
+.card.sched { border-style: dotted; color: var(--ink-3); }
+.card .status-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: var(--fs-s); }
+.card .st { border: 0; background: none; border-radius: 0; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+.card .st.final { color: var(--pos); }
+.card .st.fail { color: var(--neg); }
+.card .st.miss { color: var(--missed); }
+.card .st.sched { color: var(--ink-4); }
+.card .why { font-size: var(--fs-s); color: var(--missed); padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* the slot legend: the five states, each drawn the way the cards and cells draw them */
+.slot-legend { display: inline-flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--fs-s); color: var(--ink-3); align-items: center; }
+.slot-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+.card .at { color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .matchup { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card .team { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .score { font-size: 24px; font-weight: 200; letter-spacing: -.03em; white-space: nowrap; }
+.card .score .u { font-size: 10px; color: var(--ink-4); margin-left: 4px; font-weight: 500; letter-spacing: 0; }
+.card .score.dash { color: var(--ink-4); }
+.card .under { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-s); color: var(--ink-3); }
+.card .under .mono { color: var(--ink-4); }
+.card .err { font-size: var(--fs-s); color: var(--neg); padding-top: 8px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+
+/* the rail: headlines and records */
+.rail { display: grid; gap: var(--gap); }
+.headlines li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.headlines li:last-child { border-bottom: 0; }
+.headlines .h { font-weight: 500; color: var(--ink-2); }
+.headlines .h .flag { color: var(--neg); font-weight: 700; }
+.headlines .when { font-size: var(--fs-s); color: var(--ink-4); margin-top: 2px; }
+.stale { font-size: var(--fs-s); color: var(--warn); margin-bottom: 8px; }
+
+/* standings: the records table shared by the rail and the pipelines page */
+.standings { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.standings th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-4); font-weight: 600; padding: 4px 8px 6px 0; border-bottom: 1px solid var(--line); }
+.standings td { padding: 7px 8px 7px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.standings tr:last-child td { border-bottom: 0; }
+.standings .pname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.standings .rec, .standings .pct, .standings .strk, .standings .num { text-align: right; font-variant-numeric: tabular-nums; }
+.standings th.num, .standings th.rec, .standings th.pct, .standings th.strk { text-align: right; }
+.standings .pct.low { color: var(--neg); }
+.standings .strk.w { color: var(--pos); }
+.standings .strk.l { color: var(--neg); }
+.standings tr.row-link { cursor: pointer; }
+.standings tr.row-link:hover td { background: var(--surface); }
+
+/* two-column page grids */
+.cols-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.cols-detail { grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); }
+.table-tile .tile-body { overflow-x: auto; }
+.table-tile { margin-bottom: var(--gap); }
+
+/* narrow: one column everywhere, the rail beneath the slate */
+.shell-narrow .cols-slate, .shell-narrow .cols-two, .shell-narrow .cols-detail { grid-template-columns: minmax(0, 1fr); }
+.shell-narrow .card { flex-basis: 80vw; }

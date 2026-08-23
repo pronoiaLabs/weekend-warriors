@@ -1,0 +1,26 @@
+/* Builds page. The shared primitives carry the head, the KPI plates and the
+   table; three things they cannot express live here.
+
+   The per-sport rollups are one plate per sport PRESENT in the payload, a count
+   that varies between one and however many sports build, so they cannot use the
+   fixed .kpis modifiers (three, four, five) and lay out on an auto-fit track
+   instead. A paused sport is the normal off-season state rather than a fault,
+   so it reads dimmed and never rose. And a failed build needs a row-level wash
+   plus a rose cell, neither of which the .standings vocabulary has. */
+
+.page-builds .rolls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--gap);
+  margin-bottom: 20px;
+}
+.shell-narrow .page-builds .rolls { grid-template-columns: 1fr 1fr; }
+
+.page-builds .kpi.paused { opacity: .72; }
+.page-builds .kpi.paused .v { color: var(--ink-4); }
+
+.page-builds .standings tr.fail td { background: var(--fail-wash); }
+.page-builds .standings td.bad { color: var(--neg); }
+/* the args cell is the widest free text on the row and the only one allowed to wrap */
+.page-builds .standings td.args { white-space: normal; color: var(--ink-2); }
+.page-builds .standings td.args em { color: var(--ink-4); font-style: normal; font-size: var(--fs-s); }

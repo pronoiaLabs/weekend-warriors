@@ -1,0 +1,131 @@
+/* Run detail. The shared primitives carry the crumb row, the KPI plates, the
+   tiles and the records table; three things they have no vocabulary for live
+   here.
+
+   The head tile stacks an identity block over the two verdicts, which is not a
+   tile-head and so cannot be a TileFrame. The run facts are a definition list
+   of every column on the row, two pairs to a line, because the page's contract
+   is that it and a `SELECT *` read the same. And an error tile needs a rose
+   wash plus a scrolling monospace block, neither of which .tile has. */
+
+/* Page-level tiles and grids sit one under the other; the grid's own gap only
+   spaces its children, never the grid from what follows it. */
+.page-run > .tile,
+.page-run > .grid {
+  margin-bottom: var(--gap);
+}
+
+/* ---- head ---- */
+.page-run .run-head {
+  display: grid;
+  gap: 14px;
+}
+.page-run .run-head .kick {
+  display: inline-block;
+  font-size: var(--fs-s);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.page-run .run-head .title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-run .run-head h1 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.page-run .run-head .when {
+  margin-top: 6px;
+  color: var(--ink-3);
+  font-size: var(--fs-s);
+}
+.page-run .run-head .when .mono {
+  color: var(--ink-4);
+}
+
+/* The agreement line quotes the two boolean columns verbatim, so the codes
+   stay monospace and the sentence around them does not. */
+.page-run .agree {
+  color: var(--ink-3);
+  font-size: var(--fs-s);
+}
+.page-run .agree code {
+  font-family: var(--mono);
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+  margin-right: 4px;
+}
+
+/* ---- run facts ---- */
+.page-run .facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0;
+}
+.page-run .fact {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.page-run .fact dt {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.page-run .fact dd {
+  margin: 0;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: var(--fs-s);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.page-run .fact dd.bad {
+  color: var(--neg);
+}
+.page-run .fact dd small {
+  color: var(--ink-4);
+}
+
+/* ---- error ---- */
+.page-run .error-tile {
+  background: var(--fail-wash);
+}
+.page-run .error-tile .tile-head h2 {
+  color: var(--neg);
+}
+.page-run .error-tile pre {
+  margin: 0;
+  max-height: 340px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: var(--fs-s);
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* narrow: one fact per line, and the identity block never crowds the pill */
+.shell-narrow .page-run .facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+.shell-narrow .page-run .run-head h1 {
+  font-size: 24px;
+}
