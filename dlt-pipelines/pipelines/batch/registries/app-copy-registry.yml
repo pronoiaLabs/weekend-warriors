@@ -1,0 +1,51 @@
+# APP marts → Snowflake Postgres app.app_copy.
+#
+# First sql-to-postgres pipeline. Source is NFL_PROD_DB.APP via the ambient
+# Snowflake session (snowflake_app). Destination is postgres. The Task is a
+# child of DBT_HARVEST_NFL (after:), not a cron — APP is stale until dbt
+# rebuilds it.
+#
+# Laptop: make run-postgres NAME=nfl_app_to_postgres
+# Prod:   generate_tasks emits AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL
+
+defaults:
+  destination: postgres
+  database: NFL
+  dataset_name: app_copy
+  group: app_copy
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  secret: DLT_DB.OPS.POSTGRES_APP_COPY
+  env_var: DESTINATION__POSTGRES__CREDENTIALS__PASSWORD
+  external_access: POSTGRES_APP_EAI
+
+pipelines:
+  - name: nfl_app_to_postgres
+    source: snowflake_app
+    after: NFL_PROD_DB.OPS.DBT_HARVEST_NFL
+    write_disposition: replace
+    config:
+      schema: APP
+      # Every NFL APP table in analytics-dashboard/api/app/sports/profiles/nfl.py.
+      # Explicit list — do not SELECT * from the schema.
+      tables:
+        - app_game_slate
+        - app_game_prop_board
+        - app_team_standings
+        - app_team_weeks
+        - app_team_allowed
+        - app_team_ats
+        - app_player_leaders
+        - app_player_weeks
+        - app_player_week_stats
+        - app_player_defense_weeks
+        - app_line_history
+        - app_prop_line_history
+        - app_news_mentions
+        - app_explore_player_games
+        - app_explore_defender_games
+        - app_explore_team_games
+        - app_explore_game_lines
+        - app_explore_player_props
+        - app_explore_news
+        - app_explore_line_moves

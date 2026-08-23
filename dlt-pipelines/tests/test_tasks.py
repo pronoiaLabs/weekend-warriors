@@ -43,6 +43,10 @@ def _scheduled():
     return [s for s in load_registry().pipelines if s.schedule]
 
 
+def _tasks():
+    return [s for s in load_registry().pipelines if s.schedule or s.after]
+
+
 def _sql(name: str) -> str:
     return task_sql(load_registry().get(name))
 
@@ -146,7 +150,7 @@ def test_unsubstituted_placeholder_is_rejected() -> None:
     assert "secret" in str(exc.value)
 
 
-@pytest.mark.parametrize("spec", _scheduled(), ids=lambda s: s.name)
+@pytest.mark.parametrize("spec", _tasks(), ids=lambda s: s.name)
 def test_external_access_precedes_from(spec) -> None:
     """Clause order in EXECUTE JOB SERVICE is fixed, and getting it wrong is fatal.
 
@@ -176,20 +180,20 @@ def test_suspend_and_resume_cover_the_same_pipelines_as_tasks() -> None:
 
     They are applied as one sequence, suspend -> apply -> resume, so a pipeline present
     in one and missing from another leaves the fleet half-stopped or half-applied. All
-    three gate on the same `spec.schedule`, and this asserts they still do.
+    three gate on the same `schedule or after`, and this asserts they still do.
     """
     from deploy.tasks.generate_tasks import resume_sql, suspend_sql  # noqa: PLC0415
 
-    scheduled = [s for s in load_registry().pipelines if s.schedule]
-    assert scheduled, "registry declares no scheduled pipelines"
+    tasks = _tasks()
+    assert tasks, "registry declares no Task pipelines"
 
-    for spec in scheduled:
+    for spec in tasks:
         assert f"dlt_task_{spec.name} SUSPEND" in suspend_sql(spec)
         assert f"dlt_task_{spec.name} RESUME" in resume_sql(spec)
         assert f"dlt_task_{spec.name}" in task_sql(spec)
 
-    # `sample` has no schedule and must appear in none of them.
-    unscheduled = [s for s in load_registry().pipelines if not s.schedule]
+    # `sample` has neither schedule nor after and must appear in none of them.
+    unscheduled = [s for s in load_registry().pipelines if not s.schedule and not s.after]
     for spec in unscheduled:
         assert "ALTER TASK" not in suspend_sql(spec)
         assert "ALTER TASK" not in resume_sql(spec)
@@ -207,7 +211,7 @@ def test_suspend_tolerates_a_task_that_does_not_exist_yet() -> None:
     """
     from deploy.tasks.generate_tasks import resume_sql, suspend_sql  # noqa: PLC0415
 
-    spec = next(s for s in load_registry().pipelines if s.schedule)
+    spec = next(s for s in load_registry().pipelines if s.schedule or s.after)
     assert "ALTER TASK IF EXISTS" in suspend_sql(spec)
     assert "IF EXISTS" not in resume_sql(spec)
 
@@ -254,3 +258,84 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
     # `sample` is the guard on the whole mechanism: it exists precisely to be the
     # pipeline that is runnable by hand and never becomes a Task.
     assert "sample" not in scheduled
+    # AFTER child, not cron. A cron assertion that included it would paper over
+    # generate_tasks emitting USING CRON by accident.
+    assert "nfl_app_to_postgres" not in scheduled
+
+
+def test_app_copy_task_is_after_harvest_not_cron() -> None:
+    spec = load_registry().get("nfl_app_to_postgres")
+    sql = task_sql(spec)
+    assert "AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL" in sql
+    assert "USING CRON" not in sql
+    assert "DLT_DESTINATION: postgres" in sql or "DLT_DESTINATION:postgres" in sql
+    assert sql.index("EXTERNAL_ACCESS_INTEGRATIONS") < sql.index("FROM SPECIFICATION")
+    assert "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD" in sql
+    assert "NFL_PROD_DB" in sql
+
+
+def test_suspend_resume_include_the_harvest_graph_for_after_tasks() -> None:
+    from io import StringIO  # noqa: PLC0415
+    from contextlib import redirect_stdout  # noqa: PLC0415
+
+    from deploy.tasks.generate_tasks import main  # noqa: PLC0415
+
+    suspend = StringIO()
+    with redirect_stdout(suspend):
+        assert main(["--suspend"]) == 0
+    suspend_sql = suspend.getvalue()
+    assert "ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND" in suspend_sql
+    assert "ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL SUSPEND" in suspend_sql
+    assert suspend_sql.index("DBT_BUILD_NFL") < suspend_sql.index(
+        "dlt_task_nfl_app_to_postgres"
+    )
+
+    resume = StringIO()
+    with redirect_stdout(resume):
+        assert main(["--resume"]) == 0
+    resume_sql = resume.getvalue()
+    assert resume_sql.index("dlt_task_nfl_app_to_postgres") < resume_sql.index(
+        "DBT_HARVEST_NFL"
+    )
+    assert resume_sql.index("DBT_HARVEST_NFL") < resume_sql.index("DBT_BUILD_NFL")
+    assert "ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME" in resume_sql
+    assert "ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME" not in resume_sql
+
+
+def test_ci_task_resume_count_ignores_harvest_graph() -> None:
+    """CI greps CREATE OR ALTER TASK vs ALTER TASK DLT_DB.OPS.dlt_task_.
+
+    Harvest-graph resumes (DBT_HARVEST_* / DBT_BUILD_*) are extra ALTER TASK
+    lines on purpose. Counting every ALTER TASK would fail the equality check
+    the moment an `after:` pipeline exists.
+    """
+    from contextlib import redirect_stdout  # noqa: PLC0415
+    from io import StringIO  # noqa: PLC0415
+
+    from deploy.tasks.generate_tasks import main  # noqa: PLC0415
+
+    tasks_out = StringIO()
+    with redirect_stdout(tasks_out):
+        assert main([]) == 0
+    resume_out = StringIO()
+    with redirect_stdout(resume_out):
+        assert main(["--resume"]) == 0
+
+    creates = [
+        line
+        for line in tasks_out.getvalue().splitlines()
+        if line.startswith("CREATE OR ALTER TASK")
+    ]
+    dlt_resumes = [
+        line
+        for line in resume_out.getvalue().splitlines()
+        if line.startswith("ALTER TASK DLT_DB.OPS.dlt_task_")
+    ]
+    harvest_resumes = [
+        line
+        for line in resume_out.getvalue().splitlines()
+        if line.startswith("ALTER TASK ") and "DBT_" in line
+    ]
+    assert creates
+    assert len(creates) == len(dlt_resumes)
+    assert harvest_resumes, "after: children must resume the harvest graph too"

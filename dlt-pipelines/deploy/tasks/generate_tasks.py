@@ -40,13 +40,17 @@ IT EMITS SQL RATHER THAN APPLYING IT
     resets a Task to suspended. Hence `--resume`, a separate output CI applies straight
     after tasks.sql. See resume_sql.
 
-SCHEDULE IS WHAT MAKES A PIPELINE A TASK
-    A registry entry with no `schedule` is skipped with a comment rather than an error.
-    That is how `sample` stays runnable by hand without ever becoming a production Task,
-    and it means "not scheduled" is expressed by omission rather than by a flag.
+SCHEDULE OR AFTER IS WHAT MAKES A PIPELINE A TASK
+    A registry entry with neither `schedule` nor `after` is skipped with a comment
+    rather than an error. That is how `sample` stays runnable by hand without ever
+    becoming a production Task, and it means "not a Task" is expressed by omission.
 
-    Note this reads only `spec.schedule`. `group` plays no part here; it is a selection
-    convenience for the runner.
+    `after` emits `AFTER <fqn>` instead of `SCHEDULE = USING CRON`. Those children
+    join another graph (today: DBT_HARVEST_NFL). CREATE OR ALTER on a child fails
+    if that graph's root is started, so --suspend also suspends the harvest graph
+    and --resume resumes copy, then harvest, then build.
+
+    `group` plays no part here; it is a selection convenience for the runner.
 
 NO EXECUTION DEPENDENCIES
     This imports pipelines.batch.models and nothing else from the repo, because CI runs
@@ -118,6 +122,9 @@ SPEC_TEMPLATE_PATH = (
 SPEC_TEMPLATE_NOSECRET_PATH = (
     Path(__file__).resolve().parents[1] / "spcs" / "dlt_job_nosecret.tmpl.yaml"
 )
+SPEC_TEMPLATE_POSTGRES_PATH = (
+    Path(__file__).resolve().parents[1] / "spcs" / "dlt_job_postgres.tmpl.yaml"
+)
 
 _PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
@@ -147,11 +154,14 @@ def render_spec(spec: PipelineSpec, database: str, template: str | None = None) 
     container would fail much later looking for a secret by that name.
     """
     if template is None:
-        text = (
-            SPEC_TEMPLATE_PATH.read_text()
-            if spec.secret
-            else SPEC_TEMPLATE_NOSECRET_PATH.read_text()
-        )
+        if spec.destination == "postgres":
+            text = SPEC_TEMPLATE_POSTGRES_PATH.read_text()
+        else:
+            text = (
+                SPEC_TEMPLATE_PATH.read_text()
+                if spec.secret
+                else SPEC_TEMPLATE_NOSECRET_PATH.read_text()
+            )
     else:
         text = template
     values = {
@@ -188,9 +198,39 @@ def render_spec(spec: PipelineSpec, database: str, template: str | None = None) 
     return body.strip() + "\n"
 
 
+def is_emitted(spec: PipelineSpec) -> bool:
+    """Same gate as PipelineSpec.is_task: cron or AFTER child."""
+    return spec.is_task
+
+
+def harvest_graph_parents(specs: Sequence[PipelineSpec]) -> list[str]:
+    """Fully-qualified AFTER parents, first-seen order."""
+    parents: list[str] = []
+    seen: set[str] = set()
+    for spec in specs:
+        if spec.after and spec.after not in seen:
+            parents.append(spec.after)
+            seen.add(spec.after)
+    return parents
+
+
+def harvest_graph_roots(parents: Sequence[str]) -> list[str]:
+    """DBT_BUILD_* for any DBT_HARVEST_* parent. CREATE OR ALTER needs the root down."""
+    roots: list[str] = []
+    seen: set[str] = set()
+    for parent in parents:
+        if "DBT_HARVEST_" not in parent:
+            continue
+        root = parent.replace("DBT_HARVEST_", "DBT_BUILD_")
+        if root not in seen:
+            roots.append(root)
+            seen.add(root)
+    return roots
+
+
 def task_sql(spec: PipelineSpec) -> str:
-    if not spec.schedule:
-        return f"-- skipped '{spec.name}': no schedule in registry\n"
+    if not is_emitted(spec):
+        return f"-- skipped '{spec.name}': no schedule or after in registry\n"
 
     # Qualified, because the grant is CREATE TASK ON SCHEMA DLT_DB.OPS and nothing
     # guarantees the applying session has that as its current schema. CI sets
@@ -237,10 +277,15 @@ def task_sql(spec: PipelineSpec) -> str:
     # matters because YAML is whitespace sensitive and the spec is indented.
     rendered = render_spec(spec, database)
 
+    if spec.after:
+        trigger = f"  AFTER {spec.after}"
+    else:
+        trigger = f"  SCHEDULE = 'USING CRON {spec.schedule} UTC'"
+
     return f"""\
 CREATE OR ALTER TASK {task_name}
   WAREHOUSE = {spec.load_warehouse}
-  SCHEDULE = 'USING CRON {spec.schedule} UTC'
+{trigger}
 AS
   EXECUTE JOB SERVICE
     IN COMPUTE POOL {spec.compute_pool}
@@ -284,11 +329,11 @@ def suspend_sql(spec: PipelineSpec) -> str:
         and leave the rest started, reproducing the problem it is meant to prevent.
         Verified as a clean no-op against a name that does not exist.
 
-    Same `spec.schedule` test as task_sql, so the two outputs cannot disagree about
+    Same `is_emitted` test as task_sql, so the two outputs cannot disagree about
     which pipelines are Tasks.
     """
-    if not spec.schedule:
-        return f"-- skipped '{spec.name}': no schedule in registry\n"
+    if not is_emitted(spec):
+        return f"-- skipped '{spec.name}': no schedule or after in registry\n"
     return f"ALTER TASK IF EXISTS {TASKS_SCHEMA}.dlt_task_{spec.name} SUSPEND;\n"
 
 
@@ -310,11 +355,11 @@ def resume_sql(spec: PipelineSpec) -> str:
     error is the only signal that would say so. Suspend runs before, when absence is
     expected and harmless.
 
-    Same `spec.schedule` test as task_sql, so the two outputs cannot disagree about
+    Same `is_emitted` test as task_sql, so the two outputs cannot disagree about
     which pipelines are Tasks.
     """
-    if not spec.schedule:
-        return f"-- skipped '{spec.name}': no schedule in registry\n"
+    if not is_emitted(spec):
+        return f"-- skipped '{spec.name}': no schedule or after in registry\n"
     return f"ALTER TASK {TASKS_SCHEMA}.dlt_task_{spec.name} RESUME;\n"
 
 
@@ -349,8 +394,21 @@ def main(argv: Sequence[str] = ()) -> int:
     args = parser.parse_args(argv)
 
     registry = load_registry()
+    parents = harvest_graph_parents(registry.pipelines)
+    roots = harvest_graph_roots(parents)
+
     if args.suspend:
         print("-- Generated from pipelines/batch/registries/. Apply BEFORE tasks.sql.\n")
+        # Root of the harvest graph first: CREATE OR ALTER on a child fails while
+        # DBT_BUILD_<SPORT> is started.
+        if roots or parents:
+            print("-- Harvest-graph Tasks that AFTER children join. Suspend these first.\n")
+        for fqn in roots:
+            print(f"ALTER TASK IF EXISTS {fqn} SUSPEND;")
+        for fqn in parents:
+            print(f"ALTER TASK IF EXISTS {fqn} SUSPEND;")
+        if roots or parents:
+            print()
         for spec in registry.pipelines:
             print(suspend_sql(spec), end="")
         return 0
@@ -359,9 +417,17 @@ def main(argv: Sequence[str] = ()) -> int:
         print("-- Generated from pipelines/batch/registries/. Apply AFTER tasks.sql.\n")
         for spec in registry.pipelines:
             print(resume_sql(spec), end="")
+        # Children before parents: copy, then harvest, then build.
+        if parents or roots:
+            print()
+            print("-- Harvest-graph resume: AFTER children first (above), then harvest, then build.")
+        for fqn in parents:
+            print(f"ALTER TASK {fqn} RESUME;")
+        for fqn in roots:
+            print(f"ALTER TASK {fqn} RESUME;")
         return 0
 
-    print("-- Generated from pipelines/batch/registries/. One Task per scheduled pipeline.\n")
+    print("-- Generated from pipelines/batch/registries/. One Task per schedule/after pipeline.\n")
     for spec in registry.pipelines:
         print(task_sql(spec))
     return 0

@@ -54,6 +54,7 @@ EXPECTED_VARIABLES: dict[str, set[str]] = {
     "dlt_dev_job_nosecret.tmpl.yaml": {"args", "database", "dataset"},
     "dlt_job.tmpl.yaml": {"pipeline", "database", "secret", "env_var"},
     "dlt_job_nosecret.tmpl.yaml": {"pipeline", "database"},
+    "dlt_job_postgres.tmpl.yaml": {"pipeline", "database", "secret", "env_var"},
 }
 
 # A deliberately awkward argv: brackets the shell would glob, an `=` a naive split
@@ -142,11 +143,19 @@ def test_rendered_template_is_valid_yaml_with_the_expected_shape(filename: str) 
     env = container["env"]
 
     assert container["name"] == "dlt"
-    assert env["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] == "NFL_DEV_DB"
     assert env["DLT_REGISTRY_SOURCE"] == "auto"
     # The control plane is one database for the whole account and must not follow the
     # per-sport destination.
     assert env["SNOWFLAKE_DATABASE"] == "DLT_DB"
+    if filename == "dlt_job_postgres.tmpl.yaml":
+        assert env["DLT_DESTINATION"] == "postgres"
+        assert env["DLT_DATASET"] == "app_copy"
+        assert env["SNOWFLAKE_APP_DATABASE"] == "NFL_DEV_DB"
+        # record_run writes NFL_PROD_DB.OPS._DLT_RUNS (same as other NFL Tasks).
+        # The data dest is still postgres; this is telemetry only.
+        assert env["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] == "NFL_DEV_DB"
+    else:
+        assert env["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] == "NFL_DEV_DB"
 
 
 def test_dev_templates_pass_the_full_argv_through_intact() -> None:
@@ -176,6 +185,14 @@ def test_prod_template_binds_a_secret() -> None:
     assert bound["envVarName"] == SUBSTITUTIONS["env_var"]
     assert bound["secretKeyRef"] == "secret_string"
 
+    pg = yaml.safe_load(
+        _env().from_string((SPECS / "dlt_job_postgres.tmpl.yaml").read_text()).render(
+            **SUBSTITUTIONS
+        )
+    )["spec"]["containers"][0]
+    assert pg["secrets"][0]["envVarName"] == SUBSTITUTIONS["env_var"]
+    assert pg["env"]["DLT_DESTINATION"] == "postgres"
+
 
 def test_only_the_prod_template_enables_alerts() -> None:
     """DLT_ALERTS gates pipelines/common/alerts.py, and prod-only is the design.
@@ -193,6 +210,7 @@ def test_only_the_prod_template_enables_alerts() -> None:
 
     assert env_of("dlt_job.tmpl.yaml")["DLT_ALERTS"] == "1"
     assert env_of("dlt_job_nosecret.tmpl.yaml")["DLT_ALERTS"] == "1"
+    assert env_of("dlt_job_postgres.tmpl.yaml")["DLT_ALERTS"] == "1"
     assert "DLT_ALERTS" not in env_of("dlt_dev_job.tmpl.yaml")
     assert "DLT_ALERTS" not in env_of("dlt_dev_job_nosecret.tmpl.yaml")
 
@@ -210,3 +228,4 @@ def test_only_the_secret_template_binds_a_secret() -> None:
     assert "secrets" not in containers("dlt_dev_job_nosecret.tmpl.yaml")
     assert "secrets" in containers("dlt_job.tmpl.yaml")
     assert "secrets" not in containers("dlt_job_nosecret.tmpl.yaml")
+    assert "secrets" in containers("dlt_job_postgres.tmpl.yaml")

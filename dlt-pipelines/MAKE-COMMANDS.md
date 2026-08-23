@@ -389,3 +389,11 @@ which is included in the error. Check it against the table at the top of this fi
 
 **A green run with zero rows** means a filter matched nothing. The most likely cause is a
 `season_type` that does not exist for that endpoint, or a season the API does not carry.
+
+---
+
+## APP marts → Snowflake Postgres
+
+That path is a different destination (`app.app_copy`) and a different Make target
+(`run-postgres`, not `run-snowflake`). Every statement is a file. Start at
+[MAKE-COMMANDS-POSTGRES.md](MAKE-COMMANDS-POSTGRES.md).

@@ -96,9 +96,11 @@ def test_real_registry_sends_every_nfl_pipeline_to_the_nfl_databases():
         assert resolve_database(spec, "DEV") == "NFL_DEV_DB"
         assert resolve_database(spec, "PROD") == "NFL_PROD_DB"
         # The sport lives in the database name now, so repeating it in the schema
-        # would give NFL_PROD_DB.RAW_NFL.
-        assert spec.dataset_name == "RAW", (
-            f"{spec.name}: dataset_name should be RAW, got {spec.dataset_name}"
+        # would give NFL_PROD_DB.RAW_NFL. The Postgres copy is the exception: it
+        # writes app.app_copy, not a Snowflake RAW schema.
+        expected_dataset = "app_copy" if spec.destination == "postgres" else "RAW"
+        assert spec.dataset_name == expected_dataset, (
+            f"{spec.name}: dataset_name should be {expected_dataset}, got {spec.dataset_name}"
         )
 
 
@@ -245,6 +247,55 @@ def test_scheduled_pipeline_without_eai_is_rejected() -> None:
     assert "external_access" in str(exc.value)
 
 
+def test_sql_database_is_not_a_supported_source() -> None:
+    with pytest.raises(RegistryError) as exc:
+        _spec(source="sql_database").validate()
+    assert "not supported" in str(exc.value)
+
+
+def test_after_and_schedule_are_mutually_exclusive() -> None:
+    with pytest.raises(RegistryError) as exc:
+        _spec(
+            schedule="0 9 * * *",
+            after="NFL_PROD_DB.OPS.DBT_HARVEST_NFL",
+            external_access="POSTGRES_APP_EAI",
+            secret="DLT_DB.OPS.POSTGRES_APP_COPY",
+            env_var="DESTINATION__POSTGRES__CREDENTIALS__PASSWORD",
+        ).validate()
+    assert "mutually exclusive" in str(exc.value)
+
+
+def test_after_pipeline_requires_eai_and_secret_pair() -> None:
+    with pytest.raises(RegistryError) as exc:
+        _spec(after="NFL_PROD_DB.OPS.DBT_HARVEST_NFL").validate()
+    assert "external_access" in str(exc.value)
+
+    with pytest.raises(RegistryError) as exc:
+        _spec(
+            after="NFL_PROD_DB.OPS.DBT_HARVEST_NFL",
+            external_access="POSTGRES_APP_EAI",
+        ).validate()
+    assert "secret" in str(exc.value)
+
+    _spec(
+        after="NFL_PROD_DB.OPS.DBT_HARVEST_NFL",
+        external_access="POSTGRES_APP_EAI",
+        secret="DLT_DB.OPS.POSTGRES_APP_COPY",
+        env_var="DESTINATION__POSTGRES__CREDENTIALS__PASSWORD",
+    ).validate()
+
+
+def test_after_must_be_a_fully_qualified_task_name() -> None:
+    with pytest.raises(RegistryError) as exc:
+        _spec(
+            after="DBT_HARVEST_NFL",
+            external_access="POSTGRES_APP_EAI",
+            secret="DLT_DB.OPS.POSTGRES_APP_COPY",
+            env_var="DESTINATION__POSTGRES__CREDENTIALS__PASSWORD",
+        ).validate()
+    assert "fully-qualified" in str(exc.value)
+
+
 def test_scheduled_pipeline_without_a_secret_is_accepted_when_eai_is_set() -> None:
     # Open-Meteo: no key, but the container still needs egress.
     _spec(schedule="0 9 * * *", external_access="OPENMETEO_API_EAI").validate()
@@ -311,6 +362,23 @@ def test_sample_is_never_scheduled() -> None:
     # It is the credential-free smoke test. A Task would give it a cost and a failure
     # mode for no benefit.
     assert load_registry().get("sample").schedule is None
+    assert load_registry().get("sample").after is None
+
+
+def test_nfl_app_to_postgres_is_an_after_task_with_twenty_tables() -> None:
+    spec = load_registry().get("nfl_app_to_postgres")
+    assert spec.source == "snowflake_app"
+    assert spec.destination == "postgres"
+    assert spec.dataset_name == "app_copy"
+    assert spec.schedule is None
+    assert spec.after == "NFL_PROD_DB.OPS.DBT_HARVEST_NFL"
+    assert spec.external_access == "POSTGRES_APP_EAI"
+    assert spec.secret == "DLT_DB.OPS.POSTGRES_APP_COPY"
+    assert spec.env_var == "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD"
+    assert spec.write_disposition == "replace"
+    assert len(spec.config["tables"]) == 20
+    assert "app_game_slate" in spec.config["tables"]
+    assert "app_explore_line_moves" in spec.config["tables"]
 
 
 # ---------------------------------------------------------------------------
@@ -386,6 +454,7 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_weather_forecast",
         "nfl_weather_archive",
         "nfl_weather_hist_forecast",
+        "nfl_app_to_postgres",
     }
     assert {s.name for s in registry.pipelines} == checked, (
         "a pipeline is neither asserted to carry a season token nor asserted to have "
@@ -410,6 +479,7 @@ def test_pipelines_with_no_season_have_no_token() -> None:
         "nfl_weather_forecast",
         "nfl_weather_archive",
         "nfl_weather_hist_forecast",
+        "nfl_app_to_postgres",
     ):
         assert "{current_season}" not in json.dumps(load_registry().get(name).config)
 

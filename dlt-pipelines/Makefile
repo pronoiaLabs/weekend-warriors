@@ -103,6 +103,10 @@ CONN        ?=                                       # snow connection name (bla
 # group's pipelines could disagree.
 SF_DATABASE ?=
 
+# Repo-root env for the Snowflake Postgres instance (gitignored). Used by
+# setup-postgres / setup-postgres-secret / run-postgres. See MAKE-COMMANDS-POSTGRES.md.
+POSTGRES_ENV ?= ../.env.postgres
+
 # SPCS image build/push. Docker refs must be lowercase, and the tag is the case where
 # a trailing space actually breaks something (see the note at the top of this file).
 IMAGE       ?= dlt-pipeline:latest
@@ -179,10 +183,10 @@ endef
 
 .PHONY: help doctor install secrets setup \
         test test-config lint fmt list plan \
-        run-local run-snowflake run-prod run-spcs \
+        run-local run-snowflake run-prod run-postgres run-spcs \
         sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
         setup-base setup-dev setup-prod setup-ops setup-integrations \
-        setup-source new-source \
+        setup-source setup-postgres setup-postgres-secret new-source \
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
         sync-apply tasks-apply tasks-suspend tasks-resume deploy \
@@ -201,6 +205,7 @@ doctor: ## Check required tooling (uv, docker, snow)
 	@command -v uv     >/dev/null 2>&1 && echo "  uv:     $$(uv --version)"            || echo "  uv:     MISSING  (install: https://docs.astral.sh/uv/)"
 	@command -v docker >/dev/null 2>&1 && echo "  docker: $$(docker --version)"        || echo "  docker: missing  (only needed to build/push the image)"
 	@command -v snow   >/dev/null 2>&1 && echo "  snow:   $$(snow --version 2>&1 | head -1)" || echo "  snow:   missing  (only needed for live Snowflake apply)"
+	@command -v psql   >/dev/null 2>&1 && echo "  psql:   $$(psql --version)" || echo "  psql:   missing  (only needed for make setup-postgres; brew install libpq)"
 	@echo "uv provisions Python >=3.11 automatically from pyproject.toml."
 
 install: ## Install deps into .venv via uv (EXTRAS="dev postgres")
@@ -306,6 +311,36 @@ run-prod: ## laptop -> Snowflake PROD RAW as DLT_LOADER_ROLE (NAME= [CONFIRM=1] 
 	  DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE="$$db" DLT_DATASET="$$ds" \
 	  $(UV_RUN) python -m pipelines.batch.run $(if $(GROUP),--group $(GROUP),$(NAME)) $(RES_FLAGS) $(PARAM_FLAGS) && \
 	  echo "Ran '$(if $(GROUP),group $(GROUP),$(NAME))'$(if $(RESOURCE), resources [$(RESOURCE)],)$(if $(PARAM), params [$(PARAM)],) -> $$db.$$ds as $(PROD_ROLE) using snow connection '$(CONN)'."
+
+# Snowflake source (NFL_PROD_DB.APP) + Postgres dest (app.app_copy).
+# run-snowflake cannot do this: it forces DLT_DESTINATION=snowflake and DEV_<user>.
+run-postgres: ## laptop -> Snowflake Postgres app.app_copy (NAME= [RESOURCE=] [CONN=])
+	@if [ -z "$(NAME)" ]; then \
+		echo "Set NAME=<pipeline>, e.g. make run-postgres NAME=nfl_app_to_postgres"; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(POSTGRES_ENV)" ]; then \
+		echo "Missing $(POSTGRES_ENV). Copy .env.postgres.example to the repo root."; \
+		echo "See MAKE-COMMANDS-POSTGRES.md."; \
+		exit 2; \
+	fi
+	@set -a && . "$(POSTGRES_ENV)" && set +a && \
+	  if [ -z "$$APP_COPY_WRITER_PASSWORD" ]; then \
+	    echo "APP_COPY_WRITER_PASSWORD is empty. make setup-postgres CONFIRM=1 writes it."; \
+	    exit 2; \
+	  fi; \
+	  $(snow_env_or_die); \
+	  DLT_REGISTRY_SOURCE=yaml DLT_DESTINATION=postgres DLT_DATASET=app_copy \
+	  SNOWFLAKE_APP_DATABASE=NFL_PROD_DB \
+	  DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE=NFL_PROD_DB \
+	  DESTINATION__POSTGRES__CREDENTIALS__HOST="$$PGHOST" \
+	  DESTINATION__POSTGRES__CREDENTIALS__PORT="$$PGPORT" \
+	  DESTINATION__POSTGRES__CREDENTIALS__DATABASE=app \
+	  DESTINATION__POSTGRES__CREDENTIALS__USERNAME=app_copy_writer \
+	  DESTINATION__POSTGRES__CREDENTIALS__PASSWORD="$$APP_COPY_WRITER_PASSWORD" \
+	  PGSSLMODE="$${PGSSLMODE:-require}" \
+	  $(UV_RUN) python -m pipelines.batch.run $(NAME) $(RES_FLAGS) && \
+	  echo "Ran '$(NAME)'$(if $(RESOURCE), resources [$(RESOURCE)],) -> app.app_copy as app_copy_writer."
 
 # The container entrypoint is `python -m pipelines.batch.run`, so RESOURCE and PARAM
 # are the same CLI flags run-local and run-snowflake pass; they just have to travel
@@ -477,15 +512,60 @@ setup-source: ## Apply one source's DDL sql/sources/$(SOURCE)/* (SOURCE=nfl, gua
 		exit 2; \
 	fi
 	@if [ "$(CONFIRM)" != "1" ]; then \
-		echo "Creates $$(echo $(SOURCE) | tr a-z A-Z)_DEV_DB and $$(echo $(SOURCE) | tr a-z A-Z)_PROD_DB,"; \
-		echo "its external access integration, and its API-key secret."; \
-		echo "Requires setup-base (roles + control plane) first. Re-run with CONFIRM=1."; \
+		if [ "$(SOURCE)" = "postgres" ]; then \
+			echo "Applies sql/sources/postgres/*.sql: POSTGRES_APP_EAI and"; \
+			echo "DLT_DB.OPS.POSTGRES_APP_COPY (placeholder). No POSTGRES_*_DB is created."; \
+			echo "Re-run with CONFIRM=1. Then: make setup-postgres-secret CONFIRM=1"; \
+		else \
+			echo "Creates $$(echo $(SOURCE) | tr a-z A-Z)_DEV_DB and $$(echo $(SOURCE) | tr a-z A-Z)_PROD_DB,"; \
+			echo "its external access integration, and its API-key secret."; \
+			echo "Requires setup-base (roles + control plane) first. Re-run with CONFIRM=1."; \
+		fi; \
 		exit 2; \
 	fi
 	@for f in sql/sources/$(SOURCE)/*.sql; do echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
-	@echo "Source '$(SOURCE)' ready. Set the real API key, which no DDL can do:"
-	@echo "  ALTER SECRET DLT_DB.OPS.$$(echo $(SOURCE) | tr a-z A-Z)_API_KEY SET SECRET_STRING = '<key>';"
-	@echo "Then: make sync-apply, then make run-spcs NAME=<pipeline>."
+	@if [ "$(SOURCE)" = "postgres" ]; then \
+		echo "Source 'postgres' ready. Set the writer password from .env.postgres:"; \
+		echo "  make setup-postgres-secret CONFIRM=1"; \
+	else \
+		echo "Source '$(SOURCE)' ready. Set the real API key, which no DDL can do:"; \
+		echo "  ALTER SECRET DLT_DB.OPS.$$(echo $(SOURCE) | tr a-z A-Z)_API_KEY SET SECRET_STRING = '<key>';"; \
+		echo "Then: make sync-apply, then make run-spcs NAME=<pipeline>."; \
+	fi
+
+# Snowflake Postgres instance: database + schema + writer role. Statements in
+# sql/postgres/; this target only sources .env.postgres and runs apply.sh.
+setup-postgres: ## Create app / app_copy / app_copy_writer (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates database app, schema app_copy, roles, watermark table."; \
+		echo "Reads $(POSTGRES_ENV). Re-run with CONFIRM=1."; \
+		echo "See MAKE-COMMANDS-POSTGRES.md."; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(POSTGRES_ENV)" ]; then \
+		echo "Missing $(POSTGRES_ENV). Copy .env.postgres.example to the repo root."; \
+		exit 2; \
+	fi
+	@set -a && . "$(POSTGRES_ENV)" && set +a && ./sql/postgres/apply.sh
+
+# ALTER SECRET from the same env file. The rendered SQL is gitignored.
+setup-postgres-secret: ## ALTER SECRET POSTGRES_APP_COPY from .env.postgres (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "ALTERs DLT_DB.OPS.POSTGRES_APP_COPY from APP_COPY_WRITER_PASSWORD."; \
+		echo "Writes sql/sources/postgres/.generated/03_set_secret.sql (gitignored)."; \
+		echo "Re-run with CONFIRM=1."; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(POSTGRES_ENV)" ]; then \
+		echo "Missing $(POSTGRES_ENV). Run make setup-postgres CONFIRM=1 first."; \
+		exit 2; \
+	fi
+	@set -a && . "$(POSTGRES_ENV)" && set +a && \
+	  if [ -z "$$APP_COPY_WRITER_PASSWORD" ]; then \
+	    echo "APP_COPY_WRITER_PASSWORD is empty. make setup-postgres CONFIRM=1 writes it."; \
+	    exit 2; \
+	  fi; \
+	  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/sources/postgres/apply_secret.sh
 
 new-source: ## Scaffold SQL + registry for a new upstream API (NAME=weather [HOST=api.weather.com])
 	@if [ -z "$(NAME)" ]; then \

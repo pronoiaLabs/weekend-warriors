@@ -59,7 +59,13 @@ import yaml
 # ---------------------------------------------------------------------------
 
 # Sources the runner knows how to build. Extend build_source() in run.py to add more.
-SUPPORTED_SOURCES: tuple[str, ...] = ("rest_api", "sample", "firecrawl", "openmeteo")
+SUPPORTED_SOURCES: tuple[str, ...] = (
+    "rest_api",
+    "sample",
+    "firecrawl",
+    "openmeteo",
+    "snowflake_app",
+)
 
 # Dispositions dlt accepts as a plain string. `skip` is deliberately absent: a
 # pipeline that loads nothing should not be in the registry.
@@ -105,6 +111,10 @@ class PipelineSpec:
     source: str
     config: dict[str, Any]
     schedule: str | None = None
+    # Child of another Task instead of a cron. Mutually exclusive with `schedule`.
+    # generate_tasks.py emits `AFTER <fqn>` and joins that graph's suspend/resume.
+    # A Snowflake Task cannot have both SCHEDULE and AFTER.
+    after: str | None = None
     # Database STEM, not a full name: `NFL` resolves to NFL_DEV_DB / NFL_PROD_DB via
     # resolve_database(). `DLT` is the default so a pipeline that declares no sport
     # lands in the shared DLT_DEV_DB / DLT_PROD_DB, which is where `sample` belongs.
@@ -131,11 +141,17 @@ class PipelineSpec:
     #   external_access  the EAI granting egress, e.g. NFL_API_EAI
     #
     # They are optional because `sample` needs none of them, and Open-Meteo has no
-    # key. validate() requires `external_access` once a `schedule` is present;
-    # `secret` and `env_var` only when the source authenticates.
+    # key. validate() requires `external_access` once a `schedule` or `after` is
+    # present; `secret` and `env_var` only when the source (or dest) authenticates.
+    # An `after` pipeline always needs the pair: it is a dest-password binding.
     secret: str | None = None
     env_var: str | None = None
     external_access: str | None = None
+
+    @property
+    def is_task(self) -> bool:
+        """True when generate_tasks.py should emit a Snowflake Task."""
+        return bool(self.schedule or self.after)
 
     def validate(self) -> None:
         """Raise RegistryError on anything structurally wrong.
@@ -156,6 +172,7 @@ class PipelineSpec:
                 f"pipeline '{self.name}': `config` must be a non-empty mapping"
             )
         self._validate_database()
+        self._validate_task_trigger()
         self._validate_schedule_bindings()
         self._validate_write_disposition()
         self._validate_season_rollover()
@@ -176,30 +193,54 @@ class PipelineSpec:
                 "starts: 8 for the NFL, 5 for the WNBA."
             )
 
+    def _validate_task_trigger(self) -> None:
+        """A Task is cron or a child, never both, and `after` must be interpolatable.
+
+        Snowflake rejects a Task that sets SCHEDULE and AFTER together. The value is
+        dropped straight into Task DDL, so it has to be DATABASE.SCHEMA.NAME.
+        """
+        if self.schedule and self.after:
+            raise RegistryError(
+                f"pipeline '{self.name}': schedule and after are mutually exclusive. "
+                "A Task is either cron or a child of another Task, not both."
+            )
+        if not self.after:
+            return
+        parts = self.after.split(".")
+        if len(parts) != 3 or not all(
+            p and p.replace("_", "").isalnum() and not p[0].isdigit() for p in parts
+        ):
+            raise RegistryError(
+                f"pipeline '{self.name}': after must be a fully-qualified Task name "
+                f"(DATABASE.SCHEMA.NAME), got {self.after!r}"
+            )
+
     def _validate_schedule_bindings(self) -> None:
-        """A scheduled pipeline must carry everything a Task cannot supply.
+        """A Task pipeline must carry everything a Task cannot supply.
 
         A Task passes no arguments and nobody is watching when it fires. A missing
         `external_access` means the container has no network at all. A missing
         `secret` on an authenticated source means KeyError from dlt.secrets. Both
         surface as a red Task at 09:00 UTC rather than as an error anyone reads.
 
-        `external_access` is always required once `schedule` is set. `secret` and
-        `env_var` are required together only when the source authenticates — Open-Meteo
-        has no key, and a dummy secret would be a lie. Declaring one of them without
-        the other is still rejected, because the job spec binds them as a pair.
+        `external_access` is always required once `schedule` or `after` is set.
+        `secret` and `env_var` are required together only when the source
+        authenticates — Open-Meteo has no key, and a dummy secret would be a lie.
+        Declaring one of them without the other is still rejected, because the job
+        spec binds them as a pair. An `after` pipeline always needs the pair: it
+        binds a destination password.
 
-        Only enforced when `schedule` is set, because an unscheduled pipeline gets its
-        bindings from the command line and `sample` needs none of them at all.
+        Only enforced when a Task will be emitted, because a hand-run pipeline gets
+        its bindings from the command line and `sample` needs none of them at all.
         """
-        if not self.schedule:
+        if not self.is_task:
             return
 
         if not self.external_access:
             raise RegistryError(
-                f"pipeline '{self.name}': has a schedule but does not declare "
-                "external_access. A Snowflake Task passes no arguments, so a "
-                "scheduled pipeline must record its external access integration."
+                f"pipeline '{self.name}': has a schedule or after but does not "
+                "declare external_access. A Snowflake Task passes no arguments, so "
+                "a Task pipeline must record its external access integration."
             )
 
         if bool(self.secret) != bool(self.env_var):
@@ -207,6 +248,12 @@ class PipelineSpec:
                 f"pipeline '{self.name}': secret and env_var must be declared "
                 "together. A scheduled pipeline that authenticates needs both; "
                 "one that does not (Open-Meteo) should declare neither."
+            )
+
+        if self.after and not self.secret:
+            raise RegistryError(
+                f"pipeline '{self.name}': after requires secret and env_var "
+                "(the destination password a Task cannot pass)."
             )
 
     def _validate_database(self) -> None:

@@ -82,6 +82,7 @@ jobs:
             tasks:
               - 'dlt-pipelines/pipelines/batch/registries/**'
               - 'dlt-pipelines/deploy/spcs/dlt_job.tmpl.yaml'
+              - 'dlt-pipelines/deploy/spcs/dlt_job_postgres.tmpl.yaml'
               - 'dlt-pipelines/deploy/tasks/generate_tasks.py'
             dev_specs:
               - 'dlt-pipelines/deploy/spcs/dlt_dev_job*.tmpl.yaml'
