@@ -2,8 +2,9 @@
 reads exist in it. The fixture form runs in CI; the live form describes the real
 tables and is the early warning for a dbt rename.
 
-The column lists below are the contract tiles rely on. Add to them as tiles land;
-a mart column that disappears upstream fails here before any page does.
+The contract is each tile's COLUMNS tuple (the columns its select names), so a
+mart column that disappears upstream fails here before any page does, and a new
+field on a row model is checked against the schema the moment it is added.
 """
 
 import os
@@ -13,29 +14,11 @@ import pytest
 from app.sports import fixtures
 from app.sports.capabilities import Capability as C
 from app.sports.registry import PROFILES
+from app.sports.tiles import game_board, slate
 
 REQUIRED: dict[str, set[str]] = {
-    "app_game_slate": {
-        "app_game_slate_key", "game_key", "season", "week", "season_type", "season_type_name",
-        "game_date", "game_datetime_et", "kickoff_slot_et", "is_completed",
-        "home_team_label", "home_team_name", "away_team_label", "away_team_name",
-        "stadium_name", "roof", "is_weather_relevant",
-        "kickoff_temp_f", "wind_mph", "precip_in",
-        "vendor", "home_spread", "total_line", "home_spread_movement", "total_line_movement",
-        "implied_home_team_total", "implied_away_team_total",
-        "home_score", "away_score", "props_open", "news_mentions_7d",
-    },
-    "app_game_prop_board": {
-        "app_game_prop_board_key", "game_key", "season", "week", "game_datetime_et", "is_completed",
-        "player_key", "player_name", "position", "position_group",
-        "team_label", "opponent_label", "is_home",
-        "vendor", "prop_type", "market_type", "stat_key", "stat_label",
-        "line_value", "opening_line_value", "line_movement", "over_odds", "under_odds", "market_odds",
-        "trailing_games", "trailing_avg", "stat_last3", "trailing_over_line", "trailing_hit_rate",
-        "gap_to_line", "games_played_to_date", "stat_avg_to_date", "hit_rate_over_line",
-        "opponent_allowed_per_game", "opponent_allowed_rank", "opponent_allowed_teams_ranked",
-        "news_headline", "news_context", "actual_value", "outcome",
-    },
+    "app_game_slate": set(slate.COLUMNS),
+    "app_game_prop_board": set(game_board.COLUMNS),
 }
 
 

@@ -6,6 +6,7 @@ import Aurora from '../components/Aurora.tsx'
 import SportNav from '../components/sports/SportNav.tsx'
 import { useApi } from '../hooks/useApi.ts'
 import { useSportParam } from '../hooks/useSportParam.ts'
+import { useTilt } from '../hooks/useTilt.ts'
 import { useViewport } from '../hooks/useViewport.ts'
 
 const CapabilitiesContext = createContext<CapabilitiesPayload | null>(null)
@@ -22,6 +23,7 @@ export default function SportLayout() {
   const sport = useSportParam()
   const viewport = useViewport()
   const caps = useApi((signal) => fetchCapabilities(sport, signal), [sport])
+  useTilt()
 
   return (
     <CapabilitiesContext.Provider value={caps.data}>
