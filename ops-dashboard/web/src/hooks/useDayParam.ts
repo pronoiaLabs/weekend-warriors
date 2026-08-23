@@ -28,7 +28,7 @@ export function useDayParam() {
 export function useOpsSearch(): string {
   const [params] = useSearchParams()
   const preserved = new URLSearchParams()
-  for (const key of ['sport', 'date', 'view', 'kind'] as const) {
+  for (const key of ['sport', 'date', 'view', 'kind', 'source'] as const) {
     const value = params.get(key)
     if (value) preserved.set(key, value)
   }

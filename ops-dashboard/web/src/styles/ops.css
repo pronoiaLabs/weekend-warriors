@@ -121,6 +121,14 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
 .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .chip.bad:not(.on) { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 40%, transparent); }
 .chip.warn:not(.on) { color: var(--missed); border-color: color-mix(in srgb, var(--missed) 45%, transparent); }
+/* a native select drawn as a chip: the control is transparent over the chip, the caret is ours */
+.chip.select { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 0; cursor: pointer; }
+.chip.select select { appearance: none; -webkit-appearance: none; background: transparent; border: 0; color: inherit; font: inherit; padding: 6px 26px 6px 12px; min-height: 30px; cursor: pointer; outline: none; }
+.chip.select select option { color: var(--ink); background: var(--bg); }
+.chip.select .caret { position: absolute; right: 10px; pointer-events: none; font-size: 11px; opacity: .7; }
+.chip.select:focus-within { border-color: var(--accent); }
+.slate-filters { flex-wrap: nowrap; overflow-x: auto; }
+.shell-narrow .slate-filters { flex-wrap: wrap; overflow: visible; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 20px; align-items: center; }
 .crumb-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .crumb-row .crumbs { margin-bottom: 0; }

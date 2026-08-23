@@ -2,15 +2,19 @@ import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { fetchPipelinesIndex } from '../api/client.ts'
 import type { PipelineIndexRow, PipelinesIndexPayload } from '../api/types.ts'
+import Select from '../components/Select.tsx'
 import { FormStrip } from '../components/slate/FormStrip.tsx'
 import { pctText, streakClass } from '../utils/records.ts'
 import TileFrame from '../components/TileFrame.tsx'
 import { useApi } from '../hooks/useApi.ts'
 import { useOpsSearch } from '../hooks/useDayParam.ts'
+import { useSlateFilters } from '../hooks/useSlateFilters.ts'
 import { ALL_SPORTS, useSportFilter } from '../hooks/useSportFilter.ts'
 import { useChrome } from '../state/chrome.tsx'
 import { compact, dayHhmm, duration, num, relativeTo } from '../utils/format.ts'
 import { leagueLabel } from '../utils/leagues.ts'
+import { ALL_SOURCES } from '../utils/slateView.ts'
+import { sortSources, sourceLabel } from '../utils/sources.ts'
 import '../styles/pages/pipelines.css'
 
 // Under this, a pipeline is losing often enough to be worth a rose number.
@@ -72,6 +76,7 @@ function lastRun(row: PipelineIndexRow, now: string): string {
     at the top of its group. */
 export default function PipelinesRecords() {
   const { sport } = useSportFilter()
+  const { source, setSource } = useSlateFilters()
   const { setNow } = useChrome()
   const index = useApi((signal) => fetchPipelinesIndex(sport, signal), [sport])
 
@@ -81,7 +86,10 @@ export default function PipelinesRecords() {
   }, [index.data?.now, setNow])
 
   const data = index.data
-  const grouped = data ? leagues(data.pipelines) : []
+  // the source chip narrows the table and the KPIs together, so they agree
+  const rows = data ? data.pipelines.filter((r) => source === ALL_SOURCES || r.source === source) : []
+  const grouped = leagues(rows)
+  const sources = data ? sortSources(data.pipelines.map((r) => r.source ?? 'unknown')) : []
 
   return (
     <div className="page page-pipelines">
@@ -96,9 +104,23 @@ export default function PipelinesRecords() {
         </p>
       </div>
 
-      {data && <Kpis data={data} />}
+      {data && <Kpis data={{ ...data, pipelines: rows }} />}
 
       <div className="filters">
+        {data && sources.length > 1 && (
+          <Select
+            label="Source"
+            active={source}
+            onPick={setSource}
+            items={[
+              { id: ALL_SOURCES, label: `All sources · ${data.pipelines.length}` },
+              ...sources.map((id) => ({
+                id,
+                label: `${sourceLabel(id)} · ${data.pipelines.filter((r) => (r.source ?? 'unknown') === id).length}`,
+              })),
+            ]}
+          />
+        )}
         <span className="hint">
           Worst record first inside each league. Click a row for the pipeline, a form cell for that
           run.
@@ -117,7 +139,7 @@ export default function PipelinesRecords() {
       {data && (
         <TileFrame
           title="Records"
-          meta={`${data.pipelines.length} pipelines · last ${data.window_days} days`}
+          meta={`${rows.length}${source === ALL_SOURCES ? '' : ` of ${data.pipelines.length}`} pipelines · last ${data.window_days} days`}
           className="table-tile"
           query={data.query}
         >
@@ -143,7 +165,7 @@ export default function PipelinesRecords() {
               </tbody>
             </table>
           ) : (
-            <p className="hint">No pipeline matches this sport filter.</p>
+            <p className="hint">No pipeline matches this sport and source filter.</p>
           )}
         </TileFrame>
       )}

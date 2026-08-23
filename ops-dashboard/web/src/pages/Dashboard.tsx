@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { fetchHeadlines, fetchPipelinesIndex, fetchSlate } from '../api/client.ts'
 import type { SlatePayload } from '../api/types.ts'
 import Chips from '../components/Chips.tsx'
+import Select from '../components/Select.tsx'
 import { DayStrip } from '../components/slate/DayStrip.tsx'
 import { HeadlinesPanel } from '../components/slate/HeadlinesPanel.tsx'
 import { LeagueRow } from '../components/slate/LeagueRow.tsx'
@@ -14,14 +15,17 @@ import { useSportFilter } from '../hooks/useSportFilter.ts'
 import { useChrome } from '../state/chrome.tsx'
 import { compact, longDayTitle, num } from '../utils/format.ts'
 import {
+  ALL_SOURCES,
   filterLeagues,
   KIND_LABELS,
   kindCounts,
   SLATE_KINDS,
   SLATE_VIEWS,
+  sourceCounts,
   VIEW_LABELS,
   viewCounts,
 } from '../utils/slateView.ts'
+import { sourceLabel } from '../utils/sources.ts'
 
 /** One day of the schedule read as a scoreboard: score cards grouped by league,
     the surrounding week as a day rail, the AI wire and the worst records in
@@ -31,7 +35,7 @@ import {
 export default function Dashboard() {
   const { sport } = useSportFilter()
   const { day, setDay } = useDayParam()
-  const { view, kind, setView, setKind } = useSlateFilters()
+  const { view, kind, source, setView, setKind, setSource } = useSlateFilters()
   const { setNow } = useChrome()
 
   const slate = useApi((signal) => fetchSlate(sport, day, signal), [sport, day])
@@ -47,10 +51,11 @@ export default function Dashboard() {
   const data = slate.data
   const today = data?.days.find((d) => d.is_today)?.date ?? null
   const selected = data?.days.find((d) => d.date === data.date) ?? null
-  const filtering = view !== 'all' || kind !== 'all'
-  const shown = data ? filterLeagues(data.leagues, view, kind) : []
+  const filtering = view !== 'all' || kind !== 'all' || source !== ALL_SOURCES
+  const shown = data ? filterLeagues(data.leagues, view, kind, source) : []
   const views = data ? viewCounts(data.leagues) : null
   const kinds = data ? kindCounts(data.leagues) : null
+  const sources = data ? sourceCounts(data.leagues) : null
 
   return (
     <div className="page page-dashboard">
@@ -75,7 +80,7 @@ export default function Dashboard() {
         )}
 
         <div className="dash-main">
-          {data && views && kinds && (
+          {data && views && kinds && sources && (
             <div className="filters slate-filters">
               <Chips
                 label="Show"
@@ -88,7 +93,8 @@ export default function Dashboard() {
                   warn: id === 'missed' && views[id] > 0,
                 }))}
               />
-              <Chips
+              {/* Kind and Source are selects, not chips: three chip rows wrap at full width */}
+              <Select
                 label="Kind"
                 active={kind}
                 onPick={(id) => setKind(id as typeof kind)}
@@ -97,6 +103,18 @@ export default function Dashboard() {
                   label: `${KIND_LABELS[id]} · ${kinds[id]}`,
                 }))}
               />
+              {/* one vendor per option; a pick hides dbt builds, which belong to no single source */}
+              {sources.length > 2 && (
+                <Select
+                  label="Source"
+                  active={source}
+                  onPick={setSource}
+                  items={sources.map(({ id, count }) => ({
+                    id,
+                    label: `${id === ALL_SOURCES ? 'All sources' : sourceLabel(id)} · ${count}`,
+                  }))}
+                />
+              )}
             </div>
           )}
           <div className="filters">
@@ -137,7 +155,7 @@ export default function Dashboard() {
                   <TileFrame title="Nothing on the slate" meta={data.date}>
                     <p className="hint">
                       {filtering
-                        ? `No ${VIEW_LABELS[view].toLowerCase()} ${kind === 'all' ? 'jobs' : KIND_LABELS[kind].toLowerCase()} on this day for ${sport === 'all' ? 'any sport' : sport}.`
+                        ? `No ${VIEW_LABELS[view].toLowerCase()} ${kind === 'all' ? 'jobs' : KIND_LABELS[kind].toLowerCase()}${source === ALL_SOURCES ? '' : ` from ${sourceLabel(source)}`} on this day for ${sport === 'all' ? 'any sport' : sport}.`
                         : `No slot, run or build on this day for ${sport === 'all' ? 'any sport' : sport}.`}
                     </p>
                   </TileFrame>

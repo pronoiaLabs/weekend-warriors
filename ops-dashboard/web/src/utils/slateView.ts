@@ -1,4 +1,5 @@
 import type { SlateCard, SlateLeague } from '../api/types.ts'
+import { sortSources } from './sources.ts'
 
 /** The day's score cards, sliced the way the dashboard filter chips speak. */
 export const SLATE_VIEWS = ['all', 'ahead', 'failed', 'missed', 'missing', 'final'] as const
@@ -6,6 +7,9 @@ export type SlateView = (typeof SLATE_VIEWS)[number]
 
 export const SLATE_KINDS = ['all', 'ingestion', 'dbt'] as const
 export type SlateKind = (typeof SLATE_KINDS)[number]
+
+/** The source chip is open-ended: any registry `source` value, or 'all'. */
+export const ALL_SOURCES = 'all'
 
 export const VIEW_LABELS: Record<SlateView, string> = {
   all: 'All',
@@ -40,10 +44,18 @@ export function cardView(card: SlateCard): Exclude<SlateView, 'all'> {
   return 'final'
 }
 
-export function cardMatches(card: SlateCard, view: SlateView, kind: SlateKind): boolean {
+/** The vendor behind a card. A dbt build has none: it fired because data
+    landed, from whichever sources landed it, so a source pick hides builds. */
+export function cardSource(card: SlateCard): string | null {
+  if (card.kind === 'build') return null
+  return card.source ?? null
+}
+
+export function cardMatches(card: SlateCard, view: SlateView, kind: SlateKind, source: string = ALL_SOURCES): boolean {
   if (view !== 'all' && cardView(card) !== view) return false
   if (kind === 'ingestion' && card.kind === 'build') return false
   if (kind === 'dbt' && card.kind !== 'build') return false
+  if (source !== ALL_SOURCES && cardSource(card) !== source) return false
   return true
 }
 
@@ -77,13 +89,35 @@ export function kindCounts(leagues: SlateLeague[]): Record<SlateKind, number> {
   return counts
 }
 
+/** Sources present on the day, in vendor order, each with its card count.
+    `all` counts only cards that carry a source, so the chip row's numbers add up. */
+export function sourceCounts(leagues: SlateLeague[]): { id: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const league of leagues) {
+    for (const card of league.cards) {
+      const source = cardSource(card)
+      if (source) counts.set(source, (counts.get(source) ?? 0) + 1)
+    }
+  }
+  const total = [...counts.values()].reduce((n, c) => n + c, 0)
+  return [
+    { id: ALL_SOURCES, count: total },
+    ...sortSources(counts.keys()).map((id) => ({ id, count: counts.get(id) ?? 0 })),
+  ]
+}
+
 /** Drop empty leagues after the chips run, so a "Still ahead" pick does not
     leave a row of ingestion that already finished. */
-export function filterLeagues(leagues: SlateLeague[], view: SlateView, kind: SlateKind): SlateLeague[] {
+export function filterLeagues(
+  leagues: SlateLeague[],
+  view: SlateView,
+  kind: SlateKind,
+  source: string = ALL_SOURCES,
+): SlateLeague[] {
   return leagues
     .map((league) => ({
       ...league,
-      cards: league.cards.filter((card) => cardMatches(card, view, kind)),
+      cards: league.cards.filter((card) => cardMatches(card, view, kind, source)),
     }))
     .filter((league) => league.cards.length > 0)
 }
