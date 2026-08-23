@@ -80,7 +80,9 @@ RUN_COLUMNS: tuple[str, ...] = (
     "cpu_samples", "cpu_cores_limit", "mem_bytes_max", "mem_samples", "mem_bytes_requested",
     "restarts", "telemetry_available", "container_never_started",
 )  # fmt: skip
-REGISTRY_COLUMNS: tuple[str, ...] = ("name", "schedule", "target_database", "enabled")
+REGISTRY_COLUMNS: tuple[str, ...] = (
+    "name", "schedule", "target_database", "enabled", "updated_at",
+)  # fmt: skip
 LOG_COLUMNS: tuple[str, ...] = (
     "event_ts", "severity", "logger_name", "container_name", "log_format", "message",
 )  # fmt: skip
@@ -207,24 +209,70 @@ def registry_sql() -> str:
     )
 
 
+def first_runs_sql() -> str:
+    return (
+        f"SELECT PIPELINE, MIN(RUN_STARTED_AT) AS FIRST_RUN_AT "
+        f"FROM {_from('pipeline_runs')} GROUP BY PIPELINE"
+    )
+
+
+def first_runs() -> dict[str, str]:
+    """Pipeline -> ISO time of its earliest recorded run, over the whole table."""
+    if config.is_fixtures():
+        record(first_runs_sql())
+        first: dict[str, str] = {}
+        for r in _run_rows():
+            at = r["run_started_at"]
+            if r["pipeline"] not in first or at < first[r["pipeline"]]:
+                first[r["pipeline"]] = at
+        return first
+    from app import db
+
+    rows = db.query(first_runs_sql(), tag={"tile": "first_runs"})
+    return {r["pipeline"]: _iso_utc(r["first_run_at"]) for r in rows if r.get("first_run_at")}
+
+
+def live_from(updated_at: str | None, first_run_at: str | None) -> str | None:
+    """When a pipeline's schedule starts to count, as an ISO time.
+
+    A cron expanded over a day produces slots the Task may not have existed
+    for. The registry row's `updated_at` is the last sync, which for a
+    pipeline that has never run is the deploy that created it; the earliest
+    run ever is the other witness. The earlier of the two is the floor: slots
+    before it are not no-shows, they are before the Task existed. An old
+    pipeline floors at its first run long ago and is unaffected.
+    """
+    candidates = [t for t in (updated_at, first_run_at) if t]
+    return min(candidates) if candidates else None
+
+
 def pipelines() -> list[dict[str, Any]]:
-    """Registry pipelines as dicts: name, sport, schedule, enabled."""
+    """Registry pipelines as dicts: name, sport, schedule, enabled, live_from."""
     if config.is_fixtures():
         record(registry_sql())
+        first = first_runs()
         return [
             {
                 "name": r["name"],
                 "sport": r["target_database"],
                 "schedule": r["schedule"],
                 "enabled": r["enabled"],
+                "live_from": live_from(r.get("updated_at"), first.get(r["name"])),
             }
             for r in _fixture("registry")
             if r.get("schedule") is not None
         ]
     from app import registry
 
+    first = registry.first_runs()
     return [
-        {"name": p.name, "sport": p.sport, "schedule": p.schedule, "enabled": p.enabled}
+        {
+            "name": p.name,
+            "sport": p.sport,
+            "schedule": p.schedule,
+            "enabled": p.enabled,
+            "live_from": live_from(p.updated_at, first.get(p.name)),
+        }
         for p in registry.load_registry()
     ]
 

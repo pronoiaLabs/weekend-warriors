@@ -63,7 +63,10 @@ CREATE TABLE IF NOT EXISTS DLT_DB.OPS.PIPELINE_REGISTRY (
     external_access   STRING,
     config            VARIANT,
     enabled           BOOLEAN           DEFAULT TRUE,
-    updated_at        TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP(),
+    -- SYSDATE() is UTC regardless of the session; CURRENT_TIMESTAMP() into an NTZ
+    -- column writes the account's Pacific wall time, which readers comparing against
+    -- UTC run times (the ops dashboard) misplace by seven hours. Matches registry_sync.py.
+    updated_at        TIMESTAMP_NTZ     DEFAULT SYSDATE(),
     CONSTRAINT pk_pipeline_registry PRIMARY KEY (name)
 )
 COMMENT = 'Control-plane registry of dlt pipelines. Synced from pipelines/batch/registries/.';

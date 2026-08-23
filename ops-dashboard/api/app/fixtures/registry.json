@@ -3,108 +3,126 @@
     "name": "sample",
     "schedule": null,
     "target_database": "DLT",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "nfl_advanced_stats",
     "schedule": "0 13 * * 2",
     "target_database": "NFL",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "nfl_games",
     "schedule": "0 9 * * *",
     "target_database": "NFL",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "nfl_injuries",
     "schedule": "0 22 * * *",
     "target_database": "NFL",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "nfl_plays",
     "schedule": "0 11 * * 2",
     "target_database": "NFL",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "nfl_reference",
     "schedule": "0 8 * * *",
     "target_database": "NFL",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "nfl_standings",
     "schedule": "0 12 * * 2",
     "target_database": "NFL",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "nfl_stats",
     "schedule": "0 10 * * *",
     "target_database": "NFL",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_advanced_game",
     "schedule": "0 20 * * 2",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_advanced_season",
     "schedule": "0 21 * * 2",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_games",
     "schedule": "0 15 * * *",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_injuries",
     "schedule": "0 23 * * *",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_plays",
     "schedule": "0 17 * * 2",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_reference",
     "schedule": "0 14 * * *",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_season_stats",
     "schedule": "0 19 * * 2",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_shot_locations",
     "schedule": "0 1 * * 3",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_standings",
     "schedule": "0 18 * * 2",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   },
   {
     "name": "wnba_stats",
     "schedule": "0 16 * * *",
     "target_database": "WNBA",
-    "enabled": true
+    "enabled": true,
+    "updated_at": "2026-07-01T00:00:00.000Z"
   }
 ]
