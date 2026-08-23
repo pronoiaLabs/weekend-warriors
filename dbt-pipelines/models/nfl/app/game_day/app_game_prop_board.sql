@@ -14,7 +14,8 @@
                             to date:  this season only, empty until the season starts
                           Each gives games, average, how many cleared THIS line; the
                           trailing window also gives the last three values.
-      the matchup         the opponent's per-game yards allowed to the player's position
+      the matchup         what the opponent allows per game to the player's position
+                          in the prop's stat, with its rank (app_team_allowed)
                           (QB passing, RB rushing, WR and TE receiving), ranked across
                           teams where 1 allows the most, for this season; the prior
                           season stands in until this season has games.
@@ -253,48 +254,21 @@ actual as (
 
 ),
 
--- yards allowed per game by each defense to each position, per season
-position_stat as (
-
-    select 'QB' as position, 'passing_yards'   as stat_key union all
-    select 'RB',             'rushing_yards'             union all
-    select 'WR',             'receiving_yards'           union all
-    select 'TE',             'receiving_yards'
-
-),
-
-allowed as (
-
-    select
-        iff(ol.team_key = ol.home_team_key, ol.away_team_key, ol.home_team_key)
-                                                        as defense_team_key,
-        ol.season,
-        ol.season_type,
-        ps.position,
-        ps.stat_key,
-        sum(ol.stat_value) / count(distinct ol.game_key) as allowed_per_game,
-        count(distinct ol.game_key)                     as defense_games
-    from offense_long ol
-    inner join players pl
-        on pl.player_key = ol.player_key
-    inner join position_stat ps
-        on ps.position = pl.position_abbreviation
-       and ps.stat_key = ol.stat_key
-    group by 1, 2, 3, 4, 5
-
-),
-
+-- what each defense allows, by position and stat: one definition, shared with
+-- the team page (app_team_allowed). Joined on the prop's own stat, so a RB
+-- receiving prop reads the RB receiving row, not the rushing one.
 allowed_ranked as (
 
     select
-        *,
-        rank() over (
-            partition by season, season_type, position
-            order by allowed_per_game desc
-        )                                               as allowed_rank,
-        count(*) over (partition by season, season_type, position)
-                                                        as teams_ranked
-    from allowed
+        team_key                                        as defense_team_key,
+        season,
+        season_type,
+        position,
+        stat_key,
+        allowed_per_game,
+        allowed_rank,
+        teams_ranked
+    from {{ ref('app_team_allowed') }}
 
 ),
 
@@ -449,10 +423,12 @@ left join allowed_ranked ac
    and ac.season = s.season
    and ac.season_type = s.season_type
    and ac.position = s.position
+   and ac.stat_key = s.stat_key
 left join allowed_ranked ap
     on ap.defense_team_key = s.opponent_team_key
    and ap.season = s.season - 1
    and ap.season_type = s.season_type
    and ap.position = s.position
+   and ap.stat_key = s.stat_key
 left join latest_news ln
     on ln.game_player_vendor_prop_key = s.game_player_vendor_prop_key

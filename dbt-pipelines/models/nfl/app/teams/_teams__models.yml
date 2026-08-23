@@ -1,0 +1,119 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# Teams: standings, a team's season, its record against the number, what its defense allows.
+
+models:
+  - name: app_team_allowed
+    description: >
+      What each defense allows, by position and stat. One row per defense,
+      season, season type, position and stat (the pairs props are written on),
+      with the per-game amount, the league average, and a rank where 1 allows
+      the most. The single definition behind the prop board's matchup column and
+      the team page's allowed table.
+    columns:
+      - name: app_team_allowed_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: position
+        tests:
+          - accepted_values: {values: ['QB', 'RB', 'WR', 'TE']}
+      - name: stat_key
+        tests: [not_null]
+      - name: allowed_rank
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 32}
+      - name: defense_games
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1}
+
+  - name: app_team_weeks
+    description: >
+      A team's season game by game. One row per team game and sportsbook (vendor
+      NULL when no closing line exists), with the team's box score, the opponent's,
+      the result, running season counts, and the closing line read from this
+      team's side with cover and over calls against the final score. Completed
+      games only.
+    columns:
+      - name: app_team_weeks_key
+        tests: [unique, not_null]
+      - name: team_game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('fact_team_game_offense')", field: team_game_key}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_label
+        tests: [not_null]
+      - name: result
+        tests:
+          - accepted_values: {values: ['W', 'L', 'T']}
+      - name: spread_result
+        tests:
+          - accepted_values: {values: ['cover', 'loss', 'push']}
+      - name: total_result
+        tests:
+          - accepted_values: {values: ['over', 'under', 'push']}
+      - name: season_game_number
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 25}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_game_key, vendor]
+
+  - name: app_team_standings
+    description: >
+      The standings table with home and away splits. One row per team, season,
+      season type and split ('all', 'home', 'away'), derived from the team game
+      facts so it is live during a season; rates are sum over sum; ranks are
+      within the season, season type and split.
+    columns:
+      - name: app_team_standings_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: split
+        tests:
+          - accepted_values: {values: ['all', 'home', 'away']}
+      - name: win_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: rank_overall
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 32}
+      - name: rank_division
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 4}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_key, season, season_type, split]
+
+  - name: app_team_ats
+    description: >
+      A team's record against the closing number, per book. One row per team,
+      season, season type and sportsbook, aggregated from app_team_weeks rows
+      that carry a line; pushes sit outside the percentages.
+    columns:
+      - name: app_team_ats_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: vendor
+        tests: [not_null]
+      - name: ats_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: over_pct
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}

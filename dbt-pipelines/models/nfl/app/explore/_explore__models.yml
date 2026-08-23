@@ -1,0 +1,57 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# Explore: flat, one-table-per-grain sheets for the Explorer, curated from the
+# page marts so the sheet's column set is its own contract. Every sheet has a
+# row_id and no surrogate-key or running-count plumbing.
+
+models:
+  - name: app_explore_player_games
+    description: "Offensive player games, one row per player game, curated from app_player_weeks."
+    columns:
+      - name: row_id
+        tests: [unique, not_null]
+      - name: player_name
+        tests: [not_null]
+
+  - name: app_explore_defender_games
+    description: "Defensive player games, one row per defender game, curated from app_player_defense_weeks."
+    columns:
+      - name: row_id
+        tests: [unique, not_null]
+
+  - name: app_explore_team_games
+    description: "Team games, one row per team game (no line), curated from app_team_weeks."
+    columns:
+      - name: row_id
+        tests: [unique, not_null]
+      - name: team
+        tests: [not_null]
+
+  - name: app_explore_game_lines
+    description: "Game lines, one row per game and book with a closing line, curated from app_game_slate."
+    columns:
+      - name: row_id
+        tests: [unique, not_null]
+      - name: vendor
+        tests: [not_null]
+
+  - name: app_explore_player_props
+    description: "Player props, one row per prop at a book, curated from app_game_prop_board."
+    columns:
+      - name: row_id
+        tests: [unique, not_null]
+
+  - name: app_explore_news
+    description: "News mentions, one row per mention, curated from app_news_mentions."
+    columns:
+      - name: row_id
+        tests: [unique, not_null]
+
+  - name: app_explore_line_moves
+    description: "Pregame line changes, one row per change at a book, curated from app_line_history."
+    columns:
+      - name: row_id
+        tests: [unique, not_null]

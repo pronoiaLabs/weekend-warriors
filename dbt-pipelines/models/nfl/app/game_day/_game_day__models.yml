@@ -1,9 +1,9 @@
 version: 2
 
-# APP -- the serving layer for the analytics dashboard. Page-shaped marts built
-# from CORE, read by a thin API with bound filters. Long format with the
-# parameters as columns; sport-agnostic column names (team_label, player_name,
-# position) so NCAAF marts can carry the same contract. Not Cortex tools.
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# Game day: the board and the game page.
 
 models:
   - name: app_game_slate
