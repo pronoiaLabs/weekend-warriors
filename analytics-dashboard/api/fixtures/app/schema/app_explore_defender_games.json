@@ -1,0 +1,146 @@
+{
+  "table": "app_explore_defender_games",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "row_id",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position_group",
+      "type": "VARCHAR(20)",
+      "nullable": true
+    },
+    {
+      "name": "team",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "opponent",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "team_result",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_points",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opponent_points",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "total_tackles",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "solo_tackles",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "assisted_tackles",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "tackles_for_loss",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "sacks",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "qb_hits",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "passes_defended",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "interceptions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "interception_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "interception_touchdowns",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "fumbles_recovered",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "fumbles_touchdowns",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "takeaways",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "defensive_touchdowns",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    }
+  ]
+}

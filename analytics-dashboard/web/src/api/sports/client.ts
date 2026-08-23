@@ -1,6 +1,7 @@
 import { get } from '../client.ts'
 import type {
   CapabilitiesPayload,
+  CatalogPayload,
   GameMarketsPayload,
   GamePayload,
   HealthPayload,
@@ -8,6 +9,7 @@ import type {
   MarketsPayload,
   NewsPayload,
   PlayerPayload,
+  SheetPayload,
   SlatePayload,
   Split,
   StandingsPayload,
@@ -107,4 +109,21 @@ export type NewsParams = {
 
 export function fetchNews(sport: string, params: NewsParams, signal?: AbortSignal): Promise<NewsPayload> {
   return get<NewsPayload>(`${sportPath(sport)}/news`, params, signal)
+}
+
+export function fetchCatalog(sport: string, signal?: AbortSignal): Promise<CatalogPayload> {
+  return get<CatalogPayload>(`${sportPath(sport)}/explore`, {}, signal)
+}
+
+export type SheetParams = {
+  where: string[]
+  order?: string
+  desc?: boolean
+  limit?: number
+  offset?: number
+}
+
+/** `where` repeats as column:value (get() appends an array param once per item). */
+export function fetchSheet(sport: string, sheet: string, params: SheetParams, signal?: AbortSignal): Promise<SheetPayload> {
+  return get<SheetPayload>(`${sportPath(sport)}/explore/${encodeURIComponent(sheet)}`, params, signal)
 }

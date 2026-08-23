@@ -1,0 +1,136 @@
+{
+  "table": "app_explore_line_moves",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "row_id",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "away_team",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_team",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "vendor",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "snapshot_number",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "snapshots_before_kickoff",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "is_opening",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_closing",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "snapshot_observed_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "hours_before_kickoff",
+      "type": "NUMBER(25,1)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_spread_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "total_line",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "over_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "under_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_moneyline_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_moneyline_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread_change",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "total_line_change",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "home_spread_since_open",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "total_line_since_open",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    }
+  ]
+}

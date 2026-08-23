@@ -1,0 +1,296 @@
+{
+  "table": "app_explore_team_games",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "row_id",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "conference",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "division",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "opponent",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "result",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "went_to_overtime",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "points_for",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "points_against",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "point_margin",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "total_points",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "points_q1",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "points_q2",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "points_q3",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "points_q4",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "points_ot",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "first_downs",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "total_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "plays",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "yards_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "net_passing_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_completions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "passing_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "rushing_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "rushing_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "third_down_conversions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "third_down_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "third_down_pct",
+      "type": "NUMBER(26,3)",
+      "nullable": true
+    },
+    {
+      "name": "fourth_down_conversions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "fourth_down_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "red_zone_scores",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "red_zone_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "red_zone_pct",
+      "type": "NUMBER(26,3)",
+      "nullable": true
+    },
+    {
+      "name": "total_drives",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "possession_time_seconds",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "turnovers",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "takeaways",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "turnover_margin",
+      "type": "NUMBER(20,0)",
+      "nullable": true
+    },
+    {
+      "name": "fumbles_lost",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "interceptions_thrown",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "sacks_allowed",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "sacks_recorded",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "penalties",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "penalty_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opp_total_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opp_yards_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "opp_net_passing_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opp_rushing_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opp_third_down_conversions",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opp_third_down_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opp_red_zone_scores",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "opp_red_zone_attempts",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    }
+  ]
+}

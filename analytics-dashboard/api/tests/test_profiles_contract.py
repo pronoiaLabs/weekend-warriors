@@ -14,7 +14,7 @@ import pytest
 from app.sports import fixtures
 from app.sports.capabilities import Capability as C
 from app.sports.registry import PROFILES
-from app.sports.tiles import game_board, markets, news, players, slate, teams
+from app.sports.tiles import explore, game_board, markets, news, players, slate, teams
 
 REQUIRED: dict[str, set[str]] = {
     "app_game_slate": set(slate.COLUMNS),
@@ -29,6 +29,8 @@ REQUIRED: dict[str, set[str]] = {
     "app_line_history": set(markets.LINE_COLUMNS),
     "app_prop_line_history": set(markets.PROP_COLUMNS),
     "app_news_mentions": set(news.COLUMNS),
+    # the Explorer reads whatever columns a sheet has; row_id is the one it relies on
+    **{f"app_explore_{s.id}": {"row_id"} for s in explore.SHEETS},
 }
 
 

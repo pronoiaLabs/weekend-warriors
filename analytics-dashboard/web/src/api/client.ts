@@ -9,14 +9,13 @@ export class ApiError extends Error {
   }
 }
 
-export async function get<T>(
-  path: string,
-  params: Record<string, string | number | boolean | undefined> = {},
-  signal?: AbortSignal,
-): Promise<T> {
+export type Param = string | number | boolean | undefined | string[]
+
+export async function get<T>(path: string, params: Record<string, Param> = {}, signal?: AbortSignal): Promise<T> {
   const query = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== '') query.set(k, String(v))
+    if (Array.isArray(v)) for (const item of v) query.append(k, item)
+    else if (v !== undefined && v !== '') query.set(k, String(v))
   }
   const qs = query.toString()
   const response = await fetch(qs ? `${path}?${qs}` : path, {

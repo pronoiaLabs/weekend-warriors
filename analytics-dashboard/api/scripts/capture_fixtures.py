@@ -71,6 +71,16 @@ SELECTION: dict[str, dict[C, str]] = {
         ),
         # every mention; the feeds began on 2026-08-20
         C.NEWS: "published_date >= '2026-08-01'",
+        # the Explorer's sheets: a slice of each grain the page's filters can
+        # cut further (two teams' player seasons, one completed team season,
+        # two lined weeks, one book's props, two days of news, two books' moves)
+        C.EXPLORE_PLAYER_GAMES: "season = 2025 and season_type = 'Regular Season' and team in ('KC', 'DET')",
+        C.EXPLORE_DEFENDER_GAMES: "season = 2025 and season_type = 'Regular Season' and team = 'KC' and week <= 3",
+        C.EXPLORE_TEAM_GAMES: "season = 2025 and season_type = 'Regular Season'",
+        C.EXPLORE_GAME_LINES: "season = 2026 and week in (1, 2)",
+        C.EXPLORE_PLAYER_PROPS: "season = 2026 and week = 1 and vendor = 'draftkings'",
+        C.EXPLORE_NEWS: "published_date >= '2026-08-22'",
+        C.EXPLORE_LINE_MOVES: "season = 2026 and week = 1 and vendor in ('kalshi', 'draftkings')",
     },
 }
 
