@@ -189,8 +189,11 @@ def test_suspend_and_resume_cover_the_same_pipelines_as_tasks() -> None:
 
     for spec in tasks:
         assert f"dlt_task_{spec.name} SUSPEND" in suspend_sql(spec)
-        assert f"dlt_task_{spec.name} RESUME" in resume_sql(spec)
         assert f"dlt_task_{spec.name}" in task_sql(spec)
+        if spec.schedule:
+            assert f"dlt_task_{spec.name} RESUME" in resume_sql(spec)
+        else:
+            assert "RESUME;" not in resume_sql(spec)
 
     # `sample` has neither schedule nor after and must appear in none of them.
     unscheduled = [s for s in load_registry().pipelines if not s.schedule and not s.after]
@@ -211,7 +214,7 @@ def test_suspend_tolerates_a_task_that_does_not_exist_yet() -> None:
     """
     from deploy.tasks.generate_tasks import resume_sql, suspend_sql  # noqa: PLC0415
 
-    spec = next(s for s in load_registry().pipelines if s.schedule or s.after)
+    spec = next(s for s in load_registry().pipelines if s.schedule)
     assert "ALTER TASK IF EXISTS" in suspend_sql(spec)
     assert "IF EXISTS" not in resume_sql(spec)
 
@@ -308,11 +311,21 @@ def test_suspend_resume_do_not_touch_the_harvest_graph() -> None:
         assert main(["--resume"]) == 0
     assert "DBT_BUILD_NFL" not in resume.getvalue()
     assert "DBT_HARVEST_NFL" not in resume.getvalue()
-    assert "dlt_task_nfl_app_to_postgres" in resume.getvalue()
+    assert "ALTER TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres RESUME" not in resume.getvalue()
+
+
+def test_execute_only_task_is_not_resumed() -> None:
+    """091453: RESUME requires SCHEDULE/AFTER/WHEN. EXECUTE TASK works suspended."""
+    from deploy.tasks.generate_tasks import resume_sql  # noqa: PLC0415
+
+    spec = load_registry().get("nfl_app_to_postgres")
+    out = resume_sql(spec)
+    assert "RESUME;" not in out
+    assert "execute-only" in out
 
 
 def test_ci_task_resume_count_matches_creates() -> None:
-    """CI greps CREATE OR ALTER TASK vs ALTER TASK DLT_DB.OPS.dlt_task_."""
+    """CI greps USING CRON creates vs ALTER TASK DLT_DB.OPS.dlt_task_."""
     from contextlib import redirect_stdout  # noqa: PLC0415
     from io import StringIO  # noqa: PLC0415
 
@@ -325,16 +338,18 @@ def test_ci_task_resume_count_matches_creates() -> None:
     with redirect_stdout(resume_out):
         assert main(["--resume"]) == 0
 
-    creates = [
+    scheduled = [
         line
         for line in tasks_out.getvalue().splitlines()
-        if line.startswith("CREATE OR ALTER TASK")
+        if "SCHEDULE = 'USING CRON" in line
     ]
     dlt_resumes = [
         line
         for line in resume_out.getvalue().splitlines()
         if line.startswith("ALTER TASK DLT_DB.OPS.dlt_task_")
     ]
-    assert creates
-    assert len(creates) == len(dlt_resumes)
+    assert scheduled
+    assert len(scheduled) == len(dlt_resumes)
+    assert "CREATE OR ALTER TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres" in tasks_out.getvalue()
+    assert "ALTER TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres RESUME" not in resume_out.getvalue()
     assert "DBT_" not in resume_out.getvalue()

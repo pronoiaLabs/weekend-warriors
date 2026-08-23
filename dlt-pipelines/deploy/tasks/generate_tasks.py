@@ -339,6 +339,14 @@ def resume_sql(spec: PipelineSpec) -> str:
     """
     if not is_emitted(spec):
         return f"-- skipped '{spec.name}': no schedule or after in registry\n"
+    # 091453: a Task with no SCHEDULE / AFTER / WHEN / FINALIZE cannot be
+    # RESUMEd. `after:` pipelines are execute-only; APP_COPY_NFL (or a human)
+    # fires them with EXECUTE TASK, which works while suspended.
+    if spec.after and not spec.schedule:
+        return (
+            f"-- skipped '{spec.name}': execute-only (no SCHEDULE/AFTER). "
+            "EXECUTE TASK works suspended; RESUME is 091453.\n"
+        )
     return f"ALTER TASK {TASKS_SCHEMA}.dlt_task_{spec.name} RESUME;\n"
 
 

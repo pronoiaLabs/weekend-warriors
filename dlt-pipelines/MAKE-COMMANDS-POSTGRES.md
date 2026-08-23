@@ -134,7 +134,8 @@ snow sql -c weekend-warriors -q \
 snow sql -c weekend-warriors -q \
   "SHOW TASKS LIKE 'APP_COPY_NFL' IN SCHEMA NFL_PROD_DB.OPS;"
 
-# First fire without waiting for a dbt build (wrapper or the loader Task)
+# First fire without waiting for a dbt build. Leave the loader SUSPENDED —
+# RESUME without SCHEDULE/AFTER is 091453. EXECUTE TASK works anyway.
 snow sql -c weekend-warriors --role DLT_LOADER_ROLE -q \
   "EXECUTE TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres;"
 ```
