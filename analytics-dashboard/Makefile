@@ -20,7 +20,7 @@ endef
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install dev dev-fixtures dev-api dev-api-fixtures dev-web serve test test-live lint build smoke fixtures setup
+.PHONY: help install dev dev-fixtures dev-api dev-api-fixtures dev-web serve test test-live lint build smoke nav fixtures setup
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<target>\033[0m\n"} \
@@ -83,6 +83,9 @@ build: ## Production build of the web app into web/dist
 
 smoke: build ## Walk every route in headless Chrome against fixtures; fails on console errors
 	./scripts/smoke.sh
+
+nav: build ## Drive the app over DevTools and assert back, memory and dock behaviour
+	./scripts/nav.sh
 
 ##@ Fixtures (live; reads a dev build of the APP marts)
 

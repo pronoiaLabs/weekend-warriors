@@ -25,6 +25,7 @@ make test               # api tests in fixture mode (live tests skipped)
 make test-live          # includes the live contract tests (needs the role)
 make lint               # ruff + tsc -b
 make smoke              # build, then walk every route in headless Chrome on fixtures
+make nav                # build, then drive the app over DevTools: back, memory, dock
 make fixtures           # recapture fixtures/app/nfl from your dev build (see Fixtures)
 ```
 
@@ -79,6 +80,29 @@ selection over fixture rows). Pins on the game page are per-browser `localStorag
 matchup notes are sentences generated on the client from the columns already on the page
 (extreme opponent ranks by position, the forecast, line movement, news headlines).
 
+### Navigation and state
+
+The URL is the source of truth for the page that is open: every choice on a page (season
+type, week, book, outdoor, stat family) is a search param, so any view is shareable and a
+reload lands on the same view. Three things sit around that rule so moving between pages
+feels continuous:
+
+- **A remembered view per sport** (`web/src/state/view.tsx`): the last slate choice is kept
+  in `sessionStorage`, the dock's "Game day" link and a game page's breadcrumb return to
+  that week and book rather than the defaults, and a bare `/nfl/slate` adopts it once. A new
+  tab starts clean. Pins use `localStorage` instead, because a board you built should
+  outlive the tab.
+- **Back that behaves** (`hooks/useBack.ts`): "Back to board" on a game page uses browser
+  history when you came from inside the app and falls back to the remembered board when the
+  page was the entry point. Chip clicks update the URL with `replace`, so browser Back leaves
+  the page instead of stepping through every filter you touched.
+- **Scroll memory** (`hooks/useScrollMemory.ts`): window scroll is restored on Back and
+  Forward and reset on a new page; the board's own scroll position is remembered per URL, so
+  returning from a game lands on the same kickoff slot.
+
+`make nav` asserts all of this by driving the built app in headless Chrome over the DevTools
+protocol (`scripts/navcheck.mjs`); `make smoke` only renders routes.
+
 Two facts about the data the pages show, both from the marts rather than the app:
 
 - Weather columns are null until the forecast run inside the game week; the card says
@@ -105,6 +129,7 @@ stable. Recapture after a mart change with `make fixtures DEV_SCHEMA=DEV_<user>`
 analytics-dashboard/
 ├── Makefile
 ├── scripts/smoke.sh           headless-Chrome route walk on fixtures (make smoke)
+├── scripts/nav.sh + navcheck.mjs   DevTools-driven navigation contract (make nav)
 ├── deploy/sql/
 │   ├── 01_role.sql            ANALYTICS_DASHBOARD_ROLE: semantic-view SELECT, warehouse USAGE
 │   ├── 02_cost_tag.sql        cost attribution note (no dedicated compute in v1)

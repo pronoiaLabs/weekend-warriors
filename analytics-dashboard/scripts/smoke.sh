@@ -49,7 +49,7 @@ ROUTES=(
   "/nfl/slate|kickoff slot"
   "/nfl/slate?season_type=Regular%20Season&week=1|SUN 1:00 PM"
   "/nfl/slate?season=2025&season_type=Regular%20Season&week=18|Final"
-  "/nfl/games/$GAME_KEY|Pinned plays"
+  "/nfl/games/$GAME_KEY|Back to board"
   "/nfl/games/$GAME_KEY?vendor=fanduel|fanduel line"
   "/nfl/games/nope|No such game"
   "/ncaaf|No page marts yet"

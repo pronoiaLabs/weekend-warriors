@@ -5,9 +5,11 @@ import type { CapabilitiesPayload } from '../api/sports/types.ts'
 import Aurora from '../components/Aurora.tsx'
 import SportNav from '../components/sports/SportNav.tsx'
 import { useApi } from '../hooks/useApi.ts'
+import { useWindowScrollMemory } from '../hooks/useScrollMemory.ts'
 import { useSportParam } from '../hooks/useSportParam.ts'
 import { useTilt } from '../hooks/useTilt.ts'
 import { useViewport } from '../hooks/useViewport.ts'
+import { ViewProvider } from '../state/view.tsx'
 
 const CapabilitiesContext = createContext<CapabilitiesPayload | null>(null)
 
@@ -19,11 +21,22 @@ export function useCapabilities(): CapabilitiesPayload | null {
 
 const SPORTS = ['nfl', 'ncaaf']
 
+/** Everything under /:sport. The ViewProvider wraps the chrome as well as the
+    pages, because the dock's links return to the remembered slice. */
 export default function SportLayout() {
   const sport = useSportParam()
+  return (
+    <ViewProvider sport={sport}>
+      <SportShell sport={sport} />
+    </ViewProvider>
+  )
+}
+
+function SportShell({ sport }: { sport: string }) {
   const viewport = useViewport()
   const caps = useApi((signal) => fetchCapabilities(sport, signal), [sport])
   useTilt()
+  useWindowScrollMemory()
 
   return (
     <CapabilitiesContext.Provider value={caps.data}>

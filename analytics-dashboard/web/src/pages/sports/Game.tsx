@@ -6,10 +6,12 @@ import Chips from '../../components/sports/Chips.tsx'
 import Crumbs from '../../components/sports/Crumbs.tsx'
 import TileFrame from '../../components/sports/TileFrame.tsx'
 import { useApi } from '../../hooks/useApi.ts'
+import { useBack } from '../../hooks/useBack.ts'
 import { usePins, type Pin } from '../../hooks/usePins.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
 import { fmt, odds, ordinal, signed, spreadText, titleCase, tone } from '../../lib/format.ts'
+import { boardPath, useView } from '../../state/view.tsx'
 
 /** Stat families group prop types into one chip row. A family shows only when
     the selected book has rows in it; unknown prop types fall into "Other". */
@@ -45,6 +47,11 @@ function GameBoard() {
 
   const res = useApi((signal) => fetchGame(sport, gameKey, vendorParam, signal), [sport, gameKey, vendorParam])
   const pins = usePins(sport)
+  const { view, setView } = useView()
+  // the board this game belongs to: the remembered week (and book), else the
+  // game's own week once it has loaded
+  const board = boardPath(sport, view)
+  const back = useBack(board)
 
   const set = (patch: Record<string, string | undefined>) => {
     const next = new URLSearchParams(search)
@@ -59,12 +66,12 @@ function GameBoard() {
   if (!data) {
     return (
       <div className="page page-game">
-        <Crumbs items={[{ label: 'Game day', to: `/${sport}/slate` }, { label: res.error ? 'No such game' : '...' }]} />
+        <Crumbs items={[{ label: 'Game day', to: board }, { label: res.error ? 'No such game' : '...' }]} />
         <div className="page-head">
           <h1>{res.error ? 'No such game' : 'Loading...'}</h1>
           {res.error && (
             <p className="lede">
-              {res.error}. Pick a game from the <Link to={`/${sport}/slate`}>board</Link>.
+              {res.error}. Pick a game from the <Link to={board}>board</Link>.
             </p>
           )}
         </div>
@@ -81,11 +88,21 @@ function GameBoard() {
   const shown = rows.filter((p) => familyOf(p.prop_type) === family)
   const hasLine = g.vendor !== null && g.home_spread !== null
   const notes = matchupNotes(g, rows)
-  const slateHref = `/${sport}/slate?season=${g.season}&season_type=${encodeURIComponent(g.season_type_name)}&week=${g.week}`
+  // the board for this game's week: the remembered view when it is the same
+  // week, else the game's own week so a deep link still returns somewhere sane
+  const sameWeek = view.week === g.week && (view.season_type ?? g.season_type_name) === g.season_type_name
+  const slateHref = sameWeek
+    ? board
+    : boardPath(sport, { ...view, season: g.season, season_type: g.season_type_name, week: g.week })
 
   return (
     <div className="page page-game">
-      <Crumbs items={[{ label: 'Game day', to: slateHref }, { label: `${g.away_team_label} at ${g.home_team_label}` }]} />
+      <div className="crumb-row">
+        <Crumbs items={[{ label: 'Game day', to: slateHref }, { label: `${g.away_team_label} at ${g.home_team_label}` }]} />
+        <button type="button" className="back" onClick={back}>
+          <span aria-hidden="true">←</span> Back to board
+        </button>
+      </div>
 
       <div className="game-head" data-tilt="">
         <div className="matchup">
@@ -134,7 +151,11 @@ function GameBoard() {
             label="Book"
             items={data.vendors.map((v) => ({ id: v, label: v }))}
             active={vendor}
-            onPick={(id) => set({ vendor: id === caps?.default_vendor ? undefined : id, family: undefined })}
+            onPick={(id) => {
+              const vendor = id === caps?.default_vendor ? undefined : id
+              set({ vendor, family: undefined })
+              setView({ vendor }) // the board follows the book chosen here
+            }}
           />
         )}
         {families.length > 1 && (
