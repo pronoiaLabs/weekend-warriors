@@ -60,6 +60,17 @@ SELECTION: dict[str, dict[C, str]] = {
         C.PLAYER_WEEK_STATS: "season in (2025, 2026) and player_name in ('Puka Nacua', 'Patrick Mahomes')",
         # the defender sheet is Explorer-only; a small sample keeps the table shape
         C.PLAYER_DEFENSE_WEEKS: "season = 2025 and season_type_name = 'Regular Season' and team_label = 'KC' and week = 1",
+        # two lined weeks (every book in week 1, fewer in week 2)
+        C.LINE_HISTORY: "season = 2026 and week in (1, 2)",
+        # DraftKings' week 1 props, and FanDuel's QB props for one game: FanDuel
+        # re-snapshots every tick, so one full game at that book is 3,000 rows
+        C.PROP_LINE_HISTORY: (
+            "season = 2026 and week = 1 and (vendor = 'draftkings'"
+            " or (vendor = 'fanduel' and game_key = '56776ceb2af5a3b9fcfe711da4f84c05'"
+            " and position = 'QB'))"
+        ),
+        # every mention; the feeds began on 2026-08-20
+        C.NEWS: "published_date >= '2026-08-01'",
     },
 }
 

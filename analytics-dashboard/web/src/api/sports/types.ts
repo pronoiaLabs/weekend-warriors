@@ -13,8 +13,8 @@ export type Capability =
   | 'player_weeks'
   | 'player_week_stats'
   | 'player_defense_weeks'
-  | 'game_odds'
-  | 'player_props'
+  | 'line_history'
+  | 'prop_line_history'
   | 'news'
 
 export interface CapabilitiesPayload {
@@ -639,4 +639,174 @@ export interface PlayerPayload {
   weeks: PlayerWeekRow[]
   stats: PlayerStatRow[]
   query: string | null
+}
+
+/** One pregame snapshot of a game's line at a book, kept only where it moved. */
+export interface LineRow {
+  app_line_history_key: string
+  game_vendor_odds_key: string
+  game_key: string
+  game_id: number
+  season: number
+  week: number
+  season_type: number
+  season_type_name: string
+  game_date: string
+  game_datetime_et: string
+  is_completed: boolean
+  home_team_key: string
+  home_team_label: string | null
+  home_team_name: string | null
+  away_team_key: string
+  away_team_label: string | null
+  away_team_name: string | null
+  vendor: string
+  snapshot_number: number
+  snapshots_before_kickoff: number
+  is_opening: boolean
+  is_closing: boolean
+  snapshot_observed_at: string
+  prev_snapshot_observed_at: string | null
+  minutes_before_kickoff: number | null
+  hours_before_kickoff: number | null
+  home_spread: number | null
+  home_spread_odds: number | null
+  away_spread: number | null
+  away_spread_odds: number | null
+  home_moneyline_odds: number | null
+  away_moneyline_odds: number | null
+  total_line: number | null
+  over_odds: number | null
+  under_odds: number | null
+  home_spread_change: number | null
+  total_line_change: number | null
+  home_moneyline_odds_change: number | null
+  away_moneyline_odds_change: number | null
+  home_spread_since_open: number | null
+  total_line_since_open: number | null
+}
+
+export interface MarketsPayload extends Envelope<LineRow> {
+  season_type_name: string
+  week: number
+  vendor: string | null
+  weeks: WeekRef[]
+}
+
+/** One pregame snapshot of a player prop at a book. */
+export interface PropLineRow {
+  app_prop_line_history_key: string
+  game_player_vendor_prop_key: string
+  game_key: string
+  game_id: number
+  player_key: string
+  player_id: number | null
+  player_name: string | null
+  position: string | null
+  season: number
+  week: number
+  season_type: number
+  season_type_name: string
+  game_date: string
+  game_datetime_et: string
+  is_completed: boolean
+  home_team_key: string
+  home_team_label: string | null
+  away_team_key: string
+  away_team_label: string | null
+  vendor: string
+  prop_type: string
+  market_type: string
+  stat_key: string | null
+  stat_label: string | null
+  snapshot_number: number
+  snapshots_before_kickoff: number
+  is_opening: boolean
+  is_closing: boolean
+  snapshot_observed_at: string
+  prev_snapshot_observed_at: string | null
+  minutes_before_kickoff: number | null
+  hours_before_kickoff: number | null
+  line_value: number | null
+  market_odds: number | null
+  over_odds: number | null
+  under_odds: number | null
+  line_value_change: number | null
+  market_odds_change: number | null
+  over_odds_change: number | null
+  under_odds_change: number | null
+  line_value_since_open: number | null
+}
+
+export interface GameRef {
+  game_key: string
+  season: number
+  week: number
+  season_type_name: string
+  game_date: string
+  game_datetime_et: string
+  is_completed: boolean
+  home_team_label: string | null
+  home_team_name: string | null
+  away_team_label: string | null
+  away_team_name: string | null
+}
+
+export interface GameMarketsPayload {
+  sport: string
+  season: number
+  as_of: string
+  game: GameRef
+  vendor: string | null
+  vendors: string[]
+  lines: LineRow[]
+  props: PropLineRow[]
+  query: string | null
+}
+
+/** One player mention in an article, with the team's next game attached. */
+export interface MentionRow {
+  app_news_mentions_key: string
+  mention_key: string
+  article_key: string
+  player_key: string | null
+  player_id: number | null
+  is_player_resolved: boolean
+  player_name: string | null
+  position: string | null
+  position_name: string | null
+  position_group: string | null
+  team_key: string | null
+  team_label: string | null
+  team_name: string | null
+  published_at: string
+  published_date: string
+  feed: string
+  headline: string | null
+  context: string | null
+  detail: string | null
+  url: string | null
+  player_name_in_article: string | null
+  team_in_article: string | null
+  extract_mode: string | null
+  resolution_method: string | null
+  candidate_count: number | null
+  next_game_key: string | null
+  next_game_datetime_et: string | null
+  next_game_season: number | null
+  next_game_week: number | null
+  next_game_season_type_name: string | null
+  next_opponent_team_key: string | null
+  next_opponent_label: string | null
+  next_opponent_name: string | null
+  next_game_is_home: boolean | null
+  days_to_next_game: number | null
+}
+
+export interface NewsPayload extends Envelope<MentionRow> {
+  since: string
+  days: number
+  team: string | null
+  feeds: string[]
+  teams: string[]
 }

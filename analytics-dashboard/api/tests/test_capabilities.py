@@ -15,6 +15,9 @@ def test_nfl_capabilities_list_the_page_marts(client: TestClient) -> None:
         "player_weeks",
         "player_week_stats",
         "player_defense_weeks",
+        "line_history",
+        "prop_line_history",
+        "news",
     ]
     assert body["default_vendor"] == "draftkings"
     assert "fantasy" in body["extensions"]

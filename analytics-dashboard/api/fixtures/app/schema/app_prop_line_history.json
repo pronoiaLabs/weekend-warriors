@@ -1,0 +1,211 @@
+{
+  "table": "app_prop_line_history",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_prop_line_history_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_player_vendor_prop_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "player_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "game_datetime_et",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "is_completed",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "home_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "home_team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "vendor",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "prop_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "market_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "stat_key",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "stat_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "snapshot_number",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "snapshots_before_kickoff",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "is_opening",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_closing",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "snapshot_observed_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "prev_snapshot_observed_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "minutes_before_kickoff",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "hours_before_kickoff",
+      "type": "NUMBER(25,1)",
+      "nullable": true
+    },
+    {
+      "name": "line_value",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "market_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "over_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "under_odds",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "line_value_change",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "market_odds_change",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "over_odds_change",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "under_odds_change",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "line_value_since_open",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    }
+  ]
+}

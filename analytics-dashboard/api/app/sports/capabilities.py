@@ -16,6 +16,6 @@ class Capability(StrEnum):
     PLAYER_WEEKS = "player_weeks"          # app_player_weeks
     PLAYER_WEEK_STATS = "player_week_stats"  # app_player_week_stats
     PLAYER_DEFENSE_WEEKS = "player_defense_weeks"  # app_player_defense_weeks
-    GAME_ODDS = "game_odds"                # app_market_lines (later phase)
-    PLAYER_PROPS = "player_props"          # app_props_edge, app_prop_history (later phase)
-    NEWS = "news"                          # app_news_mentions (later phase)
+    LINE_HISTORY = "line_history"          # app_line_history
+    PROP_LINE_HISTORY = "prop_line_history"  # app_prop_line_history
+    NEWS = "news"                          # app_news_mentions

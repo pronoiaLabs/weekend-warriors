@@ -148,6 +148,57 @@ button.trow.current { background: var(--surface-2); }
 .line-strip.yoy { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .shell-narrow .line-strip.yoy { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
+/* markets: move cards on the board, the path chart and legend on the game page */
+.cols-markets { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: var(--gap); }
+.move-card { display: grid; gap: 12px; color: inherit; }
+.move-card:hover { border-color: var(--line-2); }
+.move-card .tile-head { margin-bottom: 0; }
+.move-card .tile-head h2 { font-size: 16px; }
+.move-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.move { display: flex; flex-direction: column; min-width: 0; }
+.move .l { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
+.move .v { font-size: 15px; font-weight: 600; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.move .v i { font-style: normal; color: var(--ink-4); margin: 0 2px; }
+.move .d { font-size: var(--fs-s); color: var(--ink-3); }
+.move .d.pos { color: var(--pos); }
+.move .d.neg { color: var(--neg); }
+.spark { width: 100%; height: 36px; display: block; }
+.spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.spark circle { fill: var(--accent); }
+.spark.none { height: auto; font-size: var(--fs-s); color: var(--ink-4); }
+.path-chart { width: 100%; height: auto; display: block; }
+.path-chart .grid { stroke: var(--line); stroke-width: 1; }
+.path-chart .lbl { fill: var(--ink-4); font-size: 9px; font-family: var(--sans); }
+.path-chart .book path { fill: none; stroke: var(--ink-4); stroke-width: 1.2; opacity: .7; }
+.path-chart .book circle { fill: var(--ink-4); opacity: .7; }
+.path-chart .book.on path { stroke: var(--accent); stroke-width: 2.2; opacity: 1; }
+.path-chart .book.on circle { fill: var(--accent); opacity: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: var(--fs-s); color: var(--ink-3); }
+.legend li.on { color: var(--ink); }
+.legend .sw { display: inline-block; width: 14px; height: 2px; background: var(--ink-4); vertical-align: middle; margin-right: 6px; }
+.legend .sw.on { background: var(--accent); height: 3px; }
+
+/* news: one row per mention, three columns (who, what, next game) */
+.news-tile { margin-bottom: var(--gap); }
+.mentions { display: grid; }
+.mention { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 3fr) minmax(120px, 1fr); gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); align-items: start; }
+.mention .who, .mention .next { display: flex; flex-direction: column; min-width: 0; }
+.mention .who b, .mention .next b { font-weight: 600; }
+.mention .who a, .mention .next a { color: inherit; }
+.mention .who a:hover, .mention .next a:hover, .mention .headline:hover { color: var(--accent); }
+.mention .who small a { color: var(--ink-3); }
+.mention .what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mention .headline { font-weight: 600; color: var(--ink); }
+.mention .ctx { color: var(--ink-2); font-size: 12.5px; }
+.mention.unresolved .who b { color: var(--ink-3); }
+.mention .flag.topic { margin-right: 8px; color: var(--ink-3); }
+.mention .flag.topic.injury { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 40%, transparent); }
+.mention .flag.topic.transaction, .mention .flag.topic.lineup { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.mention .next a { display: flex; flex-direction: column; }
+.mention .next a b { color: var(--accent); }
+.shell-narrow .cols-markets { grid-template-columns: minmax(0, 1fr); }
+.shell-narrow .mention { grid-template-columns: 1fr; gap: 6px; }
+
 /* team page: the head, the two-column tiles, the margin chart */
 .team-head { position: relative; display: grid; grid-template-columns: 1.1fr 2fr; gap: var(--gap); align-items: end; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px 24px; margin-bottom: 16px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--glass); }
 .team-head .kick { display: inline-block; font-size: var(--fs-s); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }

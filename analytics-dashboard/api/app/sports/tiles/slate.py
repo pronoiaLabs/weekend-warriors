@@ -121,18 +121,21 @@ class SlatePayload(Envelope[SlateRow]):
     weeks: list[WeekRef]
 
 
-def weeks(profile: SportProfile, season: int) -> tuple[list[WeekRef], str]:
+def weeks(
+    profile: SportProfile, season: int, cap: Capability = CAP, tag: str = "slate_weeks"
+) -> tuple[list[WeekRef], str]:
     """Every (season type, week) in the season with its game count, kickoff span
-    and completed count, ordered by first kickoff."""
+    and completed count, ordered by first kickoff. Any game-grain mart with the
+    same week columns serves (the markets board lists the weeks with a line)."""
     rows, sql = source.select(
         profile,
-        CAP,
+        cap,
         ("game_key", "is_completed", "game_datetime_et", *WEEK_COLUMNS),
         where="season = %(season)s",
         params={"season": season},
         matches=lambda r: r["season"] == season,
         order=("game_datetime_et", "game_key"),
-        tag="slate_weeks",
+        tag=tag,
     )
     grouped: dict[tuple[int, int], dict[str, Any]] = {}
     seen: set[tuple[int, int, str]] = set()
@@ -185,7 +188,7 @@ def load(
     """The board for one week. None when the season has no games at all."""
     season = season or profile.default_season
     refs, weeks_sql = weeks(profile, season)
-    chosen = _pick_week(refs, season_type_name, week, config.now())
+    chosen = pick_week(refs, season_type_name, week, config.now())
     if chosen is None:
         return None
     book = vendor if vendor is not None else profile.default_vendor
@@ -233,7 +236,7 @@ def collapse(rows: list[dict[str, Any]], vendor: str | None) -> list[SlateRow]:
     return out
 
 
-def _pick_week(
+def pick_week(
     refs: list[WeekRef], season_type_name: str | None, week: int | None, now: dt.datetime
 ) -> WeekRef | None:
     if season_type_name is None and week is None:
