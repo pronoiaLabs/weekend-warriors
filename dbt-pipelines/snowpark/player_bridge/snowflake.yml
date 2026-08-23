@@ -1,0 +1,33 @@
+# snow snowpark project: one procedure, DLT_DB.DEPLOY.SP_PLAYER_BRIDGE.
+#
+# `snow snowpark build` zips src/ (the player_bridge package), and
+# `snow snowpark deploy --replace` uploads the zip to the stage and runs the
+# CREATE OR REPLACE PROCEDURE with IMPORTS pointing at it. Grants drop on
+# replace; `make -C dbt-pipelines deploy-snowpark` re-grants after.
+#
+# Caller's rights, like SP_DBT_BUILD: a dev build writes the bridge tables
+# under the developer's role and schema, the prod trigger under
+# DBT_RUNNER_ROLE into CORE. The procedure itself holds no credentials.
+definition_version: 2
+
+entities:
+  player_bridge:
+    type: procedure
+    identifier:
+      name: SP_PLAYER_BRIDGE
+      database: DLT_DB
+      schema: DEPLOY
+    handler: player_bridge.main.run
+    signature:
+      - name: target_db
+        type: string
+      - name: target_schema
+        type: string
+      - name: full_refresh
+        type: boolean
+    returns: string
+    stage: DLT_DB.DEPLOY.SNOWPARK
+    artifacts:
+      - src/
+    runtime: "3.11"
+    execute_as_caller: true

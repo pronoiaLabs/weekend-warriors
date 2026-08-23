@@ -105,3 +105,26 @@ deploy-agent: ## Redeploy a sport's analyst agent in place (SPORT=nfl|wnba|ncaaf
 	$(SNOW_DBT) execute $(CONN_ARGS) --env $(call sport_env,$(SPORT)) \
 		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) \
 		run-operation deploy_$(SPORT)_analyst --args "'{alter: true}'"
+
+##@ Snowpark procedures (snowpark/)
+
+# Procedures dbt calls from hooks. Each is a snow snowpark project under
+# snowpark/<name>/ whose snowflake.yml is the source of truth for the CREATE
+# PROCEDURE; `snow snowpark deploy --replace` is a CREATE OR REPLACE and, like
+# the dbt object, DROPS the grants, so the USAGE re-grants below are load-
+# bearing: the prod trigger task calls the procedure as DBT_RUNNER_ROLE
+# (primary role alone) through bridge_player_ids' pre_hook. Ownership is
+# normalized for the same reason deploy-sport does it: CI deploys as
+# DBT_RUNNER_ROLE, the laptop as SYSADMIN.
+SNOWPARK_DIR := snowpark
+BRIDGE_PROC  := DLT_DB.DEPLOY.SP_PLAYER_BRIDGE(VARCHAR, VARCHAR, BOOLEAN)
+
+snowpark-test: ## Lint + unit tests for the Snowpark procedures (pure Python, no Snowflake)
+	cd $(SNOWPARK_DIR) && uv run --extra dev ruff check . && uv run --extra dev pytest -q
+
+deploy-snowpark: ## Build, upload and CREATE OR REPLACE SP_PLAYER_BRIDGE, then re-grant
+	@$(call hdr,deploy $(BRIDGE_PROC))
+	cd $(SNOWPARK_DIR)/player_bridge && $(SNOW) snowpark build && $(SNOW) snowpark deploy $(CONN_ARGS) --replace
+	$(SNOW) sql $(CONN_ARGS) -q "GRANT USAGE ON PROCEDURE $(BRIDGE_PROC) TO ROLE DBT_RUNNER_ROLE"
+	$(SNOW) sql $(CONN_ARGS) -q "GRANT USAGE ON PROCEDURE $(BRIDGE_PROC) TO ROLE DLT_DEV_ROLE"
+	$(SNOW) sql $(CONN_ARGS) -q "GRANT OWNERSHIP ON PROCEDURE $(BRIDGE_PROC) TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS"

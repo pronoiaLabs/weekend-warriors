@@ -57,6 +57,7 @@ jobs:
       dev_specs: ${{ steps.decide.outputs.dev_specs }}
       dbt: ${{ steps.decide.outputs.dbt }}
       agents: ${{ steps.decide.outputs.agents }}
+      snowpark: ${{ steps.decide.outputs.snowpark }}
       dashboard: ${{ steps.decide.outputs.dashboard }}
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +91,8 @@ jobs:
               - 'dbt-pipelines/**'
             agents:
               - 'dbt-pipelines/agents/**'
+            snowpark:
+              - 'dbt-pipelines/snowpark/**'
             dashboard:
               - 'ops-dashboard/**'
 
@@ -99,7 +102,7 @@ jobs:
           DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
           F: ${{ toJSON(steps.filter.outputs) }}
         run: |
-          for k in image registry tasks dev_specs dbt agents dashboard; do
+          for k in image registry tasks dev_specs dbt agents snowpark dashboard; do
             if [ "$DISPATCH" = "true" ]; then
               v=true
             else
@@ -330,6 +333,30 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/snowflake-setup
+      - name: Deploy SP_PLAYER_BRIDGE
+        # The Snowpark procedure the NFL bridge model calls from its pre_hook.
+        # Deployed BEFORE the project object so a build triggered by the new
+        # code never finds an old procedure. Same grant-drop trap as the dbt
+        # object; the Makefile target re-grants.
+        if: matrix.sport == 'nfl' && needs.changes.outputs.snowpark == 'true'
+        run: make -C dbt-pipelines deploy-snowpark CONN_ARGS=-x
+      - name: Assert DBT_RUNNER_ROLE still holds the procedure
+        if: matrix.sport == 'nfl' && needs.changes.outputs.snowpark == 'true'
+        run: |
+          snow sql -x --format json \
+            -q "SHOW GRANTS ON PROCEDURE DLT_DB.DEPLOY.SP_PLAYER_BRIDGE(VARCHAR, VARCHAR, BOOLEAN);" > proc_grants.json
+          python3 - <<'PY'
+          import json
+
+          rows = json.load(open("proc_grants.json"))
+          ok = any(
+              row.get("grantee_name") == "DBT_RUNNER_ROLE"
+              and row.get("privilege") in ("USAGE", "OWNERSHIP")
+              for row in rows
+          )
+          assert ok, f"DBT_RUNNER_ROLE lost access to SP_PLAYER_BRIDGE: {rows}"
+          print("DBT_RUNNER_ROLE procedure grant verified")
+          PY
       - name: Deploy ${{ matrix.object }}
         # The Makefile target is the single source of truth for the deploy +
         # re-grant + ownership sequence; CI passes CONN_ARGS=-x to use the
