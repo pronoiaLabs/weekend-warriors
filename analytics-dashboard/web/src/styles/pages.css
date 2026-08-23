@@ -4,6 +4,10 @@
 
 /* shared page chrome */
 .filters { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 20px; align-items: center; }
+.crumb-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.crumb-row .crumbs { margin-bottom: 0; }
+.back { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: var(--fs-s); font-weight: 500; min-height: 32px; }
+.back:hover { border-color: var(--line-2); color: var(--ink); }
 .crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--fs-s); color: var(--ink-4); margin-bottom: 10px; }
 .crumbs a { color: var(--ink-3); }
 .crumbs a:hover { color: var(--accent); }

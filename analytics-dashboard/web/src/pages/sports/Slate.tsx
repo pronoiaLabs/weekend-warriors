@@ -1,13 +1,16 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fetchSlate } from '../../api/sports/client.ts'
 import type { SlatePayload, SlateRow, WeekRef } from '../../api/sports/types.ts'
 import CapabilityGate from '../../components/sports/CapabilityGate.tsx'
 import Chips from '../../components/sports/Chips.tsx'
 import TileFrame from '../../components/sports/TileFrame.tsx'
 import { useApi } from '../../hooks/useApi.ts'
+import { useElementScrollMemory } from '../../hooks/useScrollMemory.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
 import { fmt, signed, slotLabel, spreadText, tone } from '../../lib/format.ts'
+import { useView, viewFromParams, viewToParams } from '../../state/view.tsx'
 
 const WIND_FLAG = 10
 const WIND_PASSING = 12
@@ -25,10 +28,27 @@ function SlateBoard() {
   const sport = useSportParam()
   const caps = useCapabilities()
   const [search, setSearch] = useSearchParams()
+  const { view, replaceView } = useView()
 
   // Every choice lives in the URL: the API resolves what is absent (current
   // season, the week in progress, the default book), so a bare /nfl/slate is
-  // always "this week at the default book" and a full URL is shareable.
+  // always "this week at the default book" and a full URL is shareable. Keys
+  // the URL lacks are filled from the remembered view (so Back from a game
+  // where you switched books shows that book), and a choice made here replaces
+  // the memory outright, so choosing the default again is remembered as such.
+  useEffect(() => {
+    const fromUrl = viewFromParams(search)
+    const merged = { ...view, ...fromUrl }
+    if (viewToParams(merged).toString() !== viewToParams(fromUrl).toString()) {
+      const next = new URLSearchParams(search)
+      for (const [k, v] of viewToParams(merged)) next.set(k, v)
+      setSearch(next, { replace: true })
+      return
+    }
+    replaceView(fromUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
   const seasonParam = search.get('season')
   const season = seasonParam ? Number(seasonParam) : undefined
   const seasonType = search.get('season_type') ?? undefined
@@ -48,6 +68,7 @@ function SlateBoard() {
       if (v === undefined || v === '') next.delete(k)
       else next.set(k, v)
     }
+    replaceView(viewFromParams(next)) // before the URL changes, so the effect does not refill
     setSearch(next, { replace: true })
   }
 
@@ -218,6 +239,11 @@ function Board({
   const games = outdoor ? data.rows.filter((g) => g.is_weather_relevant) : data.rows
   const slots: string[] = []
   for (const g of games) if (!slots.includes(g.kickoff_slot_et)) slots.push(g.kickoff_slot_et)
+  // the board scrolls on its own, so the browser cannot restore it; remember
+  // per URL so Back from a game lands on the same slot
+  const boardRef = useRef<HTMLDivElement>(null)
+  const { pathname, search } = useLocation()
+  useElementScrollMemory(boardRef, `${pathname}${search}`, games.length > 0)
   if (games.length === 0) {
     return (
       <section className="tile">
@@ -226,7 +252,7 @@ function Board({
     )
   }
   return (
-    <div className="board">
+    <div className="board" ref={boardRef}>
       <div className="slots" style={{ '--n': slots.length } as React.CSSProperties}>
         {slots.map((slot) => (
           <div className="slot" key={slot}>
