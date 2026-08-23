@@ -43,3 +43,20 @@ seeds:
         tests: [not_null]
       - name: is_international
         tests: [not_null]
+
+  - name: seed_nfl_prop_stat_map
+    description: >
+      Which box-score stat a prop type is about, for app_game_prop_board.
+      prop_type is a lowercased passthrough from the feed with no enumeration
+      anywhere else, so this seed is the one place the mapping lives. An empty
+      stat_key means the prop cannot be graded from the box score (first
+      touchdown, quarter and half touchdowns); those rows keep their line and
+      odds on the board with NULL form columns. A new prop type in the feed
+      appears unmapped until a row is added here.
+    columns:
+      - name: prop_type
+        tests: [unique, not_null]
+      - name: stat_key
+        tests:
+          - accepted_values:
+              values: ['receiving_yards', 'receptions', 'rushing_yards', 'passing_yards', 'passing_touchdowns', 'scoring_touchdowns']

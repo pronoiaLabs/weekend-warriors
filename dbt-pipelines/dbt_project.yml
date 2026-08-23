@@ -63,6 +63,16 @@ models:
         +materialized: table
         +schema: FEATURES
 
+      # APP -- serving layer for the analytics dashboard: page-shaped marts
+      # read by a thin API. Not a Cortex tool. Prod: NFL_PROD_DB.APP; dev
+      # collapses into DEV_<user>. copy_grants keeps ANALYTICS_DASHBOARD_ROLE's
+      # SELECT across dbt's CREATE OR REPLACE (the role's FUTURE grant covers
+      # brand-new marts; together they leave no gap).
+      app:
+        +materialized: table
+        +schema: APP
+        +copy_grants: true
+
       # ANALYTICS -- semantic views and evaluation datasets, consumed by agents.
       #
       # sv_example and eval_dataset are the upstream template's skeletons. They
@@ -150,6 +160,12 @@ models:
       semantic_views:
         +materialized: semantic_view
         +schema: ANALYTICS
+
+      # APP -- same contract as the NFL block; marts land here in a later phase.
+      app:
+        +materialized: table
+        +schema: APP
+        +copy_grants: true
 
 tests:
   cortex_agent_lifecycle:
