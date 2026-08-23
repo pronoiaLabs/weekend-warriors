@@ -127,3 +127,47 @@ jobs:
 
       - name: Typecheck and build
         run: npm run build
+
+  # analytics-dashboard: same two shapes as ops-dashboard, same invariant. The
+  # api tests run in fixture mode (ANALYTICS_DASHBOARD_DATA is set by the tests
+  # themselves) and the live-marked contract tests are skipped without
+  # ANALYTICS_DASHBOARD_LIVE=1, so the connector is never imported here.
+  analytics-dashboard-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analytics-dashboard/api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Lint
+        run: uv run --extra dev ruff check .
+
+      - name: Tests
+        run: uv run --extra dev pytest -q
+
+  analytics-dashboard-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analytics-dashboard/web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: analytics-dashboard/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck and build
+        run: npm run build

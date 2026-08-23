@@ -1,0 +1,29 @@
+[project]
+name = "analytics-dashboard-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "pydantic>=2",
+    "uvicorn[standard]",
+    "snowflake-connector-python",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+
+# No build-system on purpose: uv treats the project as a virtual (non-packaged)
+# environment, so `app` is imported from the working directory. pythonpath keeps
+# pytest able to import it the same way uvicorn does. Same shape as ops-dashboard.
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "live: needs a Snowflake connection (ANALYTICS_DASHBOARD_LIVE=1); skipped otherwise",
+]
