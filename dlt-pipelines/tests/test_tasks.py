@@ -252,6 +252,8 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
         "nfl_game_odds", "nfl_player_props", "nfl_odds_opening",
         "nfl_news",
         "nfl_weather_forecast",
+        "nfl_nflverse_stats", "nfl_nflverse_depth_charts", "nfl_nflverse_reference",
+        "nfl_sleeper_players", "nfl_sleeper_market",
     }
     # WNBA is PAUSED (2026-08-12): schedules commented out in wnba-registry.yml,
     # account tasks suspended. The pipelines stay registered and hand-runnable;

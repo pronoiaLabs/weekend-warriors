@@ -35,7 +35,10 @@ $EDITOR .dlt/secrets.toml
 ```
 
 Review `pipelines/batch/registries/`. It ships with working REST pipelines in `nfl-registry.yml`
-(`nfl_reference`, `nfl_games`) and a credential-free generator in `sample-registry.yml`.
+(`nfl_reference`, `nfl_games`), a credential-free generator in `sample-registry.yml`, and one file
+per non-REST vendor (`news-registry.yml` for Firecrawl, `weather-registry.yml` for Open-Meteo,
+`nflverse-registry.yml` for the nflverse season files read through `nflreadpy`,
+`sleeper-registry.yml` for Sleeper's player state, trending and weekly projections).
 Add or edit pipeline entries there; do **not** hard-code credentials in the registry (use the
 `secret:` prefix to reference a `secrets.toml` path instead).
 

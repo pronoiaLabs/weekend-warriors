@@ -1,0 +1,74 @@
+# Sleeper pipelines: live player state, trending adds/drops, weekly projections
+# and stats from the Sleeper fantasy API. No key.
+#
+# Every file in this directory is merged into one registry, so pipeline names must be
+# unique across ALL of them, not just within this file. `defaults:` below applies only
+# to this file's pipelines.
+#
+# NAMING. Source type and EAI are named for the vendor (`sleeper`); pipelines keep the
+# `nfl_` prefix so tests/test_registry_config.py pins them to the NFL databases; the
+# tables carry the vendor (`sleeper_players`, `sleeper_projections`) beside the
+# BallDontLie and nflverse tables in RAW. The id columns on sleeper_players are
+# SPARSE (measured 2026-08-23: espn_id on 769 and gsis_id on 577 of 3,183 rostered
+# active players), so the join to nflverse is name + team with the ids confirming
+# the subset they cover; `kalshi_id` and `oddsjam_id` ride along where present.
+#
+# NO SEASON TOKEN. Every run starts with /v1/state/nfl and reads season, week and
+# season_type from it. A backfill pins them in config instead.
+#
+# NO SECRET. A scheduled entry still needs `external_access`; with no `secret` the
+# task generator picks the nosecret job template.
+#
+# Source module: pipelines/batch/sleeper_source.py.
+
+defaults:
+  destination: snowflake
+  database: NFL                       # -> NFL_DEV_DB / NFL_PROD_DB
+  dataset_name: RAW
+  group: sleeper                      # make run-local GROUP=sleeper
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  external_access: SLEEPER_API_EAI    # egress to api.sleeper.app + api.sleeper.com
+
+pipelines:
+  # The ~15 MB player dump (12k players incl. 32 DEF rows), replaced once a day:
+  # Sleeper's docs ask that it be called at most daily. The state row logs the
+  # week clock Sleeper was on. 12:10 UTC, after the nflverse cluster.
+  #
+  #   make run-local NAME=nfl_sleeper_players
+  - name: nfl_sleeper_players
+    source: sleeper
+    schedule: "10 12 * * *"
+    config:
+      resources:
+        - state
+        - players
+
+  # The moving parts, every six hours: trending adds/drops over the last 24h,
+  # projections for this week and next, stats for this week and last. Trending
+  # and projections are appended as dated snapshots (their history is the
+  # point); stats merge on player x week. :20 keeps clear of the ops sweeps at
+  # :00 and :30 and the odds/props Tasks at :00 and :10.
+  - name: nfl_sleeper_market
+    source: sleeper
+    schedule: "20 */6 * * *"
+    config:
+      resources:
+        - trending
+        - projections
+        - stats
+
+  # Backfill: stats and projections for the BallDontLie history in the account.
+  # `seasons` x `season_types` are crossed and, with no `weeks`, every week of each
+  # phase is requested (18 regular, 5 post): 138 calls per resource. Projections for
+  # a past week are whatever single snapshot Sleeper still serves. Unscheduled.
+  #
+  #   make run-prod NAME=nfl_sleeper_backfill CONFIRM=1
+  - name: nfl_sleeper_backfill
+    source: sleeper
+    config:
+      seasons: [2023, 2024, 2025]
+      season_types: [regular, post]
+      resources:
+        - projections
+        - stats

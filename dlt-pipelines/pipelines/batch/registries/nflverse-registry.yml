@@ -1,0 +1,100 @@
+# nflverse pipelines: season files from the nflverse-data GitHub releases, read
+# through the nflreadpy package.
+#
+# Every file in this directory is merged into one registry, so pipeline names must be
+# unique across ALL of them, not just within this file. `defaults:` below applies only
+# to this file's pipelines.
+#
+# NAMING. The source type and the EAI are named for the vendor (`nflverse`). The
+# pipelines keep the `nfl_` prefix so tests/test_registry_config.py pins them to the
+# NFL databases, and the tables carry the vendor too (`nflverse_players`,
+# `nflverse_injuries`): BallDontLie already owns `players`, `injuries` and `stats` in
+# the same RAW schema, and which vendor a row came from is the first thing a reader
+# of these tables needs to know.
+#
+# NO SEASON TOKEN. `seasons: current` asks nflreadpy for its own current season,
+# which is NOT the registry's `{current_season}`: game data rolls to the new year on
+# the Thursday after Labor Day and depth charts on 15 March, and nflreadpy rejects a
+# year past its clock. The resolved year is logged on every run.
+#
+# NO SECRET. The files are public. A scheduled entry still needs `external_access`;
+# with no `secret` the task generator picks the nosecret job template.
+#
+# BACKFILLS are unscheduled entries with an explicit season list (the
+# weather-registry.yml pattern): `--param` only reaches rest_api endpoint params.
+# Run them from a laptop with `make run-prod NAME=<entry> CONFIRM=1`.
+#
+# Source module: pipelines/batch/nflverse_source.py. Its DATASETS table owns the
+# table names, keys and dispositions; an entry here only names datasets and seasons.
+
+defaults:
+  destination: snowflake
+  database: NFL                       # -> NFL_DEV_DB / NFL_PROD_DB
+  dataset_name: RAW
+  group: nflverse                     # make run-local GROUP=nflverse
+  load_warehouse: DLT_WH
+  compute_pool: DLT_POOL
+  external_access: NFLVERSE_EAI       # egress to github.com + the release asset hosts
+
+pipelines:
+  # The weekly game data, reloaded daily in season. Each dataset is one season file
+  # merged on its natural key, so a reload is how stat corrections arrive.
+  # 11:15 UTC: clear of the 09:xx BallDontLie cluster and after nflverse's overnight
+  # rebuilds; pbp is ~30 MB and ~49k rows for a full season.
+  #
+  #   make run-local NAME=nfl_nflverse_stats
+  - name: nfl_nflverse_stats
+    source: nflverse
+    schedule: "15 11 * * *"
+    config:
+      seasons: current
+      datasets:
+        - pbp
+        - player_stats
+        - snap_counts
+        - nextgen_passing
+        - nextgen_rushing
+        - nextgen_receiving
+        - injuries
+
+  # Depth charts are a daily snapshot table (~3k rows per day, every day of the
+  # year); the resource keeps a cursor on `dt` and yields only new snapshots.
+  - name: nfl_nflverse_depth_charts
+    source: nflverse
+    schedule: "45 11 * * *"
+    config:
+      seasons: current
+      datasets:
+        - depth_charts
+
+  # All-history reference files, replaced wholesale once a week. `players` is the id
+  # crosswalk (gsis, espn, pfr, pff, otc, smart) and the headshot URL; Wednesday so
+  # the week's transactions are in.
+  - name: nfl_nflverse_reference
+    source: nflverse
+    schedule: "50 11 * * 3"
+    config:
+      datasets:
+        - players
+        - officials
+        - combine
+        - trades
+
+  # Backfill: every season-keyed dataset for the BallDontLie history in the account
+  # (2023 onward). Unscheduled. Depth charts start their cursor here, so run it
+  # before the scheduled entry fires for the first time.
+  #
+  #   make run-prod NAME=nfl_nflverse_backfill CONFIRM=1
+  - name: nfl_nflverse_backfill
+    source: nflverse
+    config:
+      seasons: [2023, 2024, 2025]
+      datasets:
+        - pbp
+        - player_stats
+        - snap_counts
+        - nextgen_passing
+        - nextgen_rushing
+        - nextgen_receiving
+        - injuries
+        - depth_charts

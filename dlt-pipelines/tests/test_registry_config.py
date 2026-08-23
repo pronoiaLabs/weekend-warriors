@@ -488,6 +488,16 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_weather_hist_forecast",
         "nfl_app_to_postgres",
         "obs_to_postgres",
+        # nflverse keeps its own season clock (`seasons: current` in the entry asks
+        # nflreadpy, never the registry token). See nflverse_source.py.
+        "nfl_nflverse_stats",
+        "nfl_nflverse_depth_charts",
+        "nfl_nflverse_reference",
+        "nfl_nflverse_backfill",
+        # Sleeper reads season/week from /state/nfl on every run. See sleeper_source.py.
+        "nfl_sleeper_players",
+        "nfl_sleeper_market",
+        "nfl_sleeper_backfill",
     }
     assert {s.name for s in registry.pipelines} == checked, (
         "a pipeline is neither asserted to carry a season token nor asserted to have "

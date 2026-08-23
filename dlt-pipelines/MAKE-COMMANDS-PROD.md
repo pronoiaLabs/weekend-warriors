@@ -66,8 +66,20 @@ reports success while re-fetching a season that ended months ago.
 | `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently |
 | `nfl_game_odds` | `0 */2 * * 0,1,4,5,6` | every 2h Thu-Mon | SCD2 snapshots of current game lines |
 | `nfl_player_props` | `10 */2 * * 0,1,4,5,6` | every 2h Thu-Mon | SCD2 snapshots, staggered off game odds |
+| `nfl_nflverse_stats` | `15 11 * * *` | daily | nflverse season files (pbp, player weeks, snaps, Next Gen, injury reports) merged on their keys; a reload is how corrections arrive. 11:xx clears the 09:xx cluster and nflverse's overnight rebuilds |
+| `nfl_nflverse_depth_charts` | `45 11 * * *` | daily | one new depth-chart snapshot a day, cursor on `dt` |
+| `nfl_nflverse_reference` | `50 11 * * 3` | Wednesday | all-history files replaced: players id crosswalk, officials, combine, trades |
+| `nfl_sleeper_players` | `10 12 * * *` | daily | the ~15 MB player dump, replaced; Sleeper asks for at most one pull a day |
+| `nfl_sleeper_market` | `20 */6 * * *` | every 6h | trending adds/drops and this week's projections as dated snapshots; stats for this week and last merged |
 
 Cron is five fields, **Sunday is 0**, so Tuesday is `2`.
+
+Neither vendor entry carries a season token. nflverse's `seasons: current` asks nflreadpy for its
+own year (game data rolls the Thursday after Labor Day, depth charts on 15 March), logged on every
+run; Sleeper reads season, week and season_type from `/v1/state/nfl` at the top of every run.
+History is the unscheduled backfill entries (2023 onward, the BallDontLie floor), run once each:
+`make run-prod NAME=nfl_nflverse_backfill CONFIRM=1` and `make run-prod NAME=nfl_sleeper_backfill CONFIRM=1`;
+the Tasks then keep the current season fresh.
 
 **Why one 09:00-09:25 window instead of hourly staggering.** Loads landing close together coalesce
 into fewer triggered dbt builds (the trigger drains everything in the stream per fire), and the pool

@@ -168,9 +168,30 @@ that round-trip.** So these, and only these, require a custom source type:
 Fan-out, call chaining, incremental scoping, auth, and pagination are all declarative. Do not write
 a custom source for those.
 
-Two custom sources exist. Both keep the vendor-vs-content split: source type, secret
+Four custom sources exist. All keep the vendor-vs-content split: source type, secret
 and EAI are named for the vendor; pipelines and tables are named for the content and
-land in `NFL_PROD_DB.RAW`.
+land in `NFL_PROD_DB.RAW`. The exception to the table half is nflverse and Sleeper,
+whose tables carry the vendor (`nflverse_players`, `sleeper_players`) because
+BallDontLie already owns `players`, `injuries` and `stats` in that schema.
+
+- `sleeper` (`pipelines/batch/sleeper_source.py`, registry `sleeper-registry.yml`).
+  The player dump is a dict keyed by id (no data_selector yields a row per key),
+  and every other call takes the season, week and season_type that only
+  `/v1/state/nfl` knows: the first call decides the arguments of the rest. Two
+  hosts (`api.sleeper.app/v1` documented; `api.sleeper.com` for the weekly stats
+  and projections the app itself reads). Projections and trending are appended
+  as dated snapshots, stats merge on player x week, the players dump is replaced
+  once a day as the docs ask. Backfills pin `seasons` x `season_types` in config.
+  No API key.
+
+- `nflverse` (`pipelines/batch/nflverse_source.py`, registry `nflverse-registry.yml`).
+  One parquet file per season on a GitHub release, behind a 302 to the asset host:
+  not JSON, so not a rest_api shape. Read through `nflreadpy`, which owns the asset
+  layout and a season clock of its own (game data rolls the Thursday after Labor
+  Day, depth charts on 15 March; it rejects a year past that), so the entries say
+  `seasons: current` and never use the registry token. Backfills are unscheduled
+  entries with an explicit season list, because `--param` only reaches rest_api
+  endpoint params. No API key.
 
 - `firecrawl` (`pipelines/batch/firecrawl_source.py`, registry `news-registry.yml`).
   The items of one call (a curated RSS/Atom list) decide the arguments of the next
@@ -216,17 +237,19 @@ directory; it was removed precisely because it invites that mistake. Put custom 
 
 ### Adding a source type is four edits
 
-1. `pipelines/batch/models.py:19`, add the name to `SUPPORTED_SOURCES`
-2. New module under `pipelines/batch/`
-3. A branch in `build_source`, `run.py:67-97`, with the import **inside** the branch. Imports are
-   lazy there on purpose: CI import-checks the module with a minimal dependency set, and
-   `generate_tasks.py` imports `models.py` on a runner that has only pyyaml.
+1. `pipelines/batch/models.py`, add the name to `SUPPORTED_SOURCES`
+2. New module under `pipelines/batch/` exposing a factory `(name, config) -> source`
+3. One line in `CUSTOM_SOURCES` in `run.py` (`{source_name: (module_path, factory_name)}`), which
+   `build_source` resolves with `importlib` at run time. Imports are lazy there on purpose: CI
+   import-checks the module with a minimal dependency set, and `generate_tasks.py` imports
+   `models.py` on a runner that has only pyyaml. A source needing arguments beyond `(name, config)`
+   (`sample`, `snowflake_app`) keeps its own branch in `build_source`.
 4. `tests/test_registry_smoke.py` asserts against `SUPPORTED_SOURCES`, imported rather than
-   duplicated, so it needs no change.
+   duplicated, so it needs no change. `tests/test_registry_config.py` and `tests/test_tasks.py`
+   pin the pipeline name sets per sport and DO need the new entries listed.
 
-If this grows past two or three custom sources, replace the if-chain in `build_source` with a dict
-of `{source_name: (module_path, factory_name)}` resolved via `importlib`. Keep `models.py` free of
-any `dlt` import at module level: `generate_tasks.py` imports it on a runner that has only pyyaml.
+Keep `models.py` free of any `dlt` import at module level: `generate_tasks.py` imports it on a
+runner that has only pyyaml.
 
 ### Registry loading fails quietly
 
