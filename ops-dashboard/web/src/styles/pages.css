@@ -3,9 +3,17 @@
    primitives (tile, kpi, chip, dock) stay in ops.css; the investigation
    components (heat strip, log table, tabs ...) in components.css. */
 
-/* day strip: seven chips, each a date over its tally */
-.day-strip { display: inline-flex; gap: 6px; align-items: stretch; flex-wrap: wrap; }
-.day-strip .chip { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; padding: 6px 12px; min-width: 74px; }
+/* day rail: a vertical job-style carousel (native scroll + snap + arrows) */
+.dash-body { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: var(--gap); align-items: start; }
+.day-rail { position: sticky; top: 12px; }
+.day-rail-inner { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.day-rail-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.day-rail-head .car-nav { display: inline-flex; gap: 4px; }
+.day-rail-head .car-nav button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center; transform: rotate(90deg); }
+.day-rail-head .car-nav button:hover { color: var(--ink); border-color: var(--line-2); }
+.day-rail-head .today-jump { min-width: 0; width: auto; padding: 4px 8px; min-height: 26px; }
+.day-strip.rail { display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 220px); overflow-y: auto; scroll-snap-type: y proximity; padding-right: 2px; }
+.day-strip .chip { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; padding: 6px 12px; min-width: 74px; width: 100%; flex: 0 0 auto; scroll-snap-align: start; }
 .day-strip .chip .dow { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
 .day-strip .chip.on .dow { color: var(--bg); opacity: .7; }
 .day-strip .chip .dnum { font-weight: 600; }
@@ -15,10 +23,15 @@
 .day-strip .chip .tally.warn { color: var(--missed); }
 .day-strip .chip.on .tally.bad, .day-strip .chip.on .tally.warn { color: var(--bg); }
 .day-strip .chip.today:not(.on) { border-color: var(--accent); }
-.day-strip .nav { min-width: 0; padding: 6px 10px; display: flex; align-items: center; color: var(--ink-3); }
+.slate-filters { align-items: center; gap: 10px 22px; margin-bottom: 12px; }
+.shell-narrow .dash-body { grid-template-columns: minmax(0, 1fr); }
+.shell-narrow .day-rail { position: static; margin-bottom: 4px; }
+.shell-narrow .day-strip.rail { flex-direction: row; align-items: stretch; max-height: none; overflow: auto hidden; scroll-snap-type: x proximity; padding-right: 0; padding-bottom: 6px; }
+.shell-narrow .day-strip .chip { width: auto; }
+.shell-narrow .day-rail-head .car-nav button { transform: none; }
 
 /* the slate: one tile per league, a horizontal rail of score cards inside */
-.cols-slate { grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); }
+.cols-slate { grid-template-columns: minmax(0, 1fr) 320px; }
 .league { margin-bottom: var(--gap); }
 .league .tile-head h2 { font-size: 17px; }
 .league .car-nav { display: inline-flex; gap: 4px; margin-left: 8px; }

@@ -37,7 +37,7 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
 @keyframes drift3 { to { transform: translate(-24vw, -16vh) scale(1.25); } }
 
 /* shell */
-.shell { position: relative; z-index: 1; max-width: 1320px; margin: 0 auto; padding: 0 28px 120px; min-height: 100vh; }
+.shell { position: relative; z-index: 1; max-width: 1760px; margin: 0 auto; padding: 0 36px 120px; min-height: 100vh; }
 .shell-narrow { padding: 0 14px 96px; }
 .topbar { display: flex; align-items: center; gap: 24px; padding: 22px 0 16px; flex-wrap: wrap; }
 .brand { display: flex; align-items: baseline; gap: 8px; }
@@ -70,7 +70,7 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
 /* page scaffolding */
 .page-head { margin-bottom: 20px; }
 .page-head h1 { font-size: 34px; font-weight: 600; letter-spacing: -.035em; color: var(--ink); }
-.lede { color: var(--ink-3); max-width: 820px; margin-top: 4px; }
+.lede { color: var(--ink-3); max-width: 980px; margin-top: 4px; }
 .lede a { color: var(--accent); }
 .hint { color: var(--ink-4); font-size: var(--fs-s); }
 .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); margin-bottom: 20px; }
@@ -114,10 +114,13 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
 .links li:last-child { border-bottom: 0; }
 .links a, .links b { font-weight: 600; }
 .links a { color: var(--accent); }
+.chip-group { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); font-weight: 600; }
 .chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: var(--fs-s); font-weight: 500; min-height: 32px; }
 .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .chip.bad:not(.on) { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 40%, transparent); }
+.chip.warn:not(.on) { color: var(--missed); border-color: color-mix(in srgb, var(--missed) 45%, transparent); }
 .filters { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 20px; align-items: center; }
 .crumb-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .crumb-row .crumbs { margin-bottom: 0; }

@@ -22,16 +22,16 @@ export function useDayParam() {
   return { day, setDay }
 }
 
-/** The query string every in-app link should carry: sport and date together, in
-    a fixed order so links do not churn. Pages that only care about the sport can
-    keep using useSportFilter().search. */
+/** The query string every in-app link should carry: sport, date and the slate
+    chips together, in a fixed order so links do not churn. Pages that only care
+    about the sport can keep using useSportFilter().search. */
 export function useOpsSearch(): string {
   const [params] = useSearchParams()
   const preserved = new URLSearchParams()
-  const sport = params.get('sport')
-  if (sport) preserved.set('sport', sport)
-  const date = params.get('date')
-  if (date) preserved.set('date', date)
+  for (const key of ['sport', 'date', 'view', 'kind'] as const) {
+    const value = params.get(key)
+    if (value) preserved.set(key, value)
+  }
   const query = preserved.toString()
   return query ? `?${query}` : ''
 }
