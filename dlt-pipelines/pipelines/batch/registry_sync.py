@@ -17,7 +17,11 @@ Upsert semantics (MERGE):
   * config fields are overwritten from YAML on every sync.
   * `enabled` is set TRUE only on INSERT; a manual disable in the table is
     preserved across syncs (we never flip it back on).
-  * `updated_at` is stamped with CURRENT_TIMESTAMP() on insert and update.
+  * `updated_at` is stamped with SYSDATE() on insert and update. SYSDATE(), not
+    CURRENT_TIMESTAMP(): the column is TIMESTAMP_NTZ and the account's TIMEZONE is
+    America/Los_Angeles, so CURRENT_TIMESTAMP() wrote Pacific wall time into a
+    column every reader (the ops dashboard's "when did this pipeline start to
+    count" floor) compares against UTC run times. SYSDATE() is always UTC.
 
 Connection reuses pipelines.common.snowflake_session.connect() (SNOWFLAKE_* env vars externally).
 
@@ -81,7 +85,7 @@ WHEN MATCHED THEN UPDATE SET
     env_var = s.env_var,
     external_access = s.external_access,
     config = s.config,
-    updated_at = CURRENT_TIMESTAMP()
+    updated_at = SYSDATE()
 WHEN NOT MATCHED THEN INSERT
     (name, source, schedule, target_database, dataset_name, write_disposition,
      pipeline_group, season_rollover_month, secret, env_var, external_access,
@@ -90,7 +94,7 @@ WHEN NOT MATCHED THEN INSERT
     (s.name, s.source, s.schedule, s.target_database, s.dataset_name,
      s.write_disposition, s.pipeline_group, s.season_rollover_month, s.secret,
      s.env_var, s.external_access, s.config,
-     TRUE, CURRENT_TIMESTAMP())"""
+     TRUE, SYSDATE())"""
 
 
 def _merge_header(vals: "list[str]") -> str:

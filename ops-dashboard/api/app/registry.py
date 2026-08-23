@@ -26,9 +26,11 @@ class Pipeline:
     sport: str
     schedule: str  # 5-field cron, UTC
     enabled: bool
+    updated_at: str | None = None  # last registry sync, ISO UTC
 
 
 _cache: tuple[float, list[Pipeline]] | None = None
+_first_cache: tuple[float, dict[str, str]] | None = None
 
 
 def load_registry() -> list[Pipeline]:
@@ -45,11 +47,26 @@ def load_registry() -> list[Pipeline]:
             sport=r["target_database"],
             schedule=r["schedule"],
             enabled=bool(r["enabled"]),
+            updated_at=datasource._iso_utc(r.get("updated_at")),
         )
         for r in rows
     ]
     _cache = (now, pipelines)
     return pipelines
+
+
+def first_runs() -> dict[str, str]:
+    """Earliest run per pipeline, cached on the registry's TTL: it changes only
+    when a pipeline runs for the first time ever."""
+    global _first_cache
+    now = time.monotonic()
+    if _first_cache is not None and now - _first_cache[0] < _TTL_SECONDS:
+        return _first_cache[1]
+    from app import datasource
+
+    first = datasource.first_runs()
+    _first_cache = (now, first)
+    return first
 
 
 def sports() -> list[str]:
@@ -61,5 +78,6 @@ def pipelines_for(sport: str) -> list[Pipeline]:
 
 
 def invalidate() -> None:
-    global _cache
+    global _cache, _first_cache
     _cache = None
+    _first_cache = None

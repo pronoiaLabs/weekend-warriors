@@ -70,7 +70,30 @@ def _block_for_run(run: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _day_states(cron: str, history: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
+def _floor(live_from: str | None) -> datetime | None:
+    return _parse_ts(live_from) if live_from else None
+
+
+def _live_slots(slots: list[datetime], live_from: str | None) -> list[datetime]:
+    """Drop the slots from before the pipeline existed.
+
+    A cron expanded over a day says nothing about whether the Task was there
+    to fire; `live_from` (datasource.live_from: the earlier of the registry
+    row's last sync and the first run ever) does. A slot before it was never
+    a slot, so it is neither a no-show nor counted.
+    """
+    floor = _floor(live_from)
+    if floor is None:
+        return slots
+    return [s for s in slots if s >= floor]
+
+
+def _day_states(
+    cron: str,
+    history: list[dict[str, Any]],
+    now: datetime,
+    live_from: str | None = None,
+) -> list[dict[str, Any]]:
     """Worst state per day over the window, oldest first.
 
     `history` must be sorted newest-first. Shared by the detail heatmap and the
@@ -86,7 +109,7 @@ def _day_states(cron: str, history: list[dict[str, Any]], now: datetime) -> list
             for r in history
             if day_start <= _parse_ts(r["run_started_at"]) < day_start + timedelta(days=1)
         ]
-        slots = schedule.day_slots(cron, day)
+        slots = _live_slots(schedule.day_slots(cron, day), live_from)
         _, missed, pending = _match_slots(slots, day_runs, now)
         states = [_run_state(r) for r in day_runs] + ["missed"] * len(missed)
         if states:
@@ -130,7 +153,7 @@ def pipelines_index(
     for pipe in pipelines:
         history = by_pipeline.get(pipe["name"], [])
         latest = history[0] if history else None
-        form, record = form_and_record(pipe["schedule"], history, now)
+        form, record = form_and_record(pipe["schedule"], history, now, pipe.get("live_from"))
         durations = [
             r["duration_s"]
             for r in history
@@ -148,7 +171,7 @@ def pipelines_index(
                 "succeeded": sum(1 for r in history if r.get("task_state") == "SUCCEEDED"),
                 "runs_in_window": len(history),
                 "window_days": WINDOW_DAYS,
-                "days": _day_states(pipe["schedule"], history, now),
+                "days": _day_states(pipe["schedule"], history, now, pipe.get("live_from")),
                 "record": record,
                 "form": form,
                 "avg_duration_s": round(sum(durations) / len(durations), 1) if durations else None,
@@ -171,7 +194,7 @@ def pipeline_detail(
     durations = sorted(r["duration_s"] for r in succeeded if r.get("duration_s") is not None)
     median = durations[len(durations) // 2] if durations else None
 
-    heatmap = _day_states(cron, history, now)
+    heatmap = _day_states(cron, history, now, pipe.get("live_from"))
 
     latest = history[0] if history else None
     runs_out = []
@@ -285,7 +308,7 @@ def _slate_day(
         cron = pipe.get("schedule")
         if not cron:
             continue
-        slots = schedule.day_slots(cron, day_, tz)
+        slots = _live_slots(schedule.day_slots(cron, day_, tz), pipe.get("live_from"))
         tally["slots"] += len(slots)
         matched, missed, _pending = _match_slots(slots, by_pipe.get(pipe["name"], []), now)
         for slot in slots:
@@ -406,7 +429,10 @@ _RECORD_STATES = ("SUCCEEDED", "FAILED", "FAILED_AND_AUTO_SUSPENDED")
 
 
 def form_and_record(
-    cron: str, history: list[dict[str, Any]], now: datetime
+    cron: str,
+    history: list[dict[str, Any]],
+    now: datetime,
+    live_from: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Last-14 form cells + W-L record, the Python port of form_guide_14d.
 
@@ -428,7 +454,9 @@ def form_and_record(
                 }
             )
 
-    slots = schedule.slots_between(cron, now - timedelta(days=WINDOW_DAYS), now)
+    slots = _live_slots(
+        schedule.slots_between(cron, now - timedelta(days=WINDOW_DAYS), now), live_from
+    )
     _matched, missed, _pending = _match_slots(slots, history, now)
     outcomes.extend({"at": _iso(s), "result": "M", "query_id": None} for s in missed)
 

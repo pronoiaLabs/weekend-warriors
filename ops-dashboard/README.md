@@ -56,6 +56,14 @@ Three conventions the colours and the clock follow:
   question rather than a failure), rose hatched a run that happened but never recorded
   itself, grey dotted a slot still ahead. The dashboard carries a legend; the day strip
   and the KPIs count failures and no-shows separately.
+- **A pipeline's slots begin when the pipeline did.** A cron expanded over a day says
+  nothing about whether the Task existed to fire it, so the API floors each pipeline
+  at the earlier of its registry row's `updated_at` (the deploy that registered it;
+  stamped with `SYSDATE()`, UTC, because the account's session zone is Pacific) and
+  its first run ever (`MIN(RUN_STARTED_AT)` over the whole run table). Slots before
+  the floor are not slots: the morning before a new Task existed is not a row of
+  no-shows, an old pipeline floors at a run weeks ago and is unaffected, and a new
+  Task whose first fire never came still shows it.
 - **The slate's day is the viewer's day.** The page sends the browser's IANA zone
   (`tz=`), and the API cuts the day at local midnight, so the first card of "Sunday" is
   not Saturday evening. Crons stay UTC (they are the Task definitions); only the day's

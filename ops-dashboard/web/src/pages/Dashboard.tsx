@@ -106,7 +106,9 @@ export default function Dashboard() {
         <p>
           The registry says which pipelines exist and when they fire; the run table says what happened. The API
           expands each cron over the day, matches runs to slots, and emits one card per slot: final, failed, a
-          no-show when the slot passed with no run row, or still ahead. dbt builds have no slot, so their league
+          no-show when the slot passed with no run row, or still ahead. A pipeline's slots begin when it did
+          (the deploy that registered it or its first run, whichever came first), so the morning before a new
+          Task existed is not a row of no-shows. dbt builds have no slot, so their league
           is whatever fired when data landed. The day strip tallies the same cards for the days around it.
         </p>
       </TileFrame>
