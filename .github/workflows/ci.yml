@@ -74,13 +74,16 @@ jobs:
       # Render the Task DDL and the resume statements. generate_tasks raises on any
       # unsubstituted placeholder, so this fails here rather than producing a Task
       # whose container spec is malformed -- which is only discoverable at 09:00 UTC
-      # when the schedule fires. The two must agree on how many Tasks exist.
+      # when the schedule fires. The two must agree on how many generator-emitted
+      # Tasks exist. --resume also restarts harvest-graph parents that AFTER
+      # children join (DBT_HARVEST_* / DBT_BUILD_*); those ALTER TASK lines are
+      # extra on purpose and must not inflate the dlt-task count.
       - name: Task DDL renders
         run: |
           python -m deploy.tasks.generate_tasks > /tmp/tasks.sql
           python -m deploy.tasks.generate_tasks --resume > /tmp/resume.sql
           tasks=$(grep -c "^CREATE OR ALTER TASK" /tmp/tasks.sql || true)
-          resumes=$(grep -c "^ALTER TASK" /tmp/resume.sql || true)
+          resumes=$(grep -c "^ALTER TASK DLT_DB.OPS.dlt_task_" /tmp/resume.sql || true)
           echo "tasks=$tasks resumes=$resumes"
           test "$tasks" -gt 0
           test "$tasks" = "$resumes"

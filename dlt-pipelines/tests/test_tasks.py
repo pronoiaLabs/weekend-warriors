@@ -300,3 +300,42 @@ def test_suspend_resume_include_the_harvest_graph_for_after_tasks() -> None:
     assert resume_sql.index("DBT_HARVEST_NFL") < resume_sql.index("DBT_BUILD_NFL")
     assert "ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME" in resume_sql
     assert "ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME" not in resume_sql
+
+
+def test_ci_task_resume_count_ignores_harvest_graph() -> None:
+    """CI greps CREATE OR ALTER TASK vs ALTER TASK DLT_DB.OPS.dlt_task_.
+
+    Harvest-graph resumes (DBT_HARVEST_* / DBT_BUILD_*) are extra ALTER TASK
+    lines on purpose. Counting every ALTER TASK would fail the equality check
+    the moment an `after:` pipeline exists.
+    """
+    from contextlib import redirect_stdout  # noqa: PLC0415
+    from io import StringIO  # noqa: PLC0415
+
+    from deploy.tasks.generate_tasks import main  # noqa: PLC0415
+
+    tasks_out = StringIO()
+    with redirect_stdout(tasks_out):
+        assert main([]) == 0
+    resume_out = StringIO()
+    with redirect_stdout(resume_out):
+        assert main(["--resume"]) == 0
+
+    creates = [
+        line
+        for line in tasks_out.getvalue().splitlines()
+        if line.startswith("CREATE OR ALTER TASK")
+    ]
+    dlt_resumes = [
+        line
+        for line in resume_out.getvalue().splitlines()
+        if line.startswith("ALTER TASK DLT_DB.OPS.dlt_task_")
+    ]
+    harvest_resumes = [
+        line
+        for line in resume_out.getvalue().splitlines()
+        if line.startswith("ALTER TASK ") and "DBT_" in line
+    ]
+    assert creates
+    assert len(creates) == len(dlt_resumes)
+    assert harvest_resumes, "after: children must resume the harvest graph too"
