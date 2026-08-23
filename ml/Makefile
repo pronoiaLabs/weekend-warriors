@@ -1,19 +1,13 @@
-.PHONY: sync inspect fit cook cook-local test
+.PHONY: sync list inspect test
 
 sync: ## Install the uv lock
 	uv sync --extra dev
 
-inspect: ## Row counts on FEAT_GAME_MATCHUP
-	uv run python -m weekend_warriors_ml inspect
+list: ## Dedicated model specs
+	uv run python -m weekend_warriors_ml list
 
-fit: ## Walk-forward only (no registry write)
-	uv run python -m weekend_warriors_ml fit
-
-cook: ## Fit, register, local preds, run_batch on ML_DEV_POOL
-	uv run python -m weekend_warriors_ml cook
-
-cook-local: ## Fit, register, local preds; skip the pool
-	uv run python -m weekend_warriors_ml cook --no-batch
+inspect: ## Row counts. MODEL=NFL_GAME_TOTAL
+	uv run python -m weekend_warriors_ml inspect $(MODEL)
 
 test:
 	uv run pytest tests

@@ -25,5 +25,5 @@ def get_session(connection_name: str | None = None) -> Session:
         from snowflake.snowpark.context import get_active_session
 
         return get_active_session()
-    except Exception:
+    except Exception:  # noqa: BLE001 — kernel has no session outside Workspace
         return create_session(connection_name)
