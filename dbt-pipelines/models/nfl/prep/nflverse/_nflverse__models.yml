@@ -1,0 +1,103 @@
+version: 2
+
+# nflverse staging (vendor-prefixed: BallDontLie owns the plain names).
+
+models:
+
+  - name: stg_nfl__nflverse_players
+    description: >
+      nflverse's all-history players table, the id crosswalk. Grain: player
+      (gsis_id). Carries espn_id, pfr_id, pff_id, the headshot URL and the
+      latest team in both nflverse's and dim_team's abbreviations.
+    columns:
+      - name: gsis_id
+        tests: [unique, not_null]
+      - name: display_name
+        tests: [not_null]
+      - name: team_abbreviation
+        description: "latest_team mapped onto dim_team's vocabulary (LA -> LAR, WAS -> WSH); NULL for players without a club."
+
+  - name: stg_nfl__nflverse_player_stats
+    description: >
+      nflverse's 150-column player week: usage shares, EPA by phase, CPOE,
+      fantasy points. Grain: player (gsis) x season x season_type x week.
+    columns:
+      - name: gsis_id
+        tests: [not_null]
+      - name: nflverse_game_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [gsis_id, season, season_type, week]
+
+  - name: stg_nfl__nflverse_snap_counts
+    description: "Snap participation. Grain: pfr_player x game (pfr ids; gsis via the players crosswalk)."
+    columns:
+      - name: pfr_player_id
+        tests: [not_null]
+      - name: pfr_game_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [pfr_game_id, pfr_player_id]
+
+  - name: stg_nfl__nflverse_nextgen_passing
+    description: "Next Gen passing, weekly plus week-0 season totals (is_season_total). Grain: player x season x season_type x week."
+    columns:
+      - name: gsis_id
+        tests: [not_null]
+      - name: is_season_total
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [gsis_id, season, season_type, week]
+
+  - name: stg_nfl__nflverse_nextgen_rushing
+    description: "Next Gen rushing, same shape as passing."
+    columns:
+      - name: gsis_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [gsis_id, season, season_type, week]
+
+  - name: stg_nfl__nflverse_nextgen_receiving
+    description: "Next Gen receiving, same shape as passing."
+    columns:
+      - name: gsis_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [gsis_id, season, season_type, week]
+
+  - name: stg_nfl__nflverse_injuries
+    description: "The league's official injury report. Grain: season x season_type x week x team x player (gsis)."
+    columns:
+      - name: gsis_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, game_type, week, team, gsis_id]
+
+  - name: stg_nfl__nflverse_depth_charts
+    description: >
+      Daily depth-chart snapshots, 2025 on. Grain: chart_date x team x
+      formation package x position x slot x rank. dt is a timestamp and the
+      league occasionally publishes twice in a day; only each team's last
+      snapshot of the day survives (chart_at keeps the exact time).
+    columns:
+      - name: chart_date
+        tests: [not_null]
+      - name: team
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [chart_date, team, formation, position, depth_slot, depth_rank]
+
+  - name: stg_nfl__nflverse_depth_charts_weekly
+    description: >
+      The weekly chart, 2023-24. Two players can legitimately share
+      formation, position and rank, so the ingestion row hash is the key.
+    columns:
+      - name: row_id
+        tests: [unique, not_null]

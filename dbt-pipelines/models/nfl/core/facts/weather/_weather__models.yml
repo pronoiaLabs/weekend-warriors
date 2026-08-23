@@ -1,0 +1,32 @@
+version: 2
+
+# Weather facts (Open-Meteo source).
+
+models:
+
+  - name: fact_game_weather
+    description: "Kickoff-hour weather. Grain: game x product (archive / forecast / hist_forecast)."
+    columns:
+      - name: game_weather_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: stadium_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_stadium')", field: stadium_key}
+      - name: product
+        tests:
+          - not_null
+          - accepted_values: {values: ['archive', 'forecast', 'hist_forecast']}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_key, product]
+
+  - name: fact_game_weather_forecast
+    description: "1:1 forecast slice of fact_game_weather for sv_nfl_schedule."
+    columns:
+      - name: game_key
+        tests: [unique, not_null]
