@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFL Semantic Views Plan</title>
+<meta name="description" content="The semantic-view roster on DIM/FACTS, the deterministic Postgres tools beside it, and the agent architecture they serve — a LangGraph orchestrator over MCP-connected Cortex discipline agents, with report, edge and play-log experiences on top.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗣️</text></svg>">
+<style>
+  :root {
+    --bg: #f7f6f3; --panel: #ffffff; --panel-2: #f1efe9;
+    --ink: #1c1b18; --muted: #6b675e; --line: #dedacf;
+    --bdl: #2563eb; --bdl-bg: #eef3fe;
+    --nflverse: #16803c; --nflverse-bg: #ecf6ef;
+    --sleeper: #d9550f; --sleeper-bg: #fdf1e8;
+    --agent: #7c3aed; --agent-bg: rgba(124,58,237,.09);
+    --code-bg: #eeece5; --shadow: 0 1px 3px rgba(28,27,24,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16150f; --panel: #201f18; --panel-2: #262419;
+      --ink: #e8e5dc; --muted: #a09b8d; --line: #3a382c;
+      --bdl: #7aa2ff; --bdl-bg: #1d2436;
+      --nflverse: #57c47b; --nflverse-bg: #1b2b20;
+      --sleeper: #f08b4b; --sleeper-bg: #33241a;
+      --agent: #b195f5; --agent-bg: rgba(177,149,245,.12);
+      --code-bg: #2b2a20; --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15.5px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .875em; background: var(--code-bg); padding: .08em .3em; border-radius: 4px; }
+
+  .layout { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 28px; max-width: 1480px; margin: 0 auto; padding: 0 20px; }
+  .page { min-width: 0; padding: 0 0 90px; }
+  aside.rail { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 40px 0 24px; }
+  .rail .rg { margin-bottom: 16px; }
+  .rail .rg-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 0 10px 4px; }
+  .rail a { display: block; padding: 3px 10px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; border-left: 2px solid var(--line); }
+  .rail a:hover { color: var(--ink); }
+  .rail a.active { color: var(--bdl); border-left-color: currentColor; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    aside.rail { position: static; max-height: none; padding: 20px 0 0; }
+    .rail .rg { display: inline; }
+    .rail .rg-title { display: inline; padding: 0 6px 0 0; }
+    .rail a { display: inline-block; border-left: none; padding: 2px 8px 2px 0; }
+  }
+
+  header { padding: 46px 0 6px; }
+  header .kicker { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
+  header h1 { font-size: clamp(26px, 4vw, 38px); margin: 0 0 10px; letter-spacing: -.01em; }
+  header p.sub { color: var(--muted); font-size: 16.5px; max-width: 820px; margin: 0; }
+
+  h2.part { font-size: 22px; margin: 52px 0 4px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
+  h2.part small { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 10px; }
+
+  section.model { margin: 26px 0 34px; }
+  .model-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .model-head h3 { font-family: ui-monospace, Menlo, monospace; font-size: 18px; margin: 0; }
+  .model-head .grain { font-size: 13px; color: var(--muted); }
+  .joinpath { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+  .joinpath code { font-size: 12px; }
+
+  .tri { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .col { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
+  .col .head { padding: 9px 14px; font-size: 13px; font-weight: 800; letter-spacing: .02em; border-bottom: 1px solid var(--line); flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col.today .head { color: var(--muted); background: var(--panel-2); }
+  .col.plan .head { color: var(--nflverse); background: var(--nflverse-bg); }
+  .col.agent .head { color: var(--agent); background: var(--agent-bg); }
+  .col .head .g { font-weight: 500; opacity: .75; font-size: 11.5px; }
+  .col .body { padding: 0 14px 14px; max-height: 430px; overflow-y: auto; }
+  .grp { position: sticky; top: 0; z-index: 1; margin: 0 -14px 2px; padding: 12px 14px 5px; background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .grp:first-child { border-top: none; }
+  .cols { font-family: ui-monospace, Menlo, monospace; font-size: 12.3px; line-height: 1.9; word-spacing: 2px; }
+  .cols b { font-weight: 700; }
+  .q { font-size: 13px; font-style: italic; color: var(--ink); margin: 5px 0; padding-left: 10px; border-left: 2px solid var(--agent); }
+  .note { font-size: 12.5px; color: var(--muted); font-family: -apple-system, sans-serif; margin-top: 6px; }
+  .body > .note:first-child { margin-top: 10px; }
+  .none { font-size: 13px; color: var(--muted); font-style: italic; padding: 4px 0; }
+  .body > .none:first-child { padding-top: 12px; }
+  .flagline { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12.5px; color: var(--muted); }
+  .decide { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--sleeper); border: 1.5px solid var(--sleeper); background: var(--sleeper-bg); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 9px 12px; border-bottom: 2px solid var(--line); background: var(--panel-2); }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+
+  .callout { border-left: 4px solid var(--bdl); background: var(--panel); border-radius: 0 10px 10px 0; padding: 12px 18px; margin: 18px 0; box-shadow: var(--shadow); font-size: 14px; }
+  .callout.warn { border-left-color: var(--sleeper); }
+  .callout b.title { display: block; margin-bottom: 4px; }
+  .plain { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow); font-size: 14px; }
+  .plain ul { margin: 6px 0 0; padding-left: 20px; }
+  .plain li { margin: 4px 0; }
+  footer { margin-top: 70px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<aside class="rail">
+  <div class="rg">
+    <div class="rg-title">Foundation</div>
+    <a href="#overview">the decision</a>
+    <a href="#agents">the three agents</a>
+    <a href="#orchestration">the orchestrator</a>
+    <a href="#disciplines">discipline roster</a>
+    <a href="#page_aware">nice to have · page-aware</a>
+    <a href="#decisions">decisions — settled</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Views · enriching</div>
+    <a href="#sv_team">sv_nfl_team_performance</a>
+    <a href="#sv_po">sv_nfl_player_offense</a>
+    <a href="#sv_pd">sv_nfl_player_defense</a>
+    <a href="#sv_sched">sv_nfl_schedule</a>
+    <a href="#sv_props">sv_nfl_player_props</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Views · as-is</div>
+    <a href="#sv_odds">sv_nfl_game_odds</a>
+    <a href="#sv_news">sv_nfl_player_news</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Views · new</div>
+    <a href="#sv_avail">sv_nfl_availability</a>
+    <a href="#sv_situ">sv_nfl_team_situation</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Reference</div>
+    <a href="#retired">retired</a>
+    <a href="#mechanics">mechanics</a>
+  </div>
+</aside>
+
+<main class="page">
+
+<header>
+  <p class="kicker">Internal reference · companion to the enrichment and APP/API docs</p>
+  <h1>Semantic views built for conversation</h1>
+  <p class="sub">The agent-facing tool roster, built on DIM/FACTS only — kept simple on purpose. A LangGraph orchestrator fronts everything, connected over MCP to Cortex agents that each master one discipline's semantic views. The report workflow and edge chat are the orchestrator's two modes; a screen-embedded play-log agent drives the film-study page as a sibling.</p>
+</header>
+
+<!-- ==================== OVERVIEW ==================== -->
+<h2 class="part" id="overview">The decision: DIM/FACTS only</h2>
+
+<div class="plain">
+  Semantic views sit on the star — facts with additive measures, dims with clean attributes, relationships doing the joins — never on APP marts. Why this holds even though APP encodes hard-won logic:
+  <ul>
+    <li><b>Aggregation safety.</b> APP marts are full of non-additive columns (running to-date, trailing averages, ranks, hit rates). Generated SQL will happily SUM them. The star's metrics — defined once as ratios of sums — are the guardrail Cortex Analyst is built around.</li>
+    <li><b>Composability.</b> The agent should answer questions no dashboard page renders. APP is pre-filtered and pre-shaped (completed games, vendor fan-out, offense-only); DIM/FACTS lets any grain aggregate any way.</li>
+    <li><b>Stable coupling.</b> APP columns move with UI needs. DIM/FACTS is the contract layer — and because views resolve tables via <code>ref()</code>, the physical renames (PLAYER_PROFILE, PLAY_LOG, …) cost the views nothing.</li>
+    <li>Where APP logic is genuinely the definition (trailing windows, allowed splits), the agent gets the same answer a different way: the <b>metrics and AI_SQL_GENERATION rules encode the same discipline</b> (strictly pre-kickoff, sum-over-sum), and the situation view is built on the same fact the APP mart reads.</li>
+  </ul>
+</div>
+
+<!-- ==================== AGENTS ==================== -->
+<h2 class="part" id="agents">The three agents</h2>
+
+<div class="tri">
+  <div class="col agent">
+    <div class="head">Report agent <span class="g">workflow · auto-builds a report from an ask</span></div>
+    <div class="body">
+      <div class="grp">Shape</div>
+      <div class="note">A workflow, not a chat loop: the ask ("give me a report on the Bengals game", "prep me for my week 12 lineup") maps to a fixed set of report sections, each section backed by one view and its verified queries. Deterministic structure, LLM-composed prose.</div>
+      <div class="grp">Semantic views (via discipline agents)</div>
+      <div class="cols">sv_nfl_team_performance<br>sv_nfl_team_situation<br>sv_nfl_player_offense<br>sv_nfl_player_defense<br>sv_nfl_availability<br>sv_nfl_game_odds<br>sv_nfl_player_props</div>
+      <div class="grp">Postgres tools</div>
+      <div class="cols">slate_tool<br>status_tool<br>market_moves_tool<br>props_screen_tool<br>leaders_tool<br>news_tool</div>
+      <div class="grp">Design consequence</div>
+      <div class="note">Every report section is either a <b>table straight from a tool</b> (the slate header, the market table, the prop screen — byte-identical to the app, zero LLM) or <b>prose from a discipline agent</b> (form, situational profile, the player "why"). Agent-backed sections keep their canonical query in AI_VERIFIED_QUERIES, so the workflow's output stays reproducible — adding a report section means adding a tool call or a verified query, never prompt surgery.</div>
+    </div>
+  </div>
+  <div class="col agent">
+    <div class="head">Edge agent <span class="g">chat · find the edge in natural language</span></div>
+    <div class="body">
+      <div class="grp">Shape</div>
+      <div class="note">Conversational, multi-turn, follows the user's nose: "who's undervalued this week" → "why is his line low" → "what does that defense give up to slot guys on third down". Needs the tool list tight — agents pick tools better from nine good views than fifteen overlapping ones.</div>
+      <div class="grp">Semantic views (via discipline agents)</div>
+      <div class="cols">sv_nfl_player_offense<br>sv_nfl_player_defense<br>sv_nfl_team_performance<br>sv_nfl_team_situation<br>sv_nfl_availability<br>sv_nfl_game_odds<br>sv_nfl_player_props</div>
+      <div class="grp">Postgres tools</div>
+      <div class="cols">props_screen_tool<br>matchup_rank_tool<br>market_moves_tool<br>leaders_tool<br>status_tool<br>news_tool<br>play_feed_tool</div>
+      <div class="grp">Design consequence</div>
+      <div class="note">Every turn runs the funnel: <b>screen with tools, explain with agents, price-check with tools</b> — the LLM never re-derives what a precomputed column answers, and the survivors of a screen are what the discipline agents get asked about. Shared vocabulary still carries the thread: every view and tool uses the same dimension names (season, week, season_type, team, position), and SQL-generation rules live in each view's AI_SQL_GENERATION clause, never in agent instructions.</div>
+      <div class="note">Nice to have: this agent goes <b>page-aware, everywhere</b> — see its own section below.</div>
+    </div>
+  </div>
+  <div class="col agent">
+    <div class="head">Play-log agent <span class="g">screen-embedded · drives the film-study page</span></div>
+    <div class="body">
+      <div class="grp">Shape</div>
+      <div class="note">Lives on the PLAY_FEED screen, not in a generic chat. The user talks football — "show me his red-zone targets when they're trailing" — and the agent translates to API calls (the play-log filters and the situation-usage strip), so the <b>grid auto-populates as the conversation goes</b>. It never generates SQL over the 180k-row play table; the API layer is its tool surface, which keeps every answer identical to what the screen shows.</div>
+      <div class="grp">Semantic views (via discipline agents)</div>
+      <div class="cols">sv_nfl_team_situation</div>
+      <div class="grp">Postgres tools</div>
+      <div class="cols">play_feed_tool<br>matchup_rank_tool<br>status_tool</div>
+      <div class="grp">Screen surface (API it drives)</div>
+      <div class="cols">GET /api/nfl/plays (filters as tools)<br>GET /api/nfl/explore/plays</div>
+      <div class="grp">Session (Postgres)</div>
+      <div class="note">Conversation state — active filters, pinned players, the trail of views explored — persists in a Postgres session table beside the app_copy schema. Each turn refines or resets the state; "back to his carries" replays a prior state. The session is the film-study notebook.</div>
+      <div class="grp">Design consequence</div>
+      <div class="note">Almost everything this agent does is <b>deterministic by design</b> — driving filters, pinning players, replaying states are tool and API calls, with exactly one agent in reach (situations, for league context on what the grid shows). That is why decision 4 is "no play-grain semantic view": the browsing/pattern questions belong to this screen; the aggregate questions belong to sv_nfl_team_situation. Its API surface (session endpoints + agent-driven filter state) rides the play-log v2 workstream in the APP &amp; API plan.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ORCHESTRATION ==================== -->
+<h2 class="part" id="orchestration">The orchestrator <small>LangGraph → MCP → Cortex discipline agents → semantic views</small></h2>
+
+<div class="plain">
+  <b>The topology.</b> A LangGraph agent is the orchestrator — the only thing users talk to. It connects over <b>MCP servers to Cortex agents</b>, each one a master of exactly one discipline, each discipline owning its semantic view(s). Four layers, strict responsibilities:
+  <ul>
+    <li><b>LangGraph orchestrator</b> — routing, planning, cross-discipline reasoning, and composition. The report workflow and the edge chat are its two <i>modes</i>: a report is a planned fan-out (schedule + form + availability + market + props called in parallel, sections composed from their answers); an edge conversation is per-turn routing to whichever discipline the thread needs next. It owns conversation memory and never touches SQL.</li>
+    <li><b>Deterministic Postgres tools</b> — anything with a known question shape is a plain LangGraph tool pinging the <code>app_copy</code> tables directly: a WHERE clause and an ORDER BY over precomputed columns, no LLM, no warehouse. The APP marts' non-additive columns — the reason semantic views avoid them — are exactly what makes them perfect tool surfaces: ranks, hit rates, gaps and trailing windows are pre-answered. Tool answers are byte-identical to what the app screens show, by construction.</li>
+    <li><b>MCP servers</b> — each Cortex agent is registered as an MCP tool with a one-line contract: what discipline it masters and what a good question to it looks like. The orchestrator's tool-selection quality lives or dies on these descriptions, so they are written like the view comments: specific, bounded, honest about coverage.</li>
+    <li><b>Cortex discipline agents</b> — one per discipline, each a <code>deploy_*</code> macro like <code>nfl_analyst</code> today (spec inline, <code>&lt;&lt;DATABASE&gt;&gt;</code> tokens, alter-mode updates). A discipline agent answers only from its own views; it never reaches across. Cross-discipline synthesis ("is his line out of step with his usage?") is the <b>orchestrator's</b> job — it screens the prop board with the tool, asks the player analyst why, and reasons over both answers.</li>
+    <li><b>Semantic views</b> — the roster below, unchanged. Verified queries stay with the discipline that owns them, which is what makes each agent a master: its verified queries are its craft.</li>
+  </ul>
+  The play-log agent stays a <b>sibling, not a Cortex agent</b> — it drives the API layer on its screen. The orchestrator hands off to it ("want to see those plays?") rather than wrapping it.
+</div>
+
+<!-- ==================== DISCIPLINES ==================== -->
+<h2 class="part" id="disciplines">The roster <small>deterministic Postgres tools first, Cortex agents where reasoning is required</small></h2>
+
+<div class="callout">
+  <b class="title">The split rule — and the funnel it serves</b>
+  If the question is a WHERE clause and an ORDER BY over precomputed columns, it's a <b>tool</b> pinging Postgres. If it needs novel aggregation or judgment, it's a <b>Cortex agent</b> over the star. And the orchestrator's questioning is geared toward one thing: <b>identifying plays</b>. The funnel is: <i>screen</i> the slate and the boards deterministically (tools — cheap, exact, instant) → <i>explain</i> the survivors analytically (agents — why is the usage rising, is the matchup real) → <i>price-check</i> deterministically (tools again) → surface the play. Tools do the volume; agents do the judgment; the LLM never re-derives what a table already holds.
+</div>
+
+<h3 style="margin:24px 0 6px">Deterministic tools <span style="font-weight:400;font-size:13px;color:var(--muted)">— LangGraph tools over Postgres app_copy; answers match the app screens by construction</span></h3>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>Tool</th><th>Postgres table(s)</th><th>Answers, deterministically</th><th>Example ping</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">slate_tool</td><td class="mono">GAME_SLATE</td><td>The week's games, conditions, referee, availability counters, readiness</td><td>week=12 → the slate, ordered by kickoff</td></tr>
+    <tr><td class="mono">props_screen_tool</td><td class="mono">PROP_BOARD</td><td>The play-identification workhorse: hit rates, trailing form, gap_to_line, projection_vs_line, matchup rank — all precomputed</td><td>projection_vs_line ≥ 2 AND trailing_hit_rate ≥ 0.6 → candidate plays</td></tr>
+    <tr><td class="mono">market_moves_tool</td><td class="mono">LINE_HISTORY, PROP_LINE_HISTORY</td><td>Movement since open, steam, closing-vs-open per game and prop</td><td>this week, ORDER BY abs(line_value_since_open) DESC</td></tr>
+    <tr><td class="mono">matchup_rank_tool</td><td class="mono">TEAM_ALLOWED, TEAM_SITUATION</td><td>What a defense allows by position, stat and situation — ranked, with league context</td><td>position=WR, stat=receiving_yards → allowed rank 1–32</td></tr>
+    <tr><td class="mono">leaders_tool</td><td class="mono">PLAYER_LEADERS</td><td>Season leaderboards and ranks, incl. the new usage/fantasy ranks</td><td>position=RB, ORDER BY rank_target_share</td></tr>
+    <tr><td class="mono">status_tool</td><td class="mono">GAME_SLATE counters, PROP_BOARD status cols</td><td>Current injury/practice/depth status for the slate's players</td><td>game_key=X → who's out, questionable, limited</td></tr>
+    <tr><td class="mono">news_tool</td><td class="mono">NEWS_MENTIONS</td><td>Recent mentions by team, player, feed, recency</td><td>team=CIN, days=7 → headlines with next-game context</td></tr>
+    <tr><td class="mono">play_feed_tool</td><td class="mono">PLAY_FEED, PLAYER_SITUATION_USAGE</td><td>Filtered plays and situation-usage shares — shared with the play-log agent's screen</td><td>receiver=X AND is_red_zone → his red-zone targets</td></tr>
+  </tbody>
+</table></div>
+
+<h3 style="margin:24px 0 6px">Cortex discipline agents <span style="font-weight:400;font-size:13px;color:var(--muted)">— MCP-connected, semantic views on the star, for questions whose shape isn't known in advance</span></h3>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>Agent (deploy macro)</th><th>MCP tool</th><th>Views owned</th><th>Master of</th><th>The orchestrator asks it…</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">nfl_team_form_analyst</td><td class="mono">nfl_team_form</td><td class="mono">sv_nfl_team_performance</td><td>Team form and efficiency, both sides — arbitrary windows, splits and comparisons the leaderboards don't precompute.</td><td>"How have the Ravens trended offensively over the last five games, and what do they allow?"</td></tr>
+    <tr><td class="mono">nfl_player_analyst</td><td class="mono">nfl_players</td><td class="mono">sv_nfl_player_offense<br>sv_nfl_player_defense</td><td>Player production and usage — the why behind what the screens surfaced; IDP angles.</td><td>"Whose snap share rose the last three weeks without the PPR points following yet?"</td></tr>
+    <tr><td class="mono">nfl_situation_analyst</td><td class="mono">nfl_situations</td><td class="mono">sv_nfl_team_situation</td><td>Tendency exploration beyond the ranked lookups — cross-situation, cross-team, custom windows. (Phase 3)</td><td>"Which defenses got worse on early downs after their bye?"</td></tr>
+    <tr><td class="mono">nfl_availability_analyst</td><td class="mono">nfl_availability</td><td class="mono">sv_nfl_availability</td><td>Availability history and patterns — filed reports over time, practice-to-status trajectories (current status is the tool's job).</td><td>"How has he progressed on the report the last three weeks — trending toward playing?"</td></tr>
+    <tr><td class="mono">nfl_market_analyst</td><td class="mono">nfl_game_odds</td><td class="mono">sv_nfl_game_odds<br>sv_nfl_player_props</td><td>Market analysis beyond the movement screens — closing-line value patterns, settlement history, projection-line divergence over time.</td><td>"How often has the closing total been wrong by a touchdown in domes this season?"</td></tr>
+  </tbody>
+</table></div>
+
+<div class="callout">
+  <b class="title">Design rules that keep the roster honest</b>
+  Schedule, news and status questions turned out to be fully deterministic — they have no Cortex agent at all, just tools. That leaves <code>sv_nfl_schedule</code> and <code>sv_nfl_player_news</code> without a discipline owner: they stay deployed for the general fallback below, and become retirement candidates once the tools prove they cover the whole question space. Every remaining agent owns one discipline and one to two views; the orchestrator owns every cross-discipline thought and the tools-vs-agent routing. When a question keeps arriving at an agent with the same shape, that's a signal to <b>promote it to a tool</b> (add the precomputed column to the APP mart if needed) — the roster's center of gravity should drift deterministic over time. The existing all-in-one <code>nfl_analyst</code> survives as the general fallback until the roster covers it, then retires deliberately, with a date. Verified queries stay with the discipline that owns them — mastering a discipline means owning its canonical answers.
+</div>
+
+<!-- ==================== NICE TO HAVE ==================== -->
+<h2 class="part" id="page_aware">Nice to have — the page-aware edge agent <small>the multiplier: from destination to layer over the whole app</small></h2>
+
+<div class="plain">
+  The edge agent rides along on <b>every page</b>, not just a chat screen:
+  <ul>
+    <li><b>Context in.</b> Each request carries page context — route, entity in view, active filters — so "is this line beatable?" asked from a prop row needs no re-explaining. The orchestrator receives the page context as part of every turn.</li>
+    <li><b>State out.</b> The agent can <b>write back</b>: the play-log agent's Postgres session pattern generalized into per-page state configs (active filters, selected vendor, pinned entities) that the pages already read — so an answer can repopulate the screen the user is on. "Show me that on the board" flips the filters instead of describing them.</li>
+    <li><b>One mechanism, not many.</b> A page-state table beside <code>app_copy</code> plus a state endpoint per page, riding the same session machinery as play-log v2 — building the play log's session store is also building this.</li>
+  </ul>
+</div>
+
+<!-- ==================== DECISIONS ==================== -->
+<h2 class="part" id="decisions">Decisions — settled <small>all four resolved</small></h2>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>#</th><th>Decision</th><th>Settled</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Projections: fold into sv_nfl_player_props or a separate view?</td><td><b>✓ Fold in</b></td><td>"Line vs projection" is one question surface. AI rule pins "latest pre-kickoff snapshot".</td></tr>
+    <tr><td>2</td><td>Team performance: offense fact only, or add the defense twin?</td><td><b>✓ Add the twin</b></td><td>One team view that knows both sides — and the "allowed" side is the matchup input for <b>IDP targeting</b> in the Sleeper league: defenses that face the most dropbacks and plays feed tackle and sack opportunity.</td></tr>
+    <tr><td>3</td><td>New sv_nfl_availability?</td><td><b>✓ Yes</b></td><td>"Who's out this week" is the most-asked real question in fantasy. Cheap view, high hit rate.</td></tr>
+    <tr><td>4</td><td>A play-grain semantic view?</td><td><b>✓ No — a third agent instead</b></td><td>The <b>play-log agent</b>: screen-embedded on the PLAY_FEED page, it drives the API layer directly instead of generating SQL over 180k plays, with Postgres managing the session so the grid auto-populates as the conversation goes. See its card in the agents section.</td></tr>
+  </tbody>
+</table></div>
+
+<!-- ==================== ENRICHING ==================== -->
+<h2 class="part" id="views">Views · enriching <small>today's tables → what the enrichment adds</small></h2>
+
+<section class="model" id="sv_team">
+  <div class="model-head"><h3>sv_nfl_team_performance</h3><span class="grain">team × game · ANALYTICS · the team form tool</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_team_game_offense<br>dim_game<br>dim_team<br>dim_season_week</div>
+        <div class="grp">Covers</div>
+        <div class="note">Results and the full box score at team × game — wins, points, yards, third down, red zone, turnovers.</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="grp">New table <span class="decide">decision 2</span></div>
+        <div class="cols">fact_team_game_defense (1:1 twin on team_game_key)</div>
+        <div class="grp">New metrics (sum-over-sum)</div>
+        <div class="cols"><b>epa_per_play</b><br><b>success_rate</b><br>early_down_success_rate<br>pass_epa_per_dropback<br>rush_epa_per_carry<br><b>explosive_rate</b><br>proe<br>def_epa_per_play (allowed)<br>success_rate_allowed<br>explosive_rate_allowed</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="sv_po">
+  <div class="model-head"><h3>sv_nfl_player_offense</h3><span class="grain">player × game · ANALYTICS · the usage tool — the biggest winner</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_player_game_offense<br>dim_player<br>dim_team<br>dim_game<br>dim_season_week</div>
+        <div class="grp">Covers</div>
+        <div class="note">Passing / rushing / receiving box at player × game, fantasy points via the book UDF columns.</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="grp">New metrics (from the wide fact)</div>
+        <div class="cols"><b>target_share</b><br>air_yards_share<br><b>wopr</b><br><b>snap_pct</b><br>passing/rushing/receiving_epa<br>passing_cpoe<br><b>pts_ppr</b> · pts_half_ppr · pts_std</div>
+        <div class="grp">New dimensions (from PLAYER_PROFILE)</div>
+        <div class="cols">draft_year · draft_round<br>college_conference<br>years_of_experience<br>position (repaired — no more Unknown)<br>headshot_url</div>
+        <div class="note">Coverage note for AI_SQL_GENERATION: usage metrics are NULL on preseason and unmatched rows — never treat as zero.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="sv_pd">
+  <div class="model-head"><h3>sv_nfl_player_defense</h3><span class="grain">player × game · ANALYTICS</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_player_game_defense<br>dim_player<br>dim_team<br>dim_game<br>dim_season_week</div>
+        <div class="grp">Covers</div>
+        <div class="note">Tackling, pass rush, coverage, takeaways at player × game.</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="grp">New metrics</div>
+        <div class="cols"><b>defense_snap_pct</b><br>nflverse def_* counting stats where they add coverage<br><b>idp_tkl · idp_sack · idp_int</b> (Sleeper IDP scoring)</div>
+        <div class="note">The IDP columns turn this into a Sleeper-league tool: IDP scoring + snap share here, opportunity volume (dropbacks faced, plays faced) from the team defense twin — the two halves of "who racks up tackles this week".</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="sv_sched">
+  <div class="model-head"><h3>sv_nfl_schedule</h3><span class="grain">one row per game, full slate · the only future-games view (slate lookups are the tool's job) · exposes no scores, deliberately</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">dim_game<br>dim_team (role-played home/away)<br>dim_stadium<br>fact_game_weather_forecast</div>
+        <div class="grp">Covers</div>
+        <div class="note">The slate — when, where, who, roof, surface, kickoff forecast.</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="grp">New dimensions (from GAME_SCHEDULE)</div>
+        <div class="cols"><b>referee</b><br>is_division_game</div>
+        <div class="note">Still no scores — that rule survives. Officiating crews as a queryable angle come later via GAME_OFFICIAL if referee alone proves insufficient.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="sv_props">
+  <div class="model-head"><h3>sv_nfl_player_props</h3><span class="grain">game × player × vendor × prop_type · the price tool</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_player_prop_opening<br>fact_player_prop_closing<br>dim_player<br>dim_game<br>dim_team</div>
+        <div class="grp">Covers</div>
+        <div class="note">Prop offers at game × player × vendor × prop_type, opening and closing, with movement.</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned <span class="decide">decision 1</span></div>
+      <div class="body">
+        <div class="grp">New table</div>
+        <div class="cols">fact_sleeper_projection_snapshot<br>(relationship at player × game)</div>
+        <div class="grp">New metrics / dimensions</div>
+        <div class="cols"><b>projection_value</b> (latest pre-kickoff)<br><b>projection_vs_line</b><br>adp context where useful</div>
+        <div class="note">AI_SQL_GENERATION rule does the heavy lifting: always the latest is_pre_kickoff snapshot, never averaged across snapshots, stat mapping via the prop stat vocabulary.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== AS-IS ==================== -->
+<h2 class="part" id="asis">Views · as-is</h2>
+
+<section class="model" id="sv_odds">
+  <div class="model-head"><h3>sv_nfl_game_odds</h3><span class="grain">game × vendor · opening + closing game markets</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today — unchanged</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_game_betting_odds_opening<br>fact_game_betting_odds_closing<br>dim_game<br>dim_team</div>
+        <div class="note">Spreads, totals, moneylines, movement, devig probabilities, settlement. Already shaped for "how did the market move" and "who covered".</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="sv_news">
+  <div class="model-head"><h3>sv_nfl_player_news</h3><span class="grain">article × player mention</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today — unchanged</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_player_news_mention<br>dim_player<br>dim_team</div>
+        <div class="note">Headlines, context, resolution quality. The catalyst tool — why a number moved, in words.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== NEW ==================== -->
+<h2 class="part" id="newviews">Views · new</h2>
+
+<section class="model" id="sv_avail">
+  <div class="model-head"><h3>sv_nfl_availability</h3><span class="grain">new view · week × team × player · Phase 1–2 <span class="decide">decision 3</span></span></div>
+  <div class="tri">
+    <div class="col plan">
+      <div class="head">Shape</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_injury_report<br>fact_depth_chart<br>dim_player (PLAYER_PROFILE)<br>dim_team<br>dim_game<br>dim_season_week</div>
+        <div class="grp">Dimensions &amp; facts exposed</div>
+        <div class="cols">report_status (Out / Doubtful / Questionable)<br>practice_status + injuries named<br>depth_rank + formation slot<br>current_injury_status (serving-only, from the dim)</div>
+        <div class="note">AI rule: the filed report is history and game-anchored; the dim's current status is "as of now" — the view names both and never blends them.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="sv_situ">
+  <div class="model-head"><h3>sv_nfl_team_situation</h3><span class="grain">new view · team × game × situation · Phase 3 · built on TEAM_GAME_SITUATION</span></div>
+  <div class="tri">
+    <div class="col plan">
+      <div class="head">Shape</div>
+      <div class="body">
+        <div class="grp">Tables</div>
+        <div class="cols">fact_team_game_situation<br>dim_team<br>dim_game<br>dim_season_week</div>
+        <div class="grp">Dimensions</div>
+        <div class="cols">down bucket · distance bucket<br>field zone · play family<br>game script · side (offense / allowed)</div>
+        <div class="grp">Metrics (sum-over-sum)</div>
+        <div class="cols">epa_per_play<br>success_rate<br>explosive_rate<br>pass_rate · proe</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== RETIRED ==================== -->
+<h2 class="part" id="retired">Retired</h2>
+<div class="plain">
+  <ul>
+    <li><code>sv_nfl_player_advanced</code> — <b>permanently retired.</b> It was disabled because the Next Gen sources track each player in exactly one discipline, so the view promised cross-discipline comparisons the data can't answer. The wide fact absorbed the usage story with full coverage, which removes the reason the view existed. Decision 4 also lands here: no play-grain view replaces it — the play-log agent and its screen own that territory.</li>
+    <li><code>sv_example</code> — template skeleton, kept only for its authoring guidance; never deployed.</li>
+  </ul>
+</div>
+
+<!-- ==================== MECHANICS ==================== -->
+<h2 class="part" id="mechanics">Mechanics <small>the constraints that hold for every view here</small></h2>
+
+<div class="tri">
+  <div class="col today">
+    <div class="head">Metrics discipline</div>
+    <div class="body">
+      <div class="note">Metrics only on additive columns; every rate and share is a <b>ratio of sums</b> (total EPA / total plays, total targets / total team targets), never an average of per-game rates. NULL-vs-zero semantics ride in from the wide facts: NULL means no vendor match or preseason, and AI_SQL_GENERATION says so per view.</div>
+    </div>
+  </div>
+  <div class="col today">
+    <div class="head">DDL &amp; deploy</div>
+    <div class="body">
+      <div class="note">Clause order is enforced: <code>TABLES → RELATIONSHIPS → FACTS → DIMENSIONS → METRICS → COMMENT → AI_*</code>, with <code>AI_VERIFIED_QUERIES</code> last. Views resolve tables via <code>ref()</code>, so the DIM/FACTS physical renames cost nothing here. Agents stay macros (<code>deploy_&lt;name&gt;</code>, <code>&lt;&lt;DATABASE&gt;&gt;</code> tokens, <code>--args "'{alter: true}'"</code> quoting through snow dbt execute). SQL-generation rules live in the view's AI_SQL_GENERATION clause, never in agent instructions.</div>
+    </div>
+  </div>
+  <div class="col today">
+    <div class="head">Rollout per view</div>
+    <div class="body">
+      <div class="note">Each changed view ships with: the metric additions, refreshed <code>AI_VERIFIED_QUERIES</code> (the report agent's building blocks — every report section keeps a canonical verified query), an agent-instruction touch only if the tool list itself changed, and a dev build + <code>deploy-sport</code> like everything else. Phase alignment: player/team metric enrichment after Phase 2; availability after Phase 1–2; situation after Phase 3.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  weekend-warriors · internal reference · companions: <a href="nfl-enrichment-columns.html">enrichment columns</a>, <a href="nfl-app-api-plan.html">APP &amp; API plan</a>, <a href="nfl-core-connection-strategy.html">connection strategy</a>.
+</footer>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var targets = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function spy() {
+    var pos = window.scrollY + 100, idx = 0, best = -Infinity;
+    targets.forEach(function (t, i) {
+      if (t && t.offsetTop <= pos && t.offsetTop > best) { best = t.offsetTop; idx = i; }
+    });
+    links.forEach(function (a, i) { a.classList.toggle('active', i === idx); });
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>

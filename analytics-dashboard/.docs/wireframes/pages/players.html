@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Players — Weekend Warriors wireframe</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* players page: filter bar pills, the leaders table, the risers rail */
+.filters .hint { flex-basis: 100%; }
+
+.cols-players { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); }
+.shell-narrow .cols-players { grid-template-columns: minmax(0, 1fr); }
+
+/* leaders rows: rk · player · g · rec · yds · td · tgt% · snap% · ppr · posrk · trend */
+.leaders-tile .trow { --cols: 26px minmax(190px, 1.9fr) 32px 44px 56px 34px 76px 62px 60px 50px 42px; min-width: 760px; }
+/* the leaderboard lives inside the viewport: the rows scroll, the page doesn't */
+.leaders-tile .tile-body { max-height: calc(100vh - 400px); min-height: 360px; overflow: auto; }
+.leaders-tile .trow.head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-top: 8px; padding-bottom: 6px; }
+.pcell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pcell .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.pcell .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcell .who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trow .trend { text-align: center; font-size: 11px; color: var(--ink-4); }
+.trow .trend.pos { color: var(--pos); }
+.trow .trend.neg { color: var(--neg); }
+.trow .n .posrk { font-size: 10px; color: var(--ink-4); }
+
+/* risers rail: avatar chip rows with a delta badge */
+.riser { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); color: inherit; }
+.riser:first-of-type { border-top: 0; padding-top: 0; }
+.riser .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.riser .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riser .who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riser:hover .who b { color: var(--accent); }
+.riser .delta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.riser .delta small { font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="wf-note">wireframe · sample data</div>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="aurora two"><i></i><i></i><i></i></div>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="../index.html">
+      <span class="mark"></span><span class="word">Weekend Warriors</span><span class="sub">analytics</span>
+    </a>
+    <nav class="sport-switch"><a class="on" href="#">NFL</a><a href="#">NCAAF</a></nav>
+    <div class="context">
+      <span class="ctx-item"><span class="l">Season</span><span class="v">2025 · Week 8</span></span>
+      <span class="ctx-item"><span class="l">Data</span><span class="v">postgres</span></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <h1>Players</h1>
+      <p class="lede">Cast wide, filter down. The leaderboard sorts by <b>usage</b> — target share,
+      snaps — not just yardage, because usage moves before the box score does. Click a row to dig
+      into a player's pond on <a href="player-detail.html">the player page</a>.</p>
+    </div>
+
+    <!-- zone 1: filter bar -->
+    <div class="filters">
+      <label class="psel"><span class="l">Pos</span>
+        <select>
+          <option>All</option>
+          <option>QB</option>
+          <option>RB</option>
+          <option selected>WR</option>
+          <option>TE</option>
+        </select></label>
+      <label class="psel"><span class="l">Team</span>
+        <select>
+          <option selected>All teams</option>
+          <option>ARI</option><option>ATL</option><option>BAL</option><option>BUF</option>
+          <option>CAR</option><option>CHI</option><option>CIN</option><option>CLE</option>
+          <option>DAL</option><option>DEN</option><option>DET</option><option>GB</option>
+          <option>HOU</option><option>IND</option><option>JAX</option><option>KC</option>
+          <option>LAC</option><option>LAR</option><option>LV</option><option>MIA</option>
+          <option>MIN</option><option>NE</option><option>NO</option><option>NYG</option>
+          <option>NYJ</option><option>PHI</option><option>PIT</option><option>SEA</option>
+          <option>SF</option><option>TB</option><option>TEN</option><option>WAS</option>
+        </select></label>
+      <label class="psel"><span class="l">Season</span>
+        <select>
+          <option selected>2025 · Wks 1–8</option>
+          <option>2024</option>
+          <option>2023</option>
+        </select></label>
+      <label class="psel"><span class="l">Type</span>
+        <select>
+          <option selected>Regular</option>
+          <option>Postseason</option>
+        </select></label>
+      <label class="psel"><span class="l">Sort</span>
+        <select>
+          <option>Yards</option>
+          <option>TDs</option>
+          <option selected>Target share</option>
+          <option>Snap %</option>
+          <option>PPR pts</option>
+        </select></label>
+      <span class="hint">Usage sorts surface risers a yardage leaderboard hides — a 22% target share
+      on a bad day beats a fluky 120-yard game.</span>
+    </div>
+
+    <div class="grid cols-players">
+      <!-- zone 2: leaders grid -->
+      <section class="tile table-tile leaders-tile">
+        <div class="tile-head">
+          <h2>WR leaders · target share</h2>
+          <span class="meta">2025 · wks 1–8 · min 4 games</span>
+        </div>
+        <div class="tile-body">
+          <div class="trows" id="leaders">
+            <div class="trow head">
+              <span class="rk">#</span><span>Player</span>
+              <span class="n">G</span><span class="n">Rec</span><span class="n">Yds</span><span class="n">TD</span>
+              <span class="n sorted">Tgt&nbsp;%</span><span class="n">Snap&nbsp;%</span>
+              <span class="n">PPR</span><span class="n">Rk</span><span class="trend">3w</span>
+            </div>
+            <!-- rows rendered from WW.players + sample stat lines -->
+          </div>
+        </div>
+        <details class="q"><summary>data</summary><pre>mart:  APP.PLAYER_LEADERS
+route: GET /api/nfl/players?season=2025&amp;season_type=REG&amp;pos=WR&amp;sort=target_share
+fields: rank, player_id, player, team, position, games,
+        receptions, rec_yards, rec_td (core box aggregates today)
+planned usage/fantasy columns (PLAYER_WEEKS rollup + snaps + Sleeper pts):
+        target_share, snap_pct, ppr_points, ppr_pos_rank, tgt_share_delta_3w
+sort=  any numeric column; API ranks within position</pre></details>
+      </section>
+
+      <!-- zone 3: risers callout -->
+      <aside class="tile risers-tile">
+        <div class="tile-head">
+          <h2>Risers</h2>
+          <span class="meta">tgt share · last 3 wks</span>
+        </div>
+        <div id="risers"><!-- riser rows rendered below --></div>
+        <p class="caption">Target share over weeks 5–7 vs weeks 1–4. Usage jumps like these usually
+        show up in the box score a week or two later — this is the fishing hook.</p>
+        <details class="q"><summary>data</summary><pre>mart:  APP.PLAYER_WEEKS  (form windows, computed)
+route: GET /api/nfl/players/risers?season=2025&amp;window=3
+fields: player, team, position,
+        tgt_share_l3w, tgt_share_prior, tgt_share_delta,
+        next_opp, next_opp_pos_rank
+calc:  avg(target_share) last 3 wks − avg(prior wks), min 2 games each</pre></details>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="foot"><span>Wireframe — zones annotated with the mart + route feeding them.</span><span>NFL_PROD_DB.APP → app.app_player_leaders</span></footer>
+</div>
+
+<nav class="dock">
+  <a href="pulse.html">Pulse</a>
+  <a href="game-day.html">Game Day</a>
+  <a class="active" href="players.html">Players</a>
+  <a href="teams.html">Teams</a>
+  <a href="markets.html">Markets</a>
+  <a href="play-log.html">Play Log</a>
+  <a href="explorer.html">Explorer</a>
+</nav>
+
+<button class="edge-fab" id="edgeFab" title="Edge agent">✦</button>
+<aside class="edge-panel" id="edgePanel">
+  <div class="edge-head">Edge agent<small>page-aware · sees your filters</small></div>
+  <div class="edge-msgs">
+    <div class="edge-msg me">Find me WR2s trending up before soft matchups</div>
+    <div class="edge-msg bot">Applied Pos: WR and Sort: Target share for you — see left. Two WR2s
+    stand out: <b>Keon Sheppard</b> (NYJ, +6.8 pts of target share, faces NE 27th vs WR this week)
+    and <b>Drake London</b> (ATL, +5.4, faces MIA 24th). Both are pinned in the Risers tile.</div>
+    <div class="edge-msg me">Which one is cheaper on the prop board?</div>
+    <div class="edge-msg bot">Sheppard — DraftKings has his receiving line at 41.5 vs a 52-yard
+    l3w average. London's line already moved to 63.5. Open Markets to see the line path.</div>
+  </div>
+  <div class="edge-input"><input placeholder="Ask about this page…"></div>
+</aside>
+
+<script src="../shared/data.js"></script>
+<script>
+  document.getElementById('edgeFab').addEventListener('click', function () {
+    document.getElementById('edgePanel').classList.toggle('open');
+  });
+
+  /* ---- sample stat lines (weeks 1–8, internally consistent: ppr ≈ rec + yds/10 + 6·td) ---- */
+  // keyed by player name; real WRs come from WW.players (headshots), the rest are
+  // invented role players rendered with initials-only avatars.
+  var STATS = {
+    "Ja'Marr Chase":      { g: 7, rec: 58, yds: 704, td: 6, tgt: 31.2, snap: 94, ppr: 165.8, posrk: 1,  trend:  1 },
+    "Puka Nacua":         { g: 7, rec: 61, yds: 688, td: 3, tgt: 30.1, snap: 91, ppr: 148.2, posrk: 3,  trend:  0 },
+    "CeeDee Lamb":        { g: 6, rec: 48, yds: 598, td: 4, tgt: 28.7, snap: 93, ppr: 132.4, posrk: 7,  trend: -1 },
+    "Justin Jefferson":   { g: 7, rec: 47, yds: 671, td: 5, tgt: 27.9, snap: 95, ppr: 144.6, posrk: 5,  trend:  1 },
+    "Malik Nabers":       { g: 6, rec: 46, yds: 512, td: 3, tgt: 27.4, snap: 89, ppr: 115.9, posrk: 14, trend: -1 },
+    "Amon-Ra St. Brown":  { g: 7, rec: 52, yds: 561, td: 6, tgt: 26.8, snap: 92, ppr: 146.0, posrk: 4,  trend:  1 },
+    "Drake London":       { g: 7, rec: 44, yds: 587, td: 4, tgt: 26.1, snap: 90, ppr: 127.0, posrk: 9,  trend:  1 },
+    "Garrett Wilson":     { g: 7, rec: 43, yds: 486, td: 3, tgt: 25.5, snap: 96, ppr: 110.2, posrk: 17, trend:  0 },
+    "A.J. Brown":         { g: 6, rec: 38, yds: 552, td: 4, tgt: 24.7, snap: 88, ppr: 117.5, posrk: 13, trend: -1 },
+    "Nico Collins":       { g: 6, rec: 36, yds: 541, td: 3, tgt: 23.9, snap: 87, ppr: 108.4, posrk: 18, trend:  0 },
+    "Keon Sheppard":      { g: 7, rec: 34, yds: 402, td: 2, tgt: 22.6, snap: 78, ppr:  86.9, posrk: 29, trend:  1 },
+    "Zay Flowers":        { g: 7, rec: 39, yds: 471, td: 2, tgt: 22.1, snap: 85, ppr:  99.0, posrk: 24, trend: -1 },
+    "Deon Carter":        { g: 7, rec: 31, yds: 356, td: 3, tgt: 20.8, snap: 74, ppr:  84.6, posrk: 31, trend:  1 },
+    "Marcus Vail":        { g: 6, rec: 27, yds: 344, td: 1, tgt: 18.9, snap: 81, ppr:  67.8, posrk: 41, trend:  0 },
+    "Tre Hollins":        { g: 7, rec: 29, yds: 301, td: 2, tgt: 17.4, snap: 69, ppr:  71.4, posrk: 38, trend:  1 }
+  };
+  // invented role players (no WW.players entry → initials avatar, no headshot)
+  var ROLE_PLAYERS = [
+    { name: "Keon Sheppard", pos: "WR", team: "NYJ" },
+    { name: "Deon Carter",   pos: "WR", team: "CLE" },
+    { name: "Marcus Vail",   pos: "WR", team: "PIT" },
+    { name: "Tre Hollins",   pos: "WR", team: "MIA" }
+  ];
+
+  function teamOf(p) { return WW.teams[p.team === 'LA' ? 'LAR' : p.team]; }
+  function initials(name) {
+    return name.split(/\s+/).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase();
+  }
+  function avatarHtml(p, size) {
+    var img = p.headshot ? '<img src="' + p.headshot + '" alt="" onerror="this.remove()">' : '';
+    return '<span class="avatar' + (size ? ' ' + size : '') + '">' + img + initials(p.name) + '</span>';
+  }
+
+  /* leaders: WRs from WW.players + role players, sorted by target share */
+  var pool = WW.players.filter(function (p) { return p.pos === 'WR' && STATS[p.name]; })
+    .concat(ROLE_PLAYERS)
+    .sort(function (a, b) { return STATS[b.name].tgt - STATS[a.name].tgt; });
+
+  var rows = pool.map(function (p, i) {
+    var s = STATS[p.name], t = teamOf(p);
+    var trend = s.trend > 0 ? '<span class="trend pos">▲</span>'
+              : s.trend < 0 ? '<span class="trend neg">▼</span>'
+              : '<span class="trend">–</span>';
+    return '<a class="trow" href="player-detail.html">'
+      + '<span class="rk">' + (i + 1) + '</span>'
+      + '<span class="pcell">' + avatarHtml(p)
+      +   '<span class="who"><b>' + p.name + '</b><small>' + t.abbr + ' · ' + p.pos + '</small></span>'
+      +   '<img class="tlogo sm" src="' + t.logo + '" alt="">'
+      + '</span>'
+      + '<span class="n">' + s.g + '</span>'
+      + '<span class="n">' + s.rec + '</span>'
+      + '<span class="n">' + s.yds + '</span>'
+      + '<span class="n">' + s.td + '</span>'
+      + '<span class="n sorted">' + s.tgt.toFixed(1) + '<small>%</small></span>'
+      + '<span class="n">' + s.snap + '<small>%</small></span>'
+      + '<span class="n">' + s.ppr.toFixed(1) + '</span>'
+      + '<span class="n"><span class="posrk">WR' + s.posrk + '</span></span>'
+      + trend
+      + '</a>';
+  });
+  document.getElementById('leaders').insertAdjacentHTML('beforeend', rows.join(''));
+
+  /* risers: target-share jumps over the last 3 weeks */
+  var RISERS = [
+    { name: "Keon Sheppard", delta: 6.8, l3w: 26.4, prior: 19.6, next: "@ NE · 27th vs WR" },
+    { name: "Drake London",  delta: 5.4, l3w: 29.8, prior: 24.4, next: "@ MIA · 24th vs WR" },
+    { name: "Deon Carter",   delta: 4.9, l3w: 24.1, prior: 19.2, next: "vs CIN · 19th vs WR" }
+  ];
+  var riserRows = RISERS.map(function (r) {
+    var p = WW.players.find(function (x) { return x.name === r.name; })
+         || ROLE_PLAYERS.find(function (x) { return x.name === r.name; });
+    var t = teamOf(p);
+    return '<a class="riser" href="player-detail.html">'
+      + avatarHtml(p)
+      + '<span class="who"><b>' + p.name + '</b><small>' + t.abbr + ' · ' + r.next + '</small></span>'
+      + '<span class="delta"><span class="badge pos">▲ +' + r.delta.toFixed(1) + ' tgt%</span>'
+      + '<small>' + r.prior.toFixed(1) + '% → ' + r.l3w.toFixed(1) + '%</small></span>'
+      + '</a>';
+  });
+  document.getElementById('risers').innerHTML = riserRows.join('');
+</script>
+</body>
+</html>

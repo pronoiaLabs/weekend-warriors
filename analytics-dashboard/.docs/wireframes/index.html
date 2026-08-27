@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wireframes — Weekend Warriors NFL app</title>
+<link rel="stylesheet" href="shared/theme.css">
+<style>
+  .wf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--gap); }
+  .wf-card { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; color: inherit; }
+  .wf-card:hover { border-color: var(--line-2); }
+  .wf-card .num { font-family: var(--mono); font-size: 10px; color: var(--ink-4); letter-spacing: .08em; }
+  .wf-card h2 { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .wf-card h2 small { display: block; font-size: var(--fs-s); color: var(--ink-4); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
+  .wf-card p { color: var(--ink-3); font-size: 12.5px; line-height: 1.5; }
+  .wf-card .marts { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 10.5px; color: var(--ink-4); line-height: 1.7; }
+  .lane-head { margin: 34px 0 12px; display: flex; align-items: baseline; gap: 10px; }
+  .lane-head h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-3); }
+  .lane-head span { font-size: var(--fs-s); color: var(--ink-4); }
+  .intro { max-width: 860px; }
+</style>
+</head>
+<body>
+<div class="wf-note">wireframes · sample data</div>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="aurora two"><i></i><i></i><i></i></div>
+<div class="shell">
+  <header class="topbar">
+    <span class="brand">
+      <span class="mark"></span><span class="word">Weekend Warriors</span><span class="sub">wireframes</span>
+    </span>
+    <nav class="sport-switch"><a class="on" href="#">NFL</a><a href="#">NCAAF</a></nav>
+    <div class="context">
+      <span class="ctx-item"><span class="l">Theme</span><span class="v">Glass Prism</span></span>
+      <span class="ctx-item"><span class="l">Sample</span><span class="v">2025 · Week 8</span></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <h1>The app, screen by screen</h1>
+      <p class="lede intro">Nine wireframes for the redesign, built on the journey from the screens plan: <b>catch up</b> on the league, then <b>go fishing</b> for players — game lane or player lane — and <b>dig in</b> at play grain. Every page uses the app's real Glass Prism theme (plus the new light mode — toggle in the topbar), real player headshots and team branding from the warehouse, and annotates each zone with the APP mart and API route feeding it (look for the dashed <i>data</i> expanders).</p>
+    </div>
+
+    <div class="lane-head"><h2>Catch up</h2><span>the session starts here</span></div>
+    <div class="wf-grid">
+      <a class="tile wf-card" href="pages/pulse.html">
+        <span class="num">01 · NEW</span>
+        <h2>The Pulse<small>home</small></h2>
+        <p>The tea in one scroll: news, the status board, Sleeper trending, market movers, the week strip. Every item is a door into fishing.</p>
+        <div class="marts">NEWS_MENTIONS · STATUS_BOARD · TRENDING_PLAYERS · MARKET_MOVERS · GAME_SLATE<br>GET /api/nfl/pulse</div>
+      </a>
+    </div>
+
+    <div class="lane-head"><h2>Fishing · game lane</h2><span>slate → pond</span></div>
+    <div class="wf-grid">
+      <a class="tile wf-card" href="pages/game-day.html">
+        <span class="num">02</span>
+        <h2>Game Day<small>the slate</small></h2>
+        <p>One column per kickoff slot; each card a one-line scouting report — line, weather, referee, division flag, availability counters, team branding.</p>
+        <div class="marts">GAME_SLATE · GET /api/nfl/slate</div>
+      </a>
+      <a class="tile wf-card" href="pages/game/overview.html">
+        <span class="num">03</span>
+        <h2>Game Detail<small>the pond · BUF @ KC · 4 sub-pages</small></h2>
+        <p>The core fishing screen, split into a tabbed family: Overview (triage), Prop Board (the centerpiece), Situations, and Lines — no more one long scroll.</p>
+        <div class="marts">GAME_SLATE · TEAM_ALLOWED · TEAM_SITUATION · PROP_BOARD · LINE_HISTORY<br>GET /api/nfl/games/{game_key}</div>
+      </a>
+    </div>
+
+    <div class="lane-head"><h2>Fishing · player lane</h2><span>finder → detail → pattern room</span></div>
+    <div class="wf-grid">
+      <a class="tile wf-card" href="pages/players.html">
+        <span class="num">04</span>
+        <h2>Players<small>the finder</small></h2>
+        <p>Cast wide, filter down: leaders with usage sorts — target share and snap % surface the risers a yardage board hides.</p>
+        <div class="marts">PLAYER_LEADERS · GET /api/nfl/players</div>
+      </a>
+      <a class="tile wf-card" href="pages/player-detail.html">
+        <span class="num">05</span>
+        <h2>Player Detail<small>Ja'Marr Chase</small></h2>
+        <p>The confirmation screen: week-by-week form, situational usage, prior-season overlays, and the market's history on this player.</p>
+        <div class="marts">PLAYER_WEEKS · PLAYER_WEEK_STATS · PLAYER_SITUATION_USAGE · PROP_LINE_HISTORY<br>GET /api/nfl/players/{player_key}</div>
+      </a>
+      <a class="tile wf-card" href="pages/play-log.html">
+        <span class="num">06 · NEW</span>
+        <h2>Play Log<small>the pattern room</small></h2>
+        <p>Drive-grouped plays with EPA and situation filters, plus the embedded agent that drives the screen through Postgres session state.</p>
+        <div class="marts">PLAY_FEED · PLAYER_SITUATION_USAGE · GET /api/nfl/plays</div>
+      </a>
+    </div>
+
+    <div class="lane-head"><h2>Supporting</h2><span>deep digs, reachable from anywhere</span></div>
+    <div class="wf-grid">
+      <a class="tile wf-card" href="pages/teams.html">
+        <span class="num">07</span>
+        <h2>Teams<small>standings + team page</small></h2>
+        <p>Standings with EPA columns, then the team page: weeks, allowed grid, ATS, situation splits, margin chart. Focus: Detroit.</p>
+        <div class="marts">TEAM_STANDINGS · TEAM_WEEKS · TEAM_ALLOWED · TEAM_ATS · TEAM_SITUATION<br>GET /api/nfl/teams(/{team})</div>
+      </a>
+      <a class="tile wf-card" href="pages/markets.html">
+        <span class="num">08</span>
+        <h2>Markets<small>line movement</small></h2>
+        <p>Mover cards per game, the multi-book spread path, and per-prop movement rows — a row means the line moved.</p>
+        <div class="marts">LINE_HISTORY · PROP_LINE_HISTORY · GET /api/nfl/markets(/{game_key})</div>
+      </a>
+      <a class="tile wf-card" href="pages/explorer.html">
+        <span class="num">09</span>
+        <h2>Explorer<small>the escape hatch</small></h2>
+        <p>Flat sheets, live columns, where-clause filtering — including the new plays sheet, the v1 play log before the pattern room ships.</p>
+        <div class="marts">EXPLORE_* · GET /api/nfl/explore(/{sheet})</div>
+      </a>
+    </div>
+
+    <section class="tile" style="margin-top: 34px;">
+      <header class="tile-head"><h2>How to read these</h2><span class="meta">conventions</span></header>
+      <p class="lede" style="max-width: none;">Sample context is consistent across all nine pages — season 2025, week 8, DraftKings, marquee game BUF @ KC, focus player Ja'Marr Chase, focus team Detroit — so cross-page links land where you expect. Headshots and team logos are live CDN assets from the warehouse (the asset pipe in the screens plan). Each tile's dashed <i>data</i> expander names the mart, route, and key fields feeding that zone, so reviewing a wireframe doubles as reviewing the API payload. The edge-agent dock (✦, bottom right) is reserved on every screen; on the Play Log it graduates into the layout as the session panel.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Companion docs: the screens plan, APP &amp; API plan, and semantic views plan in <span style="font-family: var(--mono);">docs/</span> at the repo root.</span>
+    <span>analytics-dashboard/.docs/wireframes</span>
+  </footer>
+</div>
+<script src="shared/data.js"></script>
+</body>
+</html>

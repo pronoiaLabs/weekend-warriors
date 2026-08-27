@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Player detail — Weekend Warriors wireframe</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* ---- identity header: team-head chassis + player pieces ---- */
+.player-head { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr); align-items: center; }
+.player-head .team-bar { position: absolute; left: 0; top: 20px; bottom: 20px; width: 3px; border-radius: 3px; background: var(--team, var(--accent)); opacity: .85; }
+.player-head .who { display: flex; gap: 20px; align-items: center; min-width: 0; }
+.player-head .id { min-width: 0; }
+.player-head .kick { display: inline-flex; align-items: center; gap: 8px; }
+.player-head h1 .jersey { font-size: 16px; font-weight: 500; color: var(--ink-4); margin-left: 8px; }
+.bio-strip { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: var(--fs-s); color: var(--ink-3); }
+.bio-strip b { color: var(--ink-2); font-weight: 600; }
+.head-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.next-chip { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-s); font-weight: 600; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }
+.next-chip:hover { border-color: var(--line-2); color: var(--ink); }
+.next-chip .tlogo { width: 15px; height: 15px; }
+.player-head .season-side { min-width: 0; }
+.player-head .wordmark { height: 22px; object-fit: contain; opacity: .8; display: block; margin-bottom: 14px; margin-left: auto; }
+.player-head .line-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+.shell-narrow .player-head { grid-template-columns: 1fr; }
+.shell-narrow .player-head .wordmark { margin-left: 0; }
+
+/* ---- layout ---- */
+.cols-detail { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); margin-bottom: var(--gap); }
+.shell-narrow .cols-detail { grid-template-columns: minmax(0, 1fr); }
+
+/* ---- game log ---- */
+.gamelog .trow { --cols: 30px minmax(112px, 1.3fr) 40px repeat(9, minmax(46px, .72fr)) 52px; min-width: 820px; }
+.gamelog .opp { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gamelog .opp small { color: var(--ink-4); }
+.gamelog .go { text-align: right; font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+a.trow:hover .go { color: var(--accent); }
+
+/* ---- stat chart tile ---- */
+.stat-chart .val { fill: var(--ink-2); font-size: 9.5px; font-weight: 600; font-family: var(--sans); }
+.stat-chart .prior-lbl { fill: var(--ink-3); font-size: 9px; font-family: var(--sans); }
+.stat-chart .bar.over { fill: var(--pos); }
+
+/* ---- situational usage ---- */
+.usage { display: grid; gap: 16px; }
+.ugroup .gl { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); margin-bottom: 7px; }
+.ucells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+a.ucell { display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); min-width: 0; }
+a.ucell:hover { border-color: var(--line-2); }
+.ucell .v { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+.ucell .bl { font-size: var(--fs-s); color: var(--ink-2); font-weight: 600; }
+.ucell .d { font-size: 10px; color: var(--ink-4); }
+.ucell.hot { border-color: color-mix(in srgb, var(--pos) 45%, transparent); background: rgba(143, 191, 156, 0.07); }
+.ucell.hot .v { color: var(--pos); }
+.pattern { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+
+/* ---- market tile ---- */
+.market-now { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.market-now .line-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.shell-narrow .market-now .line-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.props-log .trow { --cols: 30px minmax(96px, 1.2fr) repeat(3, minmax(52px, .8fr)) 60px; min-width: 420px; }
+.hit { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; border: 1px solid var(--line); color: var(--ink-3); justify-self: end; }
+.hit.O { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent); }
+.hit.U { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 45%, transparent); }
+</style>
+</head>
+<body>
+<div class="wf-note">wireframe · sample data</div>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="aurora two"><i></i><i></i><i></i></div>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="../index.html">
+      <span class="mark"></span><span class="word">Weekend Warriors</span><span class="sub">analytics</span>
+    </a>
+    <nav class="sport-switch"><a class="on" href="#">NFL</a><a href="#">NCAAF</a></nav>
+    <div class="context">
+      <span class="ctx-item"><span class="l">Season</span><span class="v">2025 · Week 8</span></span>
+      <span class="ctx-item"><span class="l">Data</span><span class="v">postgres</span></span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <div class="crumb-row">
+      <nav class="crumbs">
+        <a href="players.html">Players</a><span class="sep"></span><span>Ja'Marr Chase</span>
+      </nav>
+      <a class="back" href="players.html">← Back to players</a>
+    </div>
+
+    <!-- ZONE 1 · identity header -->
+    <header class="team-head player-head" style="--team:#FB4F14">
+      <span class="team-bar"></span>
+      <div class="who">
+        <span class="avatar xl">JC<img src="https://static.www.nfl.com/image/upload/f_auto,q_auto/league/qya3dtjb5kgofcuj2tuw" alt="" onerror="this.remove()"></span>
+        <div class="id">
+          <span class="kick"><img class="tlogo sm" id="cinLogo" alt="">Cincinnati Bengals · WR</span>
+          <h1>Ja'Marr Chase<span class="jersey">#1</span></h1>
+          <div class="bio-strip">
+            <span>Age <b>25</b></span>
+            <span><b>6'0"</b> · <b>205 lb</b></span>
+            <span>College <b>LSU</b></span>
+            <span>Draft <b>2021 · Rd 1 · Pk 5</b></span>
+            <span><b>5th</b> season</span>
+          </div>
+          <div class="head-badges">
+            <span class="badge ok">Full practice · no designation</span>
+            <a class="next-chip" href="game-day.html" title="Week 8 slate"><img class="tlogo" id="cleLogo" alt="">Next · CIN @ CLE · Sun 1:00p</a>
+          </div>
+        </div>
+      </div>
+      <div class="season-side">
+        <img class="wordmark" id="cinWordmark" alt="" onerror="this.remove()">
+        <div class="line-strip">
+          <div class="stat"><span class="v">52<small> / 77</small></span><span class="l">Rec / targets</span></div>
+          <div class="stat"><span class="v">661</span><span class="l">Rec yards</span></div>
+          <div class="stat"><span class="v">5</span><span class="l">Rec TD</span></div>
+          <div class="stat"><span class="v">28.7%</span><span class="l">Target share</span></div>
+          <div class="stat"><span class="v">21.2</span><span class="l">PPR / game</span></div>
+          <div class="stat"><span class="v">5–2</span><span class="l">CIN record</span></div>
+        </div>
+      </div>
+      <details class="q" style="position:absolute; right:20px; bottom:14px;"><summary>data</summary><pre>mart:  APP.PLAYER_PROFILE (+ PLAYER_WEEKS season rollup)
+route: GET /api/nfl/players/{player_key}
+fields: player_key, name, team, position, jersey, headshot_url,
+        height, weight, college, draft_year, draft_round, draft_pick,
+        birth_year, injury_status, practice_status,
+        next_game { game_key, opponent, home_away, kickoff }</pre></details>
+    </header>
+
+    <!-- ZONE 2 · week-by-week game log -->
+    <section class="tile table-tile gamelog">
+      <div class="tile-head">
+        <h2>Game log · 2025</h2>
+        <span class="meta">Rows open the play log</span>
+      </div>
+      <div class="tile-body">
+        <div class="trows" id="gamelog">
+          <div class="trow head">
+            <span class="rk">Wk</span><span>Opponent</span><span>Res</span>
+            <span class="n">Tgt</span><span class="n">Rec</span><span class="n sorted">Yds</span><span class="n">TD</span>
+            <span class="n">Tgt %</span><span class="n">Air %</span><span class="n">Snap %</span><span class="n">EPA</span><span class="n">PPR</span>
+            <span></span>
+          </div>
+          <!-- rows rendered from WW-consistent sample data -->
+        </div>
+      </div>
+      <details class="q"><summary>data</summary><pre>mart:  APP.PLAYER_WEEKS
+route: GET /api/nfl/players/{player_key}?season=2025
+fields: season, week, opponent, home_away, result, team_score, opp_score,
+        targets, receptions, rec_yards, rec_td, target_share,
+        air_yards_share, snap_pct, receiving_epa, ppr_points
+grain:  player × game · completed games only</pre></details>
+    </section>
+
+    <div class="grid cols-detail">
+
+      <!-- ZONE 3 · stat chart -->
+      <section class="tile chart-tile">
+        <div class="tile-head">
+          <h2>Week by week</h2>
+          <span class="meta">Dashed line · 2024 avg</span>
+        </div>
+        <div class="chart-filters">
+          <label class="psel"><span class="l">Stat</span>
+            <select id="statPicker">
+              <option value="yards" selected>Yards</option>
+              <option value="targets">Targets</option>
+              <option value="share">Target share</option>
+              <option value="ppr">PPR</option>
+            </select></label>
+        </div>
+        <svg class="stat-chart" id="statChart" viewBox="0 0 680 240" role="img" aria-label="Receiving stat by week with prior season average"></svg>
+        <div class="line-strip yoy">
+          <div class="stat"><span class="v">94.4<small> · '24 96.4</small></span><span class="l">Yds / gm</span></div>
+          <div class="stat"><span class="v">11.0<small> · '24 10.3</small></span><span class="l">Tgt / gm</span></div>
+          <div class="stat"><span class="v">28.7%<small> · '24 29.9%</small></span><span class="l">Tgt share</span></div>
+          <div class="stat"><span class="v">36.6%<small> · '24 35.1%</small></span><span class="l">Air share</span></div>
+          <div class="stat"><span class="v">21.2<small> · '24 23.4</small></span><span class="l">PPR / gm</span></div>
+          <div class="stat"><span class="v">5<small> · '24 pace 7</small></span><span class="l">Rec TD</span></div>
+        </div>
+        <details class="q"><summary>data</summary><pre>mart:  APP.PLAYER_WEEK_STATS (long format)
+route: GET /api/nfl/players/{player_key}?season=2025
+grain:  player × week × stat — one row per stat name
+fields: week, stat, value,
+        prior_season_same_week, prior_season_avg
+note:  the dashed line and the yoy strip read the prior_season_*
+       columns; the page pivots, dbt does not precompute wide</pre></details>
+      </section>
+
+      <!-- ZONE 4 · situational usage -->
+      <section class="tile">
+        <div class="tile-head">
+          <h2>Where the work comes from</h2>
+          <span class="meta">Target share by situation · cells open the play log</span>
+        </div>
+        <div class="usage">
+          <div class="ugroup">
+            <span class="gl">By down</span>
+            <div class="ucells">
+              <a class="ucell" href="play-log.html" title="1st-down targets in the play log"><span class="bl">1st down</span><span class="v">24%</span><span class="d">21 tgt · 88 routes</span></a>
+              <a class="ucell" href="play-log.html" title="2nd-down targets in the play log"><span class="bl">2nd down</span><span class="v">27%</span><span class="d">24 tgt · 90 routes</span></a>
+              <a class="ucell hot" href="play-log.html" title="3rd-down targets in the play log"><span class="bl">3rd down</span><span class="v">34%</span><span class="d">22 tgt · 64 routes</span></a>
+            </div>
+          </div>
+          <div class="ugroup">
+            <span class="gl">By field zone</span>
+            <div class="ucells">
+              <a class="ucell" href="play-log.html" title="Own-territory targets"><span class="bl">Own territory</span><span class="v">26%</span><span class="d">28 tgt · 108 routes</span></a>
+              <a class="ucell" href="play-log.html" title="Midfield targets"><span class="bl">Midfield</span><span class="v">28%</span><span class="d">31 tgt · 110 routes</span></a>
+              <a class="ucell" href="play-log.html" title="Red-zone targets"><span class="bl">Red zone</span><span class="v">31%</span><span class="d">18 tgt · 58 routes</span></a>
+            </div>
+          </div>
+          <div class="ugroup">
+            <span class="gl">By game script</span>
+            <div class="ucells">
+              <a class="ucell" href="play-log.html" title="Targets while leading"><span class="bl">Leading</span><span class="v">25%</span><span class="d">26 tgt · 104 routes</span></a>
+              <a class="ucell" href="play-log.html" title="Targets in one-score games"><span class="bl">Neutral</span><span class="v">27%</span><span class="d">29 tgt · 106 routes</span></a>
+              <a class="ucell hot" href="play-log.html" title="Targets while trailing"><span class="bl">Trailing</span><span class="v">34%</span><span class="d">22 tgt · 66 routes</span></a>
+            </div>
+          </div>
+        </div>
+        <div class="pattern">
+          <span class="badge ok">The pattern</span>
+          <span><b>3rd down + trailing: 34% target share</b> in each bucket — when CIN has to throw, the ball finds him. League WR1 average in those spots is 26%.</span>
+        </div>
+        <details class="q"><summary>data</summary><pre>mart:  APP.PLAYER_SITUATION_USAGE  (planned — pbp aggregate)
+route: GET /api/nfl/players/{player_key}/usage?season=2025
+grain:  player × season × bucket_type × bucket
+fields: bucket_type (down | field_zone | script), bucket,
+        targets, routes, target_share, league_pos_avg_share
+source: RAW.NFLVERSE_PBP scrimmage plays, bucketed in dbt</pre></details>
+      </section>
+
+    </div>
+
+    <!-- ZONE 5 · the market on this player -->
+    <section class="tile table-tile props-log">
+      <div class="tile-head">
+        <h2>The market on this player · rec yards O/U</h2>
+        <a class="meta" href="markets.html" style="color:var(--accent)">Full line history →</a>
+      </div>
+      <div class="market-now">
+        <div class="line-strip">
+          <div class="stat"><span class="v">DK</span><span class="l">Book</span></div>
+          <div class="stat"><span class="v">86.5</span><span class="l">Wk 8 line</span></div>
+          <div class="stat"><span class="v">94.8</span><span class="l">Projection</span></div>
+          <div class="stat pos"><span class="v">+8.3</span><span class="l">Proj − line</span></div>
+          <div class="stat pos"><span class="v">5–2 O</span><span class="l">Season O/U</span></div>
+        </div>
+      </div>
+      <div class="tile-body">
+        <div class="trows" id="propLog">
+          <div class="trow head">
+            <span class="rk">Wk</span><span>Opponent</span>
+            <span class="n">Close</span><span class="n">Actual</span><span class="n">Diff</span>
+            <span style="text-align:right">Hit</span>
+          </div>
+          <!-- rows rendered from the same weeks array as the game log -->
+        </div>
+      </div>
+      <details class="q"><summary>data</summary><pre>mart:  APP.PROP_LINE_HISTORY + APP.PLAYER_WEEKS
+route: GET /api/nfl/players/{player_key}/props?vendor=draftkings
+fields: week, prop_type, close_line, actual, diff, hit,
+        current_line, projection, delta (projection − line)
+note:  close_line is the last pre-kickoff snapshot from
+       fact_player_prop_snapshot (rows exist only when the line moved)</pre></details>
+    </section>
+
+  </main>
+
+  <footer class="foot"><span>Wireframe — zones annotated with the mart + route feeding them.</span><span>NFL_PROD_DB.APP → app_player_weeks · app_player_week_stats · app_prop_line_history</span></footer>
+</div>
+
+<nav class="dock">
+  <a href="pulse.html">Pulse</a>
+  <a href="game-day.html">Game Day</a>
+  <a href="players.html">Players</a>
+  <a href="teams.html">Teams</a>
+  <a href="markets.html">Markets</a>
+  <a href="play-log.html">Play Log</a>
+  <a href="explorer.html">Explorer</a>
+</nav>
+
+<button class="edge-fab" id="edgeFab" title="Edge agent">✦</button>
+<aside class="edge-panel" id="edgePanel">
+  <div class="edge-head">Edge agent<small>page-aware · sees your filters</small></div>
+  <div class="edge-msgs">
+    <div class="edge-msg me">Is his usage stable enough to trust the over at 86.5?</div>
+    <div class="edge-msg bot">Mostly yes. Eight or more targets every week and a 24–33% target-share band, so the floor is real. The over is 5–2, and his share spikes exactly where CLE figures to force him: 3rd down and trailing script, 34% in each. I highlighted those two buckets in the usage strip — the sage cells on the right.</div>
+    <div class="edge-msg me">What's the caveat?</div>
+    <div class="edge-msg bot">Script. Leading drops him to 25% share, and both unders (Wk 3, Wk 6) were his two lowest air-share weeks — when CIN sits on a lead the deep ball disappears. CIN is only −3.5 at CLE, so a competitive game keeps the trailing boost live.</div>
+  </div>
+  <div class="edge-input"><input placeholder="Ask about this player…"></div>
+</aside>
+
+<script src="../shared/data.js"></script>
+<script>
+  document.getElementById('edgeFab').addEventListener('click', function () {
+    document.getElementById('edgePanel').classList.toggle('open');
+  });
+
+  /* team branding from WW */
+  document.getElementById('cinLogo').src = WW.teams.CIN.logo;
+  document.getElementById('cleLogo').src = WW.teams.CLE.logo;
+  document.getElementById('cinWordmark').src = WW.teams.CIN.wordmark;
+
+  /* one weeks array feeds the game log, the chart, and the prop log */
+  var weeks = [
+    { wk: 1, opp: 'NE',  ha: '@',  res: 'W', score: '27–20', tgt: 11, rec: 8,  yds: 101, td: 1, share: 29, air: 38, snap: 96, epa: 4.2,  ppr: 24.1, line: 84.5 },
+    { wk: 2, opp: 'BAL', ha: 'vs', res: 'L', score: '24–27', tgt: 13, rec: 9,  yds: 118, td: 0, share: 31, air: 41, snap: 98, epa: 3.1,  ppr: 20.8, line: 88.5 },
+    { wk: 3, opp: 'PIT', ha: 'vs', res: 'W', score: '21–17', tgt: 8,  rec: 5,  yds: 62,  td: 1, share: 24, air: 33, snap: 94, epa: 1.4,  ppr: 17.2, line: 89.5 },
+    { wk: 4, opp: 'DEN', ha: '@',  res: 'L', score: '17–23', tgt: 12, rec: 7,  yds: 84,  td: 0, share: 30, air: 36, snap: 97, epa: -0.6, ppr: 15.4, line: 82.5 },
+    { wk: 5, opp: 'JAX', ha: 'vs', res: 'W', score: '30–14', tgt: 9,  rec: 7,  yds: 93,  td: 1, share: 26, air: 34, snap: 88, epa: 3.8,  ppr: 22.3, line: 81.5 },
+    { wk: 6, opp: 'NYG', ha: '@',  res: 'W', score: '24–10', tgt: 10, rec: 6,  yds: 71,  td: 0, share: 28, air: 30, snap: 95, epa: 0.9,  ppr: 13.1, line: 85.5 },
+    { wk: 7, opp: 'TEN', ha: 'vs', res: 'W', score: '34–27', tgt: 14, rec: 10, yds: 132, td: 2, share: 33, air: 44, snap: 97, epa: 6.1,  ppr: 35.2, line: 83.5 }
+  ];
+
+  /* ZONE 2 · game log rows */
+  (function () {
+    var host = document.getElementById('gamelog');
+    weeks.forEach(function (w) {
+      var t = WW.teams[w.opp];
+      var a = document.createElement('a');
+      a.className = 'trow';
+      a.href = 'play-log.html';
+      a.title = 'Watch the Week ' + w.wk + ' plays';
+      a.innerHTML =
+        '<span class="rk">' + w.wk + '</span>' +
+        '<span class="opp"><img class="tlogo sm" src="' + t.logo + '" alt="" onerror="this.remove()"><b>' + w.ha + ' ' + w.opp + '</b><small>' + w.score + '</small></span>' +
+        '<span><i class="res ' + w.res + '">' + w.res + '</i></span>' +
+        '<span class="n">' + w.tgt + '</span>' +
+        '<span class="n">' + w.rec + '</span>' +
+        '<span class="n sorted">' + w.yds + '</span>' +
+        '<span class="n">' + w.td + '</span>' +
+        '<span class="n">' + w.share + '%</span>' +
+        '<span class="n">' + w.air + '%</span>' +
+        '<span class="n">' + w.snap + '%</span>' +
+        '<span class="n ' + (w.epa >= 0 ? 'pos' : 'neg') + '">' + (w.epa >= 0 ? '+' : '') + w.epa.toFixed(1) + '</span>' +
+        '<span class="n">' + w.ppr.toFixed(1) + '</span>' +
+        '<span class="go">plays ›</span>';
+      host.appendChild(a);
+    });
+  })();
+
+  /* ZONE 3 · stat chart with picker; dashed prior = 2024 average */
+  var CHART = {
+    yards:   { get: function (w) { return w.yds; },   prior: 96.4, fmt: function (v) { return v; },              priorLbl: "'24 avg 96.4" },
+    targets: { get: function (w) { return w.tgt; },   prior: 10.3, fmt: function (v) { return v; },              priorLbl: "'24 avg 10.3" },
+    share:   { get: function (w) { return w.share; }, prior: 29.9, fmt: function (v) { return v + '%'; },        priorLbl: "'24 avg 29.9%" },
+    ppr:     { get: function (w) { return w.ppr; },   prior: 23.4, fmt: function (v) { return v.toFixed(1); },   priorLbl: "'24 avg 23.4" }
+  };
+
+  function drawChart(key) {
+    var c = CHART[key];
+    var svg = document.getElementById('statChart');
+    var W = 680, X0 = 20, X1 = 668, Y0 = 18, Y1 = 202;
+    var vals = weeks.map(c.get);
+    var max = Math.max(c.prior, Math.max.apply(null, vals)) * 1.15;
+    var y = function (v) { return Y1 - (v / max) * (Y1 - Y0); };
+    var slot = (X1 - X0) / weeks.length, bw = slot * 0.52;
+    var s = '';
+    weeks.forEach(function (w, i) {
+      var v = c.get(w);
+      var x = X0 + slot * i + (slot - bw) / 2;
+      s += '<rect class="bar" x="' + x.toFixed(1) + '" y="' + y(v).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (Y1 - y(v)).toFixed(1) + '" rx="3"></rect>';
+      s += '<text class="val" x="' + (x + bw / 2).toFixed(1) + '" y="' + (y(v) - 5).toFixed(1) + '" text-anchor="middle">' + c.fmt(v) + '</text>';
+      s += '<text class="lbl" x="' + (x + bw / 2).toFixed(1) + '" y="' + (Y1 + 14) + '" text-anchor="middle">Wk ' + w.wk + '</text>';
+    });
+    var py = y(c.prior);
+    s += '<line class="axis" x1="' + X0 + '" y1="' + Y1 + '" x2="' + X1 + '" y2="' + Y1 + '"></line>';
+    s += '<line class="prior" x1="' + X0 + '" y1="' + py.toFixed(1) + '" x2="' + X1 + '" y2="' + py.toFixed(1) + '"></line>';
+    s += '<text class="prior-lbl" x="' + X1 + '" y="' + (py - 5).toFixed(1) + '" text-anchor="end">' + c.priorLbl + '</text>';
+    svg.innerHTML = s;
+  }
+
+  document.getElementById('statPicker').addEventListener('change', function () {
+    drawChart(this.value);
+  });
+  drawChart('yards');
+
+  /* ZONE 5 · prop line vs actual */
+  (function () {
+    var host = document.getElementById('propLog');
+    weeks.forEach(function (w) {
+      var diff = w.yds - w.line, over = diff > 0;
+      var a = document.createElement('a');
+      a.className = 'trow';
+      a.href = 'markets.html';
+      a.title = 'Week ' + w.wk + ' line history';
+      a.innerHTML =
+        '<span class="rk">' + w.wk + '</span>' +
+        '<span class="tm"><b>' + w.ha + ' ' + w.opp + '</b></span>' +
+        '<span class="n">' + w.line.toFixed(1) + '</span>' +
+        '<span class="n sorted">' + w.yds + '</span>' +
+        '<span class="n ' + (over ? 'pos' : 'neg') + '">' + (over ? '+' : '−') + Math.abs(diff).toFixed(1) + '</span>' +
+        '<span class="hit ' + (over ? 'O' : 'U') + '">' + (over ? 'Over' : 'Under') + '</span>';
+      host.appendChild(a);
+    });
+  })();
+</script>
+</body>
+</html>

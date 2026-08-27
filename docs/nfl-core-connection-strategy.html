@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFL Core Connection Strategy</title>
+<meta name="description" content="Internal strategy: CORE becomes cold storage, DIM + FACTS rise in its place, and BallDontLie rows get enriched with nflverse and Sleeper across the board.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧬</text></svg>">
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --panel: #ffffff;
+    --panel-2: #f1efe9;
+    --ink: #1c1b18;
+    --muted: #6b675e;
+    --line: #dedacf;
+    --accent: #2563eb;
+    --bdl: #2563eb;
+    --nflverse: #16803c;
+    --sleeper: #d9550f;
+    --betting: #7c3aed;
+    --news: #be185d;
+    --weather: #0e7490;
+    --cross: #57534e;
+    --enrich: #16803c;
+    --rebuild: #2563eb;
+    --keep: #6b675e;
+    --retire: #b45309;
+    --new: #7c3aed;
+    --chip-bg: #ece9e1;
+    --code-bg: #eeece5;
+    --shadow: 0 1px 3px rgba(28,27,24,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16150f;
+      --panel: #201f18;
+      --panel-2: #262419;
+      --ink: #e8e5dc;
+      --muted: #a09b8d;
+      --line: #3a382c;
+      --accent: #7aa2ff;
+      --bdl: #7aa2ff;
+      --nflverse: #57c47b;
+      --sleeper: #f08b4b;
+      --betting: #b195f5;
+      --news: #ec6fa9;
+      --weather: #59b8cf;
+      --cross: #a8a29e;
+      --enrich: #57c47b;
+      --rebuild: #7aa2ff;
+      --keep: #a09b8d;
+      --retire: #e0a94f;
+      --new: #b195f5;
+      --chip-bg: #2b2920;
+      --code-bg: #2b2a20;
+      --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .875em; }
+  code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; }
+  a { color: var(--accent); }
+
+  nav.topbar {
+    position: sticky; top: 0; z-index: 50; background: var(--panel);
+    border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
+    overflow-x: auto; white-space: nowrap;
+  }
+  nav.topbar .inner { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; gap: 2px; }
+  nav.topbar a {
+    display: inline-block; padding: 12px 12px; color: var(--muted); text-decoration: none;
+    font-size: 13.5px; font-weight: 600; border-bottom: 2px solid transparent;
+  }
+  nav.topbar a:hover { color: var(--ink); }
+  nav.topbar a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .page { max-width: 1200px; margin: 0 auto; padding: 0 20px 96px; }
+
+  header.hero { padding: 56px 0 8px; }
+  header.hero .kicker { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 10px; }
+  header.hero h1 { font-size: clamp(28px, 4.5vw, 44px); line-height: 1.12; margin: 0 0 14px; letter-spacing: -.01em; }
+  header.hero h1 .flow { color: var(--accent); }
+  header.hero .sub { font-size: 18px; color: var(--muted); max-width: 820px; margin: 0; }
+
+  section { padding-top: 48px; }
+  .section-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 20px; }
+  .section-head .no { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--muted); }
+  .section-head h2 { font-size: 24px; margin: 0; letter-spacing: -.01em; }
+  .section-head .tag { margin-left: auto; font-size: 12px; color: var(--muted); font-style: italic; }
+  h3 { font-size: 18px; margin: 28px 0 10px; }
+  p.lede { font-size: 17px; max-width: 860px; }
+  p { max-width: 900px; }
+  ul { max-width: 900px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 18px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 14px; color: var(--muted); }
+  .card .big { font-size: 26px; font-weight: 700; color: var(--ink); }
+
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; border: 1px solid; white-space: nowrap; }
+  .v-bdl      { color: var(--bdl);      border-color: var(--bdl); }
+  .v-nflverse { color: var(--nflverse); border-color: var(--nflverse); }
+  .v-sleeper  { color: var(--sleeper);  border-color: var(--sleeper); }
+  .v-betting  { color: var(--betting);  border-color: var(--betting); }
+  .v-news     { color: var(--news);     border-color: var(--news); }
+  .v-weather  { color: var(--weather);  border-color: var(--weather); }
+  .v-cross    { color: var(--cross);    border-color: var(--cross); }
+  .d-enrich   { color: var(--enrich);   border-color: var(--enrich); }
+  .d-rebuild  { color: var(--rebuild);  border-color: var(--rebuild); }
+  .d-keep     { color: var(--keep);     border-color: var(--keep); }
+  .d-retire   { color: var(--retire);   border-color: var(--retire); }
+  .d-new      { color: var(--new);      border-color: var(--new); }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 12px; align-items: center; }
+  .filters .label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-right: 2px; }
+  .chip {
+    border: 1px solid var(--line); background: var(--chip-bg); color: var(--ink);
+    border-radius: 999px; padding: 4px 13px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .count-note { font-size: 13px; color: var(--muted); margin-left: auto; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 10px 12px; border-bottom: 2px solid var(--line); background: var(--panel-2); position: sticky; top: 0; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.model { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; white-space: nowrap; font-weight: 600; }
+  td .note { color: var(--muted); }
+  tr.hidden { display: none; }
+
+  .svgwrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; box-shadow: var(--shadow); margin: 16px 0; }
+  .svgwrap svg { display: block; min-width: 860px; width: 100%; height: auto; }
+  .diagram-caption { font-size: 13px; color: var(--muted); margin: 8px 4px 0; }
+
+  details.phase { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 12px 0; box-shadow: var(--shadow); }
+  details.phase > summary {
+    cursor: pointer; padding: 14px 18px; font-weight: 700; font-size: 15px; list-style: none;
+    display: flex; align-items: center; gap: 12px;
+  }
+  details.phase > summary::-webkit-details-marker { display: none; }
+  details.phase > summary .ph { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--bg); background: var(--ink); border-radius: 6px; padding: 2px 8px; }
+  details.phase > summary .hint { margin-left: auto; font-weight: 400; font-size: 12.5px; color: var(--muted); }
+  details.phase > summary::after { content: "▸"; color: var(--muted); transition: transform .15s; }
+  details.phase[open] > summary::after { transform: rotate(90deg); }
+  details.phase .body { padding: 0 18px 18px; border-top: 1px solid var(--line); }
+  details.phase .body ul { padding-left: 20px; }
+  details.phase .body li { margin: 7px 0; font-size: 14.5px; }
+
+  .callout { border-left: 4px solid var(--accent); background: var(--panel); border-radius: 0 10px 10px 0; padding: 12px 18px; margin: 18px 0; box-shadow: var(--shadow); font-size: 14.5px; }
+  .callout.warn { border-left-color: var(--retire); }
+  .callout.good { border-left-color: var(--enrich); }
+  .callout b.title { display: block; margin-bottom: 4px; }
+
+  .cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .block { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .block h4 { margin: 0 0 8px; font-size: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .block h4 .mono { font-weight: 600; }
+  .block ul { margin: 8px 0 0; padding-left: 18px; font-size: 13.8px; }
+  .block li { margin: 4px 0; }
+  .block .src { font-size: 12px; color: var(--muted); }
+  .kv { font-size: 13.5px; }
+  .kv dt { font-weight: 700; margin-top: 8px; }
+  .kv dd { margin: 2px 0 0 0; color: var(--muted); }
+  footer { margin-top: 72px; border-top: 1px solid var(--line); padding-top: 16px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<nav class="topbar"><div class="inner">
+  <a href="#overview">Overview</a>
+  <a href="#inventory">Inventory</a>
+  <a href="#connections">Connection Map</a>
+  <a href="#enrichment">Enrichment</a>
+  <a href="#schema">Target Schema</a>
+  <a href="#pbp">Play-by-Play</a>
+  <a href="#migration">Migration</a>
+  <a href="#downstream">Downstream</a>
+  <a href="#risks">Risks</a>
+</div></nav>
+
+<div class="page">
+
+<header class="hero">
+  <p class="kicker">Internal strategy · weekend-warriors · NFL</p>
+  <h1>CORE goes cold. <span class="flow">DIM + FACTS</span> rise enriched.</h1>
+  <p class="sub">Every BallDontLie row keeps its seat at the head of the table, and nflverse and Sleeper pull up chairs beside it: usage shares, EPA, snap counts, fantasy scoring, live status, and play-level analytics grafted onto the paid spine through the two bridges already built for the job.</p>
+</header>
+
+<!-- ==================== OVERVIEW ==================== -->
+<section id="overview">
+  <div class="section-head"><span class="no">§ 1</span><h2>The Strategy in One Screen</h2><span class="tag">five principles, four phases</span></div>
+
+  <div class="cards">
+    <div class="card"><h4>BDL anchors, always</h4><p>BallDontLie is the paid source. It sits on the <b>left side of every join</b>; nflverse and Sleeper enrich the row, never replace it. Enrichment columns go NULL where a bridge has no match — a fact the row admits with <code>has_nflverse</code> / <code>has_sleeper</code> flags.</p></div>
+    <div class="card"><h4>Wide facts, familiar shape</h4><p>Player and team game facts stay <b>offense / defense</b> based, exactly as today. Each rebuilds as a wide table: BDL box score + nflverse analytics + Sleeper fantasy, one row per player-game or team-game.</p></div>
+    <div class="card"><h4>Bridges are the spine</h4><p><code>bridge_player_ids</code> and <code>bridge_game_ids</code> stay the single identity authority. Dims carry <b>denormalized convenience copies</b> of the vendor ids; facts do the vendor joins once, centrally, so no consumer ever re-implements them.</p></div>
+    <div class="card"><h4>CORE becomes cold storage</h4><p>At cutover, CORE stops being a dbt target and its tables <b>freeze at last-run state</b> — an instant rollback archive for two release cycles, then dropped on an explicit date so it can't linger as a stale shadow.</p></div>
+    <div class="card"><h4>Provenance over blending</h4><p>Where both vendors report the same stat, both columns survive with vendor prefixes — the project already does this for <code>defensive_touchdowns</code>, which the vendors disagree on across 155 rows. Disagreement stays visible, never averaged away.</p></div>
+  </div>
+
+  <div class="callout good">
+    <b class="title">Why this is cheap to do</b>
+    Every downstream consumer — 8 semantic views, 20 APP marts, 4 feature marts, the singular tests — resolves through <code>ref()</code>, so the schema move itself requires <b>zero model SQL changes</b>. The blast radius is a <code>dbt_project.yml</code> config split plus five hardcoded <code>CORE</code> references. And the game facts are small (≈23k player-games, ≈2k team-games): full rebuilds cost pennies, which frees the wide facts from the incremental machinery entirely.
+  </div>
+</section>
+
+<!-- ==================== INVENTORY ==================== -->
+<section id="inventory">
+  <div class="section-head"><span class="no">§ 2</span><h2>Inventory &amp; Disposition</h2><span class="tag">every model, where it lands</span></div>
+  <p class="lede">Everything currently in CORE (plus the new models this strategy adds), with its grain, key, and fate. Filter by vendor or disposition.</p>
+
+  <div class="filters" id="filters">
+    <span class="label">Vendor</span>
+    <button class="chip" data-filter="vendor" data-value="bdl" aria-pressed="false">BDL</button>
+    <button class="chip" data-filter="vendor" data-value="nflverse" aria-pressed="false">nflverse</button>
+    <button class="chip" data-filter="vendor" data-value="sleeper" aria-pressed="false">Sleeper</button>
+    <button class="chip" data-filter="vendor" data-value="betting" aria-pressed="false">Betting</button>
+    <button class="chip" data-filter="vendor" data-value="news" aria-pressed="false">News</button>
+    <button class="chip" data-filter="vendor" data-value="weather" aria-pressed="false">Weather</button>
+    <button class="chip" data-filter="vendor" data-value="cross" aria-pressed="false">Cross-vendor</button>
+    <span class="label" style="margin-left:14px">Disposition</span>
+    <button class="chip" data-filter="disp" data-value="enrich" aria-pressed="false">Enrich</button>
+    <button class="chip" data-filter="disp" data-value="rebuild" aria-pressed="false">Rebuild wide</button>
+    <button class="chip" data-filter="disp" data-value="keep" aria-pressed="false">Keep / move</button>
+    <button class="chip" data-filter="disp" data-value="retire" aria-pressed="false">Retire</button>
+    <button class="chip" data-filter="disp" data-value="new" aria-pressed="false">New</button>
+    <span class="count-note" id="rowcount"></span>
+  </div>
+
+  <div class="tablewrap">
+  <table id="inv">
+    <thead><tr><th>Model</th><th>Type</th><th>Vendor</th><th>Grain</th><th>Key</th><th>Disposition</th><th>Target</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr data-vendor="bdl" data-disp="enrich"><td class="model">dim_player</td><td>dim</td><td><span class="pill v-bdl">BDL</span></td><td>player (13.5k)</td><td class="mono">player_key</td><td><span class="pill d-enrich">enrich</span></td><td>DIM</td><td class="note">+ bio/draft/ids/live status; position repair for 8,379 Unknown rows</td></tr>
+      <tr data-vendor="bdl" data-disp="enrich"><td class="model">dim_team</td><td>dim</td><td><span class="pill v-bdl">BDL</span></td><td>team (32)</td><td class="mono">team_key</td><td><span class="pill d-enrich">enrich</span></td><td>DIM</td><td class="note">+ nflverse_abbr, colors/logos, stadium_key FK</td></tr>
+      <tr data-vendor="bdl" data-disp="enrich"><td class="model">dim_game</td><td>dim</td><td><span class="pill v-bdl">BDL</span></td><td>game (full slate)</td><td class="mono">game_key</td><td><span class="pill d-enrich">enrich</span></td><td>DIM</td><td class="note">+ nflverse_game_id, referee, is_division_game</td></tr>
+      <tr data-vendor="bdl" data-disp="keep"><td class="model">dim_season_week</td><td>dim</td><td><span class="pill v-bdl">BDL</span></td><td>season × week × type</td><td class="mono">season_week_key</td><td><span class="pill d-keep">move</span></td><td>DIM</td><td class="note">unchanged</td></tr>
+      <tr data-vendor="bdl" data-disp="keep"><td class="model">dim_date</td><td>dim</td><td><span class="pill v-bdl">derived</span></td><td>date</td><td class="mono">date_key</td><td><span class="pill d-keep">move</span></td><td>DIM</td><td class="note">unchanged</td></tr>
+      <tr data-vendor="bdl" data-disp="keep"><td class="model">dim_stadium</td><td>dim</td><td><span class="pill v-bdl">seed</span></td><td>stadium</td><td class="mono">stadium_key</td><td><span class="pill d-keep">move</span></td><td>DIM</td><td class="note">unchanged</td></tr>
+      <tr data-vendor="bdl" data-disp="keep"><td class="model">dim_play_type</td><td>dim</td><td><span class="pill v-bdl">BDL</span></td><td>play type (39)</td><td class="mono">play_type_key</td><td><span class="pill d-keep">move</span></td><td>DIM</td><td class="note">unchanged</td></tr>
+      <tr data-vendor="cross" data-disp="keep"><td class="model">bridge_player_ids</td><td>bridge</td><td><span class="pill v-cross">cross</span></td><td>nflverse player</td><td class="mono">gsis_id</td><td><span class="pill d-keep">move</span></td><td>DIM</td><td class="note">Snowpark pre_hook writes follow the model's schema automatically</td></tr>
+      <tr data-vendor="cross" data-disp="keep"><td class="model">bridge_game_ids</td><td>bridge</td><td><span class="pill v-cross">cross</span></td><td>game</td><td class="mono">game_key</td><td><span class="pill d-keep">move</span></td><td>DIM</td><td class="note">observed-from-pbp else composed; postseason week vocab lives here</td></tr>
+      <tr data-vendor="bdl" data-disp="rebuild"><td class="model">fact_team_game_offense</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>team × completed game</td><td class="mono">team_game_key</td><td><span class="pill d-rebuild">rebuild wide</span></td><td>FACTS</td><td class="note">absorbs offense half of fact_team_game_epa: off EPA, success rate, PROE, explosive rate</td></tr>
+      <tr data-vendor="bdl" data-disp="rebuild"><td class="model">fact_team_game_defense</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>team × game (1:1 twin)</td><td class="mono">team_game_key</td><td><span class="pill d-rebuild">rebuild wide</span></td><td>FACTS</td><td class="note">absorbs defense half: def EPA/play, success rate allowed, explosive rate allowed</td></tr>
+      <tr data-vendor="bdl" data-disp="rebuild"><td class="model">fact_player_game_offense</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>player × game (≈22k)</td><td class="mono">player_game_key</td><td><span class="pill d-rebuild">rebuild wide</span></td><td>FACTS</td><td class="note">+ target share, WOPR, EPA, CPOE, snaps, Sleeper fantasy; incremental spine retired → plain table</td></tr>
+      <tr data-vendor="bdl" data-disp="rebuild"><td class="model">fact_player_game_defense</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>player × game (≈42k)</td><td class="mono">player_game_key</td><td><span class="pill d-rebuild">rebuild wide</span></td><td>FACTS</td><td class="note">+ nflverse def_* block, Sleeper IDP</td></tr>
+      <tr data-vendor="bdl" data-disp="rebuild"><td class="model">fact_player_game_special</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>player × game (≈8k)</td><td class="mono">player_game_key</td><td><span class="pill d-rebuild">rebuild wide</span></td><td>FACTS</td><td class="note">+ FG distance bands, punting/return detail</td></tr>
+      <tr data-vendor="bdl" data-disp="enrich"><td class="model">fact_play</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>play (179k)</td><td class="mono">play_key</td><td><span class="pill d-enrich">enrich</span></td><td>FACTS</td><td class="note">per-play EPA / WPA / success grafted via pbp match (§ 6)</td></tr>
+      <tr data-vendor="bdl" data-disp="keep"><td class="model">fact_two_point_conversion</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>play × role × participant</td><td class="mono">two_point_key</td><td><span class="pill d-keep">move</span></td><td>FACTS</td><td class="note">unchanged</td></tr>
+      <tr data-vendor="bdl" data-disp="enrich"><td class="model">fact_team_season</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>team × season</td><td class="mono">team_season_key</td><td><span class="pill d-enrich">enrich</span></td><td>FACTS</td><td class="note">+ bye_week (derived from dim_game gaps)</td></tr>
+      <tr data-vendor="bdl" data-disp="retire"><td class="model">fact_player_injury</td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>player × report date</td><td class="mono">player_injury_key</td><td><span class="pill d-retire">retire</span></td><td>cold</td><td class="note">21 rows, date-grain; superseded by fact_injury_report (official filed report)</td></tr>
+      <tr data-vendor="bdl" data-disp="retire"><td class="model">fact_player_week_advanced_* <span class="note">(×3)</span></td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>player × season × week</td><td class="mono">player_week_*_key</td><td><span class="pill d-retire">retire</span></td><td>cold</td><td class="note">duplicate NGS; the nflverse gsis-keyed path wins</td></tr>
+      <tr data-vendor="bdl" data-disp="retire"><td class="model">fact_player_season_advanced_* <span class="note">(×3)</span></td><td>fact</td><td><span class="pill v-bdl">BDL</span></td><td>player × season</td><td class="mono">player_week_*_key</td><td><span class="pill d-retire">retire</span></td><td>cold</td><td class="note">same NGS duplication, season totals</td></tr>
+      <tr data-vendor="nflverse" data-disp="retire"><td class="model">fact_nflverse_player_week</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>gsis × season × type × week</td><td class="mono">player_week_key</td><td><span class="pill d-retire">retire</span></td><td>cold</td><td class="note">absorbed into wide fact_player_game_offense / _defense</td></tr>
+      <tr data-vendor="nflverse" data-disp="retire"><td class="model">fact_team_game_epa</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>team × game</td><td class="mono">team_game_key</td><td><span class="pill d-retire">retire</span></td><td>cold</td><td class="note">absorbed into the offense/defense team twins</td></tr>
+      <tr data-vendor="nflverse" data-disp="retire"><td class="model">fact_player_week_snaps</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>pfr player × game</td><td class="mono">player_game_snap_key</td><td><span class="pill d-retire">retire</span></td><td>cold</td><td class="note">snap counts/pct absorbed into wide player facts</td></tr>
+      <tr data-vendor="nflverse" data-disp="keep"><td class="model">fact_injury_report</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>week × team × player</td><td class="mono">injury_report_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">official filed report; modified_before_kickoff leakage guard</td></tr>
+      <tr data-vendor="nflverse" data-disp="keep"><td class="model">fact_depth_chart</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>game × team × slot × player</td><td class="mono">depth_chart_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">weekly + daily sources unified, game-anchored</td></tr>
+      <tr data-vendor="nflverse" data-disp="keep"><td class="model">fact_nextgen_* <span class="note">(×3)</span></td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>gsis × season × week</td><td class="mono">nextgen_*_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">full NGS depth at native grain; headline metrics optionally folded into wide player facts</td></tr>
+      <tr data-vendor="sleeper" data-disp="retire"><td class="model">fact_sleeper_player_week</td><td>fact</td><td><span class="pill v-sleeper">Sleeper</span></td><td>player × season × type × week</td><td class="mono">sleeper_player_week_key</td><td><span class="pill d-retire">retire</span></td><td>cold</td><td class="note">fantasy pts / ranks / snap shares absorbed into wide player facts</td></tr>
+      <tr data-vendor="sleeper" data-disp="keep"><td class="model">fact_sleeper_projection_snapshot</td><td>fact</td><td><span class="pill v-sleeper">Sleeper</span></td><td>player × week × snapshot</td><td class="mono">projection_snapshot_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">movement snapshots; different grain by design</td></tr>
+      <tr data-vendor="sleeper" data-disp="keep"><td class="model">fact_sleeper_trending</td><td>fact</td><td><span class="pill v-sleeper">Sleeper</span></td><td>fetched_at × direction × player</td><td class="mono">trending_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">the crowd's leading indicator, 6h cadence</td></tr>
+      <tr data-vendor="betting" data-disp="keep"><td class="model">fact_game_betting_odds_* <span class="note">(×3)</span></td><td>fact</td><td><span class="pill v-betting">betting</span></td><td>game × vendor (× snapshot)</td><td class="mono">game_vendor_odds_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">opening / snapshot / closing family, unchanged</td></tr>
+      <tr data-vendor="betting" data-disp="keep"><td class="model">fact_player_prop_* <span class="note">(×3)</span></td><td>fact</td><td><span class="pill v-betting">betting</span></td><td>game × player × vendor × prop</td><td class="mono">game_player_vendor_prop_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">opening / snapshot / closing family, unchanged</td></tr>
+      <tr data-vendor="news" data-disp="keep"><td class="model">fact_player_news_mention</td><td>fact</td><td><span class="pill v-news">news</span></td><td>article × player mention</td><td class="mono">mention_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">name-resolution against BDL roster, unchanged</td></tr>
+      <tr data-vendor="weather" data-disp="keep"><td class="model">fact_game_weather <span class="note">(+ forecast view)</span></td><td>fact</td><td><span class="pill v-weather">weather</span></td><td>game × product</td><td class="mono">game_weather_key</td><td><span class="pill d-keep">keep</span></td><td>FACTS</td><td class="note">unchanged</td></tr>
+      <tr data-vendor="nflverse" data-disp="new"><td class="model">stg_nfl__nflverse_pbp</td><td>prep</td><td><span class="pill v-nflverse">nflverse</span></td><td>play</td><td class="mono">nflverse play_id</td><td><span class="pill d-new">new</span></td><td>PREP</td><td class="note">curated subset of the 372-column raw table; ends the direct source() reads</td></tr>
+      <tr data-vendor="nflverse" data-disp="new"><td class="model">fact_team_game_situation</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>team × game × situation</td><td class="mono">team_game_situation_key</td><td><span class="pill d-new">new</span></td><td>FACTS</td><td class="note">the prop-pattern surface: EPA / success / explosive by down, zone, pass-run (§ 6)</td></tr>
+      <tr data-vendor="nflverse" data-disp="new"><td class="model">fact_game_official</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>game × official</td><td class="mono">game_official_key</td><td><span class="pill d-new">new</span></td><td>FACTS</td><td class="note">crew rotation → penalty-rate priors; referee also denormalized onto dim_game</td></tr>
+      <tr data-vendor="nflverse" data-disp="new"><td class="model">fact_player_combine</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>player</td><td class="mono">gsis/pfr via bridge</td><td><span class="pill d-new">new</span></td><td>FACTS</td><td class="note">athletic testing kept as its own small fact, not 15 more dim columns</td></tr>
+      <tr data-vendor="nflverse" data-disp="new"><td class="model">fact_trade</td><td>fact</td><td><span class="pill v-nflverse">nflverse</span></td><td>trade × asset</td><td class="mono">trade_id</td><td><span class="pill d-new">new</span></td><td>FACTS</td><td class="note">low priority; roster-movement history</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ==================== CONNECTION MAP ==================== -->
+<section id="connections">
+  <div class="section-head"><span class="no">§ 3</span><h2>Connection Map</h2><span class="tag">three id universes, two bridges, one spine</span></div>
+  <p class="lede">Every join in the enriched layer reduces to this picture. BDL surrogate keys are the conformed spine; nflverse and Sleeper reach it only through the bridges, and each wide fact does that traversal exactly once.</p>
+
+  <div class="svgwrap">
+  <svg viewBox="0 0 980 560" role="img" aria-label="Identity spine diagram: BDL, nflverse and Sleeper id universes connected by the two bridge tables">
+    <style>
+      .lbl { font: 600 13px ui-monospace, Menlo, monospace; fill: var(--ink); }
+      .sub2 { font: 11px -apple-system, sans-serif; fill: var(--muted); }
+      .hdr { font: 700 14px -apple-system, sans-serif; }
+      .edge { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+      .edge2 { stroke: var(--accent); stroke-width: 2; fill: none; }
+      .box { rx: 8; fill: var(--panel-2); stroke-width: 1.5; }
+    </style>
+    <!-- universe headers -->
+    <text x="130" y="30" class="hdr" fill="var(--bdl)" text-anchor="middle">BallDontLie (paid anchor)</text>
+    <text x="490" y="30" class="hdr" fill="var(--cross)" text-anchor="middle">Bridges (DIM)</text>
+    <text x="850" y="30" class="hdr" text-anchor="middle"><tspan fill="var(--nflverse)">nflverse</tspan><tspan fill="var(--muted)"> · </tspan><tspan fill="var(--sleeper)">Sleeper</tspan></text>
+
+    <!-- BDL column -->
+    <rect x="30" y="50" width="200" height="52" class="box" stroke="var(--bdl)"/>
+    <text x="130" y="72" class="lbl" text-anchor="middle">player_key</text>
+    <text x="130" y="90" class="sub2" text-anchor="middle">dim_player · 13.5k</text>
+
+    <rect x="30" y="130" width="200" height="52" class="box" stroke="var(--bdl)"/>
+    <text x="130" y="152" class="lbl" text-anchor="middle">game_key</text>
+    <text x="130" y="170" class="sub2" text-anchor="middle">dim_game · full slate</text>
+
+    <rect x="30" y="210" width="200" height="52" class="box" stroke="var(--bdl)"/>
+    <text x="130" y="232" class="lbl" text-anchor="middle">team_key</text>
+    <text x="130" y="250" class="sub2" text-anchor="middle">dim_team · 32</text>
+
+    <rect x="30" y="310" width="200" height="52" class="box" stroke="var(--bdl)"/>
+    <text x="130" y="332" class="lbl" text-anchor="middle">team_game_key</text>
+    <text x="130" y="350" class="sub2" text-anchor="middle">sk(game_id, team_id)</text>
+
+    <rect x="30" y="390" width="200" height="52" class="box" stroke="var(--bdl)"/>
+    <text x="130" y="412" class="lbl" text-anchor="middle">player_game_key</text>
+    <text x="130" y="430" class="sub2" text-anchor="middle">sk(game_id, player_id)</text>
+
+    <rect x="30" y="470" width="200" height="52" class="box" stroke="var(--bdl)"/>
+    <text x="130" y="492" class="lbl" text-anchor="middle">play_key</text>
+    <text x="130" y="510" class="sub2" text-anchor="middle">fact_play · 179k</text>
+
+    <!-- bridges -->
+    <rect x="370" y="50" width="240" height="72" class="box" stroke="var(--cross)"/>
+    <text x="490" y="74" class="lbl" text-anchor="middle">bridge_player_ids</text>
+    <text x="490" y="92" class="sub2" text-anchor="middle">grain: gsis_id · Snowpark + Cortex</text>
+    <text x="490" y="108" class="sub2" text-anchor="middle">espn · pfr · pff · esb ids too</text>
+
+    <rect x="370" y="150" width="240" height="72" class="box" stroke="var(--cross)"/>
+    <text x="490" y="174" class="lbl" text-anchor="middle">bridge_game_ids</text>
+    <text x="490" y="192" class="sub2" text-anchor="middle">observed from pbp, else composed</text>
+    <text x="490" y="208" class="sub2" text-anchor="middle">postseason: BDL 1,2,3,5 ↔ 19–22</text>
+
+    <rect x="370" y="250" width="240" height="56" class="box" stroke="var(--cross)"/>
+    <text x="490" y="272" class="lbl" text-anchor="middle">nfl_team_abbr_nflverse()</text>
+    <text x="490" y="290" class="sub2" text-anchor="middle">LAR↔LA · WSH↔WAS · macro, one home</text>
+
+    <!-- right column -->
+    <rect x="750" y="50" width="200" height="52" class="box" stroke="var(--nflverse)"/>
+    <text x="850" y="72" class="lbl" text-anchor="middle">gsis_id</text>
+    <text x="850" y="90" class="sub2" text-anchor="middle">every nflverse table</text>
+
+    <rect x="750" y="130" width="200" height="52" class="box" stroke="var(--nflverse)"/>
+    <text x="850" y="152" class="lbl" text-anchor="middle">nflverse_game_id</text>
+    <text x="850" y="170" class="sub2" text-anchor="middle">2025_01_DAL_PHI shape</text>
+
+    <rect x="750" y="210" width="200" height="52" class="box" stroke="var(--sleeper)"/>
+    <text x="850" y="232" class="lbl" text-anchor="middle">sleeper_player_id</text>
+    <text x="850" y="250" class="sub2" text-anchor="middle">no usable game id →</text>
+
+    <rect x="750" y="290" width="200" height="52" class="box" stroke="var(--sleeper)"/>
+    <text x="850" y="312" class="lbl" text-anchor="middle">season + week + team</text>
+    <text x="850" y="330" class="sub2" text-anchor="middle">Sleeper's game locator (+18 post)</text>
+
+    <rect x="750" y="390" width="200" height="52" class="box" stroke="var(--nflverse)"/>
+    <text x="850" y="412" class="lbl" text-anchor="middle">pfr_id</text>
+    <text x="850" y="430" class="sub2" text-anchor="middle">snap counts, combine</text>
+
+    <rect x="750" y="470" width="200" height="52" class="box" stroke="var(--nflverse)"/>
+    <text x="850" y="492" class="lbl" text-anchor="middle">nflverse_pbp play</text>
+    <text x="850" y="510" class="sub2" text-anchor="middle">EPA/WPA per play, 372 cols</text>
+
+    <!-- edges -->
+    <path class="edge2" d="M230 76 H370"/>
+    <path class="edge2" d="M610 76 H750"/>
+    <path class="edge2" d="M230 156 H370 M610 176 C 700 176, 700 156, 750 156"/>
+    <path class="edge" d="M230 236 C 300 236, 300 278, 370 278"/>
+    <path class="edge" d="M610 278 C 690 278, 690 236, 750 236"/>
+    <path class="edge" d="M610 110 C 720 130, 720 210, 750 228"/>
+    <path class="edge" d="M610 110 C 700 160, 700 380, 750 408"/>
+    <path class="edge" d="M230 496 C 470 496, 520 496, 750 496"/>
+    <text x="490" y="488" class="sub2" text-anchor="middle">play match: qtr + clock + down + dist + yardline (§ 6)</text>
+  </svg>
+  </div>
+  <p class="diagram-caption">Blue paths are the primary traversals every wide fact performs. The team-abbreviation macro is the third vocabulary that must move in lockstep with the Snowpark evidence maps and the Cortex Search filter attribute.</p>
+
+  <h3>The 1:1 key collisions (all deliberate)</h3>
+  <ul>
+    <li><code>team_game_key</code>: <code>fact_team_game_offense</code> = <code>fact_team_game_defense</code> — and, until absorbed, <code>fact_team_game_epa</code>. The wide rebuild folds the third into the first two.</li>
+    <li><code>player_game_key</code>: shared <em>key space</em> across the three player phase facts — 4,604 player-games appear in more than one phase. Row counts never sum; never UNION them. This stays true after the rebuild.</li>
+    <li><code>player_game_key</code> on <code>fact_two_point_conversion</code> matches the phase facts by construction.</li>
+  </ul>
+  <div class="callout">
+    <b class="title">Week-grain → game-grain is safe in the NFL</b>
+    nflverse player stats and Sleeper stats live at player × season × week, not player × game. Because an NFL team plays at most one game per week, <code>(gsis_id, season, week) → team that week → game_key</code> resolves deterministically through <code>bridge_game_ids</code>. The wide facts do this once; an unmapped-rows audit catches the residue (mid-week trades, postseason vocabulary) instead of silently dropping it.
+  </div>
+</section>
+
+<!-- ==================== ENRICHMENT ==================== -->
+<section id="enrichment">
+  <div class="section-head"><span class="no">§ 4</span><h2>Enrichment Plan</h2><span class="tag">what each table gains, and from where</span></div>
+  <p class="lede">BDL row on the left, enrichment blocks joined in. Vendor prefixes where both sides report the same stat; <code>has_nflverse</code> / <code>has_sleeper</code> flags so a NULL reads as "no match," never "zero."</p>
+
+  <h3>Dimensions</h3>
+  <div class="cols2">
+    <div class="block">
+      <h4><span class="mono">dim_player</span> <span class="pill d-enrich">the big one</span></h4>
+      <p class="src">via bridge_player_ids → stg_nfl__nflverse_players + stg_nfl__sleeper_players</p>
+      <ul>
+        <li><b>Bio &amp; draft</b> — birth_date, draft_year / round / pick / team, college_conference, rookie_season, years_of_experience, headshot_url, high_school (Sleeper)</li>
+        <li><b>Position repair</b> — <code>coalesce(bdl ≠ 'Unknown', nflverse, sleeper)</code> + a provenance column; fixes 8,379 of 13,503 Unknown rows and back-fills the 9,715 missing height/weight</li>
+        <li><b>Denormalized ids</b> — gsis, sleeper, espn, pfr, sportradar, yahoo, rotowire (bridge stays authoritative)</li>
+        <li><b>Live status</b> — injury_status, injury_body_part, practice_participation, depth_chart_position / order, search_rank (Sleeper daily; history stays on fact_injury_report / fact_depth_chart)</li>
+        <li><b>Flags</b> — has_nflverse_match, has_sleeper_match</li>
+      </ul>
+    </div>
+    <div class="block">
+      <h4><span class="mono">dim_team</span> &amp; <span class="mono">dim_game</span></h4>
+      <p class="src">via bridge_game_ids + nflverse teams/officials reference</p>
+      <ul>
+        <li><b>dim_team</b> — nflverse_abbr (ends re-deriving it per query), colors / logos, stadium_key FK</li>
+        <li><b>dim_game</b> — nflverse_game_id denormalized, referee (head official), is_division_game</li>
+        <li><b>fact_team_season</b> — bye_week (team × season attribute; derivable from dim_game gaps)</li>
+        <li>Full officiating crew is a fact, not dim columns → <code>fact_game_official</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Wide facts</h3>
+  <div class="cols2">
+    <div class="block">
+      <h4><span class="mono">fact_player_game_offense</span></h4>
+      <p class="src">BDL box score (anchor) ⟵ nflverse player week + snap counts + Sleeper stats</p>
+      <ul>
+        <li><b>BDL block (unchanged)</b> — passing / rushing / receiving box, scrimmage rollups, fanduel_points, draftkings_points (UDFs kept)</li>
+        <li><b>Usage</b> — target_share, air_yards_share, wopr, racr, pacr, air yards, YAC, first downs, explosive-play buckets</li>
+        <li><b>Efficiency</b> — passing/rushing/receiving EPA, passing CPOE</li>
+        <li><b>Snaps</b> — offense_snaps / offense_pct (nflverse, pfr crosswalk) + sleeper_off_snap_share (team-denominator cross-check)</li>
+        <li><b>Fantasy</b> — sleeper pts_std / half_ppr / ppr + position ranks; nflverse fantasy_points as the second opinion</li>
+        <li><b>Optional (decide in build)</b> — headline NGS per discipline (CPOE-above-expected, RYOE, avg_separation); full NGS depth stays on fact_nextgen_*</li>
+      </ul>
+    </div>
+    <div class="block">
+      <h4><span class="mono">fact_player_game_defense</span> &amp; <span class="mono">_special</span></h4>
+      <p class="src">BDL (anchor) ⟵ nflverse def_* / kicking blocks + Sleeper IDP</p>
+      <ul>
+        <li><b>Defense</b> — nflverse def_* block (≈20 cols: pressures-adjacent counting stats), Sleeper IDP (idp_tkl, idp_sack, idp_int, idp_ff, idp_qb_hit) beside BDL tackling / pass rush / coverage; defense_snaps / defense_pct</li>
+        <li><b>Special</b> — FG made/attempted by distance band (0-19 … 60+), game-winning FG, punting detail, return detail; st_snaps / st_pct</li>
+      </ul>
+      <h4 style="margin-top:16px"><span class="mono">fact_team_game_offense</span> &amp; <span class="mono">_defense</span></h4>
+      <ul>
+        <li><b>Offense twin</b> — absorbs off_epa, epa_per_play, success_rate, early_down_success_rate, pass/rush EPA splits, explosive_rate, pass_rate, PROE</li>
+        <li><b>Defense twin</b> — absorbs def_epa, success_rate_allowed, dropbacks_faced, pass/rush EPA allowed, explosive_rate_allowed</li>
+        <li>Rates never materialized as averages of averages — recomputed from this grain's own sums, as today</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <b class="title">Coverage is partial by construction — and that's fine</b>
+    Name + team matches about 78% of current nflverse players to BDL; the bridge's id and Cortex Search tiers push higher, but some rows will always carry NULL enrichment. The flags make coverage measurable per column, and the retired vendor-pure facts remain in cold storage (and RAW) if a gsis-only view of the world is ever needed again.
+  </div>
+</section>
+
+<!-- ==================== TARGET SCHEMA ==================== -->
+<section id="schema">
+  <div class="section-head"><span class="no">§ 5</span><h2>Target Schema Architecture</h2><span class="tag">DIM · FACTS · CORE (frozen)</span></div>
+
+  <div class="svgwrap">
+  <svg viewBox="0 0 980 300" role="img" aria-label="Schema layout: PREP feeds DIM and FACTS; CORE frozen as cold storage; ANALYTICS, FEATURES and APP read DIM and FACTS">
+    <style>
+      .s-lbl { font: 700 15px -apple-system, sans-serif; fill: var(--ink); }
+      .s-sub { font: 11.5px -apple-system, sans-serif; fill: var(--muted); }
+      .s-box { rx: 10; fill: var(--panel-2); stroke-width: 1.6; }
+      .s-edge { stroke: var(--muted); stroke-width: 1.6; fill: none; marker-end: url(#arr); }
+    </style>
+    <defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker></defs>
+
+    <rect x="20" y="90" width="150" height="90" class="s-box" stroke="var(--muted)"/>
+    <text x="95" y="125" class="s-lbl" text-anchor="middle">PREP</text>
+    <text x="95" y="145" class="s-sub" text-anchor="middle">views · by vendor</text>
+    <text x="95" y="161" class="s-sub" text-anchor="middle">+ stg_nfl__nflverse_pbp</text>
+
+    <rect x="230" y="30" width="220" height="100" class="s-box" stroke="var(--accent)"/>
+    <text x="340" y="60" class="s-lbl" text-anchor="middle">DIM</text>
+    <text x="340" y="80" class="s-sub" text-anchor="middle">7 dims (3 enriched) · 2 bridges</text>
+    <text x="340" y="96" class="s-sub" text-anchor="middle">PLAYER_BRIDGE tables</text>
+    <text x="340" y="112" class="s-sub" text-anchor="middle">PLAYER_SEARCH (Cortex)</text>
+
+    <rect x="230" y="150" width="220" height="100" class="s-box" stroke="var(--accent)"/>
+    <text x="340" y="180" class="s-lbl" text-anchor="middle">FACTS</text>
+    <text x="340" y="200" class="s-sub" text-anchor="middle">wide game facts · context facts</text>
+    <text x="340" y="216" class="s-sub" text-anchor="middle">situational splits · fantasy UDFs</text>
+
+    <rect x="510" y="90" width="170" height="90" class="s-box" stroke="var(--retire)" stroke-dasharray="6 4"/>
+    <text x="595" y="122" class="s-lbl" text-anchor="middle">CORE ❄</text>
+    <text x="595" y="142" class="s-sub" text-anchor="middle">frozen at cutover</text>
+    <text x="595" y="158" class="s-sub" text-anchor="middle">rollback archive → drop</text>
+
+    <rect x="740" y="20" width="220" height="70" class="s-box" stroke="var(--muted)"/>
+    <text x="850" y="48" class="s-lbl" text-anchor="middle">ANALYTICS</text>
+    <text x="850" y="68" class="s-sub" text-anchor="middle">semantic views + agents</text>
+
+    <rect x="740" y="105" width="220" height="70" class="s-box" stroke="var(--muted)"/>
+    <text x="850" y="133" class="s-lbl" text-anchor="middle">FEATURES</text>
+    <text x="850" y="153" class="s-sub" text-anchor="middle">ML marts (specs.py repoint)</text>
+
+    <rect x="740" y="190" width="220" height="70" class="s-box" stroke="var(--muted)"/>
+    <text x="850" y="218" class="s-lbl" text-anchor="middle">APP</text>
+    <text x="850" y="238" class="s-sub" text-anchor="middle">dashboard marts (copy_grants)</text>
+
+    <path class="s-edge" d="M170 115 C 200 100, 200 90, 228 80"/>
+    <path class="s-edge" d="M170 155 C 200 170, 200 185, 228 195"/>
+    <path class="s-edge" d="M340 132 V 148"/>
+    <path class="s-edge" d="M450 65 C 610 65, 640 45, 738 50"/>
+    <path class="s-edge" d="M450 195 C 600 195, 640 230, 738 228"/>
+    <path class="s-edge" d="M450 190 C 620 175, 650 145, 738 140"/>
+  </svg>
+  </div>
+  <p class="diagram-caption">Arrows are dbt <code>ref()</code> paths — none of them change. The vendor subfolders under <code>models/nfl/core/</code> stay where they are; only the <code>+schema</code> values split. Dev is unaffected: <code>DBT_COLLAPSE_SCHEMAS=true</code> keeps everything in one developer schema, so the split manifests only in prod.</p>
+
+  <h3>Where everything lands</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Object</th><th>Target</th><th>Mechanism</th></tr></thead>
+    <tbody>
+      <tr><td class="model">dimensions/</td><td>DIM</td><td><code>+schema: DIM</code> under <code>core.dimensions</code> in dbt_project.yml</td></tr>
+      <tr><td class="model">bridges/ + PLAYER_BRIDGE tables</td><td>DIM</td><td><code>+schema: DIM</code>; the SP_PLAYER_BRIDGE pre_hook writes into <code>this.schema</code>, so it follows for free</td></tr>
+      <tr><td class="model">facts/ (all vendor folders)</td><td>FACTS</td><td><code>+schema: FACTS</code> under <code>core.facts</code>; subfolders inherit</td></tr>
+      <tr><td class="model">NFL_FANDUEL_POINTS / NFL_DRAFTKINGS_POINTS</td><td>FACTS</td><td><code>nfl_fantasy_points_fqn()</code>: <code>'CORE'</code> → <code>'FACTS'</code> (macros/nfl/nfl_fantasy_udfs.sql); on-run-start recreates them, self-healing</td></tr>
+      <tr><td class="model">nfl_player_bridge_fqn()</td><td>DIM</td><td><code>'CORE'</code> → <code>'DIM'</code> (macros/nfl/nfl_bridge_helpers.sql); the three bridge tests follow it</td></tr>
+      <tr><td class="model">PLAYER_SEARCH Cortex Search service</td><td>DIM</td><td>recreate via dlt-pipelines/sql/sources/nfl/09_player_bridge.sql; update the hardcoded FQN in snowpark player_bridge search.py, redeploy the package</td></tr>
+      <tr><td class="model">ML label source</td><td>FACTS</td><td>ml-pipelines specs.py FQN repoint after cutover (reads frozen CORE until then — stale, not broken)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Cold storage, operationally</h3>
+  <ul>
+    <li><b>What it is:</b> at cutover CORE simply stops being a dbt target. dbt drops nothing — the tables freeze at last-run state automatically.</li>
+    <li><b>What it's for:</b> instant rollback (revert the <code>+schema</code> values and two macro literals) and the archive of the retired vendor-pure facts.</li>
+    <li><b>When it dies:</b> after two prod release cycles, drop the schema on an explicit date. A frozen schema without a death date becomes a stale shadow copy someone will eventually query by accident.</li>
+    <li><b>Grants:</b> DIM and FACTS need creating + ownership transfer to DBT_RUNNER_ROLE in the provisioning SQL. Consumers are untouched — the dashboard reads APP (copy_grants intact), the agent reads ANALYTICS.</li>
+  </ul>
+</section>
+
+<!-- ==================== PLAY BY PLAY ==================== -->
+<section id="pbp">
+  <div class="section-head"><span class="no">§ 6</span><h2>Play-by-Play: Finding the Happy Place</h2><span class="tag">two vendors, one spine, a prop-pattern engine</span></div>
+  <p class="lede">BDL's <code>fact_play</code> and nflverse's raw pbp describe the same plays with different superpowers. The happy place: BDL stays the spine (its <code>play_key</code> already connects to everything), nflverse becomes both the per-play analytics graft and the coverage backstop — and the situational aggregates that actually drive prop decisions don't depend on row-perfect matching at all.</p>
+
+  <h3>The two sources, honestly compared</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th><span class="pill v-bdl">BDL fact_play</span></th><th><span class="pill v-nflverse">nflverse_pbp (RAW)</span></th></tr></thead>
+    <tbody>
+      <tr><td><b>Coverage</b></td><td>179,402 plays — but <b>18 games have no plays at all</b> (never use as a game spine)</td><td>Every game, every play, back through the backfill floor — covers the 18 gaps</td></tr>
+      <tr><td><b>Keys</b></td><td><code>play_key</code>, <code>game_key</code>, <code>team_key</code> (nullable on 126 neutral plays), <code>play_type_key</code></td><td><code>nflverse_game_id</code> + play_id; gsis player ids on every role (passer, rusher, receiver, tacklers…)</td></tr>
+      <tr><td><b>Situation</b></td><td>period, clock, down, distance, yard line, red zone / third / fourth down flags</td><td>same, plus drive/series context, shotgun, no-huddle, personnel-adjacent fields</td></tr>
+      <tr><td><b>Analytics</b></td><td>yards gained, scoring flags, home win probability</td><td><b>EPA, WPA, success, CPOE, air yards, xpass and ≈360 more columns</b></td></tr>
+      <tr><td><b>Today's usage</b></td><td>full model, clustered by season/week</td><td>read directly from RAW by exactly two models — a huge untapped surface</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Prong 1 — play-level graft onto fact_play</h3>
+  <ul>
+    <li><b>Scope to a game first</b> via <code>bridge_game_ids</code>, then match within it in tiers:
+      <b>T1</b> quarter + game clock + down + distance + yardline (deterministic for the vast majority);
+      <b>T2</b> relax the clock a few seconds for entry drift;
+      <b>T3</b> normalized description similarity as the last resort.</li>
+    <li><b>Graft where matched</b> (BDL left, nflverse enrich): <code>epa</code>, <code>wpa</code>, <code>success</code>, <code>air_yards</code>, <code>yards_after_catch</code>, <code>xpass</code>, pass/rush metadata, and the nflverse play_id for drill-through.</li>
+    <li><b>Audit, don't assume:</b> a match-rate model per game with a test threshold. Unmatched BDL plays keep NULL analytics; nflverse-only plays (including the 18 missing games) are surfaced by the audit rather than invented into the BDL spine.</li>
+  </ul>
+
+  <h3>Prong 2 — situational splits: the pattern surface for props</h3>
+  <p>Built from the new curated <code>stg_nfl__nflverse_pbp</code> prep regardless of match rate. New fact <code>fact_team_game_situation</code>, grain team × game × situation, both sides of the ball:</p>
+  <div class="cols2">
+    <div class="block">
+      <h4>Situation dimensions</h4>
+      <ul>
+        <li>down (1st / 2nd / 3rd-4th) × distance bucket (short / medium / long)</li>
+        <li>field zone (own territory / midfield / red zone)</li>
+        <li>play family (dropback / designed run), shotgun, no-huddle</li>
+        <li>game state (leading / trailing / neutral script, two-minute)</li>
+      </ul>
+    </div>
+    <div class="block">
+      <h4>Measures per cell</h4>
+      <ul>
+        <li>plays, EPA/play, success rate, explosive rate</li>
+        <li>pass rate and pass rate over expected (PROE)</li>
+        <li>yards/play, first-down rate</li>
+        <li>the defense mirror: everything as "allowed"</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout good">
+    <b class="title">Why this wins prop bets</b>
+    <code>app_team_allowed</code> already answers "what does this defense give up by position." Situational splits answer the sharper question: <i>"this defense collapses on third-and-long dropbacks"</i> or <i>"this offense abandons the run when trailing."</i> Cross that with the wide player fact's target share and snap share, the Sleeper projection line, and the book's prop line — all now joined on the same keys — and the prop board can show <b>line vs projection vs situational matchup</b> in one query. Season-to-date and rolling windows aggregate downstream in FEATURES/APP from the game grain, so the fact stays additive.
+  </div>
+</section>
+
+<!-- ==================== MIGRATION ==================== -->
+<section id="migration">
+  <div class="section-head"><span class="no">§ 7</span><h2>Migration Phases</h2><span class="tag">Phase 0 ships alone; each phase is dev-built, then deploy-sport</span></div>
+
+  <details class="phase" open>
+    <summary><span class="ph">Phase 0</span> Schema cutover — deliberately SQL-inert <span class="hint">no model SQL changes; the rollback is two files</span></summary>
+    <div class="body"><ul>
+      <li><b>Provision:</b> add DIM + FACTS to <code>dlt-pipelines/sql/sources/nfl/01_databases.sql</code> (CREATE SCHEMA list) and <code>05_dbt_trigger.sql</code> (ownership transfer to DBT_RUNNER_ROLE); template the same in <code>tools/new_source.py</code>. Run against prod as the usual human-run <code>make setup-*</code> path.</li>
+      <li><b>Config:</b> in <code>dbt_project.yml</code>, split <code>core: +schema: CORE</code> into <code>dimensions: +schema: DIM</code>, <code>bridges: +schema: DIM</code>, <code>facts: +schema: FACTS</code>. Folder names don't change — config keys mirror directories, so only the values move.</li>
+      <li><b>Macros:</b> <code>nfl_player_bridge_fqn()</code> → <code>'DIM'</code>; <code>nfl_fantasy_points_fqn()</code> → <code>'FACTS'</code>.</li>
+      <li><b>Cortex Search:</b> recreate PLAYER_SEARCH in DIM (09_player_bridge.sql), update the snowpark package's hardcoded FQN, <code>make deploy-snowpark</code> — <i>before</i> the first prod run.</li>
+      <li><b>Pre-clone the three incremental facts</b> (<code>CREATE TABLE …FACTS.X CLONE …CORE.X</code> for player offense / defense / special) so the first prod run stays incremental instead of a cold rebuild. Moot once Phase 2 retires the incremental spine, but Phase 0 ships first.</li>
+      <li><b>Ship:</b> dev <code>dbt build</code> (models + tests), then <code>make deploy-sport SPORT=nfl</code>. All semantic views, APP and FEATURES rebuild against the new schemas via ref() untouched.</li>
+      <li><b>After:</b> repoint the ML specs FQN to FACTS. Freeze CORE; write down its drop date.</li>
+    </ul></div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="ph">Phase 1</span> Dimension enrichment <span class="hint">dim_player · dim_team · dim_game</span></summary>
+    <div class="body"><ul>
+      <li>Rebuild <code>dim_player</code> wide: bio/draft block, position repair with provenance, denormalized ids, Sleeper live status, match flags. Bridge ordering is already correct (dim builds after <code>bridge_player_ids</code>).</li>
+      <li><code>dim_team</code>: nflverse_abbr, colors/logos, stadium_key. <code>dim_game</code>: nflverse_game_id, referee, is_division_game — needs a thin <code>stg_nfl__nflverse_officials</code> prep model.</li>
+      <li>Tests: position_source distribution, id uniqueness where present, match-rate thresholds alongside the existing bridge tests.</li>
+    </ul></div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="ph">Phase 2</span> Wide fact rebuilds <span class="hint">the five game facts + new small facts</span></summary>
+    <div class="body"><ul>
+      <li>Rebuild the five team/player game facts wide (BDL-anchored, enrichment blocks per § 4). Retire the incremental spine — plain tables at this scale.</li>
+      <li>Absorb <code>fact_team_game_epa</code> into the team twins; retire <code>fact_nflverse_player_week</code>, <code>fact_player_week_snaps</code>, <code>fact_sleeper_player_week</code>, and the six BDL advanced facts to cold storage as their columns land.</li>
+      <li>New: <code>fact_game_official</code>, <code>fact_player_combine</code>, bye_week on <code>fact_team_season</code>; <code>fact_trade</code> when it earns its slot.</li>
+      <li>Tests: player_game_key / team_game_key uniqueness, unmapped-week audit, vendor-disagreement spot checks (the defensive_touchdowns pattern).</li>
+    </ul></div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="ph">Phase 3</span> Play-by-play <span class="hint">graft + situational splits</span></summary>
+    <div class="body"><ul>
+      <li><code>stg_nfl__nflverse_pbp</code> curated prep (ends the two direct RAW reads; <code>fact_team_game_situation</code> and the team twins' EPA blocks read it).</li>
+      <li>Play-level match (tiers T1–T3) + graft onto <code>fact_play</code>; per-game match-rate audit model with a warning threshold.</li>
+      <li><code>fact_team_game_situation</code> per § 6.</li>
+    </ul></div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="ph">Phase 4</span> Semantic views + APP <span class="hint">expose the riches</span></summary>
+    <div class="body"><ul>
+      <li><code>sv_nfl_player_offense</code>: usage / EPA / fantasy measures now ride the wide fact with full coverage — the disabled <code>sv_nfl_player_advanced</code> (dead for disjoint-coverage reasons) becomes permanently unnecessary.</li>
+      <li><code>sv_nfl_team_performance</code>: EPA, success rate, PROE measures. New semantic view on situational splits for "what does this defense allow on third and long" questions in plain English.</li>
+      <li>APP: <code>app_player_weeks</code> / <code>app_player_leaders</code> + usage columns; <code>app_game_prop_board</code> + projection-vs-line delta + situational matchup columns; <code>app_game_slate</code> + referee and injury-status rollup; explore sheets pick up the new columns as their contracts allow.</li>
+      <li>Agent instructions and AI_VERIFIED_QUERIES refreshed where measures were added.</li>
+    </ul></div>
+  </details>
+</section>
+
+<!-- ==================== DOWNSTREAM ==================== -->
+<section id="downstream">
+  <div class="section-head"><span class="no">§ 8</span><h2>Downstream Impact</h2><span class="tag">who feels this, and how much</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Consumer</th><th>Schema move (Phase 0)</th><th>Enrichment (Phases 1–4)</th></tr></thead>
+    <tbody>
+      <tr><td><b>8 semantic views</b> (ANALYTICS)</td><td>none — ref() rebakes FQNs</td><td>player offense + team performance gain measures; one new situational view; sv_nfl_player_advanced retired for good</td></tr>
+      <tr><td><b>20 APP marts</b></td><td>none</td><td>player pages + prop board + slate gain columns; explore sheets extend their column contracts deliberately</td></tr>
+      <tr><td><b>4 FEATURES marts</b></td><td>none</td><td>rolling windows can add EPA/usage inputs; leakage guards (modified_before_kickoff, is_pre_kickoff) unchanged</td></tr>
+      <tr><td><b>Cortex agent</b></td><td>none (reads ANALYTICS via tokens)</td><td>instructions + verified queries refreshed with new measures</td></tr>
+      <tr><td><b>Analytics dashboard</b></td><td>none (reads APP; copy_grants)</td><td>new columns appear as pages adopt them</td></tr>
+      <tr><td><b>ML pipeline</b></td><td>one FQN repoint (specs.py)</td><td>richer label/feature source once wide facts land</td></tr>
+      <tr><td><b>Event-driven prod builds</b></td><td>none — triggers run whatever the deployed project object holds; ship via deploy-sport as always</td><td>none</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ==================== RISKS ==================== -->
+<section id="risks">
+  <div class="section-head"><span class="no">§ 9</span><h2>Risks &amp; Gotchas</h2><span class="tag">named now, cheap later</span></div>
+  <div class="cards">
+    <div class="card"><h4>Dev can't rehearse the split</h4><p>Collapsed dev schemas mean DIM/FACTS, the macro FQNs and the search-service move are first exercised in prod. Mitigation: Phase 0 is SQL-inert, and frozen CORE is the instant rollback.</p></div>
+    <div class="card"><h4>Externals ordering at cutover</h4><p>PLAYER_SEARCH must be recreated <i>before</i> the first prod run; the ML FQN repoints <i>after</i>. In between, ML reads frozen CORE — stale for a beat, never broken.</p></div>
+    <div class="card"><h4>Vendor disagreement moves indoors</h4><p>Wide facts put both vendors' numbers on one row. Policy: prefixes + flags, disagreements documented in the models yml, never silently coalesced for measures (coalesce is for dims like position, with provenance).</p></div>
+    <div class="card"><h4>Week→game edge cases</h4><p>Postseason vocabulary is solved in the bridge; mid-week team changes are not. Uniqueness tests on the wide fact keys + an unmapped-rows audit catch what the join can't decide.</p></div>
+    <div class="card"><h4>Play-match rate &lt; 100%</h4><p>Unmatched plays keep NULL EPA — never imputed. The per-game audit makes the rate a monitored number instead of a hope, and situational splits don't depend on it at all.</p></div>
+    <div class="card"><h4>NGS is discipline-disjoint</h4><p>A player appears in exactly one Next Gen discipline, so folded NGS columns are mostly NULL by design. Fold only headline metrics; keep the depth on fact_nextgen_* where the grain is honest.</p></div>
+    <div class="card"><h4>Partial bridge coverage</h4><p>Enrichment NULLs where no match exists are a fact of the data, not a bug. The flags keep "no match" distinguishable from "zero," and cold storage keeps the gsis-pure view recoverable.</p></div>
+    <div class="card"><h4>CORE lingering</h4><p>A frozen schema with no drop date becomes the stale copy someone queries by accident. Two release cycles, then drop — written into the runbook, not remembered.</p></div>
+  </div>
+</section>
+
+<footer>
+  weekend-warriors · internal strategy document · CORE → DIM + FACTS with nflverse and Sleeper enrichment. Companion references: the repo CLAUDE.md (deploy and trigger mechanics), dbt-pipelines/README.md (semantic view and agent authoring rules).
+</footer>
+
+</div>
+
+<script>
+(function () {
+  // ---- inventory filters ----
+  var active = { vendor: new Set(), disp: new Set() };
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#inv tbody tr'));
+  var countEl = document.getElementById('rowcount');
+
+  function apply() {
+    var shown = 0;
+    rows.forEach(function (r) {
+      var okV = active.vendor.size === 0 || active.vendor.has(r.dataset.vendor);
+      var okD = active.disp.size === 0 || active.disp.has(r.dataset.disp);
+      var show = okV && okD;
+      r.classList.toggle('hidden', !show);
+      if (show) shown++;
+    });
+    countEl.textContent = shown === rows.length ? rows.length + ' models' : shown + ' of ' + rows.length + ' models';
+  }
+
+  document.querySelectorAll('#filters .chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var set = active[chip.dataset.filter];
+      var v = chip.dataset.value;
+      if (set.has(v)) { set.delete(v); chip.setAttribute('aria-pressed', 'false'); }
+      else { set.add(v); chip.setAttribute('aria-pressed', 'true'); }
+      apply();
+    });
+  });
+  apply();
+
+  // ---- scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.topbar a'));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function spy() {
+    var pos = window.scrollY + 90, idx = 0;
+    sections.forEach(function (s, i) { if (s && s.offsetTop <= pos) idx = i; });
+    links.forEach(function (a, i) { a.classList.toggle('active', i === idx); });
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teams — Weekend Warriors wireframe</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* ---- teams page specifics ---- */
+
+/* view switcher: two chips that jump between the two rendered views */
+.view-switch { margin: 14px 0 22px; }
+
+/* section break between standings and the team page */
+.section-break { display: flex; align-items: center; gap: 14px; margin: 40px 0 18px; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-4); }
+.section-break::before, .section-break::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* standings rows: logo sits inline with the name */
+.stand-row .tm { flex-direction: row; align-items: center; gap: 8px; }
+.stand-row .tm .nm { display: flex; flex-direction: column; min-width: 0; }
+.stand-row.me { background: var(--surface); border-radius: 8px; }
+.stand-row .n small { font-size: 10px; color: var(--ink-4); }
+
+/* team head: Honolulu-blue whisper — a 3px bar and a faint corner glow */
+.team-head { overflow: hidden; }
+.team-head .team-bar { position: absolute; left: 24px; top: 0; width: 72px; height: 3px; border-radius: 0 0 3px 3px; background: var(--team, var(--accent)); }
+.team-head::after { content: ""; position: absolute; left: -80px; top: -80px; width: 340px; height: 340px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, var(--team, var(--accent)) 10%, transparent), transparent 65%); }
+.team-head .id-row { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
+.team-head .id-row .rec { display: flex; flex-direction: column; }
+.team-head .id-row .rec b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.team-head .id-row .rec small { color: var(--ink-3); }
+.team-head .wordmark { height: 20px; margin-top: 12px; opacity: .8; filter: grayscale(.4) brightness(1.6); }
+.team-head .last { display: inline-flex; gap: 3px; margin-top: 12px; align-items: center; }
+.team-head .last .l { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); margin-right: 6px; }
+
+/* week rows: opponent + result get logos and W/L color */
+/* week-by-week is the page's long list — a season is 18+ rows — so the
+   tile body caps at the window (.vfit) and the column header pins */
+.weeks-tile .tile-body { --vfit: calc(100vh - 280px); }
+.weeks-tile .week-row.head { position: sticky; top: 0; z-index: 3; background: var(--bg); }
+.week-row .tm { flex-direction: row; align-items: center; gap: 8px; }
+.week-row .tm .nm { display: flex; flex-direction: column; min-width: 0; }
+.week-row.up { color: var(--ink-3); }
+
+/* allowed grid: rank badge column + stat cells that link into game day */
+.allowed-row .n a { display: flex; flex-direction: column; align-items: flex-end; color: inherit; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
+.allowed-row .n a:hover { background: var(--surface-2); }
+.allowed-row.hl { background: var(--accent-soft); border-radius: 8px; box-shadow: 0 0 0 1px rgba(var(--accent-rgb), .35) inset; }
+.allowed-row .tm b { font-weight: 600; }
+.allowed-row .tm small { color: var(--ink-3); }
+
+/* split rows are links into the play log */
+a.split-row:hover { background: var(--surface); border-radius: 8px; }
+
+/* right column of the team grid stacks two tiles */
+.stack { display: grid; gap: var(--gap); }
+
+/* the data expander spans the whole team head rather than one grid cell */
+.team-head .q { grid-column: 1 / -1; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wf-note">wireframe · sample data</div>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="aurora two"><i></i><i></i><i></i></div>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="../index.html">
+      <span class="mark"></span><span class="word">Weekend Warriors</span><span class="sub">analytics</span>
+    </a>
+    <nav class="sport-switch"><a class="on" href="#">NFL</a><a href="#">NCAAF</a></nav>
+    <div class="context">
+      <span class="ctx-item"><span class="l">Season</span><span class="v">2025 · Week 8</span></span>
+      <span class="ctx-item"><span class="l">Data</span><span class="v">postgres</span></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <h1>Teams</h1>
+      <p class="lede">The league at a glance, then one team under the glass. Standings carry the
+        efficiency columns the record hides; the team page is where a matchup story starts —
+        week-by-week EPA, what the defense allows by position, and how the market has graded them.</p>
+      <div class="chips view-switch">
+        <a class="chip on" id="chipStand" href="#standings">Standings</a>
+        <a class="chip" id="chipTeam" href="#team">Team page · DET</a>
+      </div>
+    </div>
+
+    <!-- ============ VIEW 1 — STANDINGS ============ -->
+    <div id="standings" class="grid cols-divisions"><!-- division tiles rendered by JS --></div>
+
+    <!-- ============ VIEW 2 — TEAM PAGE ============ -->
+    <div class="section-break" id="team">Team page — Detroit Lions</div>
+
+    <section class="team-head" style="--team:#0076B6">
+      <span class="team-bar"></span>
+      <div class="ident">
+        <span class="kick">NFC North · 1st place</span>
+        <h1><span id="detName">Detroit Lions</span></h1>
+        <div class="id-row">
+          <img class="tlogo xl" id="detLogo" alt="Detroit Lions logo">
+          <span class="rec"><b>5–2</b><small>208 PF · 152 PA</small></span>
+        </div>
+        <img class="wordmark" id="detWordmark" alt="" onerror="this.remove()">
+        <span class="last"><span class="l">Last 5</span><i class="res L">L</i><i class="res W">W</i><i class="res W">W</i><i class="res L">L</i><i class="res W">W</i></span>
+      </div>
+      <div class="line-strip">
+        <span class="stat pos"><span class="v">+0.14</span><span class="l">Off EPA / play · 3rd</span></span>
+        <span class="stat neg"><span class="v">+0.02</span><span class="l">Def EPA / play · 19th</span></span>
+        <span class="stat pos"><span class="v">+56</span><span class="l">Point diff · 2nd</span></span>
+        <span class="stat"><span class="v">5–2</span><span class="l">ATS · DraftKings</span></span>
+      </div>
+      <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_STANDINGS + APP.TEAM_ATS
+route: GET /api/nfl/teams/DET
+fields: team, wins, losses, points_for, points_against, division_rank,
+        off_epa_play, def_epa_play, point_diff, ats_record, last5</pre></details>
+    </section>
+
+    <!-- week-by-week -->
+    <section class="tile weeks-tile">
+      <div class="tile-head"><h2>Week by week</h2><span class="meta">rows open game detail</span></div>
+      <div class="tile-body vfit"><div class="weeks" id="weeks"><!-- rendered by JS --></div></div>
+      <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_WEEKS   (team × game × vendor, long)
+route: GET /api/nfl/teams/DET
+fields: week, opponent, is_home, result, pts_for, pts_against,
+        off_epa_play, def_epa_play, success_rate, pass_epa, rush_epa,
+        explosive_rate, third_down_rate, margin</pre></details>
+    </section>
+
+    <div class="grid cols-team">
+      <!-- defense allowed -->
+      <section class="tile allowed-tile">
+        <div class="tile-head"><h2>Defense — what DET allows</h2><span class="meta">rank of 32 · cells open prop context</span></div>
+        <div class="tile-body">
+          <div class="allowed">
+            <div class="allowed-row head"><span class="rk">RK</span><span class="tm">VS POSITION</span><span class="n">YDS/GM</span><span class="n">TD/GM</span><span class="n">EFF</span><span class="n">FPTS/GM</span></div>
+
+            <div class="allowed-row" id="allowedQB">
+              <span class="rk"><span class="badge neg">24</span></span>
+              <span class="tm"><b>QB</b><small>pass defense</small></span>
+              <span class="n"><a href="game-day.html">248.6<small>26th</small></a></span>
+              <span class="n"><a href="game-day.html">1.9<small>24th</small></a></span>
+              <span class="n"><a href="game-day.html">7.6 y/att<small>25th</small></a></span>
+              <span class="n"><a href="game-day.html">19.8<small>24th</small></a></span>
+            </div>
+
+            <div class="allowed-row" id="allowedRB">
+              <span class="rk"><span class="badge ok">5</span></span>
+              <span class="tm"><b>RB</b><small>run defense</small></span>
+              <span class="n"><a href="game-day.html">88.3<small>4th</small></a></span>
+              <span class="n"><a href="game-day.html">0.6<small>7th</small></a></span>
+              <span class="n"><a href="game-day.html">3.7 ypc<small>5th</small></a></span>
+              <span class="n"><a href="game-day.html">16.1<small>5th</small></a></span>
+            </div>
+
+            <div class="allowed-row" id="allowedWR">
+              <span class="rk"><span class="badge neg">28</span></span>
+              <span class="tm"><b>WR</b><small>perimeter coverage</small></span>
+              <span class="n"><a href="game-day.html">178.4<small>28th</small></a></span>
+              <span class="n"><a href="game-day.html">1.3<small>27th</small></a></span>
+              <span class="n"><a href="game-day.html">8.9 y/tgt<small>26th</small></a></span>
+              <span class="n"><a href="game-day.html">38.2<small>28th</small></a></span>
+            </div>
+
+            <div class="allowed-row" id="allowedTE">
+              <span class="rk"><span class="badge">14</span></span>
+              <span class="tm"><b>TE</b><small>seam coverage</small></span>
+              <span class="n"><a href="game-day.html">48.7<small>15th</small></a></span>
+              <span class="n"><a href="game-day.html">0.4<small>12th</small></a></span>
+              <span class="n"><a href="game-day.html">7.1 y/tgt<small>16th</small></a></span>
+              <span class="n"><a href="game-day.html">11.9<small>14th</small></a></span>
+            </div>
+          </div>
+        </div>
+        <p class="caption">Run funnel: teams that stay patient on the ground get nothing;
+          the perimeter is where DET bends. Monday's HOU wideouts are the prop angle.</p>
+        <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_ALLOWED   (single definition; prop board reads the same mart)
+route: GET /api/nfl/teams/DET
+fields: position, yds_per_game, td_per_game, efficiency, efficiency_unit,
+        fpts_per_game, rank_overall, rank_per_stat</pre></details>
+      </section>
+
+      <!-- market + margin -->
+      <div class="stack">
+        <section class="tile">
+          <div class="tile-head"><h2>Against the market</h2><span class="meta">DraftKings · closing</span></div>
+          <div class="line-strip ats">
+            <span class="stat pos"><span class="v">5–2</span><span class="l">ATS record</span></span>
+            <span class="stat"><span class="v">4–3</span><span class="l">Over / under</span></span>
+            <span class="stat pos"><span class="v">+3.4</span><span class="l">Avg cover margin</span></span>
+            <span class="stat"><span class="v">−3.1</span><span class="l">Avg spread</span></span>
+          </div>
+          <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_ATS
+route: GET /api/nfl/teams/DET
+fields: ats_wins, ats_losses, ou_over, ou_under,
+        avg_cover_margin, avg_spread, vendor</pre></details>
+        </section>
+
+        <section class="tile">
+          <div class="tile-head"><h2>Weekly margin</h2><span class="meta">points for − against</span></div>
+          <svg class="margin-chart" id="marginChart" viewBox="0 0 560 150" role="img" aria-label="Weekly point margin, weeks 1 through 7"></svg>
+          <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_WEEKS
+route: GET /api/nfl/teams/DET
+fields: week, pts_for, pts_against  → margin drawn client-side</pre></details>
+        </section>
+      </div>
+    </div>
+
+    <!-- situation splits -->
+    <section class="tile splits-tile">
+      <div class="tile-head"><h2>Situation splits</h2><span class="meta">EPA / play · rows open the play log</span></div>
+      <div class="tile-body">
+        <div class="splits">
+          <div class="split-row head"><span class="tm">SITUATION</span><span class="n">OFF EPA</span><span class="n">OFF SR%</span><span class="n">OFF RK</span><span class="n">DEF EPA</span><span class="n">DEF SR%</span><span class="n">DEF RK</span><span class="n">PLAYS</span></div>
+
+          <a class="split-row" href="play-log.html"><span class="tm">1st down</span><span class="n pos">+0.11</span><span class="n">49</span><span class="n">5th</span><span class="n pos">−0.02</span><span class="n">44</span><span class="n">14th</span><span class="n">214</span></a>
+          <a class="split-row" href="play-log.html"><span class="tm">2nd &amp; long</span><span class="n pos">+0.06</span><span class="n">43</span><span class="n">8th</span><span class="n neg">+0.05</span><span class="n">46</span><span class="n">22nd</span><span class="n">96</span></a>
+          <a class="split-row" href="play-log.html"><span class="tm">3rd &amp; short</span><span class="n pos">+0.32</span><span class="n">68</span><span class="n">2nd</span><span class="n pos">−0.10</span><span class="n">51</span><span class="n">9th</span><span class="n">41</span></a>
+          <a class="split-row" href="play-log.html"><span class="tm">3rd &amp; long</span><span class="n neg">−0.04</span><span class="n">34</span><span class="n">12th</span><span class="n neg">+0.18</span><span class="n">41</span><span class="n">27th</span><span class="n">58</span></a>
+          <a class="split-row" href="play-log.html"><span class="tm">Red zone</span><span class="n pos">+0.21</span><span class="n">55</span><span class="n">4th</span><span class="n neg">+0.02</span><span class="n">47</span><span class="n">18th</span><span class="n">63</span></a>
+          <a class="split-row" href="play-log.html"><span class="tm">Two-minute</span><span class="n pos">+0.09</span><span class="n">46</span><span class="n">9th</span><span class="n neg">+0.12</span><span class="n">49</span><span class="n">25th</span><span class="n">47</span></a>
+        </div>
+      </div>
+      <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_SITUATION   (planned — not built yet)
+route: GET /api/nfl/teams/DET
+fields: situation, side, epa_play, success_rate, rank, plays
+note:  rows deep-link to /play-log?team=DET&amp;situation=…</pre></details>
+    </section>
+  </main>
+
+  <footer class="foot"><span>Wireframe — zones annotated with the mart + route feeding them.</span><span>NFL_PROD_DB.APP → app.app_copy</span></footer>
+</div>
+
+<nav class="dock">
+  <a href="pulse.html">Pulse</a>
+  <a href="game-day.html">Game Day</a>
+  <a href="players.html">Players</a>
+  <a class="active" href="teams.html">Teams</a>
+  <a href="markets.html">Markets</a>
+  <a href="play-log.html">Play Log</a>
+  <a href="explorer.html">Explorer</a>
+</nav>
+
+<button class="edge-fab" id="edgeFab" title="Edge agent">✦</button>
+<aside class="edge-panel" id="edgePanel">
+  <div class="edge-head">Edge agent<small>page-aware · sees your filters</small></div>
+  <div class="edge-msgs">
+    <div class="edge-msg me">Where is DET's defense leaky?</div>
+    <div class="edge-msg bot">Through the air, to wide receivers. I highlighted the WR row in the
+      defense-allowed grid — 178.4 yds/gm (28th) and 8.9 yds/target (26th), while RBs get
+      nothing on the ground (3.7 ypc, 5th). Classic run funnel.</div>
+    <div class="edge-msg me">So attack them on obvious pass downs?</div>
+    <div class="edge-msg bot">Yes — the splits tile agrees: 3rd &amp; long def EPA is +0.18 (27th).
+      HOU's perimeter receivers Monday are the prop angle; open Game Day and I'll pull their lines.</div>
+  </div>
+  <div class="edge-input"><input placeholder="Ask about this page…"></div>
+</aside>
+
+<script src="../shared/data.js"></script>
+<script>
+  document.getElementById('edgeFab').addEventListener('click', function () {
+    document.getElementById('edgePanel').classList.toggle('open');
+  });
+
+  /* ---------- view switcher: jump + active chip ---------- */
+  var chipStand = document.getElementById('chipStand');
+  var chipTeam  = document.getElementById('chipTeam');
+  [chipStand, chipTeam].forEach(function (c) {
+    c.addEventListener('click', function () {
+      chipStand.classList.toggle('on', c === chipStand);
+      chipTeam.classList.toggle('on', c === chipTeam);
+    });
+  });
+
+  /* ---------- the edge agent's page-aware highlight ---------- */
+  document.getElementById('allowedWR').classList.add('hl');
+
+  /* ---------- team head branding from WW ---------- */
+  var det = WW.teams.DET;
+  document.getElementById('detLogo').src = det.logo;
+  document.getElementById('detWordmark').src = det.wordmark;
+
+  /* ---------- VIEW 1 — standings, rendered per division ---------- */
+  /* [abbr, w, l, pf, pa, offEpa, defEpa, sr, home, away, last5] */
+  var STAND = {
+    'AFC East':  [['BUF',5,2,196,145, 0.15,-0.04,48.6,'3-1','2-1','WWLWW'],
+                  ['NE', 4,3,168,158, 0.04,-0.02,45.1,'3-0','1-3','WLWLW'],
+                  ['MIA',3,4,151,169,-0.01, 0.05,43.8,'2-2','1-2','LWLLW'],
+                  ['NYJ',1,6,118,187,-0.12, 0.09,39.4,'1-2','0-4','LLLWL']],
+    'AFC North': [['BAL',5,2,189,151, 0.12, 0.01,47.2,'2-1','3-1','WWWLW'],
+                  ['PIT',4,3,152,148,-0.02,-0.07,42.9,'3-1','1-2','WLWWL'],
+                  ['CIN',4,3,181,175, 0.09, 0.07,46.4,'2-1','2-2','LWWLW'],
+                  ['CLE',2,5,121,166,-0.09,-0.01,40.2,'2-2','0-3','LLWLL']],
+    'AFC South': [['HOU',4,3,163,142, 0.05,-0.06,44.7,'2-1','2-2','WWLWL'],
+                  ['JAX',4,3,170,164, 0.06, 0.03,45.5,'2-2','2-1','WLLWW'],
+                  ['IND',3,4,149,161, 0.00, 0.04,43.1,'2-1','1-3','LWLWL'],
+                  ['TEN',1,6,109,192,-0.15, 0.08,38.1,'0-3','1-3','LLLLW']],
+    'AFC West':  [['KC', 6,1,201,138, 0.13,-0.08,49.1,'4-0','2-1','WWLWW'],
+                  ['DEN',4,3,155,139, 0.01,-0.09,43.5,'2-1','2-2','WLWWL'],
+                  ['LAC',4,3,166,158, 0.07, 0.02,45.9,'3-1','1-2','LWWLW'],
+                  ['LV', 2,5,126,178,-0.10, 0.06,40.8,'1-2','1-3','LLLWL']],
+    'NFC East':  [['PHI',6,1,205,146, 0.14,-0.05,48.9,'3-0','3-1','WWWLW'],
+                  ['DAL',4,3,187,172, 0.10, 0.06,47.0,'3-1','1-2','WWLWL'],
+                  ['WAS',3,4,158,166, 0.02, 0.03,44.2,'2-2','1-2','LWLWL'],
+                  ['NYG',1,6,112,189,-0.14, 0.07,38.8,'1-3','0-3','LLLLW']],
+    'NFC North': [['DET',5,2,208,152, 0.14, 0.02,47.9,'4-0','1-2','LWWLW'],
+                  ['GB', 4,3,172,160, 0.08, 0.00,46.1,'2-1','2-2','WLWLW'],
+                  ['MIN',4,3,161,149, 0.03,-0.05,44.5,'3-1','1-2','WWLWW'],
+                  ['CHI',2,5,134,181,-0.08, 0.05,41.3,'1-2','1-3','LWLLL']],
+    'NFC South': [['TB', 5,2,183,157, 0.09,-0.03,46.8,'3-1','2-1','WWLWL'],
+                  ['ATL',4,3,159,163, 0.02, 0.01,44.0,'2-1','2-2','WLLWW'],
+                  ['CAR',2,5,129,196,-0.11, 0.10,40.5,'1-2','1-3','LLWLL'],
+                  ['NO', 2,5,131,174,-0.07, 0.04,41.9,'2-2','0-3','WLLLL']],
+    'NFC West':  [['SF', 5,2,191,149, 0.11,-0.06,47.5,'3-1','2-1','WLWWW'],
+                  ['LAR',4,3,176,168, 0.07, 0.03,45.7,'2-2','2-1','WWLWL'],
+                  ['SEA',3,4,157,160, 0.01,-0.01,43.9,'1-2','2-2','WLLWL'],
+                  ['ARI',2,5,140,183,-0.06, 0.06,42.3,'1-2','1-3','LLWLL']]
+  };
+
+  function epa(v)  { return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2); }
+  function epaCls(v, defense) {
+    if (v === 0) return '';
+    var good = defense ? v < 0 : v > 0;
+    return good ? ' pos' : ' neg';
+  }
+  function srCls(v) { return v >= 46 ? ' pos' : v <= 42 ? ' neg' : ''; }
+  function resSquares(s) {
+    return s.split('').map(function (r) { return '<i class="res ' + r + '">' + r + '</i>'; }).join('');
+  }
+
+  var qStand = '<details class="q"><summary>data</summary><pre>mart:  APP.TEAM_STANDINGS\n' +
+    'route: GET /api/nfl/teams\n' +
+    'fields: team, division, wins, losses, points_for, points_against,\n' +
+    '        off_epa_play, def_epa_play, success_rate,\n' +
+    '        home_record, away_record, last5</pre></details>';
+
+  var host = document.getElementById('standings');
+  Object.keys(STAND).forEach(function (div) {
+    var rows = STAND[div].map(function (r, i) {
+      var t = WW.teams[r[0]];
+      return '<a class="stand-row' + (r[0] === 'DET' ? ' me' : '') + '" href="#team" title="Open team page">' +
+        '<span class="rk">' + (i + 1) + '</span>' +
+        '<span class="tm"><img class="tlogo" src="' + t.logo + '" alt="">' +
+          '<span class="nm"><b>' + t.nick + '</b></span></span>' +
+        '<span class="n">' + r[1] + '-' + r[2] + '</span>' +
+        '<span class="n">' + r[3] + '</span>' +
+        '<span class="n">' + r[4] + '</span>' +
+        '<span class="n' + epaCls(r[5], false) + '">' + epa(r[5]) + '</span>' +
+        '<span class="n' + epaCls(r[6], true)  + '">' + epa(r[6]) + '</span>' +
+        '<span class="n' + srCls(r[7]) + '">' + r[7].toFixed(1) + '</span>' +
+        '<span class="n">' + r[8] + '</span>' +
+        '<span class="n">' + r[9] + '</span>' +
+        '<span class="last">' + resSquares(r[10]) + '</span>' +
+      '</a>';
+    }).join('');
+
+    var tile = document.createElement('section');
+    tile.className = 'tile stand-tile';
+    tile.innerHTML =
+      '<div class="tile-head"><h2>' + div + '</h2><span class="meta">through wk 7</span></div>' +
+      '<div class="tile-body"><div class="stand">' +
+        '<div class="stand-row head"><span class="rk">#</span><span class="tm">TEAM</span>' +
+        '<span class="n">W-L</span><span class="n">PF</span><span class="n">PA</span>' +
+        '<span class="n">OFF EPA</span><span class="n">DEF EPA</span><span class="n">SR%</span>' +
+        '<span class="n">HOME</span><span class="n">AWAY</span><span class="last">LAST 5</span></div>' +
+        rows +
+      '</div></div>' + qStand;
+    host.appendChild(tile);
+  });
+
+  /* ---------- VIEW 2 — week by week ---------- */
+  /* [wk, opp, home?, result, score, offEpa, defEpa, sr, passEpa, rushEpa, expl, third, margin] */
+  var WEEKS = [
+    [1, 'GB',  false, 'W', '27-20',  0.12, -0.03, 48,  0.18,  0.04, 12, 44,  7],
+    [2, 'CHI', true,  'W', '31-17',  0.18, -0.08, 51,  0.24,  0.09, 14, 50, 14],
+    [3, 'SEA', true,  'L', '24-28',  0.08,  0.14, 46,  0.11,  0.03,  9, 38, -4],
+    [4, 'ARI', false, 'W', '34-24',  0.16,  0.04, 49,  0.21,  0.08, 13, 47, 10],
+    [5, 'CAR', true,  'W', '42-13',  0.29, -0.12, 56,  0.35,  0.17, 18, 58, 29],
+    [6, 'MIN', false, 'L', '20-23', -0.02,  0.09, 42,  0.02, -0.06,  7, 33, -3],
+    [7, 'TB',  true,  'W', '30-27',  0.14,  0.06, 50,  0.19,  0.05, 11, 45,  3]
+  ];
+
+  var weeksHtml =
+    '<div class="week-row head"><span class="rk">WK</span><span class="tm">OPPONENT</span>' +
+    '<span class="tm">RESULT</span><span class="n">OFF EPA</span><span class="n">DEF EPA</span>' +
+    '<span class="n">SUCC%</span><span class="n">PASS EPA</span><span class="n">RUSH EPA</span>' +
+    '<span class="n">EXPL%</span><span class="n">3RD%</span><span class="n">MARGIN</span></div>';
+
+  WEEKS.forEach(function (w) {
+    var t = WW.teams[w[1]];
+    weeksHtml += '<a class="week-row" href="game/overview.html" title="Open game detail">' +
+      '<span class="rk">' + w[0] + '</span>' +
+      '<span class="tm"><img class="tlogo" src="' + t.logo + '" alt="">' +
+        '<span class="nm"><b>' + (w[2] ? 'vs ' : '@ ') + w[1] + '</b><small>' + t.nick + '</small></span></span>' +
+      '<span class="tm ' + (w[3] === 'W' ? 'pos' : 'neg') + '"><span class="nm"><b>' + w[3] + ' ' + w[4] + '</b></span></span>' +
+      '<span class="n' + epaCls(w[5], false) + '">' + epa(w[5]) + '</span>' +
+      '<span class="n' + epaCls(w[6], true)  + '">' + epa(w[6]) + '</span>' +
+      '<span class="n' + srCls(w[7]) + '">' + w[7] + '</span>' +
+      '<span class="n' + epaCls(w[8], false) + '">' + epa(w[8]) + '</span>' +
+      '<span class="n' + epaCls(w[9], false) + '">' + epa(w[9]) + '</span>' +
+      '<span class="n">' + w[10] + '</span>' +
+      '<span class="n">' + w[11] + '</span>' +
+      '<span class="n' + (w[12] > 0 ? ' pos' : ' neg') + '">' + (w[12] > 0 ? '+' : '−') + Math.abs(w[12]) + '</span>' +
+    '</a>';
+  });
+
+  /* the upcoming game rides at the bottom of the same table */
+  var hou = WW.teams.HOU;
+  weeksHtml += '<a class="week-row up" href="game/overview.html" title="Open game detail">' +
+    '<span class="rk">8</span>' +
+    '<span class="tm"><img class="tlogo" src="' + hou.logo + '" alt="">' +
+      '<span class="nm"><b>vs HOU</b><small>' + hou.nick + '</small></span></span>' +
+    '<span class="tm"><span class="nm"><b>MON 8:15P</b><small>DET −3 · 47.5</small></span></span>' +
+    '<span class="n">—</span><span class="n">—</span><span class="n">—</span><span class="n">—</span>' +
+    '<span class="n">—</span><span class="n">—</span><span class="n">—</span><span class="n">—</span>' +
+  '</a>';
+
+  document.getElementById('weeks').innerHTML = weeksHtml;
+
+  /* ---------- margin chart: one bar per week ---------- */
+  (function () {
+    var svg = document.getElementById('marginChart');
+    var margins = WEEKS.map(function (w) { return w[12]; });
+    var W = 560, H = 150, padL = 26, padR = 10, top = 14, axisY = 78, scale = 1.9;
+    var n = margins.length, band = (W - padL - padR) / n, barW = 26;
+    var s = '<line class="axis" x1="' + padL + '" y1="' + axisY + '" x2="' + (W - padR) + '" y2="' + axisY + '"/>';
+    s += '<text class="lbl" x="4" y="' + (axisY + 3) + '">0</text>';
+    margins.forEach(function (m, i) {
+      var x = padL + band * i + (band - barW) / 2;
+      var h = Math.abs(m) * scale;
+      var y = m > 0 ? axisY - h : axisY;
+      s += '<rect class="bar ' + (m > 0 ? 'pos' : 'neg') + '" x="' + x + '" y="' + y +
+           '" width="' + barW + '" height="' + h + '" rx="3"/>';
+      s += '<text class="lbl" x="' + (x + barW / 2) + '" y="' + (H - 22) + '" text-anchor="middle">W' + (i + 1) + '</text>';
+      s += '<text class="lbl" x="' + (x + barW / 2) + '" y="' +
+           (m > 0 ? y - 5 : y + h + 11) + '" text-anchor="middle">' + (m > 0 ? '+' : '−') + Math.abs(m) + '</text>';
+    });
+    svg.innerHTML = s;
+  })();
+</script>
+</body>
+</html>
