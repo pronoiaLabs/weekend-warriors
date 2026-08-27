@@ -286,18 +286,29 @@ def snowflake_app(
                 )
                 continue
 
-            def _incremental_rows(
-                # include, not raise: a stray NULL cursor value must not kill
-                # the whole copy. NULL rows ride along (the SQL boundary
-                # excludes them after the first run) and never advance state.
-                incremental=dlt.sources.incremental(
-                    spec["cursor"].lower(), on_cursor_value_missing="include"
-                ),
-                _fqn: str = fqn,
-                _columns: dict[str, dict[str, Any]] = columns,
-                _cursor: str = spec["cursor"],
-            ) -> Iterator[dict[str, Any]]:
-                yield from _rows(_fqn, _columns, _cursor, incremental.last_value)
+            def _make_incremental_rows(
+                _fqn: str, _columns: dict[str, dict[str, Any]], _cursor: str
+            ):
+                # A factory, not default-argument capture: dlt builds its spec
+                # dataclass from the resource function's signature defaults,
+                # and newer dlt versions reject a mapping default there
+                # ("mutable default ... use default_factory"). The closure
+                # captures the per-table values just as safely, and the only
+                # signature default left is dlt's own incremental injection.
+                def _incremental_rows(
+                    # include, not raise: a stray NULL cursor value must not
+                    # kill the whole copy. NULL rows ride along (the SQL
+                    # boundary excludes them after the first run) and never
+                    # advance state.
+                    incremental=dlt.sources.incremental(
+                        _cursor.lower(), on_cursor_value_missing="include"
+                    ),
+                ) -> Iterator[dict[str, Any]]:
+                    yield from _rows(_fqn, _columns, _cursor, incremental.last_value)
+
+                return _incremental_rows
+
+            _incremental_rows = _make_incremental_rows(fqn, columns, spec["cursor"])
 
             kwargs: dict[str, Any] = {}
             if spec["primary_key"]:

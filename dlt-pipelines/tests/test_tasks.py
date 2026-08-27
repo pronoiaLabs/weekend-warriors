@@ -248,7 +248,7 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
 
     assert by_source["nfl"] == {
         "nfl_reference", "nfl_games", "nfl_stats", "nfl_plays",
-        "nfl_standings", "nfl_advanced_stats", "nfl_injuries",
+        "nfl_standings", "nfl_injuries",
         "nfl_game_odds", "nfl_player_props", "nfl_odds_opening",
         "nfl_news",
         "nfl_weather_forecast",
