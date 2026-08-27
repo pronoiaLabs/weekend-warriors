@@ -44,6 +44,24 @@
 
     Season scope is all three season types. season_type is on dim_game and
     dim_season_week; filter there rather than assuming regular season.
+
+    EPA BLOCK (the retired fact_team_game_epa's offense half, folded in).
+    Scrimmage plays from nflverse play-by-play rolled up to this same grain:
+    play_type in (pass, run) with a non-NULL EPA (measured 2025: 34,632 of
+    48,771 rows; qb_dropback adds nothing beyond those two types). Special
+    teams, penalties-only and no-plays are out. The fold is a lossless 1:1
+    column concat: every non-preseason team-game row has its EPA row on the
+    same team_game_key (measured Aug 2026: 1,710 of 1,710) and only the
+    preseason rows carry NULLs, nflverse publishing no preseason play-by-play
+    -- has_nflverse flags it. The same plays read from the defending side are
+    the def_* block on fact_team_game_defense, taken from THIS fact's
+    opponent row so the two can never disagree.
+
+    Rates in the EPA block are computed from this grain's own sums and cannot
+    be re-aggregated; anything at another grain should go back to off_plays,
+    dropbacks, carries and the epa sums. proe is pass rate over expected:
+    mean(pass - xpass) on scrimmage plays. Play-level detail deliberately
+    stays in stg_nfl__nflverse_pbp; this is the modeling surface.
 */
 
 with games as (
@@ -129,6 +147,73 @@ team_games as (
 box_score as (
 
     select * from {{ ref('stg_nfl__team_stats') }}
+
+),
+
+-- ---------------------------------------------------------------------------
+-- EPA block: scrimmage plays only (see header), rolled up per possessing
+-- team, then mapped onto this fact's (game_id, team_id) grain through
+-- bridge_game_ids.
+-- ---------------------------------------------------------------------------
+epa_plays as (
+
+    select
+        nflverse_game_id,
+        posteam,
+        epa,
+        success,
+        yards_gained,
+        pass,
+        rush,
+        down,
+        cpoe,
+        xpass
+    from {{ ref('stg_nfl__nflverse_pbp') }}
+    where play_type in ('pass', 'run')
+      and epa is not null
+      and posteam is not null
+
+),
+
+epa_offense as (
+
+    select
+        nflverse_game_id,
+        posteam                                         as team,
+        count(*)                                        as off_plays,
+        sum(epa)                                        as off_epa,
+        sum(epa) / count(*)                             as off_epa_per_play,
+        sum(success) / count(*)                         as success_rate,
+        sum(iff(down in (1, 2), success, 0))
+            / nullif(count_if(down in (1, 2)), 0)       as early_down_success_rate,
+        count_if(pass = 1)                              as dropbacks,
+        sum(iff(pass = 1, epa, 0))                      as pass_epa,
+        sum(iff(pass = 1, epa, 0))
+            / nullif(count_if(pass = 1), 0)             as pass_epa_per_dropback,
+        count_if(rush = 1)                              as carries,
+        sum(iff(rush = 1, epa, 0))                      as rush_epa,
+        sum(iff(rush = 1, epa, 0))
+            / nullif(count_if(rush = 1), 0)             as rush_epa_per_carry,
+        count_if((pass = 1 and yards_gained >= 20) or (rush = 1 and yards_gained >= 10))
+            / count(*)                                  as explosive_rate,
+        avg(cpoe)                                       as cpoe,
+        count_if(pass = 1) / count(*)                   as pass_rate,
+        avg(pass - xpass)                               as proe
+    from epa_plays
+    group by 1, 2
+
+),
+
+epa_by_team_game as (
+
+    select
+        g.game_id,
+        iff(e.team = g.home_abbr_nflverse, g.home_team_id, g.away_team_id)
+                                                        as team_id,
+        e.* exclude (nflverse_game_id, team)
+    from epa_offense e
+    inner join {{ ref('bridge_game_ids') }} g
+        on g.nflverse_game_id = e.nflverse_game_id
 
 )
 
@@ -221,9 +306,35 @@ select
 
     -- flags whether the box score joined, so consumers can exclude the 4 gaps
     -- without needing to know which measure to null-check
-    (bs.team_game_key is not null)                              as has_box_score
+    (bs.team_game_key is not null)                              as has_box_score,
+
+    -- ---------------------------------------------------------------
+    -- nflverse EPA block (see header). NULL on preseason rows -- nflverse
+    -- publishes no preseason play-by-play. Rates come from this grain's own
+    -- sums; re-aggregate from the counts and epa sums, never from the rates.
+    -- ---------------------------------------------------------------
+    ep.off_plays,
+    ep.off_epa,
+    ep.off_epa_per_play,
+    ep.success_rate,
+    ep.early_down_success_rate,
+    ep.dropbacks,
+    ep.pass_epa,
+    ep.pass_epa_per_dropback,
+    ep.carries,
+    ep.rush_epa,
+    ep.rush_epa_per_carry,
+    ep.explosive_rate,
+    ep.cpoe,
+    ep.pass_rate,
+    ep.proe,
+
+    (ep.game_id is not null)                                    as has_nflverse
 
 from team_games tg
 left join box_score bs
     on  tg.game_id = bs.game_id
     and tg.team_id = bs.team_id
+left join epa_by_team_game ep
+    on  tg.game_id = ep.game_id
+    and tg.team_id = ep.team_id

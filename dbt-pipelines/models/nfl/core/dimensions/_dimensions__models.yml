@@ -3,7 +3,7 @@ version: 2
 models:
 
   - name: dim_team
-    description: "The 32 NFL teams. Grain: team. SCD1."
+    description: "The 32 NFL teams. Grain: team. SCD1. Enriched with nflverse branding and the observed home stadium."
     columns:
       - name: team_key
         description: "Surrogate key. Grain of this dimension."
@@ -20,12 +20,30 @@ models:
         description: "Uppercase in the source. 8 divisions of 4 teams each."
         tests:
           - accepted_values: {values: ['EAST', 'NORTH', 'SOUTH', 'WEST']}
+      - name: nflverse_abbr
+        description: "The club's abbreviation in nflverse's vocabulary (LAR -> LA, WSH -> WAS), materialized so no nflverse join re-derives it."
+        tests: [unique, not_null]
+      - name: team_color_primary
+        description: "Hex string from stg_nfl__nflverse_teams; NULL only if the branding row is missing."
+      - name: logo_url
+        description: "Public CDN URL (ESPN), served as-is to the dashboard; siblings logo_squared_url and wordmark_url."
+      - name: stadium_key
+        description: >
+          The club's home bowl: most frequent stadium across its home games in
+          dim_game, international venues excluded so a London home game never
+          claims it. Giants and Jets legitimately share MetLife.
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_stadium')", field: stadium_key}
 
   - name: dim_player
     description: >
       Player biographical attributes. Grain: player. SCD1.
       Deliberately carries NO team column -- the source holds only the current
       team, so historical affiliation comes from the facts' team_key instead.
+      Enriched via bridge_player_ids: nflverse bio/draft/ids, Sleeper live
+      status (current state only; history lives on fact_injury_report and
+      fact_depth_chart). NULL on an enrichment column means no vendor match.
     columns:
       - name: player_key
         tests: [unique, not_null]
@@ -35,10 +53,12 @@ models:
         tests: [not_null]
       - name: position_name
         description: >
-          Clean position label derived from position_abbreviation, NOT the raw
-          source text. The source label had case-variant duplicates
-          ('Place kicker' vs 'Place Kicker') and abbreviation leakage. This is
-          the column to expose in semantic views.
+          Clean position label derived from the REPAIRED position_abbreviation,
+          NOT the raw source text. The source label had case-variant duplicates
+          ('Place kicker' vs 'Place Kicker') and abbreviation leakage, and
+          vendor-only codes fold onto these labels (SAF/FS/SS -> Safety,
+          K -> Place Kicker) so the enum never splits. This is the column to
+          expose in semantic views.
         tests:
           - not_null
           - accepted_values:
@@ -51,9 +71,19 @@ models:
                        'Place Kicker', 'Punter', 'Long Snapper', 'Kick Returner',
                        'Unknown']
       - name: position_source
-        description: "Raw source label. Retained for audit only -- do NOT expose in a semantic view or filter on it."
+        description: >
+          Which vendor supplied the repaired position: BDL when it knows the
+          position, else nflverse, else Sleeper. NULL means no vendor knows
+          (position_abbreviation stays 'UNK'). Replaces the old raw-label
+          audit column of the same name, which lives on in stg_nfl__players.
+        tests:
+          - accepted_values:
+              values: ['balldontlie', 'nflverse', 'sleeper']
       - name: position_abbreviation
-        description: "Clean and complete, 25 values. Authoritative input for position_name."
+        description: >
+          REPAIRED across vendors: BDL's code when not 'UNK', else nflverse's,
+          else Sleeper's (provenance in position_source). Vendor codes are kept
+          verbatim, so the domain is wider than BDL's original 25 values.
         tests: [not_null]
       - name: position_group
         tests:
@@ -68,6 +98,26 @@ models:
                 - 'Special Teams'
                 - 'Unknown'
       - name: has_known_position
+        description: "Reads off the REPAIRED position: true when any vendor knows it."
+        tests: [not_null]
+      - name: height_inches
+        description: "BDL's measurement, backfilled from nflverse where BDL is null. weight_lbs matches."
+      - name: gsis_id
+        description: >
+          Denormalized from bridge_player_ids, which stays authoritative. NOT
+          unique here: BDL carries duplicate ids for a few players (two ids,
+          one man), each keeping its own row and the shared gsis_id.
+      - name: sleeper_player_id
+        description: "Denormalized from bridge_player_ids; join key into the Sleeper facts."
+      - name: injury_status
+        description: >
+          Sleeper's live read, current state only -- the daily dump is
+          replaced, so this serves "as of now"; history lives on
+          fact_injury_report. Same for practice_participation and the
+          depth_chart columns (fact_depth_chart).
+      - name: has_nflverse_match
+        tests: [not_null]
+      - name: has_sleeper_match
         tests: [not_null]
 
   - name: dim_game
@@ -113,6 +163,20 @@ models:
         tests:
           - not_null
           - relationships: {to: "ref('dim_stadium')", field: stadium_key}
+      - name: nflverse_game_id
+        description: >
+          Denormalized from bridge_game_ids, which stays authoritative
+          (2025_01_DAL_PHI shape). NULL for preseason -- nflverse publishes no
+          preseason pbp -- never a placeholder.
+        tests: [unique]
+      - name: referee
+        description: >
+          The head official only (source role 'Referee', exactly one per
+          officiated game); the full crew is dim_game_official. NULL where the
+          crew is unrecorded (preseason, future games).
+      - name: is_division_game
+        description: "Both clubs share conference and division. Derived from BDL's own team reference."
+        tests: [not_null]
 
   - name: dim_stadium
     description: >
@@ -157,6 +221,16 @@ models:
         tests:
           - not_null
           - dbt_utils.accepted_range: {min_value: 1}
+      - name: bye_team_count
+        description: >
+          32 minus the clubs playing, REGULAR SEASON ONLY -- NULL for
+          preseason and postseason, where an idle club is not "on bye".
+          Pairs with fact_team_season.bye_week.
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 30}
+      - name: international_game_count
+        description: "Games in dim_stadium.is_international venues this week. 0 is a real answer: a full slate with no such game."
+        tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [season, week, season_type]
@@ -176,11 +250,27 @@ models:
       - name: day_of_week
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 6}
+      - name: is_thanksgiving
+        description: "Fourth Thursday of November. Siblings is_black_friday, is_christmas, is_new_years. Holiday slates are real analytical anchors."
+        tests: [not_null]
+      - name: season_phase
+        description: >
+          Where the date sits in its nfl_season's arc, from the observed game
+          windows: each phase runs from its first game to the day before the
+          next phase starts; everything outside (including seasons not yet
+          loaded) is offseason.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['offseason', 'preseason', 'regular', 'postseason']
 
   - name: dim_play_type
     description: >
       Play classification derived from the distinct type values on plays.
-      Grain: play type. 39 rows.
+      Grain: play type. 39 rows. Carries the measured BDL-to-nflverse
+      vocabulary mapping: BDL types encode the outcome, nflverse play_type the
+      called play, so the mapping is the call plus the flag a matched row must
+      carry. XP kicks have no BDL type at all and so no row here.
     columns:
       - name: play_type_key
         tests: [unique, not_null]
@@ -193,4 +283,73 @@ models:
               values: ['Passing', 'Rushing', 'Punt', 'Kicking', 'Kickoff',
                        'Penalty', 'Administrative', 'Turnover', 'Other']
       - name: is_live_ball_play
+        tests: [not_null]
+      - name: nflverse_play_type
+        description: >
+          The CALLED play a matched nflverse row carries ('run or qb_kneel'
+          and 'pass or qb_spike' absorb the types nflverse splits out of BDL's
+          Rush and Pass Incompletion). NULL for BDL-only administrative
+          granularity.
+        tests:
+          - accepted_values:
+              values: ['pass', 'run', 'run or qb_kneel', 'pass or qb_spike',
+                       'pass or run', 'kickoff', 'punt', 'field_goal', 'no_play']
+      - name: nflverse_flag_check
+        description: "The nflverse pbp flag that confirms the outcome the BDL type encodes, as a column expression string."
+      - name: is_scrimmage_play
+        description: "The EPA denominator: mirrors fact_team_game_epa's play_type in ('pass', 'run') filter exactly."
+        tests: [not_null]
+      - name: is_dropback
+        description: "Scrimmage split by the call; sibling is_designed_run. Both false where the call is unknowable (fumble recoveries)."
+        tests: [not_null]
+      - name: is_designed_run
+        tests: [not_null]
+      - name: is_special_teams
+        tests: [not_null]
+      - name: is_matchable
+        description: "Pre-excludes the ~27k administrative rows from the play-level match so the audit only counts plays that could match."
+        tests: [not_null]
+
+  - name: dim_game_official
+    description: >
+      The officiating crew, per game. Grain: game x official. Inner-joined
+      through bridge_game_ids, so only games BDL carries appear; the referee
+      also denormalizes onto dim_game. Physical name GAME_OFFICIAL.
+    columns:
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: nflverse_game_id
+        tests: [not_null]
+      - name: official_id
+        tests: [not_null]
+      - name: official_name
+        tests: [not_null]
+      - name: official_position
+        description: "Crew role, spelled out in full by the source ('Referee', 'Umpire', 'Back Judge', alternates...), NOT the R/U/BJ codes."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_key, official_id]
+
+  - name: dim_player_combine
+    description: >
+      NFL Combine testing, 2000 on. Grain: combine appearance (season x
+      player x position). Rows without a bridge match stay -- the combine
+      holds prospects who never played. Physical name PLAYER_COMBINE.
+    columns:
+      - name: combine_key
+        description: >
+          Surrogate over (season, player_name, position). pfr_id cannot key
+          this table: NULL on 1,531 rows and 17 ids shared by two same-name
+          different players at the source, so it carries no uniqueness test.
+        tests: [unique, not_null]
+      - name: player_key
+        description: "Via pfr_id -> gsis_id crosswalk -> bridge_player_ids. NULL = never bridged to a BDL player."
+        tests:
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: player_name
+        tests: [not_null]
+      - name: season
         tests: [not_null]

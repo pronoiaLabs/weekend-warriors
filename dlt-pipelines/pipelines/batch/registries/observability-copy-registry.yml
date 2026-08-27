@@ -28,7 +28,9 @@ pipelines:
     source: snowflake_app
     # is_task + docs only; generate_tasks does not emit AFTER
     after: DLT_DB.OPS.OBS_REFRESH
-    write_disposition: replace
+    # NO spec-level write_disposition here: run.py passes it to pipeline.run()
+    # where it bluntly overrides every resource, which would flatten the
+    # per-table modes below back into one disposition.
     config:
       # Required. Stem DLT would resolve to DLT_PROD_DB.
       database: DLT_DB
@@ -37,16 +39,75 @@ pipelines:
       # V_LOG_LINES, DBT_RUNS not V_DBT_RUNS). Explicit list.
       # VARIANT columns copy as text: write_disposition is a JSON string
       # (replace), not an object, and Postgres jsonb rejects that.
+      #
+      # A bare name is a full replace each run; a mapping copies
+      # incrementally (see snowflake_app_source.py). The big history tables
+      # are incremental because full replaces OOMed the shared Postgres
+      # instance (2026-08-24); the small tables stay replace. Incremental
+      # never deletes what Snowflake retention purges; the weekly
+      # obs_to_postgres_resync below re-bounds Postgres.
+      tables:
+        # Run tables: rows update in place (REFRESHED_AT bumps), merged on
+        # the task run's QUERY_ID, the same key the ops/04 MERGE uses.
+        - name: pipeline_runs
+          mode: merge
+          cursor: refreshed_at
+          primary_key: query_id
+        - name: task_runs
+          mode: merge
+          cursor: refreshed_at
+          primary_key: query_id
+        # Event tables: insert-only, 90d retained, the OOM makers. Cursor is
+        # the container-side EVENT_TS; the cross-container flush-skew miss
+        # this allows is healed by the weekly resync.
+        - name: log_lines
+          mode: append
+          cursor: event_ts
+        - name: metric_samples
+          mode: append
+          cursor: event_ts
+        # Harvest tables: query log rows are MERGEd on QUERY_ID with
+        # HARVESTED_AT set by the harvest; operator stats are insert-only.
+        - name: dbt_query_log
+          mode: merge
+          cursor: harvested_at
+          primary_key: query_id
+        - name: dbt_query_operator_stats
+          mode: append
+          cursor: captured_at
+        # Small tables (tens to a few thousand rows): replace stays cheapest
+        # and self-healing.
+        - pipeline_registry
+        - dbt_builds
+        - dbt_runs
+        - dbt_runs_refresh_log
+        - headlines
+        - alert_state
+
+  # Weekly full resync: same tables, all forced back to replace by the
+  # spec-level write_disposition (the blunt pipeline.run() override -- here
+  # that bluntness is the point). This is what deletes rows Snowflake
+  # retention purged and heals the event tables' flush-skew misses. Sunday
+  # 03:00 UTC, before the retention tasks' Sunday 04:30-05:00 window.
+  # SP_OBS_COPY_FIRE's in-flight guard knows this pipeline name, so the
+  # hourly copy cannot fire while a resync is INSERT-ing.
+  - name: obs_to_postgres_resync
+    source: snowflake_app
+    schedule: "0 3 * * 0"
+    write_disposition: replace
+    config:
+      database: DLT_DB
+      schema: OPS
       tables:
         - pipeline_runs
         - task_runs
         - log_lines
         - metric_samples
+        - dbt_query_log
+        - dbt_query_operator_stats
         - pipeline_registry
         - dbt_builds
         - dbt_runs
         - dbt_runs_refresh_log
-        - dbt_query_log
-        - dbt_query_operator_stats
         - headlines
         - alert_state

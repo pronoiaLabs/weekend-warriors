@@ -16,6 +16,7 @@ WHY THIS EXISTS
     No dlt and no connector needed: alerts imports lazily, exactly so the DuckDB
     and YAML paths work on a machine without snowflake-connector-python.
 """
+
 from __future__ import annotations
 
 import sys
@@ -54,18 +55,84 @@ def test_decide_matrix(prev: str | None, ok: bool, expected: str | None) -> None
 
 
 def test_message_flattens_and_truncates() -> None:
-    # A multi-line traceback would bury the scope name in Slack; a full one
-    # would blow past what a phone notification shows. TASK_HISTORY keeps the
-    # complete text, so the message only needs to identify and summarize.
+    # Non-dlt errors keep the flattened one-liner: a multi-line message would
+    # bury the scope name in Slack, and TASK_HISTORY keeps the complete text.
     msg = alerts.format_message("nfl_stats", ok=False, error="a\nb\t c" + "x" * 1000)
-    assert msg.startswith("FAILED nfl_stats: a b cx")
-    assert len(msg) <= len("FAILED nfl_stats: ") + 400
+    assert msg.startswith("*FAILED nfl_stats*: a b cx")
+    assert len(msg) <= len("*FAILED nfl_stats*: ") + 400
     assert "\n" not in msg
 
-    assert alerts.format_message("nfl_stats", ok=True) == "RECOVERED nfl_stats"
+    assert alerts.format_message("nfl_stats", ok=True) == "*RECOVERED nfl_stats*"
     assert alerts.format_message("runner", ok=False, error=None) == (
-        "FAILED runner: unknown error"
+        "*FAILED runner*: unknown error"
     )
+
+
+# The exact exception text from the OOM night (2026-08-24), abridged only in
+# the traceback middle. The whole point of the structured format is that the
+# LAST line of the FIRST traceback block survives into the alert.
+_OOM_ERROR = """Pipeline execution failed at `step=load` when processing package with `load_id=1787548486.4254708` with exception:
+
+<class 'dlt.load.exceptions.LoadClientJobRetry'>
+Job with `job_id=app_player_week_stats.8a1bcc8728.insert_values.gz` had 5 retries which is a multiple of `max_retry_count=5`. Exiting retry loop. You can still rerun the load package to retry this job. Last failure message was: Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/dlt/destinations/sql_client.py", line 532, in _wrap_gen
+    return (yield from f(self, *args, **kwargs))
+           ^^^^^^^^^^^^
+psycopg2.errors.OutOfMemory: out of memory
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/dlt/load/load.py", line 180, in w_spool_job
+    job.run_managed(self.load_storage.normalized_packages)
+dlt.destinations.exceptions.DatabaseTransientException: out of memory
+"""
+
+
+def test_dlt_failure_is_structured_mrkdwn() -> None:
+    msg = alerts.format_message("nfl_app_to_postgres", ok=False, error=_OOM_ERROR)
+    lines = msg.splitlines()
+    assert lines[0] == "*FAILED nfl_app_to_postgres*"
+    # The root cause is the deepest exception (psycopg2), not the dlt wrapper
+    # that re-raised it, and it sits on line two where truncation cannot
+    # reach it.
+    assert lines[1] == "cause: `psycopg2.errors.OutOfMemory: out of memory`"
+    # One metric per line, requested 2026-08-24.
+    assert lines[2] == "table: `app_player_week_stats`"
+    assert lines[3] == "step: load"
+    assert lines[4] == "retries: 5/5"
+    assert lines[5] == "load_id: 1787548486.4254708"
+
+
+def test_dlt_fields_without_traceback_fall_back_to_first_line() -> None:
+    # A retry-exhausted message whose "Last failure message" got cut before
+    # the traceback: dlt fields still render, cause degrades to the text head.
+    head = _OOM_ERROR.split("Traceback", 1)[0]
+    msg = alerts.format_message("nfl_app_to_postgres", ok=False, error=head)
+    lines = msg.splitlines()
+    assert lines[0] == "*FAILED nfl_app_to_postgres*"
+    assert lines[1].startswith("cause: `Pipeline execution failed at")
+    assert "table: `app_player_week_stats`" in msg
+
+
+def test_send_escapes_newlines_for_the_webhook(wired) -> None:
+    # Snowflake substitutes the message into the webhook's JSON body without
+    # escaping, so a raw newline fails the parse server-side ("Unexpected
+    # JSON error while parsing Webhook Body", measured 2026-08-24). The
+    # two-character \n sequence is what must ride the bind; Slack renders it
+    # as a line break after the JSON parse.
+    conn = wired(None)
+    alerts.report("nfl_app_to_postgres", ok=False, error=_OOM_ERROR)
+    sends = [p for sql, p in conn.cur.executed if "SEND_SNOWFLAKE_NOTIFICATION" in sql]
+    assert len(sends) == 1
+    message = sends[0][0]
+    assert "\n" not in message
+    assert "\\ncause:" in message
+
+
+def test_root_cause_prefers_first_traceback_block() -> None:
+    assert alerts._root_cause(_OOM_ERROR) == "psycopg2.errors.OutOfMemory: out of memory"
+    assert alerts._root_cause("no traceback here") is None
 
 
 # ---------------------------------------------------------------------------

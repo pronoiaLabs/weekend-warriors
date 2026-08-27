@@ -1,5 +1,10 @@
 {{ config(severity='warn') }}
 
+-- depends_on: {{ ref('bridge_player_ids') }}
+-- (the FQN below bypasses ref(), so without this line dbt schedules the test
+--  before the model whose pre_hook creates the table -- it raced and failed
+--  on the first build into the fresh DIM schema at the cutover.)
+
 {#
     assert_player_bridge_is_one_to_one -- which nflverse players are claimed by
     two ids of the same vendor.

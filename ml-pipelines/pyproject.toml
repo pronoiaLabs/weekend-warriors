@@ -1,0 +1,23 @@
+[project]
+name = "weekend-warriors-ml"
+version = "0.1.0"
+description = "Snowflake ML training and registry for weekend-warriors FEATURES."
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "snowflake-ml-python",
+    "snowflake-snowpark-python",
+    "numba",
+    "tomli",
+    "scikit-learn",
+    "pandas",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -188,7 +188,7 @@ BEGIN
     IF (prev = 'failing') THEN
       CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
         SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
-          SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('RECOVERED dbt_build_ncaaf')),
+          SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('*RECOVERED dbt_build_ncaaf*')),
         SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
       UPDATE DLT_DB.OPS.ALERT_STATE
         SET STATUS = 'ok', UPDATED_AT = CURRENT_TIMESTAMP(),
@@ -211,12 +211,23 @@ EXCEPTION
   -- revoked grant) can never mask the real dbt error.
   WHEN OTHER THEN
     LET err VARCHAR := LEFT(COALESCE(SQLERRM, 'unknown error'), 400);
+    -- Slack mrkdwn (bold is single *). cause = SQLERRM's first line, on its
+    -- own line so webhook truncation can never eat it; the full text stays
+    -- in ALERT_STATE.LAST_ERROR. build_id is DECLAREd with a DEFAULT, so it
+    -- is always set here.
+    LET alert_msg VARCHAR := '*FAILED dbt_build_ncaaf*'
+      -- \\n (two chars), never a raw newline: the webhook substitutes the
+      -- message into its JSON body unescaped, and a raw newline fails the
+      -- parse server-side (measured 2026-08-24). SQLERRM's own newlines are
+      -- gone because cause is its first line only.
+      || '\\ncause: `' || SPLIT_PART(err, '\n', 1) || '`'
+      || '\\nbuild_id: ' || build_id;
     BEGIN
       LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE WHERE SCOPE = 'dbt_build_ncaaf');
       IF (prev IS NULL OR prev <> 'failing') THEN
         CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
           SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
-            SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('FAILED dbt_build_ncaaf: ' || :err)),
+            SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT(:alert_msg)),
           SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
       END IF;
       MERGE INTO DLT_DB.OPS.ALERT_STATE t USING (SELECT 'dbt_build_ncaaf' AS SCOPE) s ON t.SCOPE = s.SCOPE

@@ -7,7 +7,7 @@
 #
 # Caller's rights, like SP_DBT_BUILD: a dev build writes the bridge tables
 # under the developer's role and schema, the prod trigger under
-# DBT_RUNNER_ROLE into CORE. The procedure itself holds no credentials.
+# DBT_RUNNER_ROLE into DIM. The procedure itself holds no credentials.
 definition_version: 2
 
 entities:

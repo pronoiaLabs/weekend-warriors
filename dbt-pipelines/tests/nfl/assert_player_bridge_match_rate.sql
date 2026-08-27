@@ -1,3 +1,7 @@
+-- depends_on: {{ ref('bridge_player_ids') }}
+-- (raw-FQN reader; see assert_player_bridge_is_one_to_one for why this edge
+--  must be declared explicitly.)
+
 {#
     assert_player_bridge_match_rate -- the bridge places at least a floor
     share of each vendor's players.

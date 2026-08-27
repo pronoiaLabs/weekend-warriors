@@ -79,6 +79,7 @@ pipelines:
         - officials
         - combine
         - trades
+        - teams
 
   # Backfill: every season-keyed dataset for the BallDontLie history in the account
   # (2023 onward). Unscheduled. A dataset entry may carry its own `seasons` when

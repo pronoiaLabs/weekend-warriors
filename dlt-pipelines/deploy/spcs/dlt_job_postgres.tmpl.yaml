@@ -10,6 +10,10 @@
 #
 # Host / user / database are env, not secrets. Change the host here AND in
 # sql/sources/postgres/02_external_access.sql together.
+#
+# LOAD__WORKERS defaults to 20. Concurrent insert_values jobs of that width
+# OOMed Snowflake Postgres (2026-08-24). DATA_WRITER__FILE_MAX_ITEMS keeps
+# each INSERT VALUES statement off the instance memory ceiling.
 spec:
   containers:
     - name: dlt
@@ -25,6 +29,8 @@ spec:
         DESTINATION__POSTGRES__CREDENTIALS__DATABASE: app
         DESTINATION__POSTGRES__CREDENTIALS__USERNAME: app_copy_writer
         PGSSLMODE: require
+        LOAD__WORKERS: "3"
+        DATA_WRITER__FILE_MAX_ITEMS: "2000"
         DESTINATION__SNOWFLAKE__CREDENTIALS__AUTHENTICATOR: oauth
         DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE: {{ database }}
         DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE: DLT_WH

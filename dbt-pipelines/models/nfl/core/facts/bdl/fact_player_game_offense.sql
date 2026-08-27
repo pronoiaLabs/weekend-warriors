@@ -1,24 +1,10 @@
-{{
-    config(
-        materialized='incremental',
-        unique_key='player_game_key',
-        incremental_strategy='merge',
-        on_schema_change='append_new_columns'
-    )
-}}
+{{ config(materialized='table') }}
 
 /*
-    fact_player_game_offense -- passing, rushing and receiving.
-    Grain: player x game. ~21,700 rows.
-
-    Incremental (merge on player_game_key); see fact_play for the watermark
-    pattern and its two traps (NUMBER(38,6), the two-condition filter). One
-    phase-fact wrinkle, shared by all three and accepted: a load id none of
-    whose rows pass this fact's phase filter never enters its watermark set,
-    so the `not in` arm re-reads that load's rows on every run, filters them
-    out again, and merges nothing. Idempotent and cheap -- every real weekly
-    load has all three phases in practice -- but no-op runs show nonzero
-    scanned rows.
+    fact_player_game_offense -- passing, rushing and receiving, all vendors.
+    Grain: player x game. ~21,700 rows. BallDontLie is the anchor: every row
+    exists because the BDL box score has one, and the nflverse and Sleeper
+    blocks ride along where the bridges find the same player-week.
 
     One of three phase facts split out of the 116-column STATS source. The split
     exists because a single wide fact would be ~100 measures, almost all NULL for
@@ -68,37 +54,23 @@
     23 completed games that have no play-by-play; kicker scoring, which needs
     field-goal distance the source does not carry.
 
-    on_schema_change='append_new_columns' because this fact is incremental:
-    without it a new column is silently dropped from an existing table. It adds
-    the column but fills history only on a --full-refresh, which the release
-    of a new derived column therefore requires once.
+    VENDOR BLOCKS. The row resolves to the other vendors through the bridges:
+    player_key -> bridge_player_ids -> gsis_id / pfr_id / sleeper_player_id,
+    game_key -> bridge_game_ids -> nflverse_game_id (which absorbs the
+    postseason week mapping: BDL numbers the playoffs 1, 2, 3, 5 where
+    nflverse continues at 19-22). nflverse player stats and snap counts join
+    on that game id; Sleeper has no team in its game id, so its week stats
+    join on season + week (postseason week + 18 = nflverse_week, the same
+    resolution the retired fact_sleeper_player_week used). NULL means no
+    match, never 0; has_nflverse / has_sleeper flag the joins. Measured Aug
+    2026, excluding preseason (nflverse publishes none, by construction):
+    99.3% of regular-season and 99.2% of postseason rows carry the nflverse
+    block; Sleeper lands 83.8% / 87.3%.
 */
 
 with stats as (
 
     select * from {{ ref('stg_nfl__player_stats') }}
-
-    {% if is_incremental() %}
-    -- Pick up rows from any load this table has not already fully absorbed.
-    --
-    -- Two conditions, both needed:
-    --   >= max   catches a load that landed only partially on a previous run.
-    --            Strict > would exclude the rest of that batch forever, since
-    --            those rows are EQUAL to the watermark, not greater.
-    --   not in   catches an out-of-order load. dlt stamps _dlt_load_id when the
-    --            load package is created, not when it commits, so a resource
-    --            that started earlier but committed later carries a LOWER id
-    --            and would never exceed the max.
-    --
-    -- Both re-read rows that may already be present, which is free here because
-    -- the merge on player_game_key is idempotent.
-    where _dlt_load_id::number(38, 6) >= (
-              select coalesce(max(dlt_load_id_numeric), 0) from {{ this }}
-          )
-       or _dlt_load_id::number(38, 6) not in (
-              select distinct dlt_load_id_numeric from {{ this }}
-          )
-    {% endif %}
 
 ),
 
@@ -118,7 +90,7 @@ games as (
 
 offense as (
 
-    -- Every column published as a measure below must appear in this filter.
+    -- Every column published as a BDL measure below must appear in this filter.
     select *
     from stats
     where coalesce(
@@ -147,6 +119,49 @@ two_point as (
     where is_success
       and player_key is not null
     group by player_game_key
+
+),
+
+-- One row per player_key. The bridge's grain is gsis_id and BallDontLie holds
+-- a few duplicate player ids mapped to one gsis row, so the qualify keeps the
+-- join from fanning out if a duplicate ever maps the other way.
+bridge as (
+
+    select player_key, gsis_id, pfr_id, sleeper_player_id
+    from {{ ref('bridge_player_ids') }}
+    where player_key is not null
+    qualify row_number() over (partition by player_key order by gsis_id) = 1
+
+),
+
+game_bridge as (
+
+    select game_key, nflverse_game_id, nflverse_week, season, week,
+           season_type, is_postseason
+    from {{ ref('bridge_game_ids') }}
+
+),
+
+nflverse as (
+
+    select * from {{ ref('stg_nfl__nflverse_player_stats') }}
+
+),
+
+snaps as (
+
+    select pfr_player_id, nflverse_game_id, offense_snaps, offense_pct
+    from {{ ref('stg_nfl__nflverse_snap_counts') }}
+
+),
+
+sleeper as (
+
+    -- No is_team_defense filter: the DEF team rows carry the club abbreviation
+    -- as their id and can never match the bridge's numeric sleeper ids, while
+    -- prep's length-based flag also catches real veterans with short ids
+    -- (id 96, 167, ...) whose weeks belong here.
+    select * from {{ ref('stg_nfl__sleeper_stats') }}
 
 )
 
@@ -270,12 +285,100 @@ select
         tp.two_point_conversions_thrown
     )                                                   as draftkings_points,
 
-    -- exact numeric watermark for the next incremental run. NOT float: a float
-    -- cast loses precision on a 17-digit load id and breaks the comparison.
-    o._dlt_load_id::number(38, 6)                       as dlt_load_id_numeric
+    -- ---------------------------------------------------------------
+    -- nflverse: usage, the headline gain -- what the box score cannot say
+    -- about how the offense flows through a player
+    -- ---------------------------------------------------------------
+    nv.target_share,
+    nv.air_yards_share,
+    nv.wopr,
+    nv.racr,
+    nv.pacr,
+    nv.passing_air_yards,
+    nv.receiving_air_yards,
+    nv.passing_yards_after_catch,
+    nv.receiving_yards_after_catch,
+
+    -- nflverse: efficiency
+    nv.passing_epa,
+    nv.rushing_epa,
+    nv.receiving_epa,
+    nv.passing_cpoe,
+
+    -- nflverse: detail -- first downs, explosive-play buckets, sack fumbles,
+    -- and nflverse's own fantasy scorings (distinct from the UDF columns
+    -- above: different scoring systems, kept under the vendor's names)
+    nv.passing_first_downs,
+    nv.rushing_first_downs,
+    nv.receiving_first_downs,
+    nv.passing_10,
+    nv.passing_16,
+    nv.passing_20,
+    nv.passing_40,
+    nv.rushing_10,
+    nv.rushing_12,
+    nv.rushing_20,
+    nv.rushing_40,
+    nv.receiving_10,
+    nv.receiving_16,
+    nv.receiving_20,
+    nv.receiving_40,
+    nv.sack_fumbles,
+    nv.sack_fumbles_lost,
+    nv.fantasy_points,
+    nv.fantasy_points_ppr,
+
+    -- nflverse: snaps, via the pfr crosswalk on the bridge
+    sn.offense_snaps,
+    sn.offense_pct,
+
+    (nv.gsis_id is not null)                            as has_nflverse,
+
+    -- ---------------------------------------------------------------
+    -- Sleeper: the three fantasy scorings of the actual week and the
+    -- positional rank per scoring
+    -- ---------------------------------------------------------------
+    sl.pts_std,
+    sl.pts_half_ppr,
+    sl.pts_ppr,
+    sl.pos_rank_std,
+    sl.pos_rank_half_ppr,
+    sl.pos_rank_ppr,
+
+    -- Sleeper: snap share with the team denominator built in
+    sl.off_snp,
+    sl.tm_off_snp,
+    sl.off_snp / nullif(sl.tm_off_snp, 0)               as off_snap_share,
+
+    -- Sleeper: detail BDL lacks
+    sl.rec_drop,
+    sl.rec_air_yd,
+    sl.rec_fd,
+    sl.rush_fd,
+    sl.pass_rtg,
+
+    (sl.sleeper_player_id is not null)                  as has_sleeper
 
 from offense o
 inner join games g
     on o.game_key = g.game_key
 left join two_point tp
     on o.player_game_key = tp.player_game_key
+left join bridge b
+    on b.player_key = o.player_key
+left join game_bridge gb
+    on gb.game_key = o.game_key
+left join nflverse nv
+    on  nv.gsis_id = b.gsis_id
+    and nv.nflverse_game_id = gb.nflverse_game_id
+left join snaps sn
+    on  sn.pfr_player_id = b.pfr_id
+    and sn.nflverse_game_id = gb.nflverse_game_id
+left join sleeper sl
+    on  sl.sleeper_player_id = b.sleeper_player_id
+    and sl.season = gb.season
+    and case sl.season_type
+            when 'regular' then gb.season_type = 2 and sl.week = gb.week
+            when 'post'    then gb.is_postseason and sl.week + 18 = gb.nflverse_week
+            when 'pre'     then gb.season_type = 1 and sl.week = gb.week
+        end

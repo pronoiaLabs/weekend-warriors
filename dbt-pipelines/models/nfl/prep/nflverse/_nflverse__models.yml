@@ -101,3 +101,76 @@ models:
     columns:
       - name: row_id
         tests: [unique, not_null]
+
+  - name: stg_nfl__nflverse_pbp
+    description: >
+      Curated slice of nflverse play-by-play (the RAW table is 372 columns):
+      play-match keys, EPA/WPA/success analytics, call and formation flags,
+      drive bookkeeping. Grain: nflverse_game_id x play_id. Every downstream
+      nflverse pbp read comes through here.
+    columns:
+      - name: nflverse_game_id
+        tests: [not_null]
+      - name: play_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [nflverse_game_id, play_id]
+
+  - name: stg_nfl__nflverse_officials
+    description: >
+      Officiating crew assignments. Grain: nfl_old_game_id x official_id.
+      The RAW table speaks only the league's own ids (old YYYYMMDDNN game_id,
+      numeric game_key -- the latter deliberately dropped, it is not our
+      game_key); nflverse_game_id is minted through the pbp file's old-to-new
+      mapping and is NULL outside the loaded pbp window (officials reach back
+      to 2015). Join through bridge_game_ids on nflverse_game_id.
+    columns:
+      - name: nfl_old_game_id
+        tests: [not_null]
+      - name: nflverse_game_id
+        description: "NULL for seasons pbp does not cover; those rows cannot anchor to a modeled game."
+      - name: official_id
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [nfl_old_game_id, official_id]
+
+  - name: stg_nfl__nflverse_teams
+    description: >
+      Franchise branding: colors, logo and wordmark URLs, conference and
+      division. Grain: team_abbr, 36 rows -- 32 current teams plus the
+      LA/OAK/SD/STL legacy abbreviations that let history join across
+      relocations.
+    columns:
+      - name: team_abbr
+        tests: [unique, not_null]
+
+  - name: stg_nfl__nflverse_combine
+    description: >
+      NFL Combine results, 2000 on. Grain: combine appearance (season x
+      player_name x pos). pfr_id is the crosswalk to nflverse players but not
+      the key: NULL on 1,531 rows and 17 ids shared by two same-name
+      different players at the source. ht converted from feet-inches text to
+      height_inches.
+    columns:
+      - name: season
+        tests: [not_null]
+      - name: player_name
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, player_name, position]
+
+  - name: stg_nfl__nflverse_trades
+    description: >
+      The nflverse trades file, one row per asset moved. Grain: trade_id x
+      asset -- a player (pfr_id) or a draft pick (pick_season / round /
+      number); the file's empty strings are nulled so the either/or reads
+      cleanly. Carries a few exact duplicate rows from the source itself;
+      fact_trade numbers assets within the trade to key them.
+    columns:
+      - name: trade_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]

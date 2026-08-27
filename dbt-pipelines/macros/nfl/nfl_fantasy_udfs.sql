@@ -23,8 +23,8 @@
 
     WHERE THEY LIVE. create_nfl_fantasy_udfs() runs from dbt_project.yml's
     on-run-start, so every run that can build fact_player_game_offense first
-    guarantees the functions exist, in the same schema CORE models resolve to:
-    NFL_PROD_DB.CORE in prod, NFL_DEV_DB.DEV_<user> in dev (via
+    guarantees the functions exist, in the same schema the fact models resolve
+    to: NFL_PROD_DB.FACTS in prod, NFL_DEV_DB.DEV_<user> in dev (via
     generate_schema_name). Gated on DBT_SPORT = nfl so a WNBA or NCAAF run never
     plants an NFL function in its own database. Every argument is coalesced to
     0 inside the function, so callers pass raw nullable measures.
@@ -42,7 +42,7 @@
 
 
 {% macro nfl_fantasy_points_fqn(book) -%}
-    {{ target.database }}.{{ generate_schema_name('CORE', none) | trim }}.NFL_{{ book | upper }}_POINTS
+    {{ target.database }}.{{ generate_schema_name('FACTS', none) | trim }}.NFL_{{ book | upper }}_POINTS
 {%- endmacro %}
 
 

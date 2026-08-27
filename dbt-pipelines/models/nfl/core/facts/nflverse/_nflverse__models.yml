@@ -5,67 +5,62 @@ version: 2
 
 models:
 
-  - name: fact_nflverse_player_week
+  - name: fact_nextgen_passing
     description: >
-      nflverse's player week: usage shares, EPA by phase, CPOE, fantasy
-      points. Grain: player (gsis) x season x season_type x week; a bye week
-      has no row. Week grain from a different provider: deliberately not
-      row-reconciled with fact_player_game_offense.
+      Next Gen passing, weekly; week-0 season totals excluded. game_key and
+      player_game_key come from the week -> game resolution (100% of rows,
+      measured): the source has no game id of its own. season_type is the
+      numeric vocabulary (2/3); nflverse_season_type keeps the source's
+      REG/POST strings, and week stays NGS's numbering (Super Bowl = 23).
     columns:
-      - name: player_week_key
-        tests: [unique, not_null]
-      - name: player_key
-        tests:
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: game_key
-        tests:
-          - relationships: {to: "ref('dim_game')", field: game_key}
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [gsis_id, season, season_type, week]
-
-  - name: fact_player_week_snaps
-    description: "Snap participation per player per game, pfr-keyed; gsis and player_key via the crosswalk."
-    columns:
-      - name: player_game_snap_key
-        tests: [unique, not_null]
-      - name: game_key
-        tests:
-          - relationships: {to: "ref('dim_game')", field: game_key}
-
-  - name: fact_team_game_epa
-    description: >
-      Play-by-play rolled up to team x game: EPA, success rate, explosive
-      rate, CPOE, pass rate over expected, offense and defense. Same
-      team_game_key as fact_team_game_offense, so the two join 1:1. Rates
-      are from this grain's own sums; re-aggregate from the sums.
-    columns:
-      - name: team_game_key
+      - name: nextgen_passing_key
         tests: [unique, not_null]
       - name: game_key
         tests:
           - not_null
           - relationships: {to: "ref('dim_game')", field: game_key}
-      - name: team_key
-        tests: [not_null]
-
-  - name: fact_nextgen_passing
-    description: "Next Gen passing, weekly; week-0 season totals excluded; no game_key (source has no game id)."
-    columns:
-      - name: nextgen_passing_key
-        tests: [unique, not_null]
+      - name: player_game_key
+        description: "The BDL phase facts' key (game_id x player_id). NULL where the player bridge has no BDL id."
 
   - name: fact_nextgen_rushing
     description: "Next Gen rushing, same conventions as passing."
     columns:
       - name: nextgen_rushing_key
         tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
 
   - name: fact_nextgen_receiving
     description: "Next Gen receiving, same conventions as passing."
     columns:
       - name: nextgen_receiving_key
         tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+
+  - name: fact_trade
+    description: >
+      Every trade since 2002, one row per asset moved (physical table
+      TRADE_ASSET). trade_id groups the sides; an asset is a player (pfr_id,
+      resolved to gsis_id / player_key through the bridge where possible and
+      kept when not) or a draft pick. gave / received are the file's own team
+      abbreviations, old franchises included.
+    columns:
+      - name: trade_asset_key
+        tests: [unique, not_null]
+      - name: trade_id
+        tests: [not_null]
+      - name: asset_type
+        tests:
+          - not_null
+          - accepted_values: {values: ['player', 'pick']}
+      - name: player_key
+        tests:
+          - relationships: {to: "ref('dim_player')", field: player_key}
 
   - name: fact_injury_report
     description: >
@@ -83,6 +78,72 @@ models:
           - accepted_values:
               values: ['Out', 'Doubtful', 'Questionable']
               config: {severity: warn}
+
+  - name: fact_team_game_situation
+    description: >
+      Situational splits from nflverse pbp (physical table
+      TEAM_GAME_SITUATION). Grain: team x game x side x situation -- every
+      scrimmage play lands twice, an offense row for posteam and a defense
+      row for defteam, so a defense row IS the allowed mirror. game_script is
+      from the row's team's perspective and flips between the pair; the
+      mirror invariant is tests/nfl/assert_fact_team_game_situation_mirrors.
+      Counts and sums are the re-aggregation contract; the rates are this
+      grain's convenience division. Base filter mirrors the team twins' EPA
+      fold, so plays per team-game-side sums to off_plays and team_game_key
+      joins the twins directly.
+    columns:
+      - name: team_game_situation_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: side
+        tests:
+          - not_null
+          - accepted_values: {values: ['offense', 'defense']}
+      - name: down_bucket
+        description: "NULL is real: two-point tries carry no down."
+        tests:
+          - accepted_values: {values: ['1st', '2nd', '3rd_4th']}
+      - name: distance_bucket
+        description: "short <= 3, medium 4-7, long >= 8. NULL with down_bucket."
+        tests:
+          - accepted_values: {values: ['short', 'medium', 'long']}
+      - name: field_zone
+        description: "By yards to the end zone: red_zone <= 20, mid 21-50, own 51+."
+        tests:
+          - not_null
+          - accepted_values: {values: ['own', 'mid', 'red_zone']}
+      - name: play_family
+        description: "dropback (nflfastR pass = 1, scrambles and sacks included) or designed_run (rush = 1)."
+        tests:
+          - accepted_values: {values: ['dropback', 'designed_run']}
+      - name: game_script
+        description: "Sign of the ROW's team's score differential -- flips between the offense and defense rows of a play."
+        tests:
+          - not_null
+          - accepted_values: {values: ['leading', 'trailing', 'neutral']}
+      - name: plays
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - game_id
+            - team_id
+            - side
+            - down_bucket
+            - distance_bucket
+            - field_zone
+            - play_family
+            - is_shotgun
+            - is_no_huddle
+            - game_script
+            - is_two_minute
 
   - name: fact_depth_chart
     description: >

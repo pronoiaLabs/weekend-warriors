@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 log = logging.getLogger("dlt_pipeline.alerts")
 
@@ -53,6 +54,17 @@ _STATE_TABLE = "DLT_DB.OPS.ALERT_STATE"
 
 # Slack renders the whole message inline; TASK_HISTORY holds the full text.
 _ERROR_LIMIT = 400
+_CAUSE_LIMIT = 300
+
+# dlt load-failure fields, as they appear in str(PipelineStepFailed) e.g.:
+#   Pipeline execution failed at `step=load` when processing package with
+#   `load_id=1787548486.42` ... Job with `job_id=app_player_weeks.994a.insert_values.gz`
+#   had 5 retries which is a multiple of `max_retry_count=5`. ...
+#   Last failure message was: Traceback (most recent call last): ...
+_STEP_RE = re.compile(r"step=`?([a-z_]+)`?")
+_LOAD_ID_RE = re.compile(r"load_id=`?(\d+\.\d+|\d+)`?")
+_JOB_ID_RE = re.compile(r"job_id=`?([A-Za-z0-9_][A-Za-z0-9_.\-]*)`?")
+_RETRIES_RE = re.compile(r"had (\d+) retries.*?max_retry_count=`?(\d+)`?", re.S)
 
 _SEND_SQL = (
     "CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION("
@@ -90,13 +102,74 @@ def decide(prev_status: str | None, ok: bool) -> str | None:
     return "recover" if prev_status == "failing" else None
 
 
+def _root_cause(error: str) -> str | None:
+    """The actual error line out of a traceback, or None when there is none.
+
+    Python prints chained tracebacks oldest-first, so the FIRST non-indented
+    exception line after the first ``Traceback`` marker is the root cause
+    (psycopg2.errors.OutOfMemory), not the dlt wrapper that re-raised it.
+    """
+    lines = error.splitlines()
+    it = iter(lines)
+    for line in it:
+        # dlt embeds the first marker mid-line ("Last failure message was:
+        # Traceback (most recent call last):"), so substring, not startswith.
+        if "Traceback (most recent call last)" in line:
+            break
+    else:
+        return None
+    for line in it:
+        if not line.strip():
+            continue
+        if line.startswith((" ", "\t")):
+            continue
+        if line.startswith(("Traceback", "During handling", "The above exception")):
+            continue
+        return line.strip()[:_CAUSE_LIMIT]
+    return None
+
+
 def format_message(scope: str, ok: bool, error: str | None = None) -> str:
-    """One line, worst news first. Newlines flattened: Slack shows the text
-    inline and a multi-line traceback buries the scope name."""
+    """Slack mrkdwn, worst news first, root cause on line two.
+
+    A dlt load failure buries the one line that matters (the traceback tail)
+    behind retry boilerplate, and Slack truncation was cutting exactly that
+    off (the OOM night, 2026-08-24). So when the dlt fields are present the
+    message is restructured: bold scope, then the cause inside backticks
+    where no truncation can reach it, then the parsed job fields. Anything
+    unparseable keeps the old flattened one-liner. mrkdwn, not Markdown:
+    bold is a single ``*``.
+    """
     if ok:
-        return f"RECOVERED {scope}"
-    snippet = " ".join((error or "unknown error").split())[:_ERROR_LIMIT]
-    return f"FAILED {scope}: {snippet}"
+        return f"*RECOVERED {scope}*"
+
+    error = error or "unknown error"
+    cause = _root_cause(error)
+    step = _STEP_RE.search(error)
+    load_id = _LOAD_ID_RE.search(error)
+    job_id = _JOB_ID_RE.search(error)
+    retries = _RETRIES_RE.search(error)
+
+    if cause is None and job_id is None and step is None:
+        snippet = " ".join(error.split())[:_ERROR_LIMIT]
+        return f"*FAILED {scope}*: {snippet}"
+
+    if cause is None:
+        # dlt fields without a traceback: the first line is the best cause.
+        cause = " ".join(error.split())[:_CAUSE_LIMIT]
+
+    # One metric per line: scannable on a phone notification, and a missing
+    # field simply drops its line rather than leaving a gap mid-row.
+    parts = [f"*FAILED {scope}*", f"cause: `{cause}`"]
+    if job_id:
+        parts.append(f"table: `{job_id.group(1).split('.')[0]}`")
+    if step:
+        parts.append(f"step: {step.group(1)}")
+    if retries:
+        parts.append(f"retries: {retries.group(1)}/{retries.group(2)}")
+    if load_id:
+        parts.append(f"load_id: {load_id.group(1)}")
+    return "\n".join(parts)
 
 
 def report(scope: str, ok: bool, error: str | None = None) -> None:
@@ -118,9 +191,7 @@ def report(scope: str, ok: bool, error: str | None = None) -> None:
         conn = connect()
         try:
             cur = conn.cursor()
-            cur.execute(
-                f"SELECT STATUS FROM {_STATE_TABLE} WHERE SCOPE = %s", (scope,)
-            )
+            cur.execute(f"SELECT STATUS FROM {_STATE_TABLE} WHERE SCOPE = %s", (scope,))
             row = cur.fetchone()
             prev = row[0] if row else None
 
@@ -131,13 +202,18 @@ def report(scope: str, ok: bool, error: str | None = None) -> None:
                 return
 
             if action is not None:
-                cur.execute(_SEND_SQL, (format_message(scope, ok, error),))
+                # Raw newlines break the webhook: Snowflake substitutes the
+                # message into the integration's JSON body WITHOUT escaping,
+                # and the parse fails server-side ("Unexpected JSON error
+                # while parsing Webhook Body", measured 2026-08-24). The
+                # two-character \n sequence IS the JSON-escaped newline;
+                # Slack renders it as a line break after parsing.
+                message = format_message(scope, ok, error).replace("\n", "\\n")
+                cur.execute(_SEND_SQL, (message,))
                 log.info("alert sent (%s) for scope '%s'", action, scope)
 
             status = "ok" if ok else "failing"
-            snippet = (
-                " ".join(error.split())[:_ERROR_LIMIT] if error and not ok else None
-            )
+            snippet = " ".join(error.split())[:_ERROR_LIMIT] if error and not ok else None
             sent = action is not None
             cur.execute(
                 _MERGE_SQL,

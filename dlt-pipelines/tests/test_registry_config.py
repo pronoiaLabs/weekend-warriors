@@ -3,6 +3,7 @@
 Pure Python. No Snowflake, no dlt, no network. Only pyyaml is required (pulled
 in transitively via pipelines.batch.models).
 """
+
 from __future__ import annotations
 
 import json
@@ -122,9 +123,7 @@ def test_real_registry_sends_every_wnba_pipeline_to_the_wnba_databases():
         # The rollover is what makes {current_season} right for this sport. Inheriting
         # the default of 8 would resolve May, June and July to the previous season
         # while the current one is being played.
-        assert spec.season_rollover_month == 5, (
-            f"{spec.name}: WNBA seasons open in May, not August"
-        )
+        assert spec.season_rollover_month == 5, f"{spec.name}: WNBA seasons open in May, not August"
 
 
 def test_real_registry_sends_every_ncaaf_pipeline_to_the_ncaaf_databases():
@@ -154,9 +153,7 @@ def test_each_source_declares_one_rollover_month() -> None:
     """
     by_source: dict[str, set[int]] = {}
     for spec in load_registry().pipelines:
-        by_source.setdefault(spec.name.split("_", 1)[0], set()).add(
-            spec.season_rollover_month
-        )
+        by_source.setdefault(spec.name.split("_", 1)[0], set()).add(spec.season_rollover_month)
 
     for source, months in by_source.items():
         assert len(months) == 1, f"{source}: conflicting rollover months {months}"
@@ -177,15 +174,15 @@ def test_real_registry_leaves_sample_in_the_shared_databases():
 @pytest.mark.parametrize(
     "day, expected",
     [
-        (date(2026, 7, 31), 2025),   # offseason: last COMPLETED season
-        (date(2026, 8, 1), 2026),    # rollover, preseason opens this month
-        (date(2026, 8, 6), 2026),    # Hall of Fame Game
-        (date(2026, 9, 9), 2026),    # regular season opener
+        (date(2026, 7, 31), 2025),  # offseason: last COMPLETED season
+        (date(2026, 8, 1), 2026),  # rollover, preseason opens this month
+        (date(2026, 8, 6), 2026),  # Hall of Fame Game
+        (date(2026, 9, 9), 2026),  # regular season opener
         (date(2026, 12, 25), 2026),  # Christmas games
-        (date(2027, 1, 10), 2026),   # Week 18 is still the 2026 season
-        (date(2027, 2, 14), 2026),   # Super Bowl LXI, likewise
-        (date(2027, 7, 31), 2026),   # whole offseason stays on 2026
-        (date(2027, 8, 1), 2027),    # next rollover
+        (date(2027, 1, 10), 2026),  # Week 18 is still the 2026 season
+        (date(2027, 2, 14), 2026),  # Super Bowl LXI, likewise
+        (date(2027, 7, 31), 2026),  # whole offseason stays on 2026
+        (date(2027, 8, 1), 2027),  # next rollover
     ],
 )
 def test_current_season_rolls_over_on_1_august(day, expected) -> None:
@@ -202,12 +199,12 @@ def test_current_season_does_not_roll_over_at_the_super_bowl() -> None:
 @pytest.mark.parametrize(
     "day, expected",
     [
-        (date(2027, 4, 30), 2026),   # offseason: last COMPLETED season
-        (date(2027, 5, 1), 2027),    # rollover, the season opens this month
-        (date(2027, 9, 24), 2027),   # final day of the regular season
+        (date(2027, 4, 30), 2026),  # offseason: last COMPLETED season
+        (date(2027, 5, 1), 2027),  # rollover, the season opens this month
+        (date(2027, 9, 24), 2027),  # final day of the regular season
         (date(2027, 12, 25), 2027),  # deep offseason, still the 2027 season
-        (date(2028, 1, 10), 2027),   # new calendar year, season unchanged
-        (date(2028, 4, 30), 2027),   # right up to the next rollover
+        (date(2028, 1, 10), 2027),  # new calendar year, season unchanged
+        (date(2028, 4, 30), 2027),  # right up to the next rollover
     ],
 )
 def test_wnba_season_rolls_over_on_1_may(day, expected) -> None:
@@ -391,26 +388,65 @@ def test_obs_to_postgres_reads_dlt_db_ops() -> None:
     assert spec.external_access == "POSTGRES_APP_EAI"
     assert spec.secret == "DLT_DB.OPS.POSTGRES_APP_COPY"
     assert spec.env_var == "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD"
-    assert spec.write_disposition == "replace"
+    # Deliberately NO spec-level write_disposition: run.py would pass it to
+    # pipeline.run(), where it bluntly overrides the per-table modes below.
+    assert spec.write_disposition is None
     assert spec.config["database"] == "DLT_DB"
     assert spec.config["schema"] == "OPS"
-    assert spec.config["tables"] == [
+
+    def table_name(entry):
+        return entry if isinstance(entry, str) else entry["name"]
+
+    names = [table_name(t) for t in spec.config["tables"]]
+    assert names == [
         "pipeline_runs",
         "task_runs",
         "log_lines",
         "metric_samples",
+        "dbt_query_log",
+        "dbt_query_operator_stats",
         "pipeline_registry",
         "dbt_builds",
         "dbt_runs",
         "dbt_runs_refresh_log",
-        "dbt_query_log",
-        "dbt_query_operator_stats",
         "headlines",
         "alert_state",
     ]
+    # The history tables are incremental (the 2026-08-24 OOM), the small
+    # tables full replace.
+    modes = {
+        table_name(t): (t.get("mode") if isinstance(t, dict) else "replace")
+        for t in spec.config["tables"]
+    }
+    assert modes["pipeline_runs"] == "merge"
+    assert modes["task_runs"] == "merge"
+    assert modes["log_lines"] == "append"
+    assert modes["metric_samples"] == "append"
+    assert modes["dbt_query_log"] == "merge"
+    assert modes["dbt_query_operator_stats"] == "append"
+    assert modes["alert_state"] == "replace"
     # Stem NFL is telemetry only; the SELECT source is config.database.
     assert spec.database == "NFL"
-    assert "dlt_events" not in spec.config["tables"]
+    assert "dlt_events" not in names
+
+
+def test_obs_resync_is_the_weekly_full_replace() -> None:
+    # The incremental copy never deletes what Snowflake retention purges;
+    # this scheduled twin replace-loads the same tables weekly to re-bound
+    # Postgres. Spec-level write_disposition IS the mechanism: pipeline.run()
+    # overrides every resource with it.
+    spec = load_registry().get("obs_to_postgres_resync")
+    assert spec.source == "snowflake_app"
+    assert spec.schedule == "0 3 * * 0"
+    assert spec.write_disposition == "replace"
+    obs = load_registry().get("obs_to_postgres")
+
+    def table_name(entry):
+        return entry if isinstance(entry, str) else entry["name"]
+
+    assert spec.config["tables"] == [table_name(t) for t in obs.config["tables"]]
+    assert spec.config["database"] == "DLT_DB"
+    assert spec.config["schema"] == "OPS"
 
 
 # ---------------------------------------------------------------------------
@@ -444,30 +480,29 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         return found
 
     expected = {
-        "nfl_games": 1,          # once, in resource_defaults
-        "nfl_stats": 1,          # once, in resource_defaults
-        "nfl_standings": 1,      # the resource itself
-        "nfl_advanced_stats": 1, # once, in resource_defaults
-        "nfl_plays": 3,          # the three parents that drive the fan-out
-        "nfl_game_odds": 2,      # regular/post games parents
-        "nfl_player_props": 2,   # regular/post games parents
-        "nfl_odds_opening": 2,   # regular/post games parents drive both endpoints
+        "nfl_games": 1,  # once, in resource_defaults
+        "nfl_stats": 1,  # once, in resource_defaults
+        "nfl_standings": 1,  # the resource itself
+        "nfl_plays": 3,  # the three parents that drive the fan-out
+        "nfl_game_odds": 2,  # regular/post games parents
+        "nfl_player_props": 2,  # regular/post games parents
+        "nfl_odds_opening": 2,  # regular/post games parents drive both endpoints
         # WNBA. Fewer tokens than the NFL for the same coverage, because /plays takes
         # no season_type and so needs one parent instead of three.
-        "wnba_games": 1,             # once, in resource_defaults
-        "wnba_stats": 1,             # once, in resource_defaults
-        "wnba_season_stats": 1,      # once, in resource_defaults
-        "wnba_advanced_game": 1,     # once, in resource_defaults
-        "wnba_advanced_season": 1,   # once, in resource_defaults, all 8 measure_types
-        "wnba_shot_locations": 1,    # once, in resource_defaults
-        "wnba_plays": 1,             # the single parent driving the fan-out
+        "wnba_games": 1,  # once, in resource_defaults
+        "wnba_stats": 1,  # once, in resource_defaults
+        "wnba_season_stats": 1,  # once, in resource_defaults
+        "wnba_advanced_game": 1,  # once, in resource_defaults
+        "wnba_advanced_season": 1,  # once, in resource_defaults, all 8 measure_types
+        "wnba_shot_locations": 1,  # once, in resource_defaults
+        "wnba_plays": 1,  # the single parent driving the fan-out
         # NCAAF. No season_type parameter exists for this sport, so no resource is
         # triplicated and every pipeline needs exactly one token.
-        "ncaaf_games": 1,            # the single games resource
-        "ncaaf_stats": 1,            # once, in resource_defaults
-        "ncaaf_season_stats": 1,     # once, in resource_defaults
-        "ncaaf_standings": 1,        # the standings child; the conference parent is season-free
-        "ncaaf_rankings": 1,         # bare season = latest published week, by design
+        "ncaaf_games": 1,  # the single games resource
+        "ncaaf_stats": 1,  # once, in resource_defaults
+        "ncaaf_season_stats": 1,  # once, in resource_defaults
+        "ncaaf_standings": 1,  # the standings child; the conference parent is season-free
+        "ncaaf_rankings": 1,  # bare season = latest published week, by design
     }
     for name, count in expected.items():
         values = season_params(registry.get(name).config)
@@ -479,8 +514,12 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
     # pipeline that needs a season and forgetting to list it here passes silently,
     # which is the exact failure the dict is meant to catch.
     checked = set(expected) | {
-        "nfl_reference", "nfl_injuries", "nfl_news",
-        "wnba_reference", "wnba_injuries", "wnba_standings",
+        "nfl_reference",
+        "nfl_injuries",
+        "nfl_news",
+        "wnba_reference",
+        "wnba_injuries",
+        "wnba_standings",
         "ncaaf_reference",
         "sample",
         "nfl_weather_forecast",
@@ -488,6 +527,7 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_weather_hist_forecast",
         "nfl_app_to_postgres",
         "obs_to_postgres",
+        "obs_to_postgres_resync",
         # nflverse keeps its own season clock (`seasons: current` in the entry asks
         # nflreadpy, never the registry token). See nflverse_source.py.
         "nfl_nflverse_stats",
@@ -516,14 +556,19 @@ def test_pipelines_with_no_season_have_no_token() -> None:
     #
     # nfl_news is dated by its search window (tbs), not by season.
     for name in (
-        "nfl_reference", "nfl_injuries", "nfl_news",
-        "wnba_reference", "wnba_injuries", "wnba_standings",
+        "nfl_reference",
+        "nfl_injuries",
+        "nfl_news",
+        "wnba_reference",
+        "wnba_injuries",
+        "wnba_standings",
         "ncaaf_reference",
         "nfl_weather_forecast",
         "nfl_weather_archive",
         "nfl_weather_hist_forecast",
         "nfl_app_to_postgres",
         "obs_to_postgres",
+        "obs_to_postgres_resync",
     ):
         assert "{current_season}" not in json.dumps(load_registry().get(name).config)
 
@@ -588,9 +633,7 @@ def test_player_props_are_deliberately_unpaginated() -> None:
         endpoint = resources[f"player_props_{suffix}"]["endpoint"]
         assert endpoint["path"] == "odds/player_props"
         assert "paginator" not in endpoint
-        assert endpoint["params"]["game_id"] == (
-            f"{{resources.props_games_{suffix}_ref.id}}"
-        )
+        assert endpoint["params"]["game_id"] == (f"{{resources.props_games_{suffix}_ref.id}}")
 
 
 def test_opening_markets_fan_out_and_merge_by_id() -> None:
@@ -974,16 +1017,16 @@ def test_merge_sql_and_row_params_align() -> None:
     # after the new column would land in the wrong field.
     assert MERGE_SQL.count("%s") == len(params) == 12
     assert params[0] == "nfl_stats"
-    assert params[3] == "DLT"                   # target_database (stem, not full name)
-    assert params[4] == "RAW"                   # dataset_name
-    assert params[6] == "batch_hourly"          # pipeline_group
-    assert params[7] == 5                       # season_rollover_month
+    assert params[3] == "DLT"  # target_database (stem, not full name)
+    assert params[4] == "RAW"  # dataset_name
+    assert params[6] == "batch_hourly"  # pipeline_group
+    assert params[7] == 5  # season_rollover_month
     # The three scheduling bindings. Unsynced, these are None inside SPCS and every
     # scheduled Task dies in spec_from_row before doing any work, while the Task DDL
     # still looks correct because generate_tasks.py reads the YAML rather than the table.
-    assert params[8] == "DLT_DB.OPS.NFL_API_KEY"   # secret
-    assert params[9] == "SOURCES__NFL__API_KEY"    # env_var
-    assert params[10] == "NFL_API_EAI"             # external_access
+    assert params[8] == "DLT_DB.OPS.NFL_API_KEY"  # secret
+    assert params[9] == "SOURCES__NFL__API_KEY"  # env_var
+    assert params[10] == "NFL_API_EAI"  # external_access
     assert json.loads(params[11]) == {"credentials": "secret:x"}  # config JSON
     # config bind is wrapped in PARSE_JSON so VARIANT typing is correct.
     assert "PARSE_JSON(%s)" in MERGE_SQL
@@ -1109,7 +1152,6 @@ def test_emit_sql_is_self_contained() -> None:
     assert "'nfl_stats'" in out and "'gh_issues'" in out
 
 
-
 # ---------------------------------------------------------------------------
 # Token substitution itself (run.py, so dlt is required)
 # ---------------------------------------------------------------------------
@@ -1134,9 +1176,7 @@ def test_resolve_tokens_replaces_only_exact_matches() -> None:
     assert out["resource_defaults"]["endpoint"]["params"]["seasons[]"] == 2026
     assert out["resources"][0]["endpoint"]["params"]["season"] == 2026
     assert out["resources"][0]["endpoint"]["params"]["season_type"] == 2
-    assert out["resources"][1]["endpoint"]["params"]["game_id"] == (
-        "{resources.games_pre_ref.id}"
-    )
+    assert out["resources"][1]["endpoint"]["params"]["game_id"] == ("{resources.games_pre_ref.id}")
     assert out["note"] == "text mentioning {current_season} in prose"
 
 

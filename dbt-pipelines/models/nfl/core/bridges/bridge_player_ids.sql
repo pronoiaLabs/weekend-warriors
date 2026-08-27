@@ -88,7 +88,10 @@ nflverse as (
 
 players as (
 
-    select player_key, player_id from {{ ref('dim_player') }}
+    -- Staging, not dim_player: dim_player now enriches FROM this bridge, so
+    -- reading the dim here would be a dependency cycle. player_key and
+    -- player_id pass through dim_player from staging unchanged.
+    select player_key, player_id from {{ ref('stg_nfl__players') }}
 
 )
 

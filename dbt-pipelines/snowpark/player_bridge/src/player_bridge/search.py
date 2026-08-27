@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from snowflake.snowpark import DataFrame, Session
 
-SERVICE = "NFL_PROD_DB.CORE.PLAYER_SEARCH"
+SERVICE = "NFL_PROD_DB.DIM.PLAYER_SEARCH"
 LIMIT = 5
 
 

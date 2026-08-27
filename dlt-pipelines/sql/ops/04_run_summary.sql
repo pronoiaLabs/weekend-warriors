@@ -794,7 +794,11 @@ ALTER TASK IF EXISTS DLT_DB.OPS.OBS_COPY SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.OBS_REFRESH
   WAREHOUSE = DLT_OPS_WH
-  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 60
+  -- Hourly, not 60: at 60s a long-running container (the postgres copies) kept
+  -- this firing continuously and DLT_OPS_WH awake around the clock (~24
+  -- credits/day, measured 2026-08-24). Freshness between fires comes from the
+  -- dashboard's manual refresh (SP_OBS_SWEEP).
+  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 3600
   USER_TASK_TIMEOUT_MS = 600000
   COMMENT = 'Event-driven observability refresh: drains the ops/02+03 streams and re-merges TASK_RUNS / PIPELINE_RUNS. NOT managed by generate_tasks.py.'
   WHEN SYSTEM$STREAM_HAS_DATA('DLT_DB.OPS.STREAM_OBS_LOGS')

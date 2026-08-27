@@ -43,6 +43,23 @@ spine as (
     )
     where date_day <= (select end_date from bounds)
 
+),
+
+-- Observed phase windows per season, for season_phase. Pure derivation from
+-- the games already loaded -- no new source. Each phase runs from its first
+-- game to the day before the next phase starts, so the dark weeks between
+-- phases classify with the phase being awaited rather than as gaps.
+season_phases as (
+
+    select
+        season,
+        min(iff(season_type = 1, game_date, null))      as preseason_start,
+        min(iff(season_type = 2, game_date, null))      as regular_start,
+        min(iff(season_type = 3, game_date, null))      as postseason_start,
+        max(iff(season_type = 3, game_date, null))      as postseason_end
+    from {{ ref('stg_nfl__games') }}
+    group by season
+
 )
 
 select
@@ -79,6 +96,42 @@ select
     (dayname(date_day) = 'Sun')               as is_sunday,
     (dayname(date_day) = 'Mon')               as is_monday,
     (dayname(date_day) = 'Thu')               as is_thursday,
-    (dayname(date_day) = 'Sat')               as is_saturday
+    (dayname(date_day) = 'Sat')               as is_saturday,
+
+    -- Holiday slates: real analytical anchors for the slate page and props.
+    -- Thanksgiving is the fourth Thursday of November, which always falls on
+    -- the 22nd through the 28th; Black Friday is the Friday right after it
+    -- (23rd through 29th). Derived from the calendar alone -- dayname() for
+    -- the same WEEK_START reason as the flags above.
+    (month(date_day) = 11 and dayname(date_day) = 'Thu'
+        and day(date_day) between 22 and 28)  as is_thanksgiving,
+    (month(date_day) = 11 and dayname(date_day) = 'Fri'
+        and day(date_day) between 23 and 29)  as is_black_friday,
+    (month(date_day) = 12 and day(date_day) = 25)  as is_christmas,
+    (month(date_day) = 1  and day(date_day) = 1)   as is_new_years,
+
+    -- Where this date sits in its NFL season's arc, from the observed phase
+    -- windows: preseason runs from the first preseason game up to the first
+    -- regular-season game, and so on through the Super Bowl; everything else
+    -- (including a season whose games have not loaded yet) is offseason.
+    case
+        when sp.postseason_start is not null
+            and date_day between sp.postseason_start and sp.postseason_end
+            then 'postseason'
+        when sp.regular_start is not null
+            and date_day >= sp.regular_start
+            and date_day < coalesce(sp.postseason_start, dateadd(day, 1, date_day))
+            then 'regular'
+        when sp.preseason_start is not null
+            and date_day >= sp.preseason_start
+            and date_day < coalesce(sp.regular_start, dateadd(day, 1, date_day))
+            then 'preseason'
+        else 'offseason'
+    end                                       as season_phase
 
 from spine
+left join season_phases sp
+    on sp.season = case
+        when month(date_day) <= 2 then year(date_day) - 1
+        else year(date_day)
+    end

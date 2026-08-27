@@ -45,10 +45,14 @@ with games as (
         g.away_team_key,
         g.away_team_id,
         at.team_abbreviation                            as away_abbr
-    from {{ ref('dim_game') }} g
-    inner join {{ ref('dim_team') }} ht
+    -- Staging, not dim_game/dim_team: dim_game now denormalizes
+    -- nflverse_game_id FROM this bridge, so reading the dims here would be a
+    -- dependency cycle. The columns are identical -- both dims pass them
+    -- through from staging unchanged.
+    from {{ ref('stg_nfl__games') }} g
+    inner join {{ ref('stg_nfl__teams') }} ht
         on ht.team_key = g.home_team_key
-    inner join {{ ref('dim_team') }} at
+    inner join {{ ref('stg_nfl__teams') }} at
         on at.team_key = g.away_team_key
 
 ),
@@ -72,13 +76,13 @@ mapped as (
 observed as (
 
     select distinct
-        game_id                                         as nflverse_game_id,
+        nflverse_game_id,
         season,
         week,
         home_team,
         away_team,
-        try_to_date(game_date::string)                  as game_date
-    from {{ source('nfl_raw', 'nflverse_pbp') }}
+        game_date
+    from {{ ref('stg_nfl__nflverse_pbp') }}
 
 ),
 

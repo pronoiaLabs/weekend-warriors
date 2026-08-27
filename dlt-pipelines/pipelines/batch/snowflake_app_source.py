@@ -14,7 +14,32 @@ CONTENTS
     1. Identifiers ............. IDENT_RE, qualify
     2. Types ................... dlt_data_type (DESCRIBE TABLE -> dlt hint)
     3. Variants ................ adapt_copied_value (VARIANT is text, not jsonb)
-    4. The source .............. snowflake_app
+    4. Table entries ........... normalize_table (per-table copy mode)
+    5. The source .............. snowflake_app
+
+INCREMENTAL COPIES
+    A full replace of every table each run is what OOMed the shared Postgres
+    instance (2026-08-24): LOG_LINES and METRIC_SAMPLES carry 90 days of
+    history and were re-INSERTed wholesale every fire. A registry table entry
+    can therefore be a mapping instead of a bare name:
+
+        - name: log_lines
+          mode: append          # or merge (needs primary_key), or replace
+          cursor: event_ts
+          primary_key: query_id # merge only
+
+    append/merge read `WHERE <cursor> >= <last seen value>` (the boundary is
+    inclusive; dlt's incremental dedupes rows equal to it), pushed into the
+    Snowflake SELECT so the warehouse stops scanning history too. A bare
+    string stays exactly what it always was: full replace. Incremental never
+    deletes, so Postgres keeps rows Snowflake retention purges; the weekly
+    obs_to_postgres_resync entry (spec-level write_disposition: replace, the
+    blunt override) is what re-bounds it.
+
+    CAVEAT, accepted: for the two event tables the cursor is the
+    container-side EVENT_TS, and two containers flushing out of order can
+    land a row below the copied maximum, which the hourly copy then never
+    picks up. The weekly resync heals exactly that.
 """
 
 from __future__ import annotations
@@ -104,15 +129,75 @@ def qualify(database: str, schema: str, table: str) -> str:
     """Return database.schema.table after rejecting anything that is not an ident."""
     for part, label in ((database, "database"), (schema, "schema"), (table, "table")):
         if not isinstance(part, str) or not IDENT_RE.match(part):
-            raise ValueError(
-                f"snowflake_app {label} is not a Snowflake identifier: {part!r}"
-            )
+            raise ValueError(f"snowflake_app {label} is not a Snowflake identifier: {part!r}")
     return f"{database}.{schema}.{table}"
+
+
+_TABLE_KEYS = frozenset({"name", "mode", "cursor", "primary_key"})
+_MODES = ("replace", "append", "merge")
+
+
+def normalize_table(entry: str | dict[str, Any]) -> dict[str, Any]:
+    """A registry table entry -> {name, mode, cursor, primary_key}, validated.
+
+    Fail-fast on shape errors: a typo here would otherwise become a silent
+    full replace (mode misspelled) or a silent append that duplicates rows
+    (merge without a key -- run.py also guards that, but the message here
+    names the table).
+    """
+    if isinstance(entry, str):
+        return {"name": entry, "mode": "replace", "cursor": None, "primary_key": ()}
+    if not isinstance(entry, dict):
+        raise ValueError(f"snowflake_app table entry must be a table name or a mapping: {entry!r}")
+    unknown = set(entry) - _TABLE_KEYS
+    if unknown:
+        raise ValueError(
+            f"snowflake_app table entry {entry.get('name')!r} has unknown "
+            f"key(s): {', '.join(sorted(unknown))}"
+        )
+    name = entry.get("name")
+    if not name:
+        raise ValueError(f"snowflake_app table entry needs a name: {entry!r}")
+    mode = entry.get("mode", "replace")
+    if mode not in _MODES:
+        raise ValueError(
+            f"snowflake_app table {name!r}: mode must be one of {_MODES}, got {mode!r}"
+        )
+    cursor = entry.get("cursor")
+    primary_key = entry.get("primary_key") or ()
+    if isinstance(primary_key, str):
+        primary_key = (primary_key,)
+    primary_key = tuple(primary_key)
+    if mode == "replace" and (cursor or primary_key):
+        raise ValueError(
+            f"snowflake_app table {name!r}: cursor/primary_key only make sense "
+            "with mode append or merge (a bare name already means replace)"
+        )
+    if mode in ("append", "merge") and not cursor:
+        raise ValueError(f"snowflake_app table {name!r}: mode {mode!r} needs a cursor")
+    if mode == "merge" and not primary_key:
+        raise ValueError(f"snowflake_app table {name!r}: mode merge needs a primary_key")
+    for ident in (name, cursor, *primary_key):
+        if ident is not None and not IDENT_RE.match(ident):
+            raise ValueError(f"snowflake_app table {name!r}: not a Snowflake identifier: {ident!r}")
+    return {"name": name, "mode": mode, "cursor": cursor, "primary_key": primary_key}
+
+
+def select_sql(fqn: str, cursor: str | None = None, since: Any = None) -> str:
+    """The read statement: full scan, or bounded at the incremental cursor.
+
+    Inclusive boundary on purpose: dlt's incremental dedupes rows equal to
+    the previous last_value, and `>` would drop rows that share the boundary
+    timestamp but landed after the previous read.
+    """
+    if cursor is None or since is None:
+        return f"SELECT * FROM {fqn}"
+    return f"SELECT * FROM {fqn} WHERE {cursor.upper()} >= %s"
 
 
 def snowflake_app(
     name: str,
-    tables: list[str],
+    tables: list[str | dict[str, Any]],
     database: str,
     schema: str = "APP",
     connect: Callable[[], Any] | None = None,
@@ -120,10 +205,13 @@ def snowflake_app(
     """One resource per table. Each yields dict rows with lowercase keys.
 
     `name` becomes the dlt schema name; pass the pipeline name so two APP copies
-    cannot share one stored schema. `connect` is injected by tests.
+    cannot share one stored schema. `connect` is injected by tests. Table
+    entries are bare names (replace) or mappings (append/merge on a cursor);
+    see normalize_table and the module docstring.
     """
     if not tables:
         raise ValueError("snowflake_app requires config.tables")
+    specs = [normalize_table(entry) for entry in tables]
 
     if connect is None:
 
@@ -132,14 +220,23 @@ def snowflake_app(
 
             return _connect()
 
-    def _rows(fqn: str, columns: dict[str, dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    def _rows(
+        fqn: str,
+        columns: dict[str, dict[str, Any]],
+        cursor_col: str | None = None,
+        since: Any = None,
+    ) -> Iterator[dict[str, Any]]:
         from snowflake.connector import DictCursor  # noqa: PLC0415
 
         types = {name: spec["data_type"] for name, spec in columns.items()}
         conn = connect()
         try:
             cur = conn.cursor(DictCursor)
-            cur.execute(f"SELECT * FROM {fqn}")
+            sql = select_sql(fqn, cursor_col, since)
+            if since is not None and cursor_col is not None:
+                cur.execute(sql, (since,))
+            else:
+                cur.execute(sql)
             for row in cur:
                 out = {str(k).lower(): v for k, v in row.items()}
                 yield {k: adapt_copied_value(v, types.get(k, "text")) for k, v in out.items()}
@@ -148,21 +245,69 @@ def snowflake_app(
 
     @dlt.source(name=name, max_table_nesting=0)
     def _source() -> Any:
-        for table in tables:
-            fqn = qualify(database, schema, table)
-            conn = connect()
-            try:
-                from snowflake.connector import DictCursor  # noqa: PLC0415
+        # One connection for every DESCRIBE; each resource still opens its own
+        # at extraction time, because extraction happens after this returns.
+        conn = connect()
+        try:
+            from snowflake.connector import DictCursor  # noqa: PLC0415
 
-                columns = _column_hints(conn.cursor(DictCursor), fqn)
-            finally:
-                conn.close()
-            log.info("resource %s reads %s (%s columns)", table, fqn, len(columns))
+            hints = {
+                spec["name"]: _column_hints(
+                    conn.cursor(DictCursor), qualify(database, schema, spec["name"])
+                )
+                for spec in specs
+            }
+        finally:
+            conn.close()
+
+        for spec in specs:
+            table = spec["name"]
+            fqn = qualify(database, schema, table)
+            columns = hints[table]
+            for ident in filter(None, (spec["cursor"], *spec["primary_key"])):
+                if ident.lower() not in columns:
+                    raise ValueError(
+                        f"snowflake_app table {table!r}: column {ident!r} is not in "
+                        f"DESCRIBE TABLE {fqn}"
+                    )
+            log.info(
+                "resource %s reads %s (%s columns, mode %s)",
+                table,
+                fqn,
+                len(columns),
+                spec["mode"],
+            )
+            if spec["mode"] == "replace":
+                yield dlt.resource(
+                    _rows(fqn, columns),
+                    name=table,
+                    write_disposition="replace",
+                    columns=columns,
+                )
+                continue
+
+            def _incremental_rows(
+                # include, not raise: a stray NULL cursor value must not kill
+                # the whole copy. NULL rows ride along (the SQL boundary
+                # excludes them after the first run) and never advance state.
+                incremental=dlt.sources.incremental(
+                    spec["cursor"].lower(), on_cursor_value_missing="include"
+                ),
+                _fqn: str = fqn,
+                _columns: dict[str, dict[str, Any]] = columns,
+                _cursor: str = spec["cursor"],
+            ) -> Iterator[dict[str, Any]]:
+                yield from _rows(_fqn, _columns, _cursor, incremental.last_value)
+
+            kwargs: dict[str, Any] = {}
+            if spec["primary_key"]:
+                kwargs["primary_key"] = list(spec["primary_key"])
             yield dlt.resource(
-                _rows(fqn, columns),
+                _incremental_rows,
                 name=table,
-                write_disposition="replace",
+                write_disposition=spec["mode"],
                 columns=columns,
+                **kwargs,
             )
 
     return _source()
