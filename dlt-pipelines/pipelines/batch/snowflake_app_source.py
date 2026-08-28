@@ -28,18 +28,19 @@ INCREMENTAL COPIES
           cursor: event_ts
           primary_key: query_id # merge only
 
-    append/merge read `WHERE <cursor> >= <last seen value>` (the boundary is
-    inclusive; dlt's incremental dedupes rows equal to it), pushed into the
-    Snowflake SELECT so the warehouse stops scanning history too. A bare
-    string stays exactly what it always was: full replace. Incremental never
-    deletes, so Postgres keeps rows Snowflake retention purges; the weekly
-    obs_to_postgres_resync entry (spec-level write_disposition: replace, the
-    blunt override) is what re-bounds it.
+    append/merge read `WHERE <cursor> > <last seen value>` (STRICTLY
+    exclusive, range_start="open" -- see select_sql for why the inclusive
+    variant was a measured disaster), pushed into the Snowflake SELECT so the
+    warehouse stops scanning history too. A bare string stays exactly what it
+    always was: full replace. Incremental never deletes, so Postgres keeps
+    rows Snowflake retention purges; the weekly obs_to_postgres_resync entry
+    (spec-level write_disposition: replace, the blunt override) is what
+    re-bounds it.
 
-    CAVEAT, accepted: for the two event tables the cursor is the
-    container-side EVENT_TS, and two containers flushing out of order can
-    land a row below the copied maximum, which the hourly copy then never
-    picks up. The weekly resync heals exactly that.
+    CAVEAT, accepted: rows can be missed at the boundary -- a row sharing the
+    copied maximum timestamp that lands after the read (the exclusive range),
+    and, for the two event tables, a container flushing out of order below
+    the copied maximum. The weekly resync heals both.
 """
 
 from __future__ import annotations
@@ -186,13 +187,19 @@ def normalize_table(entry: str | dict[str, Any]) -> dict[str, Any]:
 def select_sql(fqn: str, cursor: str | None = None, since: Any = None) -> str:
     """The read statement: full scan, or bounded at the incremental cursor.
 
-    Inclusive boundary on purpose: dlt's incremental dedupes rows equal to
-    the previous last_value, and `>` would drop rows that share the boundary
-    timestamp but landed after the previous read.
+    STRICTLY exclusive boundary (`>`), matching range_start="open" on the
+    incremental. The inclusive `>=` + dedupe combination was tried first and
+    was a disaster on this data: dedupe fingerprints every row equal to the
+    running maximum, our telemetry timestamps arrive in bursts of hundreds
+    sharing one value, so the first full pass hashed nearly every row and ran
+    3x past the old full-copy time (three 60-minute task timeouts,
+    2026-08-28). A row that shares the boundary timestamp but lands after a
+    read is missed by `>`; the weekly obs_to_postgres_resync heals exactly
+    that, which is why the fast boundary is the right trade here.
     """
     if cursor is None or since is None:
         return f"SELECT * FROM {fqn}"
-    return f"SELECT * FROM {fqn} WHERE {cursor.upper()} >= %s"
+    return f"SELECT * FROM {fqn} WHERE {cursor.upper()} > %s"
 
 
 def snowflake_app(
@@ -300,8 +307,20 @@ def snowflake_app(
                     # kill the whole copy. NULL rows ride along (the SQL
                     # boundary excludes them after the first run) and never
                     # advance state.
+                    #
+                    # range_start="open": exclusive boundary, NO row
+                    # fingerprinting. The default closed range dedupes by
+                    # hashing every row equal to the running maximum; with
+                    # telemetry timestamps arriving in bursts of hundreds
+                    # sharing one value, that hashed nearly every row and blew
+                    # the first full pass 3x past the old full-copy runtime
+                    # (three 60-min task timeouts, 2026-08-28). Pairs with the
+                    # strict `>` in select_sql; the weekly resync heals the
+                    # boundary-sharing rows an open range can miss.
                     incremental=dlt.sources.incremental(
-                        _cursor.lower(), on_cursor_value_missing="include"
+                        _cursor.lower(),
+                        on_cursor_value_missing="include",
+                        range_start="open",
                     ),
                 ) -> Iterator[dict[str, Any]]:
                     yield from _rows(_fqn, _columns, _cursor, incremental.last_value)
