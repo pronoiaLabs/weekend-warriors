@@ -63,6 +63,8 @@ that times out on `:5432` is this policy, not a missing EAI.
 make run-postgres NAME=nfl_app_to_postgres
 # one mart:
 make run-postgres NAME=nfl_app_to_postgres RESOURCE=app_game_slate
+# force every mart even when its content hash matches the last copy:
+DLT_FORCE_FULL_COPY=1 make run-postgres NAME=nfl_app_to_postgres
 # observability (writes app.observability from the spec's dataset_name):
 make run-postgres NAME=obs_to_postgres
 ```
@@ -73,6 +75,15 @@ That target:
 - writes Postgres as `app_copy_writer` using `.env.postgres`
 - sets `DLT_DESTINATION=postgres` and `DLT_DATASET` from the spec (`app_copy` or `observability`)
 
+The NFL APP copy streams normalized CSV through Postgres `COPY FROM STDIN`
+instead of batched INSERTs. It computes `HASH_AGG(*)` and `COUNT(*)` for every
+listed Snowflake mart before
+loading. It replaces only tables whose hash differs from
+`app_copy_watermark.content_hash`; the first run after adding the column copies
+everything because the stored hashes are NULL. An explicit `RESOURCE=` run
+bypasses the skip, and `DLT_FORCE_FULL_COPY=1` is the all-table recovery path
+after an out-of-band Postgres change.
+
 `make run-snowflake` forces `DLT_DESTINATION=snowflake` and a `DEV_<user>`
 schema. It is the wrong target for this pipeline.
 
@@ -80,7 +91,7 @@ After a green run:
 
 ```sql
 -- on the Postgres instance, database app
-SELECT sport, table_name, source_build_id, row_count, copied_at
+SELECT sport, table_name, source_build_id, row_count, content_hash, copied_at
 FROM app_copy.app_copy_watermark
 ORDER BY table_name;
 ```

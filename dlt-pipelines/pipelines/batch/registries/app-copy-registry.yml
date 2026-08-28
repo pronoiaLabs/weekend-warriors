@@ -28,6 +28,11 @@ pipelines:
     write_disposition: replace
     config:
       schema: APP
+      # Postgres COPY FROM STDIN instead of batched INSERT ... VALUES.
+      loader_file_format: csv
+      # A raw load can rebuild dbt without changing every APP mart. Hash each
+      # source table and only replace the tables whose content moved.
+      skip_unchanged: true
       # Every NFL APP table in analytics-dashboard/api/app/sports/profiles/nfl.py.
       # Explicit list — do not SELECT * from the schema.
       tables:

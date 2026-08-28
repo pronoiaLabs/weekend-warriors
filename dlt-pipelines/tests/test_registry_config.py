@@ -313,6 +313,30 @@ def test_unscheduled_pipeline_needs_no_bindings() -> None:
     _spec().validate()
 
 
+@pytest.mark.parametrize(
+    "loader_file_format", ["csv", "insert_values", "jsonl", "model", "parquet"]
+)
+def test_known_loader_file_formats_are_accepted(loader_file_format) -> None:
+    _spec(config={"loader_file_format": loader_file_format}).validate()
+
+
+def test_unknown_loader_file_format_is_rejected() -> None:
+    with pytest.raises(RegistryError, match="config.loader_file_format"):
+        _spec(config={"loader_file_format": "xlsx"}).validate()
+
+
+def test_skip_unchanged_requires_boolean_and_snowflake_app() -> None:
+    with pytest.raises(RegistryError, match="must be a boolean"):
+        _spec(config={"skip_unchanged": "yes"}).validate()
+    with pytest.raises(RegistryError, match="only supported for the snowflake_app"):
+        _spec(config={"skip_unchanged": True}).validate()
+
+    _spec(
+        source="snowflake_app",
+        config={"tables": ["app_game_slate"], "skip_unchanged": True},
+    ).validate()
+
+
 @pytest.mark.parametrize("month", [0, 13, -1, 8.5, "8", None, True])
 def test_rollover_month_outside_1_to_12_is_rejected(month) -> None:
     """A bad rollover month produces a wrong YEAR, not an error, so validate() must.
@@ -373,6 +397,8 @@ def test_nfl_app_to_postgres_is_an_after_task_with_twenty_tables() -> None:
     assert spec.secret == "DLT_DB.OPS.POSTGRES_APP_COPY"
     assert spec.env_var == "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD"
     assert spec.write_disposition == "replace"
+    assert spec.config["loader_file_format"] == "csv"
+    assert spec.config["skip_unchanged"] is True
     assert len(spec.config["tables"]) == 20
     assert "app_game_slate" in spec.config["tables"]
     assert "app_explore_line_moves" in spec.config["tables"]

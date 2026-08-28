@@ -591,8 +591,69 @@ def run_pipeline(
         # Narrow BEFORE the hint check, so the check only judges resources that are
         # going to load. with_resources() returns a new source and leaves this one
         # alone; unknown names raise here, naming what is available.
+        content_hashes: dict[str, str] = {}
+        source_row_counts: dict[str, int] = {}
+        loaded_source_row_counts: dict[str, int] = {}
+        skip_unchanged = (
+            spec.source == "snowflake_app" and spec.config.get("skip_unchanged")
+        )
         if resources:
             source = source.with_resources(*resources)
+        if skip_unchanged:
+            from pipelines.batch.app_copy_watermark import (  # noqa: PLC0415
+                changed_tables,
+                current_table_signatures,
+                listed_table_names,
+                stored_content_hashes,
+            )
+
+            signatures = current_table_signatures(spec, tables=resources)
+            content_hashes = {table: values[0] for table, values in signatures.items()}
+            source_row_counts = {table: values[1] for table, values in signatures.items()}
+            force_full_copy = os.environ.get("DLT_FORCE_FULL_COPY") == "1"
+            if resources:
+                # An explicit resource selection means "copy these", not "copy these
+                # if changed". The signatures still correct dlt's CSV cell counts and
+                # stamp the resulting watermark.
+                tables_to_copy = resources
+            elif force_full_copy:
+                tables_to_copy = listed_table_names(spec)
+                pipeline_log.info(
+                    "DLT_FORCE_FULL_COPY=1: bypassing content-hash skip for %s table(s)",
+                    len(tables_to_copy),
+                )
+            else:
+                stored_hashes = stored_content_hashes(spec)
+                tables_to_copy = changed_tables(spec, content_hashes, stored_hashes)
+
+            if not tables_to_copy:
+                pipeline_log.info(
+                    "all %s APP tables unchanged; skipping Postgres load",
+                    len(content_hashes),
+                )
+                record_run(
+                    spec,
+                    status="ok",
+                    load_id=None,
+                    row_counts={},
+                    resources=None,
+                    params=params,
+                )
+                return
+
+            skipped = len(content_hashes) - len(tables_to_copy)
+            loaded_source_row_counts = {
+                table.lower(): source_row_counts[table.lower()]
+                for table in tables_to_copy
+            }
+            pipeline_log.info(
+                "content-hash plan: copying %s table(s), skipping %s unchanged: %s",
+                len(tables_to_copy),
+                skipped,
+                ",".join(tables_to_copy),
+            )
+            if not resources:
+                source = source.with_resources(*tables_to_copy)
 
         _check_merge_keys(spec, source)
 
@@ -603,6 +664,8 @@ def run_pipeline(
         run_kwargs: dict[str, Any] = {}
         if spec.write_disposition:
             run_kwargs["write_disposition"] = spec.write_disposition
+        if spec.config.get("loader_file_format"):
+            run_kwargs["loader_file_format"] = spec.config["loader_file_format"]
 
         info = pipeline.run(source, **run_kwargs)
         info.raise_on_failed_jobs()
@@ -616,6 +679,11 @@ def run_pipeline(
             if pipeline.last_trace and pipeline.last_trace.last_normalize_info
             else {}
         )
+        # dlt 1.29's CSV writer reports cells (sum(len(row))) rather than rows
+        # in last_normalize_info. The signature query already counted the source
+        # rows, so use those authoritative values for logging and watermarks.
+        for table, count in loaded_source_row_counts.items():
+            row_counts[table] = count
 
         if spec.source == "snowflake_app":
             from pipelines.batch.obs_copy_watermark import (  # noqa: PLC0415
@@ -630,7 +698,12 @@ def run_pipeline(
                     write_app_copy_watermark,
                 )
 
-                write_app_copy_watermark(spec, row_counts)
+                write_app_copy_watermark(
+                    spec,
+                    row_counts,
+                    content_hashes=content_hashes,
+                    source_row_counts=loaded_source_row_counts,
+                )
 
         pipeline_log.info("load complete: %s", info)
         if row_counts:
