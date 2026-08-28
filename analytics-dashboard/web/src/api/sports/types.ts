@@ -16,6 +16,10 @@ export type Capability =
   | 'line_history'
   | 'prop_line_history'
   | 'news'
+  | 'status_board'
+  | 'trending_players'
+  | 'market_movers'
+  | 'team_branding'
   | 'explore_player_games'
   | 'explore_defender_games'
   | 'explore_team_games'
@@ -784,6 +788,8 @@ export interface MentionRow {
   position: string | null
   position_name: string | null
   position_group: string | null
+  headshot_url: string | null
+  sleeper_player_id: string | null
   team_key: string | null
   team_label: string | null
   team_name: string | null
@@ -862,3 +868,151 @@ export interface SheetPayload {
   rows: Record<string, Cell>[]
   query: string | null
 }
+
+/** The Pulse: the home screen's composite fetch, five sections in one payload. */
+export interface StatusRow {
+  app_status_board_key: string
+  player_key: string
+  player_id: number | null
+  player_name: string
+  position: string | null
+  position_name: string | null
+  position_group: string | null
+  headshot_url: string | null
+  sleeper_player_id: string | null
+  team_key: string | null
+  team_label: string | null
+  team_name: string | null
+  status_source: 'report' | 'live'
+  designation: string | null
+  designation_order: number
+  injury: string | null
+  injury_detail: string | null
+  practice_status: string | null
+  practice_wed: string | null
+  practice_thu: string | null
+  practice_fri: string | null
+  report_modified_at: string | null
+  live_injury_status: string | null
+  live_practice_participation: string | null
+  depth_chart_position: string | null
+  depth_chart_order: number | null
+  news_updated_at: string | null
+  backup_player_key: string | null
+  backup_player_name: string | null
+  backup_depth_rank: number | null
+  ripple_note: string | null
+  game_key: string | null
+  game_datetime_et: string | null
+  season: number | null
+  week: number | null
+  season_type_name: string | null
+  opponent_team_key: string | null
+  opponent_label: string | null
+  is_home: boolean | null
+}
+
+export interface TrendingRow {
+  app_trending_players_key: string
+  player_key: string
+  player_id: number | null
+  sleeper_player_id: string | null
+  player_name: string
+  position: string | null
+  position_name: string | null
+  position_group: string | null
+  headshot_url: string | null
+  team_key: string | null
+  team_label: string | null
+  team_name: string | null
+  direction: 'add' | 'drop'
+  move_count_24h: number
+  board_rank: number | null
+  lookback_hours: number | null
+  fetched_at: string
+  trend_date: string
+  state_season: number | null
+  state_week: number | null
+  next_game_key: string | null
+  next_game_datetime_et: string | null
+  next_opponent_team_key: string | null
+  next_opponent_label: string | null
+  next_game_is_home: boolean | null
+}
+
+export interface MoverRow {
+  app_market_movers_key: string
+  kind: 'game' | 'prop'
+  game_key: string
+  game_id: number
+  season: number
+  week: number
+  season_type: number
+  season_type_name: string
+  game_date: string
+  game_datetime_et: string
+  vendor: string
+  market: string
+  home_team_key: string | null
+  home_team_label: string | null
+  away_team_key: string | null
+  away_team_label: string | null
+  player_key: string | null
+  player_id: number | null
+  player_name: string | null
+  position: string | null
+  headshot_url: string | null
+  team_key: string | null
+  team_label: string | null
+  stat_label: string | null
+  open_line: number
+  latest_line: number
+  delta: number
+  abs_delta: number
+  open_at: string | null
+  moved_at: string | null
+  snapshots: number | null
+  mover_rank: number
+}
+
+export interface MoversSection {
+  games: MoverRow[]
+  props: MoverRow[]
+}
+
+export interface PulsePayload {
+  sport: string
+  season: number
+  as_of: string
+  season_type_name: string
+  week: number
+  days: number
+  vendor: string | null
+  weeks: WeekRef[]
+  slate: SlateRow[]
+  news: MentionRow[]
+  status: StatusRow[]
+  trending: TrendingRow[]
+  movers: MoversSection
+  query: string | null
+}
+
+/** Team branding: fetched once per sport, joined client-side by team_key. */
+export interface BrandingRow {
+  app_team_branding_key: string
+  team_key: string
+  team_id: number
+  team_label: string
+  team_name: string
+  team_nickname: string | null
+  conference: string | null
+  division: string | null
+  nflverse_abbr: string | null
+  color_primary: string | null
+  color_secondary: string | null
+  logo_url: string | null
+  logo_squared_url: string | null
+  wordmark_url: string | null
+}
+
+export type BrandingPayload = Envelope<BrandingRow>

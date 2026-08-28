@@ -1,0 +1,131 @@
+{
+  "table": "app_trending_players",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_trending_players_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "player_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "sleeper_player_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position_name",
+      "type": "VARCHAR(19)",
+      "nullable": true
+    },
+    {
+      "name": "position_group",
+      "type": "VARCHAR(20)",
+      "nullable": true
+    },
+    {
+      "name": "headshot_url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "direction",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "move_count_24h",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "board_rank",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "lookback_hours",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "fetched_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "trend_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "state_season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "state_week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "next_game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "next_game_datetime_et",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "next_opponent_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "next_opponent_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "next_game_is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    }
+  ]
+}

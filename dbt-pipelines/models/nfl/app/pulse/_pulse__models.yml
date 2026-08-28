@@ -1,0 +1,105 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# Pulse: the home screen's catch-up zones -- status, trending, market movers.
+# (The Pulse's news and slate zones reuse the news/ and game_day/ marts.)
+
+models:
+  - name: app_status_board
+    description: >
+      Who is worth watching right now: official designations filed for each
+      team's next game (fact_injury_report), plus live Sleeper status changes
+      between filings (dim_player, serving-only), with the mechanical next-man-up
+      from the depth chart and the next-game block. One row per player.
+      HONEST LIMITS: the injuries feed is merged on its natural key, so
+      practice_wed/thu/fri carry a letter only for the weekday the surviving
+      filing was modified on -- NULL means "not filed", never "did not
+      practice"; the ripple is depth-chart-mechanical, no usage claims;
+      unbridged players are dropped.
+    columns:
+      - name: app_status_board_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: player_name
+        tests: [not_null]
+      - name: status_source
+        tests:
+          - not_null
+          - accepted_values: {values: ['report', 'live']}
+      - name: designation
+        description: >
+          The filed report_status (Out / Doubtful / Questionable) on report
+          rows; NULL on live rows, whose signal is live_injury_status.
+      - name: designation_order
+        description: "Sort key: Out=1, Doubtful=2, Questionable=3, everything else 4."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 4}
+      - name: team_key
+        description: >
+          The filing team on report rows; the latest depth-chart appearance on
+          live rows, which can be stale or NULL for recently moved players.
+
+  - name: app_trending_players
+    description: >
+      Sleeper's add/drop leaderboard, latest fetch per direction only, with
+      player identity, team from the latest depth-chart appearance, and the
+      next game. One row per player and direction. Unbridged players are
+      dropped (the page needs a name and a headshot); movement history stays
+      on fact_sleeper_trending.
+    columns:
+      - name: app_trending_players_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: direction
+        tests:
+          - not_null
+          - accepted_values: {values: ['add', 'drop']}
+      - name: move_count_24h
+        description: >
+          The fact's move_count over its lookback window; lookback_hours rides
+          along so the "24h" caption is data, not assumption.
+        tests: [not_null]
+      - name: board_rank
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 100}
+
+  - name: app_market_movers
+    description: >
+      What the books repriced since open: game lines (spread and total,
+      home-sided) and player prop lines, opening snapshot joined to the latest
+      pregame snapshot on the two snapshot facts. A row means the line moved
+      (delta != 0). kind discriminates game rows from prop rows; kind-specific
+      identity columns are NULL on the other kind. mover_rank pre-ranks by
+      abs(delta) within (season, season_type, week, vendor, kind) so the API
+      takes top-N with a bound filter.
+    columns:
+      - name: app_market_movers_key
+        tests: [unique, not_null]
+      - name: kind
+        tests:
+          - not_null
+          - accepted_values: {values: ['game', 'prop']}
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: vendor
+        tests: [not_null]
+      - name: market
+        description: "'spread' or 'total' on game rows; the prop_type on prop rows."
+        tests: [not_null]
+      - name: delta
+        tests: [not_null]
+      - name: mover_rank
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1}

@@ -72,6 +72,12 @@ SELECTION: dict[str, dict[C, str]] = {
         ),
         # every mention; the feeds began on 2026-08-20
         C.NEWS: "published_date >= '2026-08-01'",
+        # the Pulse's zones: status and trending are current-state and small,
+        # branding is 32 rows; movers takes the two lined weeks like the lines
+        C.STATUS_BOARD: "1 = 1",
+        C.TRENDING_PLAYERS: "1 = 1",
+        C.MARKET_MOVERS: "season = 2026 and week in (1, 2)",
+        C.TEAM_BRANDING: "1 = 1",
         # the Explorer's sheets: a slice of each grain the page's filters can
         # cut further (two teams' player seasons, one completed team season,
         # two lined weeks, one book's props, two days of news, two books' moves)

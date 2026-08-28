@@ -33,7 +33,7 @@ fi
 PROFILE="$(mktemp -d -t ww-nav-profile.XXXXXX)"
 (
   cd api
-  ANALYTICS_DASHBOARD_DATA=fixtures ANALYTICS_DASHBOARD_NOW=2026-08-23T02:00:00+00:00 \
+  ANALYTICS_DASHBOARD_DATA=fixtures ANALYTICS_DASHBOARD_NOW=2026-08-28T17:00:00+00:00 \
     uv run --extra dev uvicorn app.main:app --port "$PORT" --log-level warning >/dev/null 2>&1
 ) &
 API_PID=$!

@@ -11,12 +11,14 @@ from app.sports.routers import (
     markets,
     news,
     players,
+    pulse,
     slate,
     teams,
 )
 
 router = APIRouter(prefix="/api/{sport}")
 router.include_router(capabilities.router)
+router.include_router(pulse.router)
 router.include_router(slate.router)
 router.include_router(games.router)
 router.include_router(teams.router)

@@ -1,5 +1,6 @@
 import { get } from '../client.ts'
 import type {
+  BrandingPayload,
   CapabilitiesPayload,
   CatalogPayload,
   GameMarketsPayload,
@@ -9,6 +10,7 @@ import type {
   MarketsPayload,
   NewsPayload,
   PlayerPayload,
+  PulsePayload,
   SheetPayload,
   SlatePayload,
   Split,
@@ -24,6 +26,24 @@ export function fetchHealth(signal?: AbortSignal): Promise<HealthPayload> {
 
 export function fetchCapabilities(sport: string, signal?: AbortSignal): Promise<CapabilitiesPayload> {
   return get<CapabilitiesPayload>(`${sportPath(sport)}/capabilities`, {}, signal)
+}
+
+export type PulseParams = {
+  days?: number
+  season?: number
+  season_type?: string
+  week?: number
+  vendor?: string
+}
+
+/** The home screen's one fetch: news, status, trending, movers and the slate. */
+export function fetchPulse(sport: string, params: PulseParams, signal?: AbortSignal): Promise<PulsePayload> {
+  return get<PulsePayload>(`${sportPath(sport)}/pulse`, params, signal)
+}
+
+/** Fetched once per sport and cached (useBranding); joined client-side by team_key. */
+export function fetchBranding(sport: string, signal?: AbortSignal): Promise<BrandingPayload> {
+  return get<BrandingPayload>(`${sportPath(sport)}/teams/branding`, {}, signal)
 }
 
 // a type alias, not an interface: only the alias is assignable to get()'s Record

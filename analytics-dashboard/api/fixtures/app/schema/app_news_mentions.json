@@ -53,6 +53,16 @@
       "nullable": true
     },
     {
+      "name": "headshot_url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "sleeper_player_id",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
       "name": "team_key",
       "type": "VARCHAR(32)",
       "nullable": true

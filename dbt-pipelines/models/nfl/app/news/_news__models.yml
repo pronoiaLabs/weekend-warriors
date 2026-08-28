@@ -20,6 +20,11 @@ models:
           - relationships: {to: "ref('fact_player_news_mention')", field: mention_key}
       - name: player_key
         description: "NULL when the article's name did not resolve; is_player_resolved says so."
+      - name: headshot_url
+        description: >
+          nflverse headshot via dim_player; NULL for unresolved mentions and
+          unbridged players. sleeper_player_id rides along so the frontend can
+          build the Sleeper-CDN fallback URL.
       - name: player_name
         tests: [not_null]
       - name: published_at

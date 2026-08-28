@@ -1,0 +1,76 @@
+{
+  "table": "app_team_branding",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_team_branding_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_nickname",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "conference",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "division",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "nflverse_abbr",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "color_primary",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "color_secondary",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "logo_url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "logo_squared_url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "wordmark_url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    }
+  ]
+}
