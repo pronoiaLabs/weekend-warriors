@@ -198,7 +198,7 @@ endef
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
         sync-apply tasks-apply tasks-suspend tasks-resume deploy \
-        clean
+        teardown-source clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<target>\033[0m\n"} \
@@ -670,7 +670,7 @@ setup-postgres-network: ## Render + apply POSTGRES_APP_EAI and SPCS ingress from
 setup-secrets: ## ALTER the API-key + Slack-webhook secrets from .env.snowflake (guard: CONFIRM=1)
 	@if [ "$(CONFIRM)" != "1" ]; then \
 		echo "ALTERs the secrets that setup-source / setup-ops created as placeholders:"; \
-		echo "  NFL_API_KEY  WNBA_API_KEY  NCAAF_API_KEY  FIRECRAWL_API_KEY"; \
+		echo "  NFL_API_KEY  NCAAF_API_KEY  FIRECRAWL_API_KEY"; \
 		echo "  SLACK_ALERTS_WEBHOOK"; \
 		echo "from $(SNOWFLAKE_ENV). Empty vars are skipped (never blanks a secret)."; \
 		echo "Re-run with CONFIRM=1."; \
@@ -812,6 +812,27 @@ tasks-resume: tasks-resume-sql ## Resume every Task (run AFTER tasks-apply)
 deploy: sync-apply tasks-suspend tasks-apply tasks-resume ## Sync registry + suspend, apply and resume Tasks
 	@echo "Deployed. Confirm every Task is running, because suspended looks like success:"
 	@echo "  snow sql --role $(PROD_ROLE) -q \"SHOW TASKS IN SCHEMA DLT_DB.OPS;\""
+
+##@ Destructive teardown
+
+teardown-source: ## Permanently remove one retired source (SOURCE=<name>, guards: CONFIRM=1 DROP_DATA=1)
+	@if [ -z "$(SOURCE)" ]; then \
+		echo "Set SOURCE=<retired-source>, e.g. make teardown-source SOURCE=<name> CONFIRM=1 DROP_DATA=1"; \
+		exit 2; \
+	fi
+	@if [ ! -f "sql/teardown/$(SOURCE).sql" ]; then \
+		echo "No teardown file for source '$(SOURCE)' at sql/teardown/$(SOURCE).sql"; \
+		exit 2; \
+	fi
+	@if [ "$(CONFIRM)" != "1" ] || [ "$(DROP_DATA)" != "1" ]; then \
+		echo "DESTRUCTIVE: this drops the source's production and development databases."; \
+		echo "Read sql/teardown/$(SOURCE).sql, then re-run with CONFIRM=1 DROP_DATA=1."; \
+		exit 2; \
+	fi
+	@$(call hdr,Refresh shared dbt retention before source removal)
+	@$(SNOW) -f sql/ops/06_dbt_harvest.sql
+	@$(call hdr,Permanently remove source $(SOURCE))
+	@$(SNOW) -f sql/teardown/$(SOURCE).sql
 
 ##@ Cleanup
 

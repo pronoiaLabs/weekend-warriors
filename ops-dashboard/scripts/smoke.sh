@@ -63,7 +63,7 @@ ROUTES=(
   "/|How this board is built"
   "/?sport=NFL&date=2026-08-08|Sat"
   "/pipelines|Worst record first"
-  "/pipelines?sport=WNBA|Pipelines"
+  "/pipelines?sport=NFL|Pipelines"
   "/builds|Build log"
   "/ingestion/$SPORT/$NAME|Back to pipelines"
   "/runs/$QID|Back to pipeline"

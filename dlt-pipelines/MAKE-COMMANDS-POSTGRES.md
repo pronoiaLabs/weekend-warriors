@@ -13,7 +13,7 @@ APP trigger in prod: child of `NFL_PROD_DB.OPS.DBT_HARVEST_NFL`, not a cron.
 Obs trigger: `OBS_COPY` after `OBS_REFRESH` and `DBT_OBS_COPY` after
 `DBT_RUNS_REFRESH`, both `EXECUTE TASK` the same loader.
 
-Out of scope here: `app_state`, RLS, NCAAF/WNBA, FEATURES/ML, `0.0.0.0/0`,
+Out of scope here: `app_state`, RLS, NCAAF, FEATURES/ML, `0.0.0.0/0`,
 rewiring `ops-dashboard` to Postgres, `DLT_EVENTS`, per-sport trigger-load
 tables.
 

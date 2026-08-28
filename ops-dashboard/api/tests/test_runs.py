@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 def test_runs_shape(client: TestClient) -> None:
     body = client.get("/api/runs?limit=10").json()
-    assert body["sports"] == ["NFL", "WNBA"]
+    assert body["sports"] == ["NFL"]
     assert len(body["runs"]) == 10
     first = body["runs"][0]
     for key in ("sport", "pipeline", "query_id", "task_state", "run_started_at"):
@@ -19,9 +19,9 @@ def test_runs_newest_first_utc(client: TestClient) -> None:
     assert all(s.endswith("Z") for s in stamps)
 
 
-def test_runs_both_sports_present(client: TestClient) -> None:
+def test_runs_have_the_expected_sport(client: TestClient) -> None:
     runs = client.get("/api/runs?limit=100").json()["runs"]
-    assert {r["sport"] for r in runs} == {"NFL", "WNBA"}
+    assert {r["sport"] for r in runs} == {"NFL"}
 
 
 def test_row_counts_parsed(client: TestClient) -> None:
@@ -32,6 +32,6 @@ def test_row_counts_parsed(client: TestClient) -> None:
 
 
 def test_sport_filter_and_unknown_sport(client: TestClient) -> None:
-    wnba = client.get("/api/runs?sport=WNBA").json()["runs"]
-    assert wnba and all(r["sport"] == "WNBA" for r in wnba)
+    nfl = client.get("/api/runs?sport=NFL").json()["runs"]
+    assert nfl and all(r["sport"] == "NFL" for r in nfl)
     assert client.get("/api/runs?sport=NHL").status_code == 404

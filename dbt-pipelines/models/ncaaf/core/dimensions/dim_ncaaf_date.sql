@@ -10,7 +10,7 @@
 
     Range: 1 January of the earliest standings season to the later of the
     last standings year end and 60 days past the last scheduled game. The
-    60-day tail matters here more than in the WNBA: bowls and the CFP are
+    60-day tail matters because bowls and the CFP are
     scheduled late and land in January, so the spine widens on its own as
     the postseason slate loads.
 
@@ -83,7 +83,7 @@ select
         year(date_day) - 1)                   as ncaaf_season,
 
     -- dayname(), not dayofweek(): the latter's numbering depends on the
-    -- session WEEK_START parameter (see dim_wnba_date).
+    -- session WEEK_START parameter.
     (dayname(date_day) in ('Sat', 'Sun'))     as is_weekend
 
 from spine

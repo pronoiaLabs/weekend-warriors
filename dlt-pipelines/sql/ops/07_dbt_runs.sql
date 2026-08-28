@@ -273,7 +273,7 @@ BEGIN
   -- history for every task the role can see, account-wide. Found live
   -- 2026-08-10: a first draft looped one merge per sport database, stamping
   -- SPORT from the loop variable -- every arm matched ALL rows and the last
-  -- arm relabeled the whole table 'wnba'. (The old view's three per-database
+  -- arm relabeled the whole table with the last sport. (The old view's three per-database
   -- branches were the same misunderstanding in benign form: three identical
   -- account-wide scans, deduped -- correct output, 3x the cost.) SPORT must
   -- derive from the row's own DATABASE_NAME, exactly as the archive arm does.

@@ -8,7 +8,7 @@
 # same values is a same-value ALTER: harmless.
 #
 # The placeholder secrets themselves are created by:
-#   make setup-source SOURCE=<nfl|wnba|ncaaf|firecrawl> CONFIRM=1   (API keys)
+#   make setup-source SOURCE=<nfl|ncaaf|firecrawl> CONFIRM=1   (API keys)
 #   make setup-ops CONFIRM=1                                        (Slack webhook)
 # This script only sets their values. Values cannot be read back from
 # Snowflake; a successful pipeline run (make run-spcs NAME=nfl_reference) or a
@@ -32,7 +32,6 @@ mkdir -p "$GEN"
 # adds a placeholder secret.
 MAPPINGS=(
   "NFL_API_KEY:DLT_DB.OPS.NFL_API_KEY"
-  "WNBA_API_KEY:DLT_DB.OPS.WNBA_API_KEY"
   "NCAAF_API_KEY:DLT_DB.OPS.NCAAF_API_KEY"
   "FIRECRAWL_API_KEY:DLT_DB.OPS.FIRECRAWL_API_KEY"
   "SLACK_WEBHOOK_SECRET:DLT_DB.OPS.SLACK_ALERTS_WEBHOOK"

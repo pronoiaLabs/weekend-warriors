@@ -14,8 +14,8 @@
     to completed games, so "who does Ohio State play next" is answerable
     only here, which is exactly what sv_ncaaf_schedule anchors on.
 
-    Carries the final score, like dim_wnba_game and unlike the NFL
-    dimension, because this is the complete schedule and the scores are
+    Carries the final score unlike the NFL dimension, because this is the
+    complete schedule and the scores are
     NULL-guarded upstream: a scheduled game cannot leak a fake shutout.
 
     Both spellings of the same instant: game_datetime (UTC) and

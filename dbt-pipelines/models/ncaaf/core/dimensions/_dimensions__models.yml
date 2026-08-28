@@ -23,7 +23,7 @@ models:
   - name: dim_ncaaf_team
     description: >
       Every team the source references, 536 rows, SCD1. Only ~134 are FBS
-      programs; filter on is_fbs (the WNBA is_franchise move). Conference
+      programs; filter on is_fbs when needed. Conference
       membership is CURRENT; season-accurate conference lives on
       fact_ncaaf_standing.
     columns:

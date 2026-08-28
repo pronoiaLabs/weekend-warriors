@@ -65,7 +65,7 @@ query in the right column, not the exit code.
 |---|---|---|---|---|
 | 1 | `make setup-base CONFIRM=1` | ACCOUNTADMIN, USERADMIN, SYSADMIN | account grants (compute pool + Postgres instance to SYSADMIN), `DLT_LOADER_ROLE` / `DLT_DEV_ROLE`, `DLT_DB` control plane, registry, `DBT_RUNNER_ROLE` + `DBT_WH`, `DBT_EXT_ACCESS` EAI | `SHOW DATABASES LIKE 'DLT_DB'` |
 | 2 | `make setup-dev CONFIRM=1` | SYSADMIN | `DLT_DEV_DB`, dev pools, `DLT_DEV_WH`, `DEVELOPMENT_WH` | `SHOW WAREHOUSES LIKE 'DEV%'` |
-| 3 | `make setup-source SOURCE=<s> CONFIRM=1` for `nfl`, `wnba`, `ncaaf`, and the extras you want (`firecrawl`, `nflverse`, `openmeteo`, `sleeper`) | SYSADMIN, ACCOUNTADMIN | per-source DEV/PROD databases, EAI, placeholder secret | `SHOW DATABASES LIKE '%_PROD_DB'` |
+| 3 | `make setup-source SOURCE=<s> CONFIRM=1` for `nfl`, `ncaaf`, and the extras you want (`firecrawl`, `nflverse`, `openmeteo`, `sleeper`) | SYSADMIN, ACCOUNTADMIN | per-source DEV/PROD databases, EAI, placeholder secret | `SHOW DATABASES LIKE '%_PROD_DB'` |
 | 4 | `make setup-secrets CONFIRM=1` | SYSADMIN | real secret values from `.env.snowflake` (empty vars skipped) | a later `run-spcs` succeeds |
 | 5 | `make setup-ops CONFIRM=1` | SYSADMIN, ACCOUNTADMIN, DLT_LOADER_ROLE, DBT_RUNNER_ROLE | `DLT_OPS_WH`, `DLT_EVENTS` event table + account binding, observability tables/procs, cost tags, Slack alerting integration | `SHOW PARAMETERS LIKE 'EVENT_TABLE' IN ACCOUNT` (level ACCOUNT) |
 | 6 | `make setup-integrations CONFIRM=1` | SYSADMIN, ACCOUNTADMIN | GitHub API integration for Snowsight Workspaces. Fork note: the allowed prefix is `github.com/pronoiaLabs`; point it at your org with the `ALTER API INTEGRATION` documented in the file | `SHOW API INTEGRATIONS` |
@@ -111,7 +111,7 @@ ingress CIDRs are discovered live and expire when Snowflake rotates them;
 ```bash
 cd ../dbt-pipelines
 make deploy-dev                         # shared dev object
-make deploy-sport SPORT=nfl             # per-sport prod objects (repeat: wnba, ncaaf)
+make deploy-sport SPORT=nfl             # per-sport prod objects (repeat: ncaaf)
 make build-sport SPORT=nfl              # first prod build (later builds fire on data landing)
 make deploy-agent SPORT=nfl             # analyst agent (repeat per sport)
 make deploy-snowpark                    # SP_PLAYER_BRIDGE (NFL bridge pre_hook needs it)

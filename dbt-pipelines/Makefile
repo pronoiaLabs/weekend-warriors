@@ -4,8 +4,8 @@
 # these targets wrap `snow dbt` rather than local dbt Core, which this project
 # does not support. Quickstart:
 #   make deploy-dev                 # upload code to the shared dev object
-#   make build-dev ENV=wnba_dev     # run a dev build as yourself
-#   make deploy-sport SPORT=wnba    # upload code to a sport's prod object
+#   make build-dev ENV=ncaaf_dev    # run a dev build as yourself
+#   make deploy-sport SPORT=ncaaf   # upload code to a sport's prod object
 #
 # THREE PROJECT OBJECTS, ONE SOURCE TREE. Concurrent EXECUTE DBT PROJECT
 # calls against one object are unsupported, and the per-sport trigger tasks
@@ -13,7 +13,7 @@
 # time, so each sport gets its own object:
 #   DLT_DB.DEPLOY.CORTEX_LIFECYCLE          interactive + dev builds
 #   DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL      prod, fired by DBT_BUILD_NFL
-#   DLT_DB.DEPLOY.CORTEX_LIFECYCLE_WNBA     prod, fired by DBT_BUILD_WNBA
+#   DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NCAAF    prod, fired by DBT_BUILD_NCAAF
 # Deploying is how code reaches prod: the triggers always run whatever the
 # sport object holds, so `make deploy-sport` for each sport after merging
 # model changes IS the release step.
@@ -34,8 +34,8 @@ printf '\n\033[1;36m== %s ==\033[0m\n' "$(1)"
 endef
 
 # The prod environment name is per sport and grandfathered for NFL: the first
-# sport's env was named plain `prod` before wnba_prod set the <sport>_prod
-# pattern. New sports follow the pattern (see tools/new_source.py scaffold).
+# sport's env was named plain `prod`; later sports follow the <sport>_prod
+# pattern (see tools/new_source.py scaffold).
 define sport_env
 $(if $(filter nfl,$(1)),prod,$(1)_prod)
 endef
@@ -67,8 +67,8 @@ deploy-dev: ## Upload the source tree to the shared dev object
 # object. Normalizing ownership to DBT_RUNNER_ROLE after every deploy makes
 # both paths converge, so neither strands the other's next deploy. (SYSADMIN
 # still deploys fine: it inherits DBT_RUNNER_ROLE through the role hierarchy.)
-deploy-sport: ## Upload the source tree to a sport's prod object (SPORT=nfl|wnba|ncaaf)
-	@test -n "$(SPORT)" || { echo "usage: make deploy-sport SPORT=nfl|wnba|ncaaf"; exit 1; }
+deploy-sport: ## Upload the source tree to a sport's prod object (SPORT=nfl|ncaaf)
+	@test -n "$(SPORT)" || { echo "usage: make deploy-sport SPORT=nfl|ncaaf"; exit 1; }
 	@$(call hdr,deploy $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z))
 	$(SNOW_DBT) deploy $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) $(CONN_ARGS) --source . \
 		--default-env $(call sport_env,$(SPORT)) --external-access-integration $(EAI) --force
@@ -77,17 +77,16 @@ deploy-sport: ## Upload the source tree to a sport's prod object (SPORT=nfl|wnba
 
 deploy-all: deploy-dev ## Deploy dev + every sport object
 	@$(MAKE) deploy-sport SPORT=nfl
-	@$(MAKE) deploy-sport SPORT=wnba
 	@$(MAKE) deploy-sport SPORT=ncaaf
 
 ##@ Run builds by hand
 
-build-dev: ## Dev build as yourself (ENV=dev|wnba_dev, default dev)
+build-dev: ## Dev build as yourself (ENV=dev|ncaaf_dev, default dev)
 	@$(call hdr,build $(or $(ENV),dev) on $(DEV_FQN))
 	$(SNOW_DBT) execute $(CONN_ARGS) --env $(or $(ENV),dev) $(DEV_FQN) build
 
-build-sport: ## Prod build on a sport's object, as the connection's role (SPORT=nfl|wnba)
-	@test -n "$(SPORT)" || { echo "usage: make build-sport SPORT=nfl|wnba"; exit 1; }
+build-sport: ## Prod build on a sport's object, as the connection's role (SPORT=nfl|ncaaf)
+	@test -n "$(SPORT)" || { echo "usage: make build-sport SPORT=nfl|ncaaf"; exit 1; }
 	@$(call hdr,build $(call sport_env,$(SPORT)) on $(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z))
 	$(SNOW_DBT) execute $(CONN_ARGS) --env $(call sport_env,$(SPORT)) \
 		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) build
@@ -118,7 +117,7 @@ deploy-agent: ## Redeploy a sport's whole agent roster in place (SPORT=nfl|wnba|
 setup-cowork: ## Apply sql/01_cowork.sql: CoWork object + register the prod analyst agents (CONFIRM=1)
 	@if [ "$(CONFIRM)" != "1" ]; then \
 		echo "Creates SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT (ACCOUNTADMIN) and ADDs the"; \
-		echo "NFL / WNBA / NCAAF prod analyst agents to it. Requires those agents to be"; \
+		echo "NFL / NCAAF prod analyst agents to it. Requires those agents to be"; \
 		echo "deployed first (make deploy-sport + deploy-agent per sport)."; \
 		echo "Re-run with CONFIRM=1"; \
 		exit 2; \

@@ -2,8 +2,7 @@
 
 (The mechanics here -- Tasks, tokens, deployment, watching, backfilling --
 apply to every sport. The schedules and calendars are per sport: NFL below,
-NCAAF in its own section near the end. WNBA cadences live only in
-`wnba-registry.yml`'s comments.)
+NCAAF in its own section near the end.)
 
 Scheduled Snowflake Tasks loading `NFL_PROD_DB.RAW`. The third runbook, after
 [MAKE-COMMANDS.md](MAKE-COMMANDS.md) (laptop) and [MAKE-COMMANDS-SPCS.md](MAKE-COMMANDS-SPCS.md)
@@ -412,8 +411,8 @@ accepts only bracketed `game_ids[]`, which the child resources resolve from thos
 ## NCAAF: schedules and calendar
 
 Deployed 2026-08-09 (WORKFLOW-7). The band is **02:00-07:59 UTC**, below the
-NFL's 08:00-13:00 and the WNBA's 14:00-23:00 (+ Wed 01:00), so the three
-sports never stack against the shared 600 req/min API limit or `DLT_POOL`.
+NFL's 08:00-13:00, so the two sports never stack against the shared 600
+req/min API limit or `DLT_POOL`.
 
 | Pipeline | Cron (UTC) | Cadence | Why |
 |---|---|---|---|

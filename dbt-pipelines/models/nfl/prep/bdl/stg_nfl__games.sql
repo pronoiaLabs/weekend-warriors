@@ -21,9 +21,8 @@
     rather than breaking a value list.
 
     Scores are nulled for anything not completed. The source writes NULL
-    scores on scheduled rows today, so the iff() is belt and suspenders --
-    it also protects against the provider switching to 0-0 placeholders the
-    way the WNBA games source does.
+    scores on scheduled rows today, so the iff() is belt and suspenders -- it
+    also protects against the provider switching to 0-0 placeholders.
 
     season_type is decoded to a label: 1 = Preseason, 2 = Regular Season,
     3 = Postseason.

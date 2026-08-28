@@ -210,10 +210,9 @@ def _apply_constants(cfg: dict[str, Any]) -> None:
 def _token_values(spec: PipelineSpec) -> dict[str, Any]:
     """Resolve the token table once per call, so the date is read at run time.
 
-    Takes the spec because the season boundary is per sport: `season_rollover_month` is
-    8 for the NFL and 5 for the WNBA. One `{current_season}` token serves every league,
-    which keeps the registries uniform and means a new sport adds a line of YAML rather
-    than a token and a function.
+    Takes the spec because the season boundary is per sport. One `{current_season}`
+    token serves every league, which keeps the registries uniform and means a new sport
+    adds a line of YAML rather than a token and a function.
     """
     return {"{current_season}": current_season(spec.season_rollover_month)}
 

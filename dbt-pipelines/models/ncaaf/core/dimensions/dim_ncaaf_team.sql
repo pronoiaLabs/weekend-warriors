@@ -10,8 +10,8 @@
 
     Only ~134 rows are FBS programs; the rest are FCS and below, kept
     because games and stats reference them by id (an FBS team's September
-    schedule routinely includes an FCS opponent). Filter on is_fbs, the
-    same move as the WNBA's is_franchise.
+    schedule routinely includes an FCS opponent). Filter on is_fbs when the
+    consumer needs only top-division programs.
 
     Conference membership here is CURRENT (SCD1): realignment history is
     not in the source's team object. fact_ncaaf_standing's conference is

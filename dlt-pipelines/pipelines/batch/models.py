@@ -137,9 +137,8 @@ class PipelineSpec:
     group: str | None = None
 
     # The month this sport's season starts owning the calendar, feeding the
-    # `{current_season}` token. See current_season() for why it is per-source: the NFL
-    # opens in August and the WNBA in May, and the two only agree in August, so a shared
-    # constant looks correct on the day you write it and is wrong the following spring.
+    # `{current_season}` token. See current_season() for why it is per-source: leagues
+    # can open in different months, so one platform constant is not generally correct.
     season_rollover_month: int = DEFAULT_SEASON_ROLLOVER_MONTH
 
     # Scheduled-run bindings. Unused by a local or dev run, which take them from the
@@ -227,8 +226,7 @@ class PipelineSpec:
         if not isinstance(month, int) or isinstance(month, bool) or not 1 <= month <= 12:
             raise RegistryError(
                 f"pipeline '{self.name}': season_rollover_month must be an integer "
-                f"month 1-12, got {month!r}. It is the month this sport's season "
-                "starts: 8 for the NFL, 5 for the WNBA."
+                f"month 1-12, got {month!r}. It is the month this sport's season starts."
             )
 
     def _validate_task_trigger(self) -> None:
@@ -575,12 +573,11 @@ def current_season(
     than an error, so it would look like a working pipeline loading nothing.
 
     WHY THIS IS A PARAMETER AND NOT A CONSTANT.
-    A hardcoded 8 is right for the NFL and wrong for every sport that does not open in
-    August. The WNBA plays May to September within one calendar year, so under the NFL
-    rule the whole of May, June and July would resolve to LAST season while the current
-    one is being played:
+    A hardcoded 8 is right for football and wrong for any sport that opens earlier in
+    the calendar year. For a hypothetical league opening in May, the football rule
+    would resolve May through July to the previous season:
 
-        WNBA, rollover 5:   30 Apr 2027 -> 2026      1 May 2027 -> 2027
+        rollover 5:   30 Apr 2027 -> 2026      1 May 2027 -> 2027
 
     Both agree in August, which is exactly why a shared constant would have shipped
     looking correct and broken the following spring. The value lives in each registry's

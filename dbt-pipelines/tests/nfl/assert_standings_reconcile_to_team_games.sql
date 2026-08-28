@@ -12,9 +12,8 @@
     parse all at once, against a completely separate source table. A silent
     error in any of them shows up here.
 
-    TOLERANCE, NOT EXACT EQUALITY. Ported from
-    assert_wnba_standings_reconcile_to_team_games, where the full reasoning
-    lives. In season, the game log loads daily while the standings snapshot
+    TOLERANCE, NOT EXACT EQUALITY. In season, the game log loads daily while
+    the standings snapshot
     can trail it by a load, so the log legitimately runs AHEAD of the
     standings and exact equality would fail every day from the first
     completed regular-season game. What is asserted instead is the shape of
@@ -23,8 +22,7 @@
       * the standings never lead the game log, on any split or on points;
       * per team, the log leads by at most the tolerance on every win/loss/
         tie split: one day of lag costs at most one game (no NFL team plays
-        twice in a day) plus one game of headroom for a provider omission,
-        the WNBA precedent;
+        twice in a day) plus one game of headroom for a provider omission;
       * league-wide, the total win lead equals the total loss lead exactly
         (every missing game contributes one win and one loss; a missing tie
         adds zero to both), the total tie lead is even (a missing tie is
@@ -40,7 +38,7 @@
     ability to catch a home/away swap (a swap preserves league-wide totals
     but not each team's splits or points).
 
-    TWO NFL DIVERGENCES FROM THE WNBA STRUCTURE, both deliberate:
+    TWO NFL-SPECIFIC DETAILS are deliberate:
 
       * The games side is COALESCED TO 0 rather than failed when absent. In
         week 1, once the first completed regular-season game pulls the season
@@ -49,8 +47,8 @@
         an empty game log passes, while a standings row claiming wins with no
         game rows correctly goes negative. The coalesce also covers the
         home/road split sums, which are NULL for a team whose only games so
-        far are on the road. The WNBA 'team_season_only_in_standings' branch
-        is absorbed by this coalesce and deliberately dropped. The standings
+        far are on the road. A team present only in standings is absorbed by
+        this coalesce. The standings
         side is NOT coalesced: a team-season only in the game log stays a
         hard failure.
 

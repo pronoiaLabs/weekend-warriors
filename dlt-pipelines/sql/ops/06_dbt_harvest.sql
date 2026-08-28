@@ -66,7 +66,7 @@ USE ROLE DBT_RUNNER_ROLE;
 -- lets the error propagate rather than swallowing it to write a row).
 CREATE TABLE IF NOT EXISTS DLT_DB.OPS.DBT_BUILDS (
   BUILD_ID       VARCHAR,        -- UUID minted by SP_DBT_BUILD; 'manual' runs lack a row here
-  SPORT          VARCHAR,        -- 'nfl', 'wnba', ...
+  SPORT          VARCHAR,        -- 'nfl', 'ncaaf', ...
   ENVIRONMENT    VARCHAR,        -- env.yml environment the build ran as
   PROJECT_FQN    VARCHAR,        -- which project object built
   ARGS           VARCHAR,        -- 'run' / 'build' (the NFL run-vs-build split)
@@ -304,8 +304,6 @@ BEGIN
   DELETE FROM DLT_DB.OPS.DBT_BUILDS
     WHERE FINISHED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
   DELETE FROM NFL_PROD_DB.OPS.DBT_TRIGGER_LOADS
-    WHERE DRAINED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
-  DELETE FROM WNBA_PROD_DB.OPS.DBT_TRIGGER_LOADS
     WHERE DRAINED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());
   DELETE FROM NCAAF_PROD_DB.OPS.DBT_TRIGGER_LOADS
     WHERE DRAINED_AT < DATEADD('day', -365, CURRENT_TIMESTAMP());

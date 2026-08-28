@@ -18,8 +18,8 @@ def test_default_date_serves_todays_wire(client: TestClient) -> None:
     assert body["served_date"] == "2026-08-09"
     assert body["stale"] is False
     assert body["model"] == "claude-haiku-4-5"
-    assert len(body["headlines"]) == 5
-    assert [h["seq"] for h in body["headlines"]] == [0, 1, 2, 3, 4]
+    assert len(body["headlines"]) == 4
+    assert [h["seq"] for h in body["headlines"]] == [0, 1, 2, 3]
     assert body["headlines"][0]["severity"] == "fail"  # worst first, seq 0 = lead
 
 
@@ -28,7 +28,7 @@ def test_missing_day_falls_back_to_newest_before_it(client: TestClient) -> None:
     body = client.get("/api/headlines?date=2026-08-08").json()
     assert body["served_date"] == "2026-08-07"
     assert body["stale"] is True
-    assert len(body["headlines"]) == 3
+    assert len(body["headlines"]) == 1
 
 
 def test_no_wire_at_or_before_date_is_empty_not_404(client: TestClient) -> None:
