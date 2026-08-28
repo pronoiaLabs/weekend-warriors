@@ -35,7 +35,7 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
 @keyframes drift3 { to { transform: translate(-24vw, -16vh) scale(1.25); } }
 
 /* shell */
-.shell { position: relative; z-index: 1; max-width: 1320px; margin: 0 auto; padding: 0 28px 120px; min-height: 100vh; }
+.shell { position: relative; z-index: 1; max-width: 1320px; margin: 0 auto; padding: 0 28px 48px; min-height: 100vh; }
 .shell-narrow { padding: 0 14px 96px; }
 .topbar { display: flex; align-items: center; gap: 24px; padding: 22px 0 16px; flex-wrap: wrap; }
 .brand { display: flex; align-items: baseline; gap: 8px; }
@@ -55,11 +55,12 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
 .foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-4); font-size: var(--fs-s); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
 /* the dock (wide) and the tabs (narrow): one nav, two chrome */
-.dock, .tabs { position: fixed; z-index: 40; display: flex; gap: 2px; background: rgba(13, 14, 17, 0.7); border: 1px solid var(--line); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
-.dock { left: 50%; bottom: 18px; transform: translateX(-50%); border-radius: 999px; padding: 6px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); max-width: calc(100vw - 40px); overflow-x: auto; }
-.dock a { border-radius: 999px; padding: 8px 14px; font-weight: 600; color: var(--ink-3); white-space: nowrap; transition: transform .15s ease, color .15s ease; }
-.dock a:hover { transform: translateY(-3px); color: var(--ink); }
-.tabs { left: 0; right: 0; bottom: 0; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-left: 0; border-right: 0; border-bottom: 0; justify-content: space-around; }
+.dock, .tabs { z-index: 40; display: flex; gap: 2px; background: rgba(13, 14, 17, 0.7); border: 1px solid var(--line); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+/* the page nav rides at the top, in flow under the header, so it never covers content */
+.dock { width: fit-content; margin: 0 0 14px; border-radius: 999px; padding: 6px; max-width: 100%; overflow-x: auto; }
+.dock a { border-radius: 999px; padding: 8px 14px; font-weight: 600; color: var(--ink-3); transition: color .15s ease; white-space: nowrap; }
+.dock a:hover { color: var(--ink); }
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-left: 0; border-right: 0; border-bottom: 0; justify-content: space-around; }
 .tabs a { flex: 1; text-align: center; padding: 10px 4px; border-radius: 12px; font-size: var(--fs-s); font-weight: 600; color: var(--ink-3); min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .dock a.active, .tabs a.active { background: var(--surface-2); color: var(--ink); box-shadow: 0 0 0 1px var(--line-2) inset; }
 
@@ -105,6 +106,5 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .aurora i { animation: none; }
-  .dock a:hover { transform: none; }
   [data-tilt] { transition: none; }
 }

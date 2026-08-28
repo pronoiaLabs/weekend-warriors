@@ -300,18 +300,27 @@ button.trow.current { background: var(--surface-2); }
 .scard.marquee { border-color: rgba(var(--accent-rgb), .45); box-shadow: 0 0 0 1px rgba(var(--accent-rgb), .18) inset; }
 .scard.marquee .slot .day { color: var(--accent); }
 
-/* two-column page grid */
-.pulse-grid { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
-.pulse-col { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
+/* one gap between every page-level block; the blocks' own margins step aside */
+.page-pulse > * + * { margin-top: var(--gap); }
+.page-pulse .page-head, .page-pulse .strip-wrap { margin-bottom: 0; }
 
-/* around the league: reuse the .mention voice, tighter columns for the feed */
-.page-pulse .news-tile .mentions { max-height: calc(100vh - 500px); min-height: 220px; overflow-y: auto; }
-.mention.pulse { grid-template-columns: minmax(150px, 1.1fr) minmax(0, 2.4fr) minmax(110px, .9fr); gap: 10px; }
-.mention.pulse .who { flex-direction: row; align-items: center; gap: 10px; }
-.mention.pulse .who .id { display: flex; flex-direction: column; min-width: 0; }
-.mention.pulse .who .id b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mention.pulse .src { font-size: 11px; color: var(--ink-4); }
-.mention.pulse .src b { font-weight: 500; color: var(--ink-3); }
+/* the three rails share one row: equal widths, equal fixed-height TILES —
+   the height lives on the tile (not the list) so wrapped headers can't
+   unbalance the row; the list flexes to the leftover and scrolls */
+.pulse-rails { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.pulse-rails > .tile { height: 440px; display: flex; flex-direction: column; }
+.pulse-rails > .tile .tile-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* around the league: one row per story — avatar cluster, then pill + headline */
+.news-article { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+.news-article .avs { display: flex; align-items: center; padding-left: 4px; }
+.news-article .avs a { margin-left: -8px; display: inline-flex; }
+.news-article .avs a:first-child { margin-left: 0; }
+.news-article .avs .avatar, .news-article .avs .more { box-shadow: 0 0 0 2px var(--surface); }
+.news-article .avs .more { flex: none; width: 26px; height: 26px; margin-left: -8px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--ink-3); }
+.news-article .what { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.news-article .src { font-size: 11px; color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-article .src b { font-weight: 500; color: var(--ink-3); }
 
 /* status board rows */
 .srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 11px 0; border-top: 1px solid var(--line); }
@@ -336,10 +345,12 @@ button.trow.current { background: var(--surface-2); }
 .trend-row .id b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .trend-row .nxt { font-size: 11px; color: var(--ink-3); text-align: right; white-space: nowrap; }
 .trend-row .nxt small { display: block; font-size: 9.5px; color: var(--ink-4); text-transform: uppercase; letter-spacing: .06em; }
+.trend-row .mvmt { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.trend-row .mvmt small { font-size: 9.5px; color: var(--ink-4); white-space: nowrap; }
 
-/* market movers */
-.mv-sub { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); font-weight: 600; margin: 14px 0 2px; }
-.mv-sub:first-of-type { margin-top: 0; }
+/* market movers: full-width tile, games and props side by side */
+.mv-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; align-items: start; }
+.mv-sub { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); font-weight: 600; margin: 0 0 2px; }
 .mv-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); color: inherit; font-size: 12.5px; }
 .mv-row:hover .mv-what b { color: var(--accent); }
 .mv-row .mv-what { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -351,9 +362,17 @@ button.trow.current { background: var(--surface-2); }
 .mv-row .mv-path b { font-weight: 600; }
 .mv-row .mv-path small { display: block; font-size: 9.5px; color: var(--ink-4); text-transform: uppercase; letter-spacing: .06em; }
 
-/* narrow: one column, feed rows stack */
+/* mid: rails go two-up, movers stack */
+@media (max-width: 1180px) {
+  .pulse-rails { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mv-cols { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+}
+
+/* narrow: everything one column */
 @media (max-width: 900px) {
-  .pulse-grid { grid-template-columns: minmax(0, 1fr); }
-  .mention.pulse { grid-template-columns: 1fr; gap: 6px; }
+  .pulse-rails { grid-template-columns: minmax(0, 1fr); }
   .srow .ripple { padding-left: 0; }
 }
+
+/* the rail zones are fixed windows: the list scrolls inside, the page doesn't grow */
+.page-pulse .rail-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }

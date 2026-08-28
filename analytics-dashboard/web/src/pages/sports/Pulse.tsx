@@ -47,16 +47,12 @@ export default function Pulse() {
       {data && (
         <>
           <SlateStrip data={data} sport={sport} branding={branding} />
-          <div className="grid pulse-grid">
-            <div className="pulse-col">
-              <NewsFeed rows={data.news} days={data.days} sport={sport} branding={branding} />
-              <MarketMovers data={data} sport={sport} branding={branding} />
-            </div>
-            <div className="pulse-col">
-              <StatusBoard rows={data.status} sport={sport} />
-              <TrendingList rows={data.trending} sport={sport} />
-            </div>
+          <div className="grid pulse-rails">
+            <NewsFeed rows={data.news} days={data.days} sport={sport} />
+            <StatusBoard rows={data.status} sport={sport} />
+            <TrendingList rows={data.trending} sport={sport} />
           </div>
+          <MarketMovers data={data} sport={sport} branding={branding} />
           <TileFrame title="How this screen is built" className="note-tile" query={data.query ?? undefined}>
             <p>
               One fetch composes five known-column selects: the week's slate, the news window, the status
@@ -146,84 +142,95 @@ function agoLabel(publishedAt: string, asOf: string): string {
   return `${Math.round(hours / 24)}d ago`
 }
 
-function NewsFeed({
-  rows,
-  days,
-  sport,
-  branding,
-}: {
-  rows: MentionRow[]
-  days: number
-  sport: string
-  branding: Branding
-}) {
-  // injury-tagged first, newest first within each — the wireframe's ordering.
-  // The feed caps what it renders: a 48h window can be hundreds of mentions,
-  // and the home page is a digest; the News page is the full feed.
-  const ordered = [...rows]
-    .sort((a, b) => {
-      const ai = a.context === 'injury' ? 0 : 1
-      const bi = b.context === 'injury' ? 0 : 1
-      return ai - bi || b.published_at.localeCompare(a.published_at)
-    })
-    .slice(0, 80)
+// A mention row is one player in one article; the home feed reads at the
+// article grain. The pill is the strongest context any mention carries, so an
+// injury story tags injury even when it also names healthy players.
+const CONTEXT_RANK: Record<string, number> = { injury: 0, suspension: 1, transaction: 2, lineup: 3, other: 4 }
+
+function contextRank(c: string | null): number {
+  return c !== null && c in CONTEXT_RANK ? CONTEXT_RANK[c] : 5
+}
+
+type Article = {
+  key: string
+  headline: string | null
+  url: string | null
+  feed: string
+  published_at: string
+  context: string | null
+  players: { player_key: string; player_name: string; headshot_url: string | null; sleeper_player_id: string | null }[]
+}
+
+function toArticles(rows: MentionRow[]): Article[] {
+  const byKey = new Map<string, Article>()
+  for (const m of rows) {
+    const key = m.article_key
+    const found = byKey.get(key)
+    const a: Article = found ?? {
+      key,
+      headline: m.headline,
+      url: m.url,
+      feed: m.feed,
+      published_at: m.published_at,
+      context: m.context,
+      players: [],
+    }
+    if (!found) byKey.set(key, a)
+    if (contextRank(m.context) < contextRank(a.context)) a.context = m.context
+    if (m.published_at > a.published_at) a.published_at = m.published_at
+    if (m.player_key && !a.players.some((p) => p.player_key === m.player_key)) {
+      a.players.push({
+        player_key: m.player_key,
+        player_name: m.player_name ?? m.player_name_in_article ?? '?',
+        headshot_url: m.headshot_url,
+        sleeper_player_id: m.sleeper_player_id,
+      })
+    }
+  }
+  return [...byKey.values()].sort((a, b) => {
+    const ai = a.context === 'injury' ? 0 : 1
+    const bi = b.context === 'injury' ? 0 : 1
+    return ai - bi || b.published_at.localeCompare(a.published_at)
+  })
+}
+
+function NewsFeed({ rows, days, sport }: { rows: MentionRow[]; days: number; sport: string }) {
+  // injury-tagged first, newest first within each — the wireframe's ordering,
+  // applied at the article grain. The cap is a safety net; a 48h window runs
+  // well under it once mentions collapse to stories.
+  const articles = toArticles(rows).slice(0, 80)
   const asOf = new Date().toISOString()
   return (
-    <TileFrame title="Around the league" meta={`injury-tagged first · last ${days * 24}h`} className="news-tile">
-      {ordered.length === 0 ? (
+    <TileFrame title="Around the league" meta={`last ${days * 24}h · ${articles.length} stories`}>
+      {articles.length === 0 ? (
         <p className="hint">Quiet window — no mentions in the last {days * 24} hours.</p>
       ) : (
-        <div className="mentions vfit">
-          {ordered.map((m) => (
-            <div key={m.mention_key} className="mention pulse">
-              <div className="who">
-                {m.player_key ? (
-                  <Link to={`/${sport}/players/${m.player_key}`}>
-                    <Avatar name={m.player_name ?? '?'} headshotUrl={m.headshot_url} sleeperPlayerId={m.sleeper_player_id} />
+        <div className="rail-scroll">
+          {articles.map((a) => (
+            <div key={a.key} className="news-article">
+              <span className="avs">
+                {a.players.slice(0, 3).map((p) => (
+                  <Link key={p.player_key} to={`/${sport}/players/${p.player_key}`} title={p.player_name}>
+                    <Avatar name={p.player_name} headshotUrl={p.headshot_url} sleeperPlayerId={p.sleeper_player_id} size="sm" />
                   </Link>
-                ) : (
-                  <Avatar name={m.player_name ?? m.player_name_in_article ?? '?'} />
-                )}
-                <span className="id">
-                  {m.player_key ? (
-                    <Link to={`/${sport}/players/${m.player_key}`}>
-                      <b>{m.player_name}</b>
-                    </Link>
-                  ) : (
-                    <b>{m.player_name ?? m.player_name_in_article}</b>
-                  )}
-                  <small>
-                    {[m.position, m.team_label].filter(Boolean).join(' · ') || '—'}
-                  </small>
-                </span>
-              </div>
+                ))}
+                {a.players.length > 3 && <span className="more">+{a.players.length - 3}</span>}
+              </span>
               <div className="what">
                 <span>
-                  {m.context && <span className={`flag topic ${m.context}`}>{m.context}</span>}
-                  {m.url ? (
-                    <a className="headline" href={m.url} target="_blank" rel="noreferrer">
-                      {m.headline}
+                  {a.context && <span className={`flag topic ${a.context}`}>{a.context}</span>}
+                  {a.url ? (
+                    <a className="headline" href={a.url} target="_blank" rel="noreferrer">
+                      {a.headline}
                     </a>
                   ) : (
-                    <span className="headline">{m.headline}</span>
+                    <span className="headline">{a.headline}</span>
                   )}
                 </span>
                 <span className="src">
-                  <b>{m.feed}</b> · {agoLabel(m.published_at, asOf)}
+                  <b>{a.feed}</b> · {agoLabel(a.published_at, asOf)}
+                  {a.players.length > 0 && <> · {a.players.map((p) => p.player_name).join(', ')}</>}
                 </span>
-              </div>
-              <div className="next">
-                {m.next_game_key ? (
-                  <Link to={`/${sport}/games/${m.next_game_key}`}>
-                    <TeamLogo teamKey={m.team_key} label={m.team_label} branding={branding} size="sm" />{' '}
-                    <b>
-                      {m.team_label} {m.next_game_is_home ? 'vs' : 'at'} {m.next_opponent_label}
-                    </b>
-                    <small>{m.next_game_datetime_et ? `${kickoffDay(m.next_game_datetime_et)} ${kickoffTime(m.next_game_datetime_et)} ET` : ''}</small>
-                  </Link>
-                ) : (
-                  <small>no game scheduled</small>
-                )}
               </div>
             </div>
           ))}
@@ -283,16 +290,22 @@ function MarketMovers({ data, sport, branding }: { data: PulsePayload; sport: st
       {games.length === 0 && props.length === 0 ? (
         <p className="hint">No line has moved off its opener this week.</p>
       ) : (
-        <>
-          {games.length > 0 && <p className="mv-sub">Games — spread &amp; total</p>}
-          {games.map((m) => (
-            <MoverRowView key={m.app_market_movers_key} m={m} sport={sport} branding={branding} />
-          ))}
-          {props.length > 0 && <p className="mv-sub">Props — player lines</p>}
-          {props.map((m) => (
-            <MoverRowView key={m.app_market_movers_key} m={m} sport={sport} branding={branding} />
-          ))}
-        </>
+        <div className="mv-cols">
+          <div>
+            <p className="mv-sub">Games — spread &amp; total</p>
+            {games.length === 0 && <p className="hint">No game line has moved.</p>}
+            {games.map((m) => (
+              <MoverRowView key={m.app_market_movers_key} m={m} sport={sport} branding={branding} />
+            ))}
+          </div>
+          <div>
+            <p className="mv-sub">Props — player lines</p>
+            {props.length === 0 && <p className="hint">No prop line has moved.</p>}
+            {props.map((m) => (
+              <MoverRowView key={m.app_market_movers_key} m={m} sport={sport} branding={branding} />
+            ))}
+          </div>
+        </div>
       )}
     </TileFrame>
   )
@@ -312,14 +325,13 @@ function Prac({ code }: { code: string | null }) {
 }
 
 function StatusBoard({ rows, sport }: { rows: StatusRow[]; sport: string }) {
-  // the rail is a digest: the hardest designations, not the whole league
-  const shown = rows.slice(0, 12)
   return (
-    <TileFrame title="Status board" meta={`designations · practice W/T/F${rows.length > shown.length ? ` · top ${shown.length} of ${rows.length}` : ''}`}>
+    <TileFrame title="Status board" meta={`practice W/T/F · ${rows.length} players`}>
       {rows.length === 0 ? (
         <p className="hint">Nobody carries a designation right now.</p>
       ) : (
-        shown.map((s) => (
+        <div className="rail-scroll">
+          {rows.map((s) => (
           <div key={s.app_status_board_key} className="srow">
             <div className="top">
               <Link to={`/${sport}/players/${s.player_key}`}>
@@ -354,26 +366,36 @@ function StatusBoard({ rows, sport }: { rows: StatusRow[]; sport: string }) {
               </div>
             )}
           </div>
-        ))
+          ))}
+        </div>
       )}
     </TileFrame>
   )
 }
 
+const compact = (n: number) => Intl.NumberFormat('en-US', { notation: 'compact' }).format(n)
+
 function TrendingList({ rows, sport }: { rows: TrendingRow[]; sport: string }) {
   const hours = rows[0]?.lookback_hours ?? 24
-  // top of each board only; the rail is a digest, not the full top-100s
-  const shown = [
-    ...rows.filter((t) => t.direction === 'add').slice(0, 6),
-    ...rows.filter((t) => t.direction === 'drop').slice(0, 6),
-  ]
+  // One row per player: Sleeper's boards overlap (a player can be heavily
+  // added AND dropped in the same window), so the row leads with the dominant
+  // direction and keeps the other as a footnote instead of a second row.
+  const byPlayer = new Map<string, { primary: TrendingRow; other: TrendingRow | null }>()
+  for (const t of rows) {
+    const cur = byPlayer.get(t.player_key)
+    if (!cur) byPlayer.set(t.player_key, { primary: t, other: null })
+    else if (t.move_count_24h > cur.primary.move_count_24h) byPlayer.set(t.player_key, { primary: t, other: cur.primary })
+    else byPlayer.set(t.player_key, { primary: cur.primary, other: t })
+  }
+  const players = [...byPlayer.values()].sort((a, b) => b.primary.move_count_24h - a.primary.move_count_24h)
   return (
-    <TileFrame title="Trending" meta={`Sleeper · adds & drops · ${hours}h`}>
-      {rows.length === 0 ? (
+    <TileFrame title="Trending" meta={`Sleeper · ${hours}h · ${players.length} players`}>
+      {players.length === 0 ? (
         <p className="hint">No trending board captured yet.</p>
       ) : (
-        shown.map((t) => (
-          <Link key={t.app_trending_players_key} className="trend-row" to={`/${sport}/players/${t.player_key}`}>
+        <div className="rail-scroll">
+          {players.map(({ primary: t, other }) => (
+          <Link key={t.player_key} className="trend-row" to={`/${sport}/players/${t.player_key}`}>
             <Avatar name={t.player_name} headshotUrl={t.headshot_url} sleeperPlayerId={t.sleeper_player_id} size="sm" />
             <span className="id">
               <b>{t.player_name}</b>
@@ -383,12 +405,20 @@ function TrendingList({ rows, sport }: { rows: TrendingRow[]; sport: string }) {
               {t.next_game_key ? `${t.next_game_is_home ? 'vs' : 'at'} ${t.next_opponent_label}` : '—'}
               <small>{t.next_game_datetime_et ? `${kickoffDay(t.next_game_datetime_et)} ${kickoffTime(t.next_game_datetime_et)}` : ''}</small>
             </span>
-            <span className={`badge ${t.direction === 'add' ? 'pos' : 'neg'}`}>
-              {t.direction === 'add' ? '▲ +' : '▼ −'}
-              {Intl.NumberFormat('en-US', { notation: 'compact' }).format(t.move_count_24h)}
+            <span className="mvmt">
+              <span className={`badge ${t.direction === 'add' ? 'pos' : 'neg'}`}>
+                {t.direction === 'add' ? '▲ +' : '▼ −'}
+                {compact(t.move_count_24h)}
+              </span>
+              {other && (
+                <small>
+                  also {other.direction === 'add' ? '▲' : '▼'} {compact(other.move_count_24h)}
+                </small>
+              )}
             </span>
           </Link>
-        ))
+          ))}
+        </div>
       )}
     </TileFrame>
   )
