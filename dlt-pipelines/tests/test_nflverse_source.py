@@ -53,7 +53,7 @@ def test_tables_are_unique() -> None:
 
 
 def test_all_history_datasets_are_replaced_and_not_season_keyed() -> None:
-    for key in ("players", "officials", "combine", "trades"):
+    for key in ("players", "officials", "combine", "trades", "teams"):
         ds = DATASETS[key]
         assert not ds.season_keyed, key
         assert ds.write_disposition == "replace", key

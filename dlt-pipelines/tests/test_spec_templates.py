@@ -162,6 +162,8 @@ def test_rendered_template_is_valid_yaml_with_the_expected_shape(filename: str) 
         # record_run writes NFL_PROD_DB.OPS._DLT_RUNS (same as other NFL Tasks).
         # The data dest is still postgres; this is telemetry only.
         assert env["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] == "NFL_DEV_DB"
+        assert env["LOAD__WORKERS"] == "3"
+        assert env["DATA_WRITER__FILE_MAX_ITEMS"] == "2000"
     else:
         assert env["DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE"] == "NFL_DEV_DB"
 

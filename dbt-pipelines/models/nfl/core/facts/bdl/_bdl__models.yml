@@ -16,6 +16,11 @@ models:
       Every box-score measure is offensive (sacks_allowed is sacks the team's
       QB took). The defensive view of the same game is fact_team_game_defense,
       1:1 on team_game_key.
+      The nflverse EPA block (the retired fact_team_game_epa's offense half)
+      is folded in from stg_nfl__nflverse_pbp on the same team_game_key -- a
+      lossless 1:1 concat, present on 100% of non-preseason rows and NULL on
+      preseason (has_nflverse flags it). EPA rates come from this grain's own
+      sums; re-aggregate from the counts, never from the rates.
       Covers all season types -- filter on season_type, do not assume regular season.
     columns:
       - name: team_game_key
@@ -55,6 +60,11 @@ models:
         description: "NULL where has_box_score is false. Roughly 1800s per team per game."
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 5400, severity: warn}
+      - name: has_nflverse
+        description: "Whether the nflverse EPA block joined. False only on preseason rows (nflverse publishes no preseason play-by-play)."
+        tests: [not_null]
+      - name: off_epa_per_play
+        description: "NULL where has_nflverse is false. A rate from this grain's sums; re-aggregate from off_epa / off_plays."
 
     tests:
       # the declared grain
@@ -72,6 +82,10 @@ models:
       fumbles_recovered, which counts own-fumble recoveries too.
       Two defensive_touchdowns columns are exposed on purpose: the provider's
       team box and the player rollup disagree on 155 rows.
+      The def_* EPA-allowed block (the retired fact_team_game_epa's defense
+      half) reads the opponent row's folded EPA columns through the same
+      self-join as opp_*, so the twins can never disagree; NULL on preseason
+      rows, flagged by has_nflverse.
     columns:
       - name: team_game_key
         description: "Surrogate key, identical to the offense row's. Grain of this fact."
@@ -115,6 +129,9 @@ models:
         description: "Sum of player defensive_sacks. FLOAT: half-sacks are real. Agrees with opp_sacks_allowed within 1.0."
         tests:
           - dbt_utils.accepted_range: {min_value: 0}
+      - name: has_nflverse
+        description: "Whether the EPA-allowed block joined (the opponent row's, see description). False only on preseason rows."
+        tests: [not_null]
 
     tests:
       # the declared grain
@@ -131,10 +148,16 @@ models:
   # ---------------------------------------------------------------------------
   - name: fact_player_game_offense
     description: >
-      Passing, rushing and receiving. Grain: player x game. ~21,700 rows.
-      Incremental (merge on player_game_key).
+      Passing, rushing and receiving, all vendors. Grain: player x game.
+      ~21,700 rows, anchored on the BallDontLie box score.
       Filtered to rows with offensive volume, not by position -- position is
       'Unknown' for 801 players who appear in box scores.
+      The nflverse block (usage shares, EPA, first downs, explosive buckets,
+      snaps) and the Sleeper block (the three fantasy scorings, pos ranks,
+      snap share, drop/air-yard detail) join through the bridges; NULL means
+      no match, never 0. Measured coverage excluding preseason: has_nflverse
+      on 99.3% of regular-season and 99.2% of postseason rows, has_sleeper
+      on 83.8% / 87.3%.
     columns:
       - name: player_game_key
         description: "Unique WITHIN this fact. Also appears in the other phase facts for multi-phase players."
@@ -184,15 +207,26 @@ models:
         tests:
           - not_null
           - dbt_utils.accepted_range: {min_value: -10, max_value: 80, severity: warn}
-      - name: dlt_load_id_numeric
-        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
+      - name: has_nflverse
+        description: "Whether the nflverse week-stats block joined through the bridges. See the description for measured coverage."
         tests: [not_null]
+      - name: has_sleeper
+        tests: [not_null]
+      - name: target_share
+        description: "NULL where has_nflverse is false, like the whole nflverse block."
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
 
   - name: fact_player_game_defense
     description: >
-      Tackles, pressure and coverage. Grain: player x game. ~42,300 rows.
-      Incremental (merge on player_game_key).
+      Tackles, pressure and coverage, all vendors. Grain: player x game.
+      ~42,300 rows, anchored on the BallDontLie box score.
       defensive_sacks is FLOAT -- half-sacks are real.
+      The nflverse def_* block and Sleeper IDP columns keep their own names
+      beside BallDontLie's readings (the providers disagree on attribution;
+      coalescing would hide it). Measured coverage excluding preseason:
+      has_nflverse on 98.6% / 99.1% (regular / post), has_sleeper on
+      81.2% / 83.9% with IDP values on ~78% of matched rows.
     columns:
       - name: player_game_key
         tests: [unique, not_null]
@@ -218,16 +252,24 @@ models:
           - dbt_utils.accepted_range: {min_value: 0}
       - name: takeaways
         tests: [not_null]
-      - name: dlt_load_id_numeric
-        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
+      - name: has_nflverse
+        description: "Whether the nflverse def_* block joined. On matched rows the block carries zeros, not NULLs, where nothing was recorded."
+        tests: [not_null]
+      - name: has_sleeper
         tests: [not_null]
 
   - name: fact_player_game_special
     description: >
-      Kicking, punting and returns. Grain: player x game. ~7,700 rows.
-      Incremental (merge on player_game_key).
+      Kicking, punting and returns, all vendors. Grain: player x game.
+      ~7,700 rows, anchored on the BallDontLie box score.
       Three sub-disciplines sharing one fact; use has_kicking / has_punting /
       has_returns to isolate them.
+      nflverse fills BDL's gaps: field goals by distance band (made AND
+      missed), the full PAT line (BDL has made only), punt placement, and
+      snaps; its return counters are vendor-prefixed because BDL publishes
+      the same stats. Measured coverage excluding preseason: has_nflverse on
+      99.7% / 100% (regular / post, the best of the three player facts),
+      has_sleeper on 78.3% / 83.0% with kicking values on actual kickers only.
     columns:
       - name: player_game_key
         tests: [unique, not_null]
@@ -252,17 +294,23 @@ models:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 100, severity: warn}
       - name: total_returns
         tests: [not_null]
-      - name: dlt_load_id_numeric
-        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
+      - name: has_nflverse
         tests: [not_null]
+      - name: has_sleeper
+        tests: [not_null]
+      - name: pat_att
+        description: "nflverse. The attempts/missed/blocked/pct PAT line exists only in this block -- BDL carries extra_points_made alone."
 
   # ---------------------------------------------------------------------------
   # Play-by-play
   # ---------------------------------------------------------------------------
   - name: fact_play
     description: >
-      Play-by-play. Grain: play. 179,402 rows. Incremental (merge on play_key),
-      clustered on season, week.
+      Play-by-play (physical table PLAY_LOG). Grain: play. ~182k rows.
+      Clustered on season, week. BDL is the spine; where the T1/T2/T3 cascade
+      locates the play in nflverse pbp (99.7% of matchable plays, measured --
+      docs/nfl-enrichment-columns.html), the nflverse analytics ride along.
+      Unmatched plays keep NULL analytics, never imputed.
       Does NOT cover all games -- 18 games have no plays. Never use as a game spine.
     columns:
       - name: play_key
@@ -288,120 +336,56 @@ models:
       - name: home_win_probability
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 1, severity: warn}
-      - name: dlt_load_id_numeric
-        description: "Incremental watermark. Decoded epoch seconds from dlt's _dlt_load_id."
+      - name: is_matchable
+        description: >
+          Whether this play enters the nflverse match denominator:
+          non-administrative type (dim_play_type.is_matchable), bridge-observed
+          game, not preseason. False keeps the ~27k admin rows and all
+          preseason out of the audit's rates.
         tests: [not_null]
+      - name: match_tier
+        description: >
+          Which cascade tier matched the play. T1 exact five-key, T2 clock
+          +/-15s, T3 yardline dropped + play-family agreement. NULL on the
+          ~0.3% residual AND on non-matchable plays; read with is_matchable.
+        tests:
+          - accepted_values: {values: ['T1', 'T2', 'T3']}
+      - name: nflverse_play_id
+        description: >
+          Drill-through key: with nflverse_game_id it addresses the matched
+          row in stg_nfl__nflverse_pbp, one join away from the other ~360
+          pbp columns. NULL where unmatched.
+      - name: epa
+        description: "nflverse graft, bare names -- BDL has no equivalents. NULL where unmatched."
+      - name: success
+        description: "nflverse graft: EPA > 0, as 0/1."
+        tests:
+          - accepted_values: {values: [0, 1], quote: false}
 
-  # ---------------------------------------------------------------------------
-  # Next Gen Stats -- weekly grain. NO game_key: the source has no game_id.
-  # ---------------------------------------------------------------------------
-  - name: fact_player_week_advanced_passing
+  - name: fact_play_match_audit
     description: >
-      Next Gen passing, weekly. Grain: player x season x week x postseason.
-      Excludes the week 0 season totals (see fact_player_season_advanced_passing).
-      Cannot be joined to dim_game.
+      The play-level nflverse match rolled up per game over matchable plays
+      only (physical table PLAY_MATCH_AUDIT). Grain: game; games with zero
+      matchable plays (preseason) have no row. The tier split is the early
+      warning -- a game going T3-heavy means clock or yardline drift even
+      while the total rate holds. Watched by
+      tests/nfl/assert_play_match_rate_above_floor (97% per game / 99%
+      overall, warn).
     columns:
-      - name: player_week_passing_key
-        tests: [unique, not_null]
-      - name: player_key
+      - name: game_key
         tests:
+          - unique
           - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: season_week_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
-      - name: week
-        description: "Always >= 1 here; week 0 is filtered out as a season total."
-        tests:
-          - not_null
-          - dbt_utils.accepted_range: {min_value: 1, max_value: 18}
-
-  - name: fact_player_week_advanced_rushing
-    description: "Next Gen rushing, weekly. Same grain and caveats as the passing weekly fact."
-    columns:
-      - name: player_week_rushing_key
-        tests: [unique, not_null]
-      - name: player_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: season_week_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
-      - name: week
-        tests:
-          - not_null
-          - dbt_utils.accepted_range: {min_value: 1, max_value: 18}
-
-  - name: fact_player_week_advanced_receiving
-    description: "Next Gen receiving, weekly. Same grain and caveats as the passing weekly fact."
-    columns:
-      - name: player_week_receiving_key
-        tests: [unique, not_null]
-      - name: player_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: season_week_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_season_week')", field: season_week_key}
-      - name: week
-        tests:
-          - not_null
-          - dbt_utils.accepted_range: {min_value: 1, max_value: 18}
-
-  # ---------------------------------------------------------------------------
-  # Next Gen Stats -- season totals (source week 0). NOT a rollup of the weekly
-  # facts; the two do not reconcile, and the source totals are authoritative.
-  # ---------------------------------------------------------------------------
-  - name: fact_player_season_advanced_passing
-    description: >
-      Next Gen passing season totals from the source's week 0 rows.
-      Grain: player x season x postseason. Independent of the weekly fact.
-    columns:
-      - name: player_week_passing_key
-        tests: [unique, not_null]
-      - name: player_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: season
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: matchable_plays
         tests: [not_null]
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [player_id, season, is_postseason]
-
-  - name: fact_player_season_advanced_rushing
-    description: "Next Gen rushing season totals. Grain: player x season x postseason."
-    columns:
-      - name: player_week_rushing_key
-        tests: [unique, not_null]
-      - name: player_key
+      - name: match_rate
         tests:
           - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [player_id, season, is_postseason]
-
-  - name: fact_player_season_advanced_receiving
-    description: "Next Gen receiving season totals. Grain: player x season x postseason."
-    columns:
-      - name: player_week_receiving_key
-        tests: [unique, not_null]
-      - name: player_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [player_id, season, is_postseason]
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
 
   # ---------------------------------------------------------------------------
-  # Season and injury facts
+  # Season facts
   # ---------------------------------------------------------------------------
   - name: fact_team_season
     description: >
@@ -447,34 +431,19 @@ models:
         tests:
           - not_null:
               config: {where: "wins + losses + ties > 0"}
+      - name: bye_week
+        description: >
+          The missing week in the team's regular-season slate, derived from
+          dim_game (exactly one per team-season, weeks 5-14, verified).
+          Populated for future seasons too, since dim_game holds the full
+          slate before a snap is played. warn, not error: a standings season
+          whose slate has not landed yet would be NULL without being wrong.
+        tests:
+          - not_null: {config: {severity: warn}}
+          - dbt_utils.accepted_range: {min_value: 5, max_value: 14, severity: warn}
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [team_id, season]
-
-  - name: fact_player_injury
-    description: >
-      Injury report with SCD2 history. Grain: player x report date x version.
-      Only 21 rows today. Filter is_current for the live report.
-    columns:
-      - name: player_injury_key
-        tests: [unique, not_null]
-      - name: player_key
-        tests:
-          - not_null
-          - relationships: {to: "ref('dim_player')", field: player_key}
-      - name: team_key
-        tests:
-          - relationships: {to: "ref('dim_team')", field: team_key}
-      - name: reported_date
-        description: >
-          NULL when the provider omits the date, which it does on a minority
-          of reports (first observed Aug 2026, 101 of 642 rows). warn, not
-          error: the injuries are real and the date is genuinely unknown,
-          but a sudden jump to all-NULL should stay visible.
-        tests:
-          - not_null: {config: {severity: warn}}
-      - name: is_current
-        tests: [not_null]
 
   - name: fact_two_point_conversion
     description: >

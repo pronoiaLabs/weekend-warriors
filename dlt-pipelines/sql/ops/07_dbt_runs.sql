@@ -438,7 +438,9 @@ ALTER TASK IF EXISTS DLT_DB.OPS.DBT_OBS_COPY SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.DBT_RUNS_REFRESH
   WAREHOUSE = DLT_OPS_WH
-  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 60
+  -- Hourly, matching OBS_REFRESH (same warehouse): either twin at 60s keeps
+  -- DLT_OPS_WH from ever auto-suspending. Manual refresh covers in-between.
+  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 3600
   USER_TASK_TIMEOUT_MS = 600000
   COMMENT = 'Event-driven refresh of DBT_RUNS: fires when a build lands (DBT_BUILDS) or a harvest lands (DBT_QUERY_LOG, fills rollups). NOT managed by generate_tasks.py.'
   WHEN SYSTEM$STREAM_HAS_DATA('DLT_DB.OPS.STREAM_DBT_BUILDS')

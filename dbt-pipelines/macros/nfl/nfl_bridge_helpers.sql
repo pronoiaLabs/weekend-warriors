@@ -72,7 +72,7 @@
     The procedure takes the target database and schema as arguments and the
     bridge model's pre_hook passes its own (this.database, this.schema). Tests
     and other readers need the same address without a model to hang it on:
-    generate_schema_name('CORE') resolves to CORE in prod and to the
+    generate_schema_name('DIM') resolves to DIM in prod and to the
     developer's single schema in dev, exactly as the model's +schema does.
     Same pattern as nfl_fantasy_points_fqn.
 
@@ -82,5 +82,5 @@
 #}
 
 {% macro nfl_player_bridge_fqn(table_name='PLAYER_BRIDGE') -%}
-    {{ target.database }}.{{ generate_schema_name('CORE', none) | trim }}.{{ table_name }}
+    {{ target.database }}.{{ generate_schema_name('DIM', none) | trim }}.{{ table_name }}
 {%- endmacro %}

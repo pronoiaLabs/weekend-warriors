@@ -21,18 +21,6 @@ models:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [sleeper_player_id, season, season_type, week, snapshot_number]
 
-  - name: fact_sleeper_player_week
-    description: >
-      Sleeper's weekly actuals: the three fantasy scorings, positional ranks,
-      snap share. Grain: player x season x season_type x week; DEF team rows
-      carried with is_team_defense = true.
-    columns:
-      - name: sleeper_player_week_key
-        tests: [unique, not_null]
-      - name: game_key
-        tests:
-          - relationships: {to: "ref('dim_game')", field: game_key}
-
   - name: fact_sleeper_trending
     description: "The add/drop board, one row per appearance. Grain: fetched_at x direction x player."
     columns:

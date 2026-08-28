@@ -248,7 +248,7 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
 
     assert by_source["nfl"] == {
         "nfl_reference", "nfl_games", "nfl_stats", "nfl_plays",
-        "nfl_standings", "nfl_advanced_stats", "nfl_injuries",
+        "nfl_standings", "nfl_injuries",
         "nfl_game_odds", "nfl_player_props", "nfl_odds_opening",
         "nfl_news",
         "nfl_weather_forecast",
@@ -272,6 +272,9 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
     # would paper over generate_tasks emitting USING CRON by accident.
     assert "nfl_app_to_postgres" not in scheduled
     assert "obs_to_postgres" not in scheduled
+    # The weekly full resync IS cron: it re-bounds Postgres after the hourly
+    # incremental copy (which never deletes what Snowflake retention purges).
+    assert by_source["obs"] == {"obs_to_postgres_resync"}
 
 
 def test_app_copy_task_is_standalone_not_cron_or_after() -> None:
@@ -281,6 +284,7 @@ def test_app_copy_task_is_standalone_not_cron_or_after() -> None:
     assert "AFTER " not in sql
     assert "USING CRON" not in sql
     assert "DLT_DESTINATION: postgres" in sql or "DLT_DESTINATION:postgres" in sql
+    assert "LOAD__WORKERS: \"3\"" in sql or "LOAD__WORKERS: '3'" in sql or "LOAD__WORKERS: 3" in sql
     assert sql.index("EXTERNAL_ACCESS_INTEGRATIONS") < sql.index("FROM SPECIFICATION")
     assert "DESTINATION__POSTGRES__CREDENTIALS__PASSWORD" in sql
     assert "NFL_PROD_DB" in sql
@@ -294,6 +298,7 @@ def test_obs_copy_task_is_standalone_not_cron_or_after() -> None:
     assert "AFTER " not in sql
     assert "USING CRON" not in sql
     assert "DLT_DESTINATION: postgres" in sql or "DLT_DESTINATION:postgres" in sql
+    assert "LOAD__WORKERS: \"3\"" in sql or "LOAD__WORKERS: '3'" in sql or "LOAD__WORKERS: 3" in sql
     assert "DLT_DATASET: observability" in sql or "DLT_DATASET:observability" in sql
     assert "SNOWFLAKE_APP_DATABASE: DLT_DB" in sql or "SNOWFLAKE_APP_DATABASE:DLT_DB" in sql
     assert sql.index("EXTERNAL_ACCESS_INTEGRATIONS") < sql.index("FROM SPECIFICATION")
@@ -307,8 +312,11 @@ def test_app_copy_wrapper_is_the_harvest_dag_edge() -> None:
     sql = (_ROOT / "sql/sources/nfl/08_app_copy_task.sql").read_text()
     assert "CREATE OR ALTER TASK NFL_PROD_DB.OPS.APP_COPY_NFL" in sql
     assert "AFTER NFL_PROD_DB.OPS.DBT_HARVEST_NFL" in sql
+    assert "CALL DLT_DB.OPS.SP_APP_COPY_FIRE()" in sql
     assert "EXECUTE TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres" in sql
     assert "GRANT OPERATE ON TASK DLT_DB.OPS.dlt_task_nfl_app_to_postgres" in sql
+    assert "GRANT SELECT ON TABLE DLT_DB.OPS.TASK_RUNS TO ROLE DBT_RUNNER_ROLE" in sql
+    assert "skipped: postgres copy already executing" in sql
     assert sql.index("DBT_BUILD_NFL SUSPEND") < sql.index("DBT_HARVEST_NFL SUSPEND")
     assert sql.index("APP_COPY_NFL RESUME") < sql.index("DBT_HARVEST_NFL RESUME")
     assert sql.index("DBT_HARVEST_NFL RESUME") < sql.index("DBT_BUILD_NFL RESUME")
@@ -325,8 +333,21 @@ def test_obs_copy_wrappers_are_the_refresh_dag_edges() -> None:
     assert sql.count("CALL DLT_DB.OPS.SP_OBS_COPY_FIRE()") == 2
     assert "GRANT OPERATE ON TASK DLT_DB.OPS.dlt_task_obs_to_postgres" in sql
     assert "GRANT SELECT ON TABLE DLT_DB.OPS.DBT_RUNS TO ROLE DLT_LOADER_ROLE" in sql
+    assert "GRANT SELECT ON TABLE DLT_DB.OPS.TASK_RUNS TO ROLE DBT_RUNNER_ROLE" in sql
     assert "OBS_COPY_LATCH" in sql
-    assert "DATEADD('minute', -10, CURRENT_TIMESTAMP())" in sql
+    # 50-minute windows: with both refresh tasks at a 3600s trigger interval
+    # this bounds the copy to about once an hour (2026-08-24).
+    assert "DATEADD('minute', -50, CURRENT_TIMESTAMP())" in sql
+    assert "DATEADD('minute', -10, CURRENT_TIMESTAMP())" not in sql
+    # FORCE (the dashboard refresh button) skips the latch, never the
+    # in-flight guards; the old zero-arg proc must be dropped or the new
+    # signature would sit beside it as an overload.
+    assert "FORCE BOOLEAN DEFAULT FALSE" in sql
+    assert "DROP PROCEDURE IF EXISTS DLT_DB.OPS.SP_OBS_COPY_FIRE()" in sql
+    assert "GRANT USAGE ON PROCEDURE DLT_DB.OPS.SP_OBS_COPY_FIRE(BOOLEAN)" in sql
+    assert "'obs_to_postgres_resync'" in sql
+    assert "skipped: postgres copy already executing" in sql
+    assert "TASK_NAME => 'DLT_TASK_OBS_TO_POSTGRES'" in sql
     assert sql.index("USE ROLE DLT_LOADER_ROLE") < sql.index("USE ROLE DBT_RUNNER_ROLE")
     assert sql.index("OBS_REFRESH SUSPEND") < sql.index("OBS_COPY SUSPEND")
     assert sql.index("OBS_COPY RESUME") < sql.index("OBS_REFRESH RESUME")

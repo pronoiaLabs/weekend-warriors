@@ -44,22 +44,31 @@ models:
       # PREP -- thin views over NFL_PROD_DB.RAW. Rename, cast, strip the dlt
       # bookkeeping columns and the flattened parent payload, hash surrogate keys.
       # Views (not tables) because these are pass-through and the cost belongs in
-      # CORE, which materializes.
+      # DIM and FACTS, which materialize.
       prep:
         +materialized: view
         +schema: PREP
 
-      # CORE -- conformed dimensions and facts at declared grain.
+      # DIM + FACTS -- conformed dimensions and facts at declared grain. The
+      # schema carries the role, so physical names drop the dim_/fact_ prefix
+      # (macros/generate_alias_name.sql: folder-scoped strip + override map);
+      # dbt model names are unchanged and every ref() compiles untouched. The
+      # previous single CORE schema is frozen as the rollback archive -- see
+      # docs/nfl-core-connection-strategy.html and sql/sources/nfl/10 in
+      # dlt-pipelines.
       core:
-        +schema: CORE
         dimensions:
+          +schema: DIM
           +materialized: table
         facts:
+          +schema: FACTS
           +materialized: table
-        # Id crosswalks to the other vendors. bridge_player_ids overrides to a
-        # view in its own config: its pre_hook calls SP_PLAYER_BRIDGE, which
-        # writes the underlying table into this same schema.
+        # Id crosswalks to the other vendors, living beside the dims in DIM.
+        # bridge_player_ids overrides to a view in its own config: its pre_hook
+        # calls SP_PLAYER_BRIDGE, which writes the underlying table into this
+        # same schema.
         bridges:
+          +schema: DIM
           +materialized: table
 
       # FEATURES -- ML marts. Train and score only; not a Cortex tool.
@@ -90,22 +99,6 @@ models:
         +schema: ANALYTICS
         sv_example:
           +enabled: false
-        # Disabled: the Next Gen source tracks each player in only ONE discipline.
-        # Verified against the BallDontLie API directly -- advanced_stats/rushing
-        # returns zero rows for quarterbacks (Lamar Jackson, Jalen Hurts) while
-        # returning data for running backs. Same shape for the other endpoints:
-        # 96 QBs in passing, 132 RBs in rushing, 307 WR/TE in receiving, with
-        # zero player overlap between any two.
-        #
-        # The consequence is that the obvious questions ("how good a runner is
-        # Lamar Jackson versus expectation?") have no answer, so the view
-        # promises more than the data supports. Actual rushing production is
-        # still fully available in sv_nfl_player_offense from the box score.
-        #
-        # The underlying facts are left in place and still build -- only this
-        # semantic view is off. Re-enable if the provider broadens coverage.
-        sv_nfl_player_advanced:
-          +enabled: false
       evaluations:
         +materialized: table
         +schema: ANALYTICS
@@ -119,7 +112,7 @@ models:
     # basketball box score is one block), and sv_wnba_player_advanced ships
     # ENABLED because the five advanced season sources cover the identical
     # 223-player set (verified 100% pairwise overlap) -- the disjointness that
-    # disabled sv_nfl_player_advanced does not exist in this source.
+    # retired NFL's player-advanced view does not exist in this source.
     # -------------------------------------------------------------------------
     wnba:
       +tags: ['wnba']

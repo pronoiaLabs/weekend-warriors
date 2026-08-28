@@ -25,13 +25,13 @@
 --   * Watch: SNOWFLAKE.ACCOUNT_USAGE.CORTEX_SEARCH_BATCH_QUERY_USAGE_HISTORY,
 --     CORTEX_SEARCH_SERVING_USAGE_HISTORY, CORTEX_FUNCTIONS_USAGE_HISTORY.
 --
--- Kill switch: ALTER CORTEX SEARCH SERVICE NFL_PROD_DB.CORE.PLAYER_SEARCH SUSPEND;
+-- Kill switch: ALTER CORTEX SEARCH SERVICE NFL_PROD_DB.DIM.PLAYER_SEARCH SUSPEND;
 -- (the procedure's deterministic tiers keep working; the search and AI tiers
 -- fail inside the procedure, which fails the dbt model, which is the signal.)
 --
 -- Roles: SYSADMIN for stage and grants, ACCOUNTADMIN for the Cortex database
 -- role, DLT_LOADER_ROLE for change tracking on its own table, DBT_RUNNER_ROLE
--- for the service (it owns CORE and the bridge tables land beside it).
+-- for the service (it owns DIM and the bridge tables land beside it).
 --
 -- Apply with make setup-source SOURCE=nfl CONFIRM=1.
 -- =============================================================================
@@ -73,7 +73,7 @@ USE ROLE DLT_LOADER_ROLE;
 
 ALTER TABLE NFL_PROD_DB.RAW.NFLVERSE_PLAYERS SET CHANGE_TRACKING = TRUE;
 
--- DBT_RUNNER_ROLE owns CORE (05_dbt_trigger.sql transferred it), so it can
+-- DBT_RUNNER_ROLE owns DIM (05_dbt_trigger.sql transferred it), so it can
 -- create the service there without a further grant. One service serves dev
 -- and prod: both read the same prod RAW table, and the bridge tables are
 -- written wherever the caller's dbt target points.
@@ -83,7 +83,7 @@ USE ROLE DBT_RUNNER_ROLE;
 -- dbt-pipelines/snowpark/player_bridge/src/player_bridge/evidence.py and to
 -- macros/nfl/nfl_helpers.sql::nfl_position_group: the procedure filters the
 -- search on this attribute with the Python side's value.
-CREATE CORTEX SEARCH SERVICE IF NOT EXISTS NFL_PROD_DB.CORE.PLAYER_SEARCH
+CREATE CORTEX SEARCH SERVICE IF NOT EXISTS NFL_PROD_DB.DIM.PLAYER_SEARCH
   ON SEARCH_TEXT
   ATTRIBUTES LATEST_TEAM, POS_GROUP
   WAREHOUSE = DBT_WH
@@ -130,4 +130,4 @@ WHERE GSIS_ID IS NOT NULL;
 
 -- Dev callers. SYSADMIN inherits DBT_RUNNER_ROLE through the hierarchy and
 -- needs nothing; DLT_DEV_ROLE does not.
-GRANT USAGE ON CORTEX SEARCH SERVICE NFL_PROD_DB.CORE.PLAYER_SEARCH TO ROLE DLT_DEV_ROLE;
+GRANT USAGE ON CORTEX SEARCH SERVICE NFL_PROD_DB.DIM.PLAYER_SEARCH TO ROLE DLT_DEV_ROLE;

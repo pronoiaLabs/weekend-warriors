@@ -6,11 +6,13 @@
     Grain: player x game (~23,200 rows). One row per player per game in which he
     recorded offensive involvement.
 
-    Scope note: this is one of three player phase views. Defensive statistics are
-    in sv_nfl_player_defense and Next Gen tracking metrics are in
-    sv_nfl_player_advanced. A player who contributed in more than one phase
-    appears in more than one view; the measure sets are disjoint so nothing is
-    double counted, but the views cannot be joined to each other.
+    Scope note: this is one of the player phase views. Defensive statistics
+    are in sv_nfl_player_defense. A player who contributed in more than one
+    phase appears in more than one view; the measure sets are disjoint so
+    nothing is double counted, but the views cannot be joined to each other.
+    (The former sv_nfl_player_advanced was retired with the BDL advanced
+    sources; Next Gen data now rides the wide facts and reaches agents when
+    this view is enriched in the follow-up phase.)
 
     team_key is the team the player appeared for in THIS game, which is the only
     historically accurate affiliation in the source. dim_player deliberately has
@@ -260,7 +262,7 @@ FANTASY POINTS: two books are available and they are NOT interchangeable. total_
 ai_question_categorization 'Answer questions about individual offensive production: passing, rushing, receiving, efficiency rates, statistical leaders and per-game output.
 If the question is about DEFENSIVE statistics (tackles, sacks recorded, interceptions caught by a defender, passes defended), mark it out of scope and tell the user those live in the player defense view.
 If the question is about KICKING, PUNTING or RETURNS, mark it out of scope and point to the special teams data.
-If the question asks for NEXT GEN or tracking metrics (completion percentage above expectation, time to throw, separation, yards over expected), mark it out of scope and point to the player advanced view.
+If the question asks for NEXT GEN or tracking metrics (completion percentage above expectation, time to throw, separation, yards over expected), mark it out of scope and say those metrics are not exposed to agents yet.
 If the question is about a TEAM result, record or team-level scoring rather than an individual, mark it out of scope and point to the team performance view.
 If the question asks for a rate or average WITHOUT implying a volume threshold, still apply the documented minimum and say so rather than returning a misleading leader.
 If the question names a season that is not present in the data, say which seasons are actually available rather than assuming a fixed range.

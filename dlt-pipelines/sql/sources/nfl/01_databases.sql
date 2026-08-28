@@ -73,19 +73,27 @@ CREATE DATABASE IF NOT EXISTS NFL_PROD_DB
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.RAW
     COMMENT = 'Raw / landing layer written by dlt (production).';
 
--- dbt layers. PREP / CORE / FEATURES / ANALYTICS. Created here so a greenfield
--- `make setup-source SOURCE=nfl` is enough before the first EXECUTE DBT PROJECT:
--- DBT_RUNNER_ROLE has no CREATE SCHEMA on this database. ANALYTICS is not called
--- STAGING, deliberately -- dlt creates <dataset>_STAGING for every merge, so
--- RAW_STAGING already exists and a dbt schema called STAGING would sit beside it
--- meaning something entirely different.
+-- dbt layers. PREP / DIM / FACTS / FEATURES / ANALYTICS. Created here so a
+-- greenfield `make setup-source SOURCE=nfl` is enough before the first
+-- EXECUTE DBT PROJECT: DBT_RUNNER_ROLE has no CREATE SCHEMA on this database.
+-- ANALYTICS is not called STAGING, deliberately -- dlt creates
+-- <dataset>_STAGING for every merge, so RAW_STAGING already exists and a dbt
+-- schema called STAGING would sit beside it meaning something entirely
+-- different.
+--
+-- DIM + FACTS replaced the single CORE schema (the schema carries the role;
+-- physical names drop the dim_/fact_ prefix). On the account that predates
+-- the split, CORE is frozen as the rollback archive -- see
+-- 10_dim_facts_cutover.sql; fresh accounts never create it.
 --
 -- ML is not a dbt layer. SYSADMIN keeps it (registry, experiments, pred tables).
 -- Stage + CREATE MODEL live in 06_ml.sql, which this same setup-source glob applies.
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.PREP
     COMMENT = 'dbt staging views over RAW.';
-CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.CORE
-    COMMENT = 'dbt conformed dimensions and facts.';
+CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.DIM
+    COMMENT = 'dbt conformed dimensions and id bridges; PLAYER_SEARCH lives here.';
+CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.FACTS
+    COMMENT = 'dbt wide vendor-enriched facts and the fantasy UDFs.';
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.FEATURES
     COMMENT = 'dbt ML feature marts. Not exposed to Cortex agents.';
 CREATE SCHEMA IF NOT EXISTS NFL_PROD_DB.ML

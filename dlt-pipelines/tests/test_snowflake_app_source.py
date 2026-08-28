@@ -16,7 +16,9 @@ pytest.importorskip("dlt")
 from pipelines.batch.snowflake_app_source import (  # noqa: E402
     adapt_copied_value,
     dlt_data_type,
+    normalize_table,
     qualify,
+    select_sql,
     snowflake_app,
 )
 
@@ -29,9 +31,7 @@ def test_qualify_rejects_non_identifiers() -> None:
 
 
 def test_qualify_joins_three_idents() -> None:
-    assert qualify("NFL_PROD_DB", "APP", "app_game_slate") == (
-        "NFL_PROD_DB.APP.app_game_slate"
-    )
+    assert qualify("NFL_PROD_DB", "APP", "app_game_slate") == ("NFL_PROD_DB.APP.app_game_slate")
 
 
 def test_dlt_data_type_maps_snowflake_describe() -> None:
@@ -91,9 +91,10 @@ def test_source_reads_only_listed_tables() -> None:
         connect=lambda: _Conn(),
     )
     assert set(source.resources) == {"app_game_slate", "app_news_mentions"}
-    assert source.resources["app_game_slate"].compute_table_schema()["columns"]["col"][
-        "data_type"
-    ] == "bigint"
+    assert (
+        source.resources["app_game_slate"].compute_table_schema()["columns"]["col"]["data_type"]
+        == "bigint"
+    )
     rows = list(source.resources["app_game_slate"])
     assert rows == [{"col": 1}]
     assert executed[0] == "DESCRIBE TABLE NFL_PROD_DB.APP.app_game_slate"
@@ -153,3 +154,121 @@ def test_source_adapts_variant_cells() -> None:
 def test_empty_tables_rejected() -> None:
     with pytest.raises(ValueError, match="tables"):
         snowflake_app(name="x", tables=[], database="NFL_PROD_DB")
+
+
+# ---------------------------------------------------------------------------
+# Per-table copy modes (the incremental copy that replaced full replaces
+# after the 2026-08-24 Postgres OOM)
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_table_bare_name_is_replace() -> None:
+    assert normalize_table("log_lines") == {
+        "name": "log_lines",
+        "mode": "replace",
+        "cursor": None,
+        "primary_key": (),
+    }
+
+
+def test_normalize_table_validates_shape() -> None:
+    # A typo must fail loudly, not silently degrade to a full replace.
+    with pytest.raises(ValueError, match="unknown"):
+        normalize_table({"name": "x", "moed": "append"})
+    with pytest.raises(ValueError, match="mode"):
+        normalize_table({"name": "x", "mode": "incremental"})
+    with pytest.raises(ValueError, match="cursor"):
+        normalize_table({"name": "x", "mode": "append"})
+    with pytest.raises(ValueError, match="primary_key"):
+        normalize_table({"name": "x", "mode": "merge", "cursor": "ts"})
+    with pytest.raises(ValueError, match="identifier"):
+        normalize_table({"name": "x", "mode": "append", "cursor": "ts; DROP TABLE y"})
+    # A bare name already means replace; extra keys on replace are confusion.
+    with pytest.raises(ValueError, match="replace"):
+        normalize_table({"name": "x", "cursor": "ts"})
+    assert normalize_table(
+        {"name": "task_runs", "mode": "merge", "cursor": "refreshed_at", "primary_key": "query_id"}
+    ) == {
+        "name": "task_runs",
+        "mode": "merge",
+        "cursor": "refreshed_at",
+        "primary_key": ("query_id",),
+    }
+
+
+def test_select_sql_bounds_at_cursor_inclusively() -> None:
+    assert select_sql("DLT_DB.OPS.LOG_LINES") == "SELECT * FROM DLT_DB.OPS.LOG_LINES"
+    # No prior state (first run) is a full read even for incremental tables.
+    assert select_sql("DLT_DB.OPS.LOG_LINES", "event_ts", None) == (
+        "SELECT * FROM DLT_DB.OPS.LOG_LINES"
+    )
+    # >= not >: dlt dedupes the boundary; > would drop same-timestamp rows
+    # that landed after the previous read.
+    assert select_sql("DLT_DB.OPS.LOG_LINES", "event_ts", "2026-08-24") == (
+        "SELECT * FROM DLT_DB.OPS.LOG_LINES WHERE EVENT_TS >= %s"
+    )
+
+
+class _ModalCursor:
+    def __init__(self, executed: list[str]) -> None:
+        self._executed = executed
+
+    def execute(self, sql: str, params: tuple | None = None) -> None:
+        self._executed.append(sql)
+
+    def fetchall(self) -> list[dict[str, str]]:
+        return [
+            {"name": "QUERY_ID", "type": "VARCHAR", "null?": "N"},
+            {"name": "REFRESHED_AT", "type": "TIMESTAMP_LTZ(9)", "null?": "Y"},
+        ]
+
+    def __iter__(self):
+        return iter([{"QUERY_ID": "q1", "REFRESHED_AT": None}])
+
+
+class _ModalConn:
+    def __init__(self, executed: list[str]) -> None:
+        self._executed = executed
+
+    def cursor(self, *_args, **_kwargs):
+        return _ModalCursor(self._executed)
+
+    def close(self) -> None:
+        return None
+
+
+def test_incremental_table_declares_merge_and_key() -> None:
+    executed: list[str] = []
+    source = snowflake_app(
+        name="obs_to_postgres",
+        tables=[
+            {
+                "name": "task_runs",
+                "mode": "merge",
+                "cursor": "refreshed_at",
+                "primary_key": "query_id",
+            }
+        ],
+        database="DLT_DB",
+        schema="OPS",
+        connect=lambda: _ModalConn(executed),
+    )
+    schema = source.resources["task_runs"].compute_table_schema()
+    assert schema["write_disposition"] == "merge"
+    assert schema["columns"]["query_id"]["primary_key"] is True
+    # First extraction has no incremental state: a plain full read.
+    assert list(source.resources["task_runs"]) == [{"query_id": "q1", "refreshed_at": None}]
+    assert executed[-1] == "SELECT * FROM DLT_DB.OPS.task_runs"
+
+
+def test_cursor_column_must_exist_in_describe() -> None:
+    # The source evaluates eagerly, so a cursor typo dies at construction,
+    # before anything loads.
+    with pytest.raises(ValueError, match="no_such_col"):
+        snowflake_app(
+            name="obs_to_postgres",
+            tables=[{"name": "task_runs", "mode": "append", "cursor": "no_such_col"}],
+            database="DLT_DB",
+            schema="OPS",
+            connect=lambda: _ModalConn([]),
+        )

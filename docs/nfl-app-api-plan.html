@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFL APP &amp; API Plan</title>
+<meta name="description" content="What the APP serving layer looks like today, which marts gain enrichment columns, the new marts, and exactly what the dashboard API needs so nothing breaks.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📱</text></svg>">
+<style>
+  :root {
+    --bg: #f7f6f3; --panel: #ffffff; --panel-2: #f1efe9;
+    --ink: #1c1b18; --muted: #6b675e; --line: #dedacf;
+    --bdl: #2563eb; --bdl-bg: #eef3fe;
+    --nflverse: #16803c; --nflverse-bg: #ecf6ef;
+    --sleeper: #d9550f; --sleeper-bg: #fdf1e8;
+    --code-bg: #eeece5; --shadow: 0 1px 3px rgba(28,27,24,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16150f; --panel: #201f18; --panel-2: #262419;
+      --ink: #e8e5dc; --muted: #a09b8d; --line: #3a382c;
+      --bdl: #7aa2ff; --bdl-bg: #1d2436;
+      --nflverse: #57c47b; --nflverse-bg: #1b2b20;
+      --sleeper: #f08b4b; --sleeper-bg: #33241a;
+      --code-bg: #2b2a20; --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15.5px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .875em; background: var(--code-bg); padding: .08em .3em; border-radius: 4px; }
+
+  .layout { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 28px; max-width: 1480px; margin: 0 auto; padding: 0 20px; }
+  .page { min-width: 0; padding: 0 0 90px; }
+  aside.rail { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 40px 0 24px; }
+  .rail .rg { margin-bottom: 16px; }
+  .rail .rg-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 0 10px 4px; }
+  .rail a { display: block; padding: 3px 10px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; border-left: 2px solid var(--line); }
+  .rail a:hover { color: var(--ink); }
+  .rail a.active { color: var(--bdl); border-left-color: currentColor; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    aside.rail { position: static; max-height: none; padding: 20px 0 0; }
+    .rail .rg { display: inline; }
+    .rail .rg-title { display: inline; padding: 0 6px 0 0; }
+    .rail a { display: inline-block; border-left: none; padding: 2px 8px 2px 0; }
+  }
+
+  header { padding: 46px 0 6px; }
+  header .kicker { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
+  header h1 { font-size: clamp(26px, 4vw, 38px); margin: 0 0 10px; letter-spacing: -.01em; }
+  header p.sub { color: var(--muted); font-size: 16.5px; max-width: 820px; margin: 0; }
+
+  h2.part { font-size: 22px; margin: 52px 0 4px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
+  h2.part small { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 10px; }
+
+  section.model { margin: 26px 0 34px; }
+  .model-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .model-head h3 { font-family: ui-monospace, Menlo, monospace; font-size: 18px; margin: 0; }
+  .model-head .grain { font-size: 13px; color: var(--muted); }
+  .joinpath { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+  .joinpath code { font-size: 12px; }
+
+  .tri { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .col { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+  .col { display: flex; flex-direction: column; }
+  .col .head { padding: 9px 14px; font-size: 13px; font-weight: 800; letter-spacing: .02em; border-bottom: 1px solid var(--line); flex: none; }
+  .col.today .head { color: var(--muted); background: var(--panel-2); }
+  .col.plan .head { color: var(--nflverse); background: var(--nflverse-bg); }
+  .col.api .head { color: var(--bdl); background: var(--bdl-bg); }
+  .col.slp .head { color: var(--sleeper); background: var(--sleeper-bg); }
+  .col .head .g { font-weight: 500; opacity: .75; font-size: 11.5px; }
+  .col .body { padding: 0 14px 14px; max-height: 430px; overflow-y: auto; }
+  .grp { position: sticky; top: 0; z-index: 1; margin: 0 -14px 2px; padding: 12px 14px 5px; background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .grp:first-child { border-top: none; }
+  .cols { font-family: ui-monospace, Menlo, monospace; font-size: 12.3px; line-height: 1.9; word-spacing: 2px; }
+  .cols b { font-weight: 700; }
+  .note { font-size: 12.5px; color: var(--muted); font-family: -apple-system, sans-serif; margin-top: 6px; }
+  .body > .note:first-child { margin-top: 10px; }
+  .none { font-size: 13px; color: var(--muted); font-style: italic; padding: 4px 0; }
+  .body > .none:first-child { padding-top: 12px; }
+  .flagline { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12.5px; color: var(--muted); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 9px 12px; border-bottom: 2px solid var(--line); background: var(--panel-2); }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+
+  .callout { border-left: 4px solid var(--bdl); background: var(--panel); border-radius: 0 10px 10px 0; padding: 12px 18px; margin: 18px 0; box-shadow: var(--shadow); font-size: 14px; }
+  .callout.warn { border-left-color: var(--sleeper); }
+  .callout b.title { display: block; margin-bottom: 4px; }
+  .plain { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow); font-size: 14px; }
+  .plain ul { margin: 6px 0 0; padding-left: 20px; }
+  .plain li { margin: 4px 0; }
+  footer { margin-top: 70px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<aside class="rail">
+  <div class="rg">
+    <div class="rg-title">Contract</div>
+    <a href="#overview">how APP + API fit</a>
+    <a href="#api_contract">the additive rules</a>
+    <a href="#api_routes">API routes</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Pages · enriching</div>
+    <a href="#a_slate">game_slate</a>
+    <a href="#a_prop">prop_board</a>
+    <a href="#a_pweeks">player_weeks</a>
+    <a href="#a_pstats">player_week_stats</a>
+    <a href="#a_leaders">player_leaders</a>
+    <a href="#a_pdef">defender_weeks</a>
+    <a href="#a_tweeks">team_weeks</a>
+    <a href="#a_standings">team_standings</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Pages · as-is</div>
+    <a href="#a_allowed">team_allowed</a>
+    <a href="#a_ats">team_ats</a>
+    <a href="#a_lines">line_history</a>
+    <a href="#a_proplines">prop_line_history</a>
+    <a href="#a_news">news_mentions</a>
+    <a href="#a_explore">explore_* sheets</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">APP · new</div>
+    <a href="#n_situation">team_situation</a>
+    <a href="#n_playlog">play_feed</a>
+    <a href="#n_psitu">player_situation_usage</a>
+    <a href="#n_deferred">deferred ideas</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">API plan</div>
+    <a href="#api_newmart">new-mart checklist</a>
+    <a href="#api_pg">postgres copy gate</a>
+    <a href="#api_seq">sequencing</a>
+  </div>
+</aside>
+
+<main class="page">
+
+<header>
+  <p class="kicker">Internal reference · companion to the enrichment columns doc</p>
+  <h1>The APP layer plan, and the API that keeps up</h1>
+  <p class="sub">What each page mart looks like today, exactly which enrichment columns it gains, the new marts, and — because the dashboard reads APP through explicit column contracts — the precise API touch points that keep everything intact while we build.</p>
+</header>
+
+<!-- ==================== OVERVIEW ==================== -->
+<h2 class="part" id="overview">How APP and the API fit together</h2>
+
+<div class="plain">
+  <b>The serving path today:</b> dbt builds page-shaped marts into <code>NFL_PROD_DB.APP</code> (long format, parameters as columns); a dlt pipeline (<code>app-copy-registry.yml</code>) replaces each mart into Postgres <code>app.app_copy</code>; the FastAPI service reads <b>Postgres by default</b> (the swap has landed — <code>db.py</code> is dual-backend with Snowflake retained for fixture capture and rollback). Curated pages select through pydantic row models; the Explorer is fully dynamic.
+  <ul>
+    <li><b>APP tables adopt the same naming convention as DIM/FACTS</b>: the schema carries the role, physical names drop the <code>app_</code> prefix, two words minimum — <code>APP.GAME_SLATE</code>, <code>APP.PROP_BOARD</code>, <code>APP.LINE_HISTORY</code>; explore sheets keep an <code>EXPLORE_</code> family prefix (<code>APP.EXPLORE_PLAYER_GAMES</code>). dbt model names stay <code>app_*</code> via the same <code>generate_alias_name</code> macro (folder strip + overrides: app_game_prop_board → PROP_BOARD, app_player_defense_weeks → DEFENDER_WEEKS, and app_play_log → <b>PLAY_FEED</b>, because dev collapses schemas and a bare PLAY_LOG would collide with the FACTS alias for fact_play). Unlike DIM/FACTS, the API pins physical names, so the rename touches four places in lockstep: the profiles <code>tables</code> map, the Postgres <code>app-copy-registry.yml</code>, the fixtures/schema fixture filenames + capture SELECTION keys, and the Explorer's <code>f"app_explore_{sheet.id}"</code> prefix (becomes <code>explore_{id}</code>). The contract tests then verify the whole chain. Section headers below show the physical name; grain lines name the dbt model; prose keeps dbt model names.</li>
+    <li>What changes underneath: the marts re-point their <code>ref()</code>s from retired vendor facts to the <b>wide facts</b> — which is free, since the wide facts keep the same model names and keys. APP enrichment is then mostly "select more columns from the same ref".</li>
+    <li>Two conventions every addition must respect: the <b>vendor-NULL row</b> (game-level columns belong on it, line-level columns don't) and <b>knowability</b> (form windows strictly pre-kickoff; projections only from <code>is_pre_kickoff</code> snapshots; live status columns are serving-only, never history).</li>
+  </ul>
+</div>
+
+<!-- ==================== API CONTRACT ==================== -->
+<h2 class="part" id="api_contract">The additive rules <small>verified against the API code — what breaks, what doesn't</small></h2>
+
+<div class="tri">
+  <div class="col api">
+    <div class="head">New column on an existing mart</div>
+    <div class="body">
+      <div class="note"><b>Nothing breaks.</b> Tiles select only known columns (<code>COLUMNS = tuple(Row.model_fields)</code>), extra mart columns are ignored, and the Postgres replace load carries new columns automatically. To <i>surface</i> a column: add the field to the tile's pydantic row model (COLUMNS follows), mirror it in <code>web/src/api/sports/types.ts</code>, use it in the page, then <code>make fixtures</code> — the schema fixtures are what <code>test_profiles_contract.py</code> asserts against, so a stale fixture fails CI, which is the safety net working.</div>
+      <div class="note">Renaming or dropping a mart column breaks the SELECT immediately — the enrichment plan is additive on APP precisely to avoid that.</div>
+    </div>
+  </div>
+  <div class="col api">
+    <div class="head">The LINE_FIELDS slice — the one sharp edge</div>
+    <div class="body">
+      <div class="note"><code>tiles/slate.py</code> and <code>tiles/teams.py</code> blank a game's line fields on the vendor-NULL fallback using a <b>positional slice</b> of COLUMNS: <code>vendor … total_result</code>. So placement in the row model is semantic:</div>
+      <div class="cols">line-level column → inside the slice<br>game/team-level column → after total_result</div>
+      <div class="note">A line column accidentally placed after the sentinel leaks another book's value onto a no-line card; a game column placed inside gets wrongly blanked. Every addition below states its placement.</div>
+    </div>
+  </div>
+  <div class="col api">
+    <div class="head">The Explorer — zero-code additions</div>
+    <div class="body">
+      <div class="note">Explore sheets read their live column list, so a new column on any <code>app_explore_*</code> table appears in the catalog, grid, filters and sort <b>with no API or frontend change</b>. Requirements: the sheet keeps <code>row_id</code>, and the sheet SQL itself names the column (sheets are curated flat selects — one line per column). VARIANT/ARRAY columns need a <code>parse_variant</code> field_validator on curated pages (Postgres lands them as text).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ROUTES ==================== -->
+<h2 class="part" id="api_routes">API routes <small>the full surface, with what this plan changes on each</small></h2>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>Route</th><th>Query params</th><th>Reads</th><th>Plan impact</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">GET /api/health</td><td class="mono">—</td><td class="mono">—</td><td>none</td></tr>
+    <tr><td class="mono">GET /api/{sport}/capabilities</td><td class="mono">—</td><td>profile only</td><td>+ team_situation and play_log capabilities</td></tr>
+    <tr><td class="mono">GET /api/{sport}/plays <b>(new, v2)</b></td><td class="mono">season, week, game_key, player_key, team, down, field_zone…</td><td class="mono">app_play_log, app_player_situation_usage</td><td>the curated play-log page: drive-grouped plays + the player's usage-pattern strip</td></tr>
+    <tr><td class="mono">GET /api/{sport}/slate</td><td class="mono">season, season_type, week, vendor</td><td class="mono">app_game_slate</td><td>SlateRow +6 fields (referee, is_division_game, availability counters)</td></tr>
+    <tr><td class="mono">GET /api/{sport}/games/{game_key}</td><td class="mono">vendor</td><td class="mono">app_game_slate, app_game_prop_board</td><td>PropRow +~11 fields (projection block, usage form, player status)</td></tr>
+    <tr><td class="mono">GET /api/{sport}/teams</td><td class="mono">season, season_type, split</td><td class="mono">app_team_standings</td><td>StandingsRow + EPA / success-rate fields</td></tr>
+    <tr><td class="mono">GET /api/{sport}/teams/{team}</td><td class="mono">season, season_type, vendor</td><td class="mono">app_team_standings, app_team_weeks, app_team_allowed, app_team_ats</td><td>TeamWeekRow + EPA block; <b>new situations rows array</b> reading app_team_situation (Phase 3)</td></tr>
+    <tr><td class="mono">GET /api/{sport}/players</td><td class="mono">season, season_type, position, team</td><td class="mono">app_player_leaders</td><td>LeadersRow + surfaced usage/fantasy aggregates and ranks</td></tr>
+    <tr><td class="mono">GET /api/{sport}/players/{player_key}</td><td class="mono">season, season_type</td><td class="mono">app_player_leaders, app_player_weeks, app_player_week_stats</td><td>PlayerWeekRow + usage/EPA/fantasy fields; <b>PlayerStatRow unchanged</b> — new stat_keys flow automatically</td></tr>
+    <tr><td class="mono">GET /api/{sport}/markets</td><td class="mono">season, season_type, week, vendor</td><td class="mono">app_line_history</td><td>none</td></tr>
+    <tr><td class="mono">GET /api/{sport}/markets/{game_key}</td><td class="mono">vendor</td><td class="mono">app_line_history, app_prop_line_history</td><td>none (projection-history overlay deferred)</td></tr>
+    <tr><td class="mono">GET /api/{sport}/news</td><td class="mono">days (1–90), team</td><td class="mono">app_news_mentions</td><td>none</td></tr>
+    <tr><td class="mono">GET /api/{sport}/explore</td><td class="mono">—</td><td>catalog of all app_explore_*</td><td>+ team_situations, plays (the v1 play log), player_situations sheets</td></tr>
+    <tr><td class="mono">GET /api/{sport}/explore/{sheet}</td><td class="mono">where, order, desc, limit (≤5000), offset</td><td>one app_explore_*</td><td>new columns on every touched sheet, zero code</td></tr>
+  </tbody>
+</table></div>
+<p class="joinpath">Vendor defaulting: when the <code>vendor</code> param is absent, routes use <code>profile.default_vendor</code> (draftkings for NFL). Slate and team tiles collapse game × vendor rows in Python (falling back to the vendor-NULL row with blanked line fields); the markets tiles bind the vendor in SQL. <code>app_player_defense_weeks</code> is served only through the Explorer's defender_games sheet — no curated route reads it.</p>
+
+<!-- ==================== SLATE ==================== -->
+<h2 class="part" id="pages">Pages · enriching <small>today's shape → planned additions → API touch points</small></h2>
+
+<section class="model" id="a_slate">
+  <div class="model-head"><h3>GAME_SLATE</h3><span class="grain">dbt model app_game_slate · game × vendor (vendor-NULL row kept) · GET /api/nfl/slate + /games/{game_key}</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys &amp; params</div>
+        <div class="cols">app_game_slate_key<br>game_key<br>game_id<br>season<br>week<br>season_type<br>season_type_name<br>is_postseason<br>season_week_key<br>game_date<br>game_datetime<br>game_datetime_et<br>kickoff_slot_et<br>game_status<br>is_completed<br>went_to_overtime</div>
+        <div class="grp">Teams</div>
+        <div class="cols">home_team_key<br>home_team_id<br>home_team_label<br>home_team_name<br>home_conference<br>home_division<br>away_team_key<br>away_team_id<br>away_team_label<br>away_team_name<br>away_conference<br>away_division</div>
+        <div class="grp">Venue</div>
+        <div class="cols">venue<br>stadium_key<br>stadium_name<br>roof<br>surface<br>is_weather_relevant<br>is_international</div>
+        <div class="grp">Kickoff forecast</div>
+        <div class="cols">kickoff_temp_f<br>wind_mph<br>gust_mph<br>wind_dir_deg<br>precip_in<br>weather_code<br>forecast_hours_before_kickoff</div>
+        <div class="grp">Closing line (vendor block — blanked on the no-line row)</div>
+        <div class="cols">vendor<br>game_vendor_odds_key<br>home_spread<br>away_spread<br>home_spread_odds<br>away_spread_odds<br>total_line<br>over_odds<br>under_odds<br>home_moneyline_odds<br>away_moneyline_odds<br>opening_home_spread<br>opening_total_line<br>home_spread_movement<br>total_line_movement<br>implied_home_team_total<br>implied_away_team_total<br>home_moneyline_devig_probability<br>away_moneyline_devig_probability<br>line_selected_at<br>home_spread_result<br>total_result</div>
+        <div class="grp">Score &amp; readiness</div>
+        <div class="cols">home_score<br>away_score<br>props_open<br>players_with_props<br>props_open_all_books<br>players_with_props_all_books<br>news_mentions_7d<br>players_in_news_7d</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="grp">Officiating (← GAME_SCHEDULE / GAME_OFFICIAL)</div>
+        <div class="cols"><b>referee</b><br>is_division_game</div>
+        <div class="grp">Availability rollup (← PLAYER_PROFILE live status)</div>
+        <div class="cols"><b>home_players_out</b><br>home_players_questionable<br><b>away_players_out</b><br>away_players_questionable</div>
+        <div class="note">Counts of rostered players by current Sleeper status — serving-only signal for upcoming games; history stays on INJURY_REPORT. All game-level → they belong on the vendor-NULL row too.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/slate<br>GET /api/nfl/games/{game_key}</div>
+        <div class="grp">Changes</div>
+        <div class="note"><code>SlateRow</code> gains 6 fields, all placed <b>after</b> <code>total_result</code> (game-level, never blanked). Mirror in types.ts; surface on the slate card; <code>make fixtures</code>. No route or param changes.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PROP BOARD ==================== -->
+<section class="model" id="a_prop">
+  <div class="model-head"><h3>PROP_BOARD</h3><span class="grain">dbt model app_game_prop_board · game × player × vendor × prop_type · GET /api/nfl/games/{game_key}</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys &amp; params</div>
+        <div class="cols">app_game_prop_board_key<br>game_player_vendor_prop_key<br>game_key<br>game_id<br>season<br>week<br>season_type<br>season_type_name<br>game_date<br>game_datetime_et<br>is_completed</div>
+        <div class="grp">Player &amp; teams (team-as-of)</div>
+        <div class="cols">player_key<br>player_id<br>player_name<br>position<br>position_name<br>position_group<br>team_key<br>team_label<br>team_name<br>is_home<br>opponent_team_key<br>opponent_label<br>opponent_name<br>home_team_key<br>away_team_key</div>
+        <div class="grp">The prop &amp; line</div>
+        <div class="cols">vendor<br>prop_type<br>market_type<br>stat_key<br>stat_label<br>line_value<br>opening_line_value<br>line_movement<br>over_odds<br>under_odds<br>market_odds<br>opening_over_odds<br>opening_under_odds<br>opening_market_odds<br>line_selected_at</div>
+        <div class="grp">Trailing form (strictly pre-kickoff)</div>
+        <div class="cols">trailing_games<br>trailing_avg<br>stat_last3 (ARRAY)<br>trailing_over_line<br>trailing_hit_rate<br>gap_to_line</div>
+        <div class="grp">Season-to-date form</div>
+        <div class="cols">games_played_to_date<br>stat_avg_to_date<br>games_over_line_to_date<br>hit_rate_over_line</div>
+        <div class="grp">Matchup (prior-season fallback)</div>
+        <div class="cols">opponent_allowed_stat_key<br>opponent_allowed_per_game<br>opponent_allowed_rank<br>opponent_allowed_teams_ranked<br>opponent_allowed_season</div>
+        <div class="grp">News &amp; result</div>
+        <div class="cols">news_headline<br>news_context<br>news_feed<br>news_published_at<br>actual_value<br>outcome</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="grp">Projection vs line (← SLEEPER_PROJECTION_SNAPSHOT — available today)</div>
+        <div class="cols"><b>projection_value</b> (mapped via stat_key)<br><b>projection_vs_line</b><br>projection_pts_ppr<br>projection_captured_at<br>has_projection</div>
+        <div class="note">Latest <code>is_pre_kickoff</code> snapshot only — same knowability rule as the form windows. The stat mapping extends <code>seed_nfl_prop_stat_map</code> with the Sleeper stat names (pass_yd → passing_yards …).</div>
+        <div class="grp">Usage form (← wide PLAYER_GAME_OFFENSE)</div>
+        <div class="cols"><b>trailing_target_share</b><br>trailing_air_yards_share<br><b>trailing_snap_pct</b></div>
+        <div class="grp">Player status (← PLAYER_PROFILE, serving-only)</div>
+        <div class="cols"><b>injury_status</b><br>practice_participation<br>depth_chart_order</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/games/{game_key}</div>
+        <div class="grp">Changes</div>
+        <div class="note"><code>PropRow</code> gains ~11 fields (game_board.py has no LINE_FIELDS slice — placement free). The projection-vs-line delta is the headline UI addition on the board. types.ts + fixtures as usual.</div>
+      </div>
+    </div>
+  </div>
+  <p class="flagline">Phase-3 option, deferred: situational matchup columns (opponent EPA allowed on third-and-long dropbacks, from app_team_situation) join here the same way app_team_allowed does today.</p>
+</section>
+
+<!-- ==================== PLAYER WEEKS ==================== -->
+<section class="model" id="a_pweeks">
+  <div class="model-head"><h3>PLAYER_WEEKS</h3><span class="grain">dbt model app_player_weeks · player × game (offense) · GET /api/nfl/players/{player_key}</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys &amp; identity</div>
+        <div class="cols">app_player_weeks_key<br>player_game_key<br>game_key<br>game_id<br>player_key<br>player_id<br>player_name<br>position<br>position_name<br>position_group<br>team_key<br>team_id<br>team_label<br>team_name<br>opponent_team_key<br>opponent_label<br>opponent_name<br>is_home</div>
+        <div class="grp">Params &amp; context</div>
+        <div class="cols">season<br>week<br>season_type<br>season_type_name<br>is_postseason<br>game_date<br>game_datetime_et<br>is_completed<br>team_result<br>team_points<br>opponent_points<br>games_to_date</div>
+        <div class="grp">Passing</div>
+        <div class="cols">passing_attempts<br>passing_completions<br>passing_yards<br>yards_per_pass_attempt<br>passing_touchdowns<br>passing_interceptions<br>times_sacked<br>sack_yards_lost<br>qb_rating<br>qbr</div>
+        <div class="grp">Rushing</div>
+        <div class="cols">rushing_attempts<br>rushing_yards<br>yards_per_rush_attempt<br>rushing_touchdowns<br>long_rushing</div>
+        <div class="grp">Receiving</div>
+        <div class="cols">receiving_targets<br>receptions<br>receiving_yards<br>yards_per_reception<br>receiving_touchdowns<br>long_reception</div>
+        <div class="grp">Ball security &amp; derived</div>
+        <div class="cols">fumbles<br>fumbles_lost<br>scrimmage_yards<br>scrimmage_touchdowns<br>scoring_touchdowns<br>touches<br>has_passing<br>has_rushing<br>has_receiving<br>two_point_conversions<br>two_point_conversions_thrown</div>
+        <div class="grp">Fantasy &amp; running</div>
+        <div class="cols">fanduel_points<br>draftkings_points<br>fanduel_points_to_date<br>draftkings_points_to_date<br>scrimmage_yards_to_date</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned (← wide PLAYER_GAME_OFFENSE)</div>
+      <div class="body">
+        <div class="grp">Usage</div>
+        <div class="cols"><b>target_share</b><br>air_yards_share<br><b>wopr</b><br><b>off_snap_pct</b></div>
+        <div class="grp">Efficiency</div>
+        <div class="cols">passing_epa<br>rushing_epa<br><b>receiving_epa</b><br>passing_cpoe</div>
+        <div class="grp">Fantasy</div>
+        <div class="cols"><b>pts_ppr</b><br>pts_half_ppr<br>pts_std<br>has_nflverse / has_sleeper flags</div>
+        <div class="note">Straight column pass-through — the mart already refs the fact that now carries them. NULL means no vendor match (≈0.7% + preseason), and the flags say which.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/players/{player_key}</div>
+        <div class="grp">Changes</div>
+        <div class="note"><code>PlayerWeekRow</code> gains the fields; propagation below does most of the surfacing work. types.ts + fixtures.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PLAYER WEEK STATS ==================== -->
+<section class="model" id="a_pstats">
+  <div class="model-head"><h3>PLAYER_WEEK_STATS</h3><span class="grain">dbt model app_player_week_stats · player × game × stat · long companion, reads app_player_weeks</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys &amp; identity</div>
+        <div class="cols">app_player_week_stats_key<br>player_game_key<br>game_key<br>player_key<br>player_name<br>position<br>team_key<br>team_label</div>
+        <div class="grp">Params (19 stat_keys via Jinja set)</div>
+        <div class="cols">season<br>week<br>season_type<br>season_type_name<br>game_date<br>stat_key</div>
+        <div class="grp">Measures &amp; comparisons</div>
+        <div class="cols">value<br>games_through<br>trailing3_avg<br>season_avg_through<br>season_total_through<br>prior_season_same_week<br>prior_season_avg<br>prior_season_games<br>avg_vs_prior_season</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="cols">new stat_keys: <b>target_share</b><br><b>off_snap_pct</b><br><b>pts_ppr</b><br>receiving_epa<br>wopr</div>
+        <div class="note">One line each in the Jinja stat set — every new stat automatically gets the trailing-3, season-through, and prior-season comparison machinery for free. Share/rate stats need one care point: prior-season and trailing averages of a share should average the share (mean of ratios is acceptable at this display grain), and missing weeks coalesce to NULL, not 0 — a bye is not a 0% target share.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API — zero changes</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/players/{player_key}</div>
+        <div class="grp">Changes</div>
+        <div class="note"><code>PlayerStatRow</code> is stat-generic (stat_key + value + comparison columns), so <b>new stats flow to the player page with no API or frontend change at all</b> — the best-leveraged addition in the whole plan.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== LEADERS ==================== -->
+<section class="model" id="a_leaders">
+  <div class="model-head"><h3>PLAYER_LEADERS</h3><span class="grain">dbt model app_player_leaders · player × season × season_type · GET /api/nfl/players</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys, identity &amp; params</div>
+        <div class="cols">app_player_leaders_key<br>player_key<br>player_id<br>player_name<br>position<br>position_name<br>position_group<br>team_key<br>team_label<br>team_name<br>teams_count<br>season<br>season_type<br>season_type_name<br>is_postseason<br>games<br>first_game_date<br>last_game_date</div>
+        <div class="grp">Passing totals &amp; rates</div>
+        <div class="cols">passing_attempts<br>passing_completions<br>passing_yards<br>passing_touchdowns<br>passing_interceptions<br>times_sacked<br>completion_pct<br>yards_per_pass_attempt</div>
+        <div class="grp">Rushing / receiving totals &amp; rates</div>
+        <div class="cols">rushing_attempts<br>rushing_yards<br>rushing_touchdowns<br>long_rushing<br>yards_per_rush_attempt<br>receiving_targets<br>receptions<br>receiving_yards<br>receiving_touchdowns<br>long_reception<br>yards_per_reception<br>catch_rate</div>
+        <div class="grp">Derived &amp; fantasy</div>
+        <div class="cols">fumbles<br>fumbles_lost<br>scrimmage_yards<br>scrimmage_touchdowns<br>scoring_touchdowns<br>touches<br>two_point_conversions<br>fanduel_points<br>draftkings_points<br>games_with_passing<br>games_with_rushing<br>games_with_receiving</div>
+        <div class="grp">Per game</div>
+        <div class="cols">passing_yards_per_game<br>rushing_yards_per_game<br>receiving_yards_per_game<br>receptions_per_game<br>targets_per_game<br>scrimmage_yards_per_game<br>touches_per_game<br>fanduel_points_per_game<br>draftkings_points_per_game</div>
+        <div class="grp">Ranks (per position) + context</div>
+        <div class="cols">rank_passing_yards<br>rank_passing_touchdowns<br>rank_rushing_yards<br>rank_rushing_touchdowns<br>rank_receiving_yards<br>rank_receptions<br>rank_receiving_touchdowns<br>rank_scrimmage_yards<br>rank_scoring_touchdowns<br>rank_fanduel_points<br>rank_draftkings_points<br>rank_fanduel_points_per_game<br>rank_draftkings_points_per_game<br>players_at_position</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="cols">season aggregates: <b>avg_target_share</b><br>avg_off_snap_pct<br>total_pts_ppr<br>avg_receiving_epa<br>ranks (add to the Jinja ranked list): <b>rank_target_share</b><br>rank_pts_ppr</div>
+        <div class="note">Built from app_player_weeks as today, so leaderboard and player page stay reconciled row-for-row — the existing reconcile test extends to the new columns.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/players<br>GET /api/nfl/players/{player_key}</div>
+        <div class="grp">Changes</div>
+        <div class="note"><code>LeadersRow</code> gains the surfaced subset (not every rank needs the API — pick what the leaderboard UI will actually sort by). types.ts + fixtures.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DEFENDER WEEKS ==================== -->
+<section class="model" id="a_pdef">
+  <div class="model-head"><h3>DEFENDER_WEEKS</h3><span class="grain">dbt model app_player_defense_weeks · player × game (defense) · read via explore sheet only today</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys &amp; identity</div>
+        <div class="cols">app_player_defense_weeks_key<br>player_game_key<br>game_key<br>game_id<br>player_key<br>player_id<br>player_name<br>position<br>position_name<br>position_group<br>team_key<br>team_id<br>team_label<br>team_name<br>opponent_team_key<br>opponent_label<br>opponent_name<br>is_home</div>
+        <div class="grp">Params &amp; context</div>
+        <div class="cols">season<br>week<br>season_type<br>season_type_name<br>is_postseason<br>game_date<br>game_datetime_et<br>team_result<br>team_points<br>opponent_points<br>games_to_date</div>
+        <div class="grp">Defensive box</div>
+        <div class="cols">total_tackles<br>solo_tackles<br>assisted_tackles<br>tackles_for_loss<br>sacks<br>qb_hits<br>passes_defended<br>interceptions<br>interception_yards<br>interception_touchdowns<br>fumbles_recovered<br>fumbles_touchdowns<br>takeaways<br>defensive_touchdowns</div>
+        <div class="grp">Running</div>
+        <div class="cols">total_tackles_to_date<br>sacks_to_date</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned (← wide PLAYER_GAME_DEFENSE)</div>
+      <div class="body">
+        <div class="cols"><b>defense_snaps</b><br><b>defense_pct</b></div>
+        <div class="note">Snap share is the missing denominator for every defender stat. IDP fantasy columns are available but deferred until a page wants them.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API — sheet only</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/explore/defender_games</div>
+        <div class="grp">Changes</div>
+        <div class="note">No curated tile reads this mart; add the two columns to <code>app_explore_defender_games</code> and they appear in the Explorer with zero API work. The defender-leaders asymmetry (no defensive leaderboard) stays a noted gap, not in this plan's scope.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== TEAM WEEKS ==================== -->
+<section class="model" id="a_tweeks">
+  <div class="model-head"><h3>TEAM_WEEKS</h3><span class="grain">dbt model app_team_weeks · team × game × vendor (vendor-NULL row kept) · GET /api/nfl/teams/{team}</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys &amp; identity</div>
+        <div class="cols">app_team_weeks_key<br>team_game_key<br>game_key<br>game_id<br>team_key<br>team_id<br>team_label<br>team_name<br>conference<br>division<br>opponent_team_key<br>opponent_label<br>opponent_name</div>
+        <div class="grp">Params</div>
+        <div class="cols">season<br>week<br>season_type<br>season_type_name<br>is_postseason<br>game_date<br>game_datetime_et<br>kickoff_slot_et<br>is_home<br>is_completed<br>went_to_overtime</div>
+        <div class="grp">Result &amp; running record</div>
+        <div class="cols">result<br>season_game_number<br>wins_to_date<br>losses_to_date<br>ties_to_date<br>point_diff_to_date</div>
+        <div class="grp">Scoring</div>
+        <div class="cols">points_for<br>points_against<br>point_margin<br>total_points<br>points_q1<br>points_q2<br>points_q3<br>points_q4<br>points_ot</div>
+        <div class="grp">Own box score</div>
+        <div class="cols">first_downs<br>total_yards<br>plays<br>yards_per_play<br>net_passing_yards<br>passing_completions<br>passing_attempts<br>yards_per_pass<br>rushing_yards<br>rushing_attempts<br>yards_per_rush_attempt<br>third_down_conversions<br>third_down_attempts<br>third_down_pct<br>fourth_down_conversions<br>fourth_down_attempts<br>red_zone_scores<br>red_zone_attempts<br>red_zone_pct<br>total_drives<br>possession_time_seconds<br>turnovers<br>takeaways<br>turnover_margin<br>fumbles_lost<br>interceptions_thrown<br>sacks_allowed<br>sacks_recorded<br>penalties<br>penalty_yards</div>
+        <div class="grp">Allowed</div>
+        <div class="cols">opp_total_yards<br>opp_yards_per_play<br>opp_net_passing_yards<br>opp_rushing_yards<br>opp_third_down_conversions<br>opp_third_down_attempts<br>opp_red_zone_scores<br>opp_red_zone_attempts<br>opp_turnovers<br>has_box_score</div>
+        <div class="grp">Sided line (vendor block — blanked on the no-line row)</div>
+        <div class="cols">vendor<br>spread<br>spread_odds<br>moneyline_odds<br>moneyline_devig_probability<br>opening_spread<br>spread_movement<br>total_line<br>opening_total_line<br>total_line_movement<br>over_odds<br>under_odds<br>implied_team_total<br>line_selected_at<br>spread_result<br>margin_vs_spread<br>total_result</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned (← wide TEAM_GAME_OFFENSE / _DEFENSE)</div>
+      <div class="body">
+        <div class="grp">Efficiency</div>
+        <div class="cols"><b>off_epa_per_play</b><br><b>off_success_rate</b><br>proe<br>explosive_rate</div>
+        <div class="grp">Efficiency allowed</div>
+        <div class="cols"><b>def_epa_per_play</b><br>def_success_rate_allowed<br>def_explosive_rate_allowed</div>
+        <div class="note">Available immediately — these already exist at team_game_key on the current EPA fact, before the wide rebuild even ships. Team-level values, so they belong on the vendor-NULL row.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/teams/{team}</div>
+        <div class="grp">Changes</div>
+        <div class="note"><code>TeamWeekRow</code> gains 7 fields — placed <b>after</b> <code>total_result</code> (team-level, must not join the blanked line slice in <code>tiles/teams.py</code>). One line each in <code>app_explore_team_games</code> for the Explorer. types.ts + fixtures.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== STANDINGS ==================== -->
+<section class="model" id="a_standings">
+  <div class="model-head"><h3>TEAM_STANDINGS</h3><span class="grain">dbt model app_team_standings · team × season × season_type × split · GET /api/nfl/teams</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today</div>
+      <div class="body">
+        <div class="grp">Keys, identity &amp; params</div>
+        <div class="cols">app_team_standings_key<br>team_key<br>team_id<br>team_label<br>team_name<br>conference<br>division<br>season<br>season_type<br>season_type_name<br>is_postseason<br>split</div>
+        <div class="grp">Record</div>
+        <div class="cols">games<br>wins<br>losses<br>ties<br>win_pct<br>points_for<br>points_against<br>point_diff<br>points_for_per_game<br>points_against_per_game<br>point_diff_per_game</div>
+        <div class="grp">Efficiency (sum-over-sum)</div>
+        <div class="cols">total_yards<br>plays<br>yards_per_play<br>yards_per_game<br>net_passing_yards<br>rushing_yards<br>third_down_conversions<br>third_down_attempts<br>third_down_pct<br>red_zone_scores<br>red_zone_attempts<br>red_zone_pct<br>turnovers<br>takeaways<br>turnover_margin<br>sacks_allowed<br>sacks_recorded</div>
+        <div class="grp">Opponent mirror &amp; penalties</div>
+        <div class="cols">opp_total_yards<br>opp_plays<br>opp_yards_per_play<br>opp_yards_per_game<br>opp_net_passing_yards<br>opp_rushing_yards<br>penalties<br>penalty_yards</div>
+        <div class="grp">Recency &amp; ranks</div>
+        <div class="cols">last_game_date<br>last_results (ARRAY)<br>rank_overall<br>rank_conference<br>rank_division</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">+ Planned</div>
+      <div class="body">
+        <div class="cols"><b>off_epa_per_play</b> (season, sum-over-sum)<br><b>def_epa_per_play</b><br>off_success_rate<br>def_success_rate_allowed<br>rank_off_epa</div>
+        <div class="note">Season EPA computed from the game facts' own sums (total EPA / total plays), never averaged per-game rates — the mart's existing discipline. Splits (home/away) come free from the existing split machinery.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/teams<br>GET /api/nfl/teams/{team}</div>
+        <div class="grp">Changes</div>
+        <div class="note"><code>StandingsRow</code> gains the fields; the standings table gets an EPA sort. types.ts + fixtures.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== AS-IS ==================== -->
+<h2 class="part" id="asis">Pages · as-is <small>no planned changes; extension points noted</small></h2>
+
+<section class="model" id="a_allowed">
+  <div class="model-head"><h3>TEAM_ALLOWED</h3><span class="grain">dbt model app_team_allowed · defense × season × season_type × position × stat · the shared matchup definition</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today — unchanged</div>
+      <div class="body">
+        <div class="grp">Keys, identity &amp; params</div>
+        <div class="cols">app_team_allowed_key<br>team_key<br>team_id<br>team_label<br>team_name<br>conference<br>division<br>season<br>season_type<br>season_type_name<br>is_postseason<br>position<br>stat_key</div>
+        <div class="grp">Measures</div>
+        <div class="cols">defense_games<br>allowed_total<br>allowed_per_game<br>league_avg_per_game<br>allowed_vs_league<br>allowed_rank<br>teams_ranked</div>
+        <div class="note">The 11-pair <code>position_stats</code> union is the designed extension point ("adding a pair is one line") — new pairs like WR receiving_epa allowed become possible once the wide facts land, but nothing in this plan requires touching it. The prop board and team page keep agreeing by construction.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="a_ats">
+  <div class="model-head"><h3>TEAM_ATS</h3><span class="grain">dbt model app_team_ats · team × season × season_type × vendor · reads app_team_weeks</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today — unchanged</div>
+      <div class="body">
+        <div class="grp">Keys, identity &amp; params</div>
+        <div class="cols">app_team_ats_key<br>team_key<br>team_id<br>team_label<br>team_name<br>season<br>season_type<br>season_type_name<br>vendor</div>
+        <div class="grp">ATS &amp; totals records (pushes excluded from pct)</div>
+        <div class="cols">games_with_line<br>ats_wins<br>ats_losses<br>ats_pushes<br>ats_pct<br>overs<br>unders<br>total_pushes<br>over_pct</div>
+        <div class="grp">Splits</div>
+        <div class="cols">favourite_games<br>favourite_ats_wins<br>underdog_games<br>underdog_ats_wins<br>home_ats_wins<br>home_ats_losses<br>away_ats_wins<br>away_ats_losses</div>
+        <div class="grp">Averages</div>
+        <div class="cols">avg_spread<br>avg_total_line<br>avg_margin_vs_spread<br>avg_total_vs_line</div>
+        <div class="note">Reads only line columns from app_team_weeks, so the EPA additions there don't touch it.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="a_lines">
+  <div class="model-head"><h3>LINE_HISTORY</h3><span class="grain">dbt model app_line_history · game × vendor × snapshot · GET /api/nfl/markets + /markets/{game_key}</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today — unchanged</div>
+      <div class="body">
+        <div class="grp">Keys, identity &amp; params</div>
+        <div class="cols">app_line_history_key<br>game_vendor_odds_key<br>game_key<br>game_id<br>season<br>week<br>season_type<br>season_type_name<br>game_date<br>game_datetime_et<br>is_completed<br>home_team_key<br>home_team_label<br>home_team_name<br>away_team_key<br>away_team_label<br>away_team_name<br>vendor</div>
+        <div class="grp">Snapshot position</div>
+        <div class="cols">snapshot_number<br>snapshots_before_kickoff<br>is_opening<br>is_closing<br>snapshot_observed_at<br>prev_snapshot_observed_at<br>minutes_before_kickoff<br>hours_before_kickoff</div>
+        <div class="grp">Line state &amp; deltas</div>
+        <div class="cols">home_spread<br>home_spread_odds<br>away_spread<br>away_spread_odds<br>home_moneyline_odds<br>away_moneyline_odds<br>total_line<br>over_odds<br>under_odds<br>home_spread_change<br>total_line_change<br>home_moneyline_odds_change<br>away_moneyline_odds_change<br>home_spread_since_open<br>total_line_since_open</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="a_proplines">
+  <div class="model-head"><h3>PROP_LINE_HISTORY</h3><span class="grain">dbt model app_prop_line_history · game × player × vendor × prop × snapshot · GET /api/nfl/markets/{game_key}</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today — unchanged</div>
+      <div class="body">
+        <div class="grp">Keys, identity &amp; params</div>
+        <div class="cols">app_prop_line_history_key<br>game_player_vendor_prop_key<br>game_key<br>game_id<br>player_key<br>player_id<br>player_name<br>position<br>season<br>week<br>season_type<br>season_type_name<br>game_date<br>game_datetime_et<br>is_completed<br>home_team_key<br>home_team_label<br>away_team_key<br>away_team_label<br>vendor<br>prop_type<br>market_type<br>stat_key<br>stat_label</div>
+        <div class="grp">Snapshot position</div>
+        <div class="cols">snapshot_number<br>snapshots_before_kickoff<br>is_opening<br>is_closing<br>snapshot_observed_at<br>prev_snapshot_observed_at<br>minutes_before_kickoff<br>hours_before_kickoff</div>
+        <div class="grp">Line state &amp; deltas</div>
+        <div class="cols">line_value<br>market_odds<br>over_odds<br>under_odds<br>line_value_change<br>market_odds_change<br>over_odds_change<br>under_odds_change<br>line_value_since_open</div>
+        <div class="note">The projection-history overlay (Sleeper projection movement charted against the prop line's movement) is the natural future extension here — deferred, see below.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="a_news">
+  <div class="model-head"><h3>NEWS_MENTIONS</h3><span class="grain">dbt model app_news_mentions · mention grain · GET /api/nfl/news</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today — unchanged</div>
+      <div class="body">
+        <div class="grp">Keys &amp; resolution (unresolved rows kept)</div>
+        <div class="cols">app_news_mentions_key<br>mention_key<br>article_key<br>player_key<br>player_id<br>is_player_resolved<br>player_name<br>position<br>position_name<br>position_group<br>team_key<br>team_label<br>team_name<br>player_name_in_article<br>team_in_article<br>extract_mode<br>resolution_method<br>candidate_count</div>
+        <div class="grp">Article</div>
+        <div class="cols">published_at<br>published_date<br>feed<br>headline<br>context<br>detail<br>url</div>
+        <div class="grp">Next game</div>
+        <div class="cols">next_game_key<br>next_game_datetime_et<br>next_game_season<br>next_game_week<br>next_game_season_type_name<br>next_opponent_team_key<br>next_opponent_label<br>next_opponent_name<br>next_game_is_home<br>days_to_next_game</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="a_explore">
+  <div class="model-head"><h3>EXPLORE_* sheets</h3><span class="grain">dbt model app_explore_* · 7 flat sheets · GET /api/nfl/explore/{sheet}</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Today + how they absorb the plan</div>
+      <div class="body">
+        <div class="note">Each sheet is a curated flat select from its page mart with a <code>row_id</code> — so every enrichment above reaches the Explorer by adding the column name to the sheet SQL (one line each), and the dynamic catalog does the rest: no API, no frontend. Sheets touched: <code>player_games</code> (usage/EPA/fantasy), <code>defender_games</code> (snaps), <code>team_games</code> (EPA block), <code>player_props</code> (projection + usage + status columns), <code>game_lines</code> (referee, availability counters).</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== NEW ==================== -->
+<h2 class="part" id="newmarts">APP · new</h2>
+
+<section class="model" id="n_situation">
+  <div class="model-head"><h3>TEAM_SITUATION</h3><span class="grain">dbt model app_team_situation · new mart · team × season × season_type × situation × side · from TEAM_GAME_SITUATION (Phase 3)</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Shape (follows app_team_allowed's template)</div>
+      <div class="body">
+        <div class="grp">Situation params</div>
+        <div class="cols">situation_key (down bucket × distance × zone × play family)<br>side (offense / defense)</div>
+        <div class="grp">Measures</div>
+        <div class="cols">plays<br>epa_per_play<br>success_rate<br>explosive_rate<br>league_avg + vs_league<br>situation_rank + teams_ranked</div>
+        <div class="note">Season-to-date sum-over-sum from the game-grain fact; rank partitioned by (season, season_type, situation, side). The "this defense collapses on third-and-long" surface, shaped exactly like the allowed mart the prop board already knows how to join.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API — two registrations</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/teams/{team}<br>GET /api/nfl/explore/team_situations</div>
+        <div class="grp">Changes</div>
+        <div class="note"><b>Team page tile:</b> extend <code>GET /api/nfl/teams/{team}</code> with a situations rows array (new row model + read in <code>tiles/teams.py</code>) rather than a new route. <b>Explorer:</b> new <code>app_explore_team_situations</code> sheet (id must match the table for the contract test; needs row_id). Both go through the full new-mart checklist below — including the Postgres copy registry, or the API 500s on a missing relation.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="n_playlog">
+  <div class="model-head"><h3>PLAY_FEED</h3><span class="grain">dbt model app_play_log · new mart · one row per play · from PLAY_LOG (BDL spine + pbp graft) · Phase 3</span></div>
+  <p class="joinpath">the pattern-recognition screen: player attribution comes from the pbp role ids (passer / rusher / receiver gsis → bridge → player_key) — BDL's play fact alone cannot name who was involved, so this mart is a direct payoff of the play-match work</p>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Shape</div>
+      <div class="body">
+        <div class="grp">Keys &amp; params</div>
+        <div class="cols">app_play_log_key (play_key)<br>game_key<br>season<br>week<br>season_type<br>season_type_name<br>game_date<br>team_key (possession)<br>team_label<br>opponent_team_key<br>opponent_label<br>is_home_possession</div>
+        <div class="grp">Game context &amp; sequence</div>
+        <div class="cols">quarter<br>clock_display<br>clock_seconds_remaining<br>score_differential<br>game_script (leading / trailing / neutral)<br>drive_number<br>play_in_drive<br>series_result</div>
+        <div class="grp">Situation</div>
+        <div class="cols">down<br>distance<br>yards_to_endzone<br>field_zone<br>is_red_zone<br>is_third_down<br>is_fourth_down<br>is_two_minute<br>shotgun<br>no_huddle</div>
+        <div class="grp">The call</div>
+        <div class="cols">play_family (dropback / designed run / special)<br>pass_length<br>pass_location<br>run_gap</div>
+        <div class="grp">Who (role columns — filter "his targets" and "his carries" separately)</div>
+        <div class="cols">passer_player_key<br>passer_name<br>rusher_player_key<br>rusher_name<br>receiver_player_key<br>receiver_name</div>
+        <div class="grp">Outcome</div>
+        <div class="cols">yards_gained<br>epa<br>success<br>wpa<br>achieved_first_down<br>is_touchdown<br>is_scoring_play<br>play_description</div>
+        <div class="note">Unmatched plays (0.3% + preseason) carry NULL roles and analytics — visible, never imputed. Largest APP table by far (~180k rows, growing weekly): the copy-registry entry and the sheet both get a current-season default filter, with older seasons behind an explicit filter.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API — two stages</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/explore/plays  (v1)<br>GET /api/nfl/plays  (v2, curated)</div>
+        <div class="grp">Changes</div>
+        <div class="note"><b>v1 — nearly free:</b> one <code>Sheet(...)</code> entry gives the Explorer grid, per-column filters, sort and stats — a functioning film-study tool the day the mart builds. Sheet + fixture + copy-registry line, no frontend code.</div>
+        <div class="note"><b>v2 — the curated page:</b> <code>GET /api/nfl/plays</code> with bound params (season, week, game_key, player_key, team, down, field_zone…), drive-grouped rendering, and the player's situation-usage strip as the header. Full new-mart checklist + play_log capability + frontend page. v2 also hosts the <b>screen-embedded play-log agent</b> (see the semantic views plan): the agent drives these same filters conversationally, with session state in a Postgres table beside app_copy, so the grid auto-populates as the user talks.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="n_psitu">
+  <div class="model-head"><h3>PLAYER_SITUATION_USAGE</h3><span class="grain">dbt model app_player_situation_usage · new mart · player × season × season_type × situation · Phase 3</span></div>
+  <p class="joinpath">the distillation the raw log can't state: "40% of this team's red-zone targets go to him" · "his carries disappear when trailing" — shares computed within team-situation denominators, the natural join to the opponent's situational-allowed splits when deciding a prop</p>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Shape</div>
+      <div class="body">
+        <div class="grp">Keys, identity &amp; params</div>
+        <div class="cols">app_player_situation_usage_key<br>player_key<br>player_name<br>position<br>position_group<br>team_key<br>team_label<br>season<br>season_type<br>season_type_name<br>situation_key (down bucket × field zone × game script × play family)</div>
+        <div class="grp">Involvement</div>
+        <div class="cols">plays_involved<br>targets<br>carries<br>dropbacks</div>
+        <div class="grp">Shares (within team × situation)</div>
+        <div class="cols"><b>target_share_in_situation</b><br><b>carry_share_in_situation</b></div>
+        <div class="grp">Efficiency</div>
+        <div class="cols">avg_epa<br>success_rate<br>yards_per_opportunity<br>td_count</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">API</div>
+      <div class="body">
+        <div class="grp">Routes</div>
+        <div class="cols">GET /api/nfl/explore/player_situations  (sheet)<br>GET /api/nfl/players/{player_key}  (later: usage-pattern strip)</div>
+        <div class="grp">Changes</div>
+        <div class="note">Ships as an explore sheet first; the player page gains a situation-usage rows array when the play-log v2 page lands (they share the header strip). Prop-board matchup v2 joins this against app_team_situation on situation_key.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="n_deferred">
+  <div class="model-head"><h3>Deferred ideas</h3><span class="grain">named so they're decisions, not omissions</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Parked</div>
+      <div class="body">
+        <div class="cols">app_projection_history — Sleeper projection movement vs prop-line movement, market-page overlay (snapshot grains already align)<br>defender leaders — the defensive leaderboard asymmetry<br>prop-board situational matchup columns — after app_team_situation proves out<br>prop settlement — outcome grading now one join away on the wide facts; unblocks hit-rate-vs-closing pages</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== API PLAN ==================== -->
+<h2 class="part" id="api_newmart">API plan · new-mart checklist <small>verified against the code — five registrations, in order</small></h2>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>#</th><th>Where</th><th>What</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td class="mono">api/app/sports/capabilities.py</td><td>New <code>Capability</code> enum member</td></tr>
+    <tr><td>2</td><td class="mono">api/app/sports/profiles/nfl.py</td><td><code>tables</code> map entry (and ncaaf.py if shared)</td></tr>
+    <tr><td>3</td><td class="mono">tiles/ + routers/ or tiles/explore.py</td><td>Curated: row model + tile + router include. Explore: one <code>Sheet(...)</code> in SHEETS — sheet id must match <code>app_explore_&lt;id&gt;</code>, table needs row_id</td></tr>
+    <tr><td>4</td><td class="mono">tests/test_profiles_contract.py + fixtures/</td><td>REQUIRED map entry + schema fixture — CI fails for any profile table without one; add the mart's WHERE clause to capture_fixtures.py SELECTION, run <code>make fixtures</code></td></tr>
+    <tr><td>5</td><td class="mono">web/src/api/sports/types.ts</td><td>Capability union + row interface + page wiring (curated pages only; explore sheets need nothing)</td></tr>
+  </tbody>
+</table></div>
+
+<h2 class="part" id="api_pg">API plan · the Postgres copy gate</h2>
+
+<div class="callout warn">
+  <b class="title">A new mart does not exist for the API until it's in the copy registry</b>
+  Live reads hit Postgres <code>app.app_copy</code>, fed by <code>dlt-pipelines/pipelines/batch/registries/app-copy-registry.yml</code> — an <b>explicit</b> list of all 20 NFL marts ("do not SELECT * from the schema"), replace-loaded. New marts (<code>app_team_situation</code>, <code>app_explore_team_situations</code>) must be added there or the API throws missing-relation errors even though the dbt model built fine in Snowflake. New <i>columns</i> ride the replace loads automatically, with one caveat: Snowflake VARIANT/ARRAY lands as text in Postgres, so any new array column surfaced on a curated page needs a <code>field_validator(..., mode="before")</code> calling <code>db.parse_variant</code> (the pattern <code>stat_last3</code> and <code>last_results</code> already use).
+</div>
+
+<h2 class="part" id="api_seq">API plan · sequencing <small>what unlocks when, so APP work never waits on the wrong phase</small></h2>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>APP change</th><th>Depends on</th><th>Available</th></tr></thead>
+  <tbody>
+    <tr><td>Prop board projection-vs-line columns</td><td class="mono">SLEEPER_PROJECTION_SNAPSHOT (exists)</td><td><b>Now</b> — no fact-phase dependency at all</td></tr>
+    <tr><td>Team weeks + standings EPA blocks</td><td class="mono">fact_team_game_epa (exists) or wide team facts</td><td><b>Now</b> via the existing EPA fact; re-point to the wide twins when they land</td></tr>
+    <tr><td>Slate availability counters, prop-board player status</td><td class="mono">PLAYER_PROFILE live-status columns</td><td>After dim enrichment (Phase 1)</td></tr>
+    <tr><td>Player weeks / stats / leaders usage + EPA + fantasy</td><td class="mono">wide PLAYER_GAME_OFFENSE</td><td>After wide fact rebuilds (Phase 2)</td></tr>
+    <tr><td>Defender weeks snaps</td><td class="mono">wide PLAYER_GAME_DEFENSE</td><td>After Phase 2</td></tr>
+    <tr><td>Slate referee</td><td class="mono">GAME_SCHEDULE.referee / GAME_OFFICIAL</td><td>After Phase 2 (new dims)</td></tr>
+    <tr><td>app_team_situation + explore sheet + prop-board matchup v2</td><td class="mono">TEAM_GAME_SITUATION</td><td>After play-by-play work (Phase 3)</td></tr>
+    <tr><td>app_play_log (v1 sheet → v2 curated page) + app_player_situation_usage</td><td class="mono">PLAY_LOG pbp graft + role ids via bridge</td><td>After Phase 3 — player attribution only exists once plays are matched</td></tr>
+  </tbody>
+</table></div>
+
+<footer>
+  weekend-warriors · internal reference · companions: <a href="nfl-enrichment-columns.html">enrichment columns</a> (what the DIM/FACTS layer carries) and <a href="nfl-core-connection-strategy.html">the connection strategy</a> (schema migration and phasing).
+</footer>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var targets = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function spy() {
+    var pos = window.scrollY + 100, idx = 0, best = -Infinity;
+    targets.forEach(function (t, i) {
+      if (t && t.offsetTop <= pos && t.offsetTop > best) { best = t.offsetTop; idx = i; }
+    });
+    links.forEach(function (a, i) { a.classList.toggle('active', i === idx); });
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>

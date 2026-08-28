@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFL App Screens Plan</title>
+<meta name="description" content="The screens the app is built around — catch up on the league, then go fishing for players at game level or player level — with the APP tables, API routes, and image assets behind every zone.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎣</text></svg>">
+<style>
+  :root {
+    --bg: #f7f6f3; --panel: #ffffff; --panel-2: #f1efe9;
+    --ink: #1c1b18; --muted: #6b675e; --line: #dedacf;
+    --bdl: #2563eb; --bdl-bg: #eef3fe;
+    --nflverse: #16803c; --nflverse-bg: #ecf6ef;
+    --sleeper: #d9550f; --sleeper-bg: #fdf1e8;
+    --code-bg: #eeece5; --shadow: 0 1px 3px rgba(28,27,24,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16150f; --panel: #201f18; --panel-2: #262419;
+      --ink: #e8e5dc; --muted: #a09b8d; --line: #3a382c;
+      --bdl: #7aa2ff; --bdl-bg: #1d2436;
+      --nflverse: #57c47b; --nflverse-bg: #1b2b20;
+      --sleeper: #f08b4b; --sleeper-bg: #33241a;
+      --code-bg: #2b2a20; --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15.5px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .875em; background: var(--code-bg); padding: .08em .3em; border-radius: 4px; }
+
+  .layout { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 28px; max-width: 1480px; margin: 0 auto; padding: 0 20px; }
+  .page { min-width: 0; padding: 0 0 90px; }
+  aside.rail { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 40px 0 24px; }
+  .rail .rg { margin-bottom: 16px; }
+  .rail .rg-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 0 10px 4px; }
+  .rail a { display: block; padding: 3px 10px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; border-left: 2px solid var(--line); }
+  .rail a:hover { color: var(--ink); }
+  .rail a.active { color: var(--bdl); border-left-color: currentColor; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    aside.rail { position: static; max-height: none; padding: 20px 0 0; }
+    .rail .rg { display: inline; }
+    .rail .rg-title { display: inline; padding: 0 6px 0 0; }
+    .rail a { display: inline-block; border-left: none; padding: 2px 8px 2px 0; }
+  }
+
+  header { padding: 46px 0 6px; }
+  header .kicker { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
+  header h1 { font-size: clamp(26px, 4vw, 38px); margin: 0 0 10px; letter-spacing: -.01em; }
+  header p.sub { color: var(--muted); font-size: 16.5px; max-width: 820px; margin: 0; }
+
+  h2.part { font-size: 22px; margin: 52px 0 4px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
+  h2.part small { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 10px; }
+
+  section.model { margin: 26px 0 34px; }
+  .model-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .model-head h3 { font-family: ui-monospace, Menlo, monospace; font-size: 18px; margin: 0; }
+  .model-head .grain { font-size: 13px; color: var(--muted); }
+  .joinpath { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+  .joinpath code { font-size: 12px; }
+
+  .tri { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .col { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
+  .col .head { padding: 9px 14px; font-size: 13px; font-weight: 800; letter-spacing: .02em; border-bottom: 1px solid var(--line); flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col.today .head { color: var(--muted); background: var(--panel-2); }
+  .col.plan .head { color: var(--nflverse); background: var(--nflverse-bg); }
+  .col.api .head { color: var(--bdl); background: var(--bdl-bg); }
+  .col.slp .head { color: var(--sleeper); background: var(--sleeper-bg); }
+  .col .body { padding: 0 14px 14px; max-height: 430px; overflow-y: auto; }
+  .grp { position: sticky; top: 0; z-index: 1; margin: 0 -14px 2px; padding: 12px 14px 5px; background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .grp:first-child { border-top: none; }
+  .cols { font-family: ui-monospace, Menlo, monospace; font-size: 12.3px; line-height: 1.9; word-spacing: 2px; }
+  .cols b { font-weight: 700; }
+  .note { font-size: 12.5px; color: var(--muted); font-family: -apple-system, sans-serif; margin-top: 6px; }
+  .body > .note:first-child { margin-top: 10px; }
+  .none { font-size: 13px; color: var(--muted); font-style: italic; padding: 4px 0; }
+  .body > .none:first-child { padding-top: 12px; }
+  .flagline { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12.5px; color: var(--muted); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 9px 12px; border-bottom: 2px solid var(--line); background: var(--panel-2); }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+
+  .callout { border-left: 4px solid var(--bdl); background: var(--panel); border-radius: 0 10px 10px 0; padding: 12px 18px; margin: 18px 0; box-shadow: var(--shadow); font-size: 14px; }
+  .callout.warn { border-left-color: var(--sleeper); }
+  .callout b.title { display: block; margin-bottom: 4px; }
+  .plain { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow); font-size: 14px; }
+  .plain ul { margin: 6px 0 0; padding-left: 20px; }
+  .plain li { margin: 4px 0; }
+
+  .mapwrap { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); padding: 14px; margin: 14px 0; overflow-x: auto; }
+  svg.map { display: block; min-width: 760px; width: 100%; height: auto; }
+  .map .box rect { fill: var(--panel-2); stroke: var(--line); stroke-width: 1.2; rx: 8; }
+  .map .box.hub rect { fill: var(--bdl-bg); stroke: var(--bdl); }
+  .map .box.game rect { fill: var(--nflverse-bg); stroke: var(--nflverse); }
+  .map .box.player rect { fill: var(--sleeper-bg); stroke: var(--sleeper); }
+  .map .box text { fill: var(--ink); font: 700 12.5px -apple-system, sans-serif; }
+  .map .box text.sub { fill: var(--muted); font-weight: 500; font-size: 10.5px; }
+  .map .lane { fill: var(--muted); font: 800 10px -apple-system, sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+  .map .edge { stroke: var(--muted); stroke-width: 1.4; fill: none; marker-end: url(#arr); }
+  .map .edge.faint { stroke-dasharray: 4 4; opacity: .65; }
+  .map .overlay rect { fill: none; stroke: var(--bdl); stroke-width: 1.2; stroke-dasharray: 6 5; rx: 12; opacity: .7; }
+  .map .overlay text { fill: var(--bdl); font: 700 10.5px -apple-system, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  footer { margin-top: 70px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<aside class="rail">
+  <div class="rg">
+    <div class="rg-title">Foundation</div>
+    <a href="#journey">the journey</a>
+    <a href="#screen_map">the screen map</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Catch up</div>
+    <a href="#s_pulse">the pulse · home</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Fishing · games</div>
+    <a href="#s_gameday">game day · slate</a>
+    <a href="#s_pond">game detail · the pond</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Fishing · players</div>
+    <a href="#s_players">players · the finder</a>
+    <a href="#s_player">player detail</a>
+    <a href="#s_playlog">play log · pattern room</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Supporting</div>
+    <a href="#s_teams">teams</a>
+    <a href="#s_markets">markets</a>
+    <a href="#s_explorer">explorer</a>
+    <a href="#s_edge">edge agent overlay</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Assets</div>
+    <a href="#assets_headshots">player headshots</a>
+    <a href="#assets_branding">team branding</a>
+    <a href="#assets_pipe">the pipe</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Wrap</div>
+    <a href="#additions">new marts &amp; routes</a>
+    <a href="#wireframes">wireframes next</a>
+  </div>
+</aside>
+
+<main class="page">
+
+<header>
+  <p class="kicker">Internal reference · companion to the APP &amp; API plan</p>
+  <h1>The screens, and the tables behind them</h1>
+  <p class="sub">The app is built around one journey: land, catch up on the tea around the league, then go fishing for players — at game level or player level. This doc names every screen, the zones on it, the APP table feeding each zone, the API route serving it, and the image assets (headshots, logos, colors) that make it feel like a real product.</p>
+</header>
+
+<!-- ==================== JOURNEY ==================== -->
+<h2 class="part" id="journey">The journey <small>what a session actually looks like</small></h2>
+
+<div class="plain">
+  <b>Three modes, in order.</b> Every screen exists to serve one of them, and every screen links forward into the next.
+  <ul>
+    <li><b>Catch up.</b> First minute on the app: what happened since I last looked? Injuries and designation changes, the hot topics, who the fantasy world is grabbing and dropping, which lines moved. One screen — <a href="#s_pulse">the Pulse</a> — answers all of it, and every item on it is a door into fishing.</li>
+    <li><b>Go fishing.</b> Two lanes into the same water. <b>Game lane:</b> start from the slate, pick a matchup, and work the pond — what does this defense give up, in which situations, and which props sit soft against it. <b>Player lane:</b> start from the finder, filter by position and usage, and work a player — form, situational usage, projections against lines.</li>
+    <li><b>Dig in.</b> When a candidate surfaces, drop to the <a href="#s_playlog">play log</a> and watch the pattern at play grain — with the embedded agent driving the screen through the API. The <a href="#s_edge">edge agent overlay</a> rides along on every screen for the questions that need judgment.</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <b class="title">Fishing is the product; catch-up is the bait.</b>
+  Nothing on the Pulse is a dead end. A news item opens the player it names. A designation change opens the depth chart it shakes and the props it moves. A trending player opens their detail page. A line move opens the market view. The screen map below is drawn so that every arrow points toward a decision about a play.
+</div>
+
+<!-- ==================== SCREEN MAP ==================== -->
+<h2 class="part" id="screen_map">The screen map <small>every screen, and how you move between them</small></h2>
+
+<div class="mapwrap">
+<svg class="map" viewBox="0 0 960 470" role="img" aria-label="Screen map: the Pulse feeds a game lane and a player lane; supporting screens sit below; the edge agent overlays everything">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path>
+    </marker>
+  </defs>
+
+  <g class="overlay">
+    <rect x="10" y="12" width="940" height="368"></rect>
+    <text x="24" y="32">edge agent overlay — page-aware, on every screen</text>
+  </g>
+
+  <g class="box hub">
+    <rect x="40" y="170" width="160" height="96" rx="8"></rect>
+    <text x="60" y="204">THE PULSE</text>
+    <text class="sub" x="60" y="222">home · catch up</text>
+    <text class="sub" x="60" y="238">news · status · trending</text>
+    <text class="sub" x="60" y="254">movers · slate strip</text>
+  </g>
+
+  <text class="lane" x="250" y="70">game lane</text>
+  <g class="box game">
+    <rect x="250" y="82" width="150" height="72" rx="8"></rect>
+    <text x="268" y="112">GAME DAY</text>
+    <text class="sub" x="268" y="130">the week's slate</text>
+  </g>
+  <g class="box game">
+    <rect x="470" y="82" width="190" height="72" rx="8"></rect>
+    <text x="488" y="112">GAME DETAIL</text>
+    <text class="sub" x="488" y="130">matchup HUD + prop board</text>
+  </g>
+
+  <text class="lane" x="250" y="290">player lane</text>
+  <g class="box player">
+    <rect x="250" y="302" width="150" height="72" rx="8"></rect>
+    <text x="268" y="332">PLAYERS</text>
+    <text class="sub" x="268" y="350">the finder</text>
+  </g>
+  <g class="box player">
+    <rect x="470" y="302" width="170" height="72" rx="8"></rect>
+    <text x="488" y="332">PLAYER DETAIL</text>
+    <text class="sub" x="488" y="350">form · usage · lines</text>
+  </g>
+  <g class="box player">
+    <rect x="710" y="302" width="170" height="72" rx="8"></rect>
+    <text x="728" y="332">PLAY LOG</text>
+    <text class="sub" x="728" y="350">pattern room + agent</text>
+  </g>
+
+  <path class="edge" d="M 200 196 C 230 180, 230 130, 250 120"></path>
+  <path class="edge" d="M 200 240 C 230 256, 230 326, 250 336"></path>
+  <path class="edge" d="M 400 118 L 470 118"></path>
+  <path class="edge" d="M 400 338 L 470 338"></path>
+  <path class="edge" d="M 640 338 L 710 338"></path>
+  <path class="edge faint" d="M 565 154 C 565 230, 555 260, 555 302"></path>
+  <path class="edge faint" d="M 660 130 C 760 160, 790 230, 795 302"></path>
+
+  <g class="box">
+    <rect x="250" y="404" width="140" height="48" rx="8"></rect>
+    <text x="268" y="424">TEAMS</text>
+    <text class="sub" x="268" y="440">standings · splits</text>
+  </g>
+  <g class="box">
+    <rect x="420" y="404" width="140" height="48" rx="8"></rect>
+    <text x="438" y="424">MARKETS</text>
+    <text class="sub" x="438" y="440">line movement</text>
+  </g>
+  <g class="box">
+    <rect x="590" y="404" width="140" height="48" rx="8"></rect>
+    <text x="608" y="424">EXPLORER</text>
+    <text class="sub" x="608" y="440">raw sheets</text>
+  </g>
+  <text class="lane" x="250" y="396">supporting — reachable from anywhere</text>
+</svg>
+</div>
+
+<p class="joinpath">Solid arrows are the journey's main current; dashed arrows are the cross-lane jumps that matter most — a prop board row opens the player behind it, and a game card can drop straight into the play log filtered to that matchup. The supporting screens (teams, markets, explorer) stay in the global nav; they serve deeper digs rather than the main current.</p>
+
+<!-- ==================== THE PULSE ==================== -->
+<h2 class="part" id="pulse_part">Catch up <small>the screen that starts every session</small></h2>
+
+<section class="model" id="s_pulse">
+  <div class="model-head"><h3>THE PULSE</h3><span class="grain">home screen · new · GET /api/nfl/pulse (new composite route, one fetch)</span></div>
+  <p class="joinpath">The tea, in one scroll: what changed, who's hot, what moved — with every item linking into a fishing lane. Composite payload so the screen renders on a single request.</p>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Zones on screen</div>
+      <div class="body">
+        <div class="grp">Around the league</div>
+        <div class="cols">latest news mentions, injury-tagged first<br>headline · source · published_at<br>player chips (headshot + name)<br>team chip + next-game context<br><b>feeds from NEWS_MENTIONS</b></div>
+        <div class="grp">Status board</div>
+        <div class="cols">active designations: Out / Doubtful / Questionable / IR<br>practice-participation moves (DNP → Limited → Full)<br>depth-chart ripple: who slides up when a starter sits<br><b>feeds from STATUS_BOARD (new)</b></div>
+        <div class="grp">Trending</div>
+        <div class="cols">Sleeper 24h adds and drops — 12M league managers voting<br>headshot · position · team · next opponent<br>add/drop count + direction badge<br><b>feeds from TRENDING_PLAYERS (new)</b></div>
+        <div class="grp">Market movers</div>
+        <div class="cols">biggest spread / total moves since open, per game<br>biggest prop-line moves, per player × prop_type<br>open → latest, with direction and book<br><b>feeds from MARKET_MOVERS (new)</b></div>
+        <div class="grp">This week strip</div>
+        <div class="cols">horizontal slate: logos, kickoff slot, line, total<br><b>feeds from GAME_SLATE</b></div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">Data &amp; API</div>
+      <div class="body">
+        <div class="grp">Route</div>
+        <div class="cols">GET /api/nfl/pulse<br>params: days (news window), week (defaults to state)</div>
+        <div class="grp">Reads</div>
+        <div class="cols">app_news_mentions → NEWS_MENTIONS<br>app_status_board → <b>STATUS_BOARD (new)</b><br>app_trending_players → <b>TRENDING_PLAYERS (new)</b><br>app_market_movers → <b>MARKET_MOVERS (new)</b><br>app_game_slate → GAME_SLATE</div>
+        <div class="grp">Payload shape</div>
+        <div class="cols">{ news: [...], status: [...],<br>&nbsp;&nbsp;trending: [...], movers: [...],<br>&nbsp;&nbsp;slate: [...] }</div>
+        <div class="note">Each section is its own pydantic row model with its own <code>COLUMNS</code> tuple, so the additive rules from the APP &amp; API plan apply per section. The route is read-only composition — no new query semantics, five known-column selects.</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">Fishing hooks</div>
+      <div class="body">
+        <div class="grp">Every item is a door</div>
+        <div class="cols">news item → player detail / team page<br>status row → game detail (prop impact) + depth chart<br>trending player → player detail<br>market mover → markets detail / prop board<br>slate card → game detail · the pond</div>
+        <div class="grp">Why these four signals</div>
+        <div class="note">They are the four ways an edge announces itself before kickoff: the press knows something (news), the team confirmed something (status), the crowd smells something (trending), and the books already repriced something (movers). Seeing all four side by side is the catch-up; clicking through is the fishing.</div>
+        <div class="flagline">STATUS_BOARD and TRENDING_PLAYERS are buildable <b>now</b> — fact_injury_report, fact_depth_chart and fact_sleeper_trending already exist. MARKET_MOVERS derives from the two snapshot facts. Details in <a href="#additions">new marts &amp; routes</a>.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== GAME LANE ==================== -->
+<h2 class="part" id="game_lane">Fishing · game lane <small>from the slate into the pond</small></h2>
+
+<section class="model" id="s_gameday">
+  <div class="model-head"><h3>GAME DAY</h3><span class="grain">exists · GET /api/nfl/slate · reads app_game_slate → GAME_SLATE</span></div>
+  <p class="joinpath">The week at a glance. With the planned slate enrichments (referee, division-game flag, availability counters) plus team branding, each card becomes a one-line scouting report instead of a scoreboard row.</p>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Zones on screen</div>
+      <div class="body">
+        <div class="grp">Week nav strip</div>
+        <div class="cols">season · season_type · week picker<br>kickoff-slot grouping (TNF / early / late / SNF / MNF)</div>
+        <div class="grp">Game cards</div>
+        <div class="cols">team logos + colors (new — team branding)<br>records + division context<br>spread · total · moneyline (chosen book, vendor-NULL fallback)<br>weather badge<br>referee + is_division_game (planned slate fields)<br>availability counters: Qs and Outs per side (planned)</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">Fishing hooks</div>
+      <div class="body">
+        <div class="grp">Reading the card</div>
+        <div class="note">The card answers "is this game worth working?" before a click: a division rematch in wind with four questionable starters and a moving total is a different pond than a dome game with clean injury reports. The counters and badges are the triage.</div>
+        <div class="grp">Doors</div>
+        <div class="cols">card → game detail · the pond<br>weather badge → game detail weather zone<br>availability counter → status board filtered to the game</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="s_pond">
+  <div class="model-head"><h3>GAME DETAIL · THE POND</h3><span class="grain">exists, grows · GET /api/nfl/games/{game_key} + /markets/{game_key} + situations rows</span></div>
+  <p class="joinpath">The core fishing screen of the game lane: one matchup, every angle. The prop board is the centerpiece — player × prop with the line, the projection, the delta, and the matchup rank all on one row.</p>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Zones on screen</div>
+      <div class="body">
+        <div class="grp">Matchup header</div>
+        <div class="cols">logos · colors · records · line · total · weather · referee<br><b>feeds from GAME_SLATE row</b></div>
+        <div class="grp">Defense-allowed grid</div>
+        <div class="cols">what each defense gives up, by position × stat<br>rank badges (1–32) vs league<br><b>feeds from TEAM_ALLOWED</b></div>
+        <div class="grp">Situation splits</div>
+        <div class="cols">EPA / success / explosive by down · distance · zone<br>both teams, offense and defense side<br><b>feeds from TEAM_SITUATION (planned)</b></div>
+        <div class="grp">Prop board</div>
+        <div class="cols">player headshot + name + position + status<br>prop line (chosen book) + over/under odds<br>Sleeper projection + projection − line delta (planned)<br>usage form: target_share / snap_pct trend (planned)<br>defense rank vs that position + stat<br><b>feeds from PROP_BOARD</b></div>
+        <div class="grp">Line context</div>
+        <div class="cols">spread / total sparkline since open<br><b>feeds from LINE_HISTORY</b></div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">Fishing hooks</div>
+      <div class="body">
+        <div class="grp">The screening pass</div>
+        <div class="note">Sort the prop board by projection-minus-line delta, filter to positions the defense-allowed grid flags as leaky, and check the situation splits for <i>why</i> (bad on third-and-long, generous in the red zone). That is the deterministic screen; the plays that survive move to the player lane.</div>
+        <div class="grp">Doors</div>
+        <div class="cols">prop row → player detail<br>prop row → prop line history overlay<br>situation cell → play log filtered to team + situation<br>header → teams page for either side</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PLAYER LANE ==================== -->
+<h2 class="part" id="player_lane">Fishing · player lane <small>from the finder into the pattern room</small></h2>
+
+<section class="model" id="s_players">
+  <div class="model-head"><h3>PLAYERS · THE FINDER</h3><span class="grain">exists, grows · GET /api/nfl/players · reads app_player_leaders → PLAYER_LEADERS</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Zones on screen</div>
+      <div class="body">
+        <div class="grp">Filter bar</div>
+        <div class="cols">position · team · season · season_type<br>sort by any leader stat or rank</div>
+        <div class="grp">Leaders grid</div>
+        <div class="cols">headshot · name · position · team (logo chip)<br>core box-score aggregates + within-position ranks<br>usage aggregates: target_share · snap_pct (planned)<br>fantasy: ppr totals + pos ranks (planned)</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">Fishing hooks</div>
+      <div class="body">
+        <div class="note">This is the player-lane entry: cast wide, filter down. Usage columns are the difference between a leaderboard and a finder — a WR2 whose target share jumped three weeks ago is invisible on a yardage leaderboard and obvious on a usage sort.</div>
+        <div class="grp">Doors</div>
+        <div class="cols">row → player detail<br>team chip → teams page</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="s_player">
+  <div class="model-head"><h3>PLAYER DETAIL</h3><span class="grain">exists, grows · GET /api/nfl/players/{player_key} · reads leaders + weeks + week stats + situations</span></div>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Zones on screen</div>
+      <div class="body">
+        <div class="grp">Identity header</div>
+        <div class="cols">headshot (large) · position · jersey<br>team wordmark + colors<br>bio block: age · draft · college (from PLAYER_PROFILE enrichment)<br>live status: designation · practice participation (planned)</div>
+        <div class="grp">Week-by-week</div>
+        <div class="cols">game log with opponent logos and results<br>usage per week: target_share · air_yards_share · snap_pct (planned)<br>EPA / fantasy points per week (planned)<br><b>feeds from PLAYER_WEEKS</b></div>
+        <div class="grp">Stat detail</div>
+        <div class="cols">long-format stats with prior-season same-week and average<br><b>feeds from PLAYER_WEEK_STATS</b> — new stat_keys flow automatically</div>
+        <div class="grp">Situational usage</div>
+        <div class="cols">where the player's work comes from: down · zone · script<br><b>feeds from PLAYER_SITUATION_USAGE (planned)</b></div>
+        <div class="grp">The market on this player</div>
+        <div class="cols">prop lines by week + result vs line<br>projection vs actual track record<br><b>feeds from PROP_LINE_HISTORY + PLAYER_WEEKS</b></div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">Fishing hooks</div>
+      <div class="body">
+        <div class="note">The confirmation screen. The pond said this player might be live; this page says whether the pattern is real — is the usage stable, does the situational profile match the matchup, and has the market historically underpriced him in this spot.</div>
+        <div class="grp">Doors</div>
+        <div class="cols">week row → play log filtered to player + game<br>situational cell → play log filtered to player + situation<br>prop history → markets detail<br>next-game chip → game detail · the pond</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="s_playlog">
+  <div class="model-head"><h3>PLAY LOG · PATTERN ROOM</h3><span class="grain">planned (v2 in the APP &amp; API plan) · GET /api/nfl/plays · reads PLAY_FEED + PLAYER_SITUATION_USAGE</span></div>
+  <p class="joinpath">Where pattern recognition happens at play grain: drive-grouped plays with situation, personnel, EPA and outcome, filtered by player, team, down, distance, zone. The third agent lives here — chat drives the API through Postgres session state and auto-populates the screen as the conversation goes.</p>
+  <div class="tri">
+    <div class="col today">
+      <div class="head">Zones on screen</div>
+      <div class="body">
+        <div class="grp">Filter rail</div>
+        <div class="cols">season · week · game · team · player<br>down · distance bucket · field zone · play type<br>pass/run · shotgun · no-huddle</div>
+        <div class="grp">Drive-grouped feed</div>
+        <div class="cols">plays grouped by drive with drive result header<br>situation line: down-and-distance · clock · yardline<br>description + EPA · success · WPA per play<br>involved players as headshot chips<br><b>feeds from PLAY_FEED</b></div>
+        <div class="grp">Usage-pattern strip</div>
+        <div class="cols">the selected player's situational profile pinned on top<br><b>feeds from PLAYER_SITUATION_USAGE</b></div>
+        <div class="grp">Agent dock</div>
+        <div class="cols">embedded play-log agent chat<br>agent writes session state → screen re-renders<br>(see the semantic views plan, "the three agents")</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">Fishing hooks</div>
+      <div class="body">
+        <div class="note">The deepest screen in the app and the end of the funnel: pond → finder → detail all point here. Arrivals come pre-filtered (a situation cell click lands with team + down + zone already set), so the screen opens on the exact pattern that raised the question.</div>
+        <div class="grp">Doors</div>
+        <div class="cols">player chip → player detail<br>drive header → game detail<br>agent answer → saved view (session state)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SUPPORTING ==================== -->
+<h2 class="part" id="supporting">Supporting screens <small>the deep-dig surfaces, reachable from anywhere</small></h2>
+
+<section class="model" id="s_teams">
+  <div class="model-head"><h3>TEAMS</h3><span class="grain">exists, grows · GET /api/nfl/teams + /teams/{team} · standings, weeks, allowed, ATS, situations</span></div>
+  <div class="plain">
+    Standings with home/away splits and planned EPA columns (<b>TEAM_STANDINGS</b>); the team page stacks week-by-week with EPA blocks (<b>TEAM_WEEKS</b>), the allowed-by-position grid (<b>TEAM_ALLOWED</b>), against-the-spread history (<b>TEAM_ATS</b>), and the new situation splits array (<b>TEAM_SITUATION</b>). Branding lands here hardest: logos in standings rows, team colors as page accent on the team page, opponent logos in the week log. Doors: week row → game detail; allowed cell → prop board filtered to that position; situation cell → play log.
+  </div>
+</section>
+
+<section class="model" id="s_markets">
+  <div class="model-head"><h3>MARKETS</h3><span class="grain">exists · GET /api/nfl/markets + /markets/{game_key} · LINE_HISTORY + PROP_LINE_HISTORY</span></div>
+  <div class="plain">
+    Line movement over the collapsed snapshot facts — a row means the line moved. The Pulse's market-movers zone is the summary; this is the full curve. Unchanged by this plan except arrival context: movers deep-link here with game and market pre-selected. Deferred idea from the APP &amp; API plan stays deferred: overlaying projection history on the prop-line curve.
+  </div>
+</section>
+
+<section class="model" id="s_explorer">
+  <div class="model-head"><h3>EXPLORER</h3><span class="grain">exists · GET /api/nfl/explore + /explore/{sheet} · all EXPLORE_* sheets</span></div>
+  <div class="plain">
+    The escape hatch when a curated screen doesn't cut the question: flat sheets with live column lists, filter, sort, export. Gains the planned <b>team_situations</b>, <b>plays</b> (v1 play log), and <b>player_situations</b> sheets — the v1 way to fish at play grain before the pattern room ships. Zero-code on new columns by construction.
+  </div>
+</section>
+
+<section class="model" id="s_edge">
+  <div class="model-head"><h3>EDGE AGENT OVERLAY</h3><span class="grain">nice-to-have · every screen · see the semantic views plan, "page-aware edge agent"</span></div>
+  <div class="plain">
+    The edge chat agent rides on every screen as an overlay dock. Each request carries page context (which screen, which filters, which entity), and the agent can write Postgres page-state configs to populate the screen it's sitting on — ask it "show me this week's soft WR props" from the pond and the prop board re-sorts itself. Designed in the <a href="nfl-semantic-views-plan.html">semantic views plan</a>; this doc just reserves the dock on every screen so wireframes account for it.
+  </div>
+</section>
+
+<!-- ==================== ASSETS ==================== -->
+<h2 class="part" id="assets">Assets <small>headshots, logos, colors — verified against the warehouse</small></h2>
+
+<section class="model" id="assets_headshots">
+  <div class="model-head"><h3>PLAYER HEADSHOTS</h3><span class="grain">source verified · RAW.NFLVERSE_PLAYERS.HEADSHOT · static.www.nfl.com CDN</span></div>
+  <div class="tri">
+    <div class="col plan">
+      <div class="head">What we have</div>
+      <div class="body">
+        <div class="grp">Measured</div>
+        <div class="cols">24,840 / 25,050 crosswalk rows carry a headshot (99.2%)<br>14,960 / 15,041 active-status rows (99.5%)<br>NFLVERSE_PLAYER_STATS.HEADSHOT_URL carries the same asset at week grain</div>
+        <div class="grp">URL shape</div>
+        <div class="cols">https://static.www.nfl.com/image/…/f_auto,q_auto/league/{id}</div>
+        <div class="note">The NFL's Cloudinary-style CDN: <code>f_auto,q_auto</code> in the path means the CDN negotiates format and quality, so the same URL serves list chips and the big player-detail portrait. Store the URL as-is; no resizing pipeline needed on our side.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">How it pipes</div>
+      <div class="body">
+        <div class="grp">The path</div>
+        <div class="cols">RAW.NFLVERSE_PLAYERS.HEADSHOT<br>→ bridge (gsis_id) → PLAYER_PROFILE.headshot_url<br>→ every player-facing APP mart adds headshot_url<br>→ pydantic row + types.ts + fixtures (additive rule)</div>
+        <div class="grp">Marts that carry it</div>
+        <div class="cols">PROP_BOARD · PLAYER_LEADERS · PLAYER_WEEKS<br>DEFENDER_WEEKS · TRENDING_PLAYERS · STATUS_BOARD<br>NEWS_MENTIONS (player chips) · PLAY_FEED (involved players)</div>
+        <div class="grp">Fallback</div>
+        <div class="cols">sleepercdn.com/content/nfl/players/{sleeper_player_id}.jpg</div>
+        <div class="note">For the &lt;1% without an nflverse headshot (and BDL-only players the bridge hasn't matched): PLAYER_PROFILE already plans denormalized <code>sleeper_player_id</code>, so the Sleeper CDN URL is constructible in the frontend with no extra column. Unofficial host (the app's own CDN) — fallback only, never primary. Final fallback: initials-on-team-color avatar, which needs team branding below.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="assets_branding">
+  <div class="model-head"><h3>TEAM BRANDING</h3><span class="grain">gap verified · BDL RAW.TEAMS has no branding · fix: new nflverse teams ingestion</span></div>
+  <div class="tri">
+    <div class="col slp">
+      <div class="head">The gap</div>
+      <div class="body">
+        <div class="grp">BDL RAW.TEAMS, full column list</div>
+        <div class="cols">ID · CONFERENCE · DIVISION · LOCATION<br>NAME · FULL_NAME · ABBREVIATION</div>
+        <div class="note">No logos, no colors, anywhere in RAW today (checked every table for headshot/logo/color/wordmark columns — only the two nflverse player headshot columns exist). Every screen above assumes logos and team colors, so this is a prerequisite, not a polish item.</div>
+      </div>
+    </div>
+    <div class="col plan">
+      <div class="head">The fix</div>
+      <div class="body">
+        <div class="grp">Ingest</div>
+        <div class="cols">nflreadpy.load_teams() → RAW.NFLVERSE_TEAMS<br>one registry entry in nflverse-registry.yml<br>36 rows: 32 current + LA · OAK · SD · STL legacy</div>
+        <div class="grp">Columns (verified from nflreadpy)</div>
+        <div class="cols">team_abbr · team_name · team_id · team_nick<br>team_conf · team_division<br>team_color · team_color2 · team_color3 · team_color4<br>team_logo_espn · team_logo_wikipedia<br>team_logo_squared · team_wordmark<br>team_conference_logo · team_league_logo</div>
+        <div class="grp">Model</div>
+        <div class="cols">TEAM_PROFILE gains: primary/secondary colors,<br>logo_url (espn), logo_squared_url, wordmark_url</div>
+        <div class="note">The legacy rows are why this joins cleanly to history: LA/SD/STL/OAK map relocated franchises' old abbreviations. Join on <code>nflverse_abbr</code>, which TEAM_PROFILE already plans to carry. Replace-load daily alongside the players crosswalk — the file barely changes, the cost is nothing.</div>
+      </div>
+    </div>
+    <div class="col api">
+      <div class="head">How it serves</div>
+      <div class="body">
+        <div class="grp">One mart, one fetch</div>
+        <div class="cols">app_team_branding → TEAM_BRANDING (32 rows)<br>team_key · team_id · abbr · nflverse_abbr<br>color_primary · color_secondary<br>logo_url · logo_squared_url · wordmark_url<br>GET /api/nfl/teams/branding (new)</div>
+        <div class="note">Branding is static per season, so the frontend fetches it <b>once</b>, caches it, and joins client-side by <code>team_key</code> — which every mart already carries on both home/away and team columns. This keeps logo/color columns off every other mart and every other row model: zero LINE_FIELDS-slice risk, zero fixture churn on marts that would otherwise all gain five columns.</div>
+        <div class="grp">Dark mode</div>
+        <div class="note">Team colors on dark panels can fail contrast (navy on near-black). The wireframes should treat <code>color_primary</code> as an accent behind a contrast check, with <code>logo_squared_url</code> as the safe mark on any background — that's what it exists for.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="model" id="assets_pipe">
+  <div class="model-head"><h3>THE PIPE</h3><span class="grain">end to end — both asset families, layer by layer</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Layer</th><th>Player headshots</th><th>Team branding</th></tr></thead>
+    <tbody>
+      <tr><td><b>RAW</b> (dlt)</td><td class="mono">NFLVERSE_PLAYERS.HEADSHOT — already landing daily</td><td class="mono">NFLVERSE_TEAMS — new registry entry, replace daily</td></tr>
+      <tr><td><b>Prep</b></td><td class="mono">already read by the crosswalk prep</td><td class="mono">stg_nfl__nflverse_teams — thin new view</td></tr>
+      <tr><td><b>DIM</b></td><td class="mono">PLAYER_PROFILE.headshot_url (in the enrichment plan)</td><td class="mono">TEAM_PROFILE colors + logo/wordmark urls</td></tr>
+      <tr><td><b>APP</b></td><td class="mono">headshot_url column on 8 player-facing marts</td><td class="mono">TEAM_BRANDING mart only — other marts stay clean</td></tr>
+      <tr><td><b>Postgres gate</b></td><td colspan="2">both ride the existing app-copy path; TEAM_BRANDING and each new mart added to the explicit list in <code>app-copy-registry.yml</code></td></tr>
+      <tr><td><b>API</b></td><td class="mono">headshot_url field on each touched row model + types.ts + fixtures</td><td class="mono">GET /api/nfl/teams/branding + BrandingRow, fetched once</td></tr>
+      <tr><td><b>Frontend</b></td><td class="mono">&lt;img&gt; with Sleeper-CDN then initials fallback</td><td class="mono">client-side join by team_key; contrast-checked accents</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn">
+    <b class="title">Hotlinking reality check.</b>
+    All three hosts (static.www.nfl.com, ESPN's CDN via nflverse, sleepercdn.com) serve these URLs publicly today and the nflverse ecosystem has leaned on them for years — but none is a contracted asset service. For a personal app that risk is fine to accept; the mitigation to keep in the back pocket is a one-time mirror of logos/wordmarks (a few hundred small files) into our own bucket if a host ever tightens up. Headshots are too many to mirror casually; the initials fallback covers an outage.
+  </div>
+</section>
+
+<!-- ==================== ADDITIONS ==================== -->
+<h2 class="part" id="additions">New marts &amp; routes <small>what this doc adds to the APP &amp; API plan</small></h2>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>Addition</th><th>dbt model → physical</th><th>Grain</th><th>Built from</th><th>Buildable</th></tr></thead>
+  <tbody>
+    <tr><td><b>Status board mart</b></td><td class="mono">app_status_board → STATUS_BOARD</td><td>player with an active designation or recent status change</td><td class="mono">fact_injury_report + fact_depth_chart + PLAYER_PROFILE live status</td><td><b>now</b></td></tr>
+    <tr><td><b>Trending mart</b></td><td class="mono">app_trending_players → TRENDING_PLAYERS</td><td>player × direction (add/drop), latest 24h window</td><td class="mono">fact_sleeper_trending + PLAYER_PROFILE + next game</td><td><b>now</b></td></tr>
+    <tr><td><b>Market movers mart</b></td><td class="mono">app_market_movers → MARKET_MOVERS</td><td>game × market and player × prop_type, open → latest delta</td><td class="mono">fact_game_betting_odds_snapshot + fact_player_prop_snapshot</td><td><b>now</b></td></tr>
+    <tr><td><b>Branding mart</b></td><td class="mono">app_team_branding → TEAM_BRANDING</td><td>team (32 rows)</td><td class="mono">TEAM_PROFILE ← RAW.NFLVERSE_TEAMS</td><td>after the teams ingestion</td></tr>
+    <tr><td><b>Pulse route</b></td><td class="mono">GET /api/nfl/pulse</td><td colspan="2">composite of the three new marts + NEWS_MENTIONS + GAME_SLATE, one fetch</td><td>after its marts</td></tr>
+    <tr><td><b>Branding route</b></td><td class="mono">GET /api/nfl/teams/branding</td><td colspan="2">TEAM_BRANDING, fetched once and cached client-side</td><td>with the mart</td></tr>
+    <tr><td><b>Headshot columns</b></td><td class="mono">headshot_url</td><td colspan="2">added to 8 player-facing marts + their row models (additive rule)</td><td>after PLAYER_PROFILE enrichment</td></tr>
+  </tbody>
+</table></div>
+
+<p class="joinpath">Every new mart follows the 5-step new-mart checklist and the Postgres copy gate from the <a href="nfl-app-api-plan.html">APP &amp; API plan</a>; every new column follows its additive rules. Nothing here renames or drops anything that exists.</p>
+
+<!-- ==================== WIREFRAMES ==================== -->
+<h2 class="part" id="wireframes">Wireframes next <small>docs/screens/ — one file per screen, this theme</small></h2>
+
+<div class="plain">
+  <b>The next step is visual:</b> a <code>docs/screens/</code> folder, one self-contained HTML wireframe per screen, using the same theme tokens and light/dark behavior as these docs, with static sample data shaped exactly like the API payloads named above.
+  <ul>
+    <li><b>Build order follows the journey:</b> the Pulse first (it defines the app's voice), then game detail · the pond (the densest screen), then player detail, then the play log pattern room. Game day, players, and the supporting screens fall out of the patterns those four establish.</li>
+    <li><b>Each wireframe carries its data contract:</b> a footer note naming the route and marts feeding each zone, so a wireframe review doubles as an API-payload review.</li>
+    <li><b>Every screen reserves the agent dock</b> (bottom-right overlay) so the edge agent lands without a redesign.</li>
+    <li><b>Assets render for real:</b> wireframes use live headshot and logo URLs from the warehouse rows above, because layout decisions (chip sizes, contrast, fallbacks) only surface with real images.</li>
+  </ul>
+</div>
+
+<footer>
+  weekend-warriors · internal reference · companions: <a href="nfl-app-api-plan.html">the APP &amp; API plan</a> (mart columns and API contracts), <a href="nfl-enrichment-columns.html">enrichment columns</a> (what DIM/FACTS carries), <a href="nfl-semantic-views-plan.html">semantic views &amp; agents</a> (the three agents and the orchestrator), and <a href="nfl-core-connection-strategy.html">the connection strategy</a> (schema migration and phasing).
+</footer>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var targets = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function spy() {
+    var pos = window.scrollY + 100, idx = 0, best = -Infinity;
+    targets.forEach(function (t, i) {
+      if (t && t.offsetTop <= pos && t.offsetTop > best) { best = t.offsetTop; idx = i; }
+    });
+    links.forEach(function (a, i) { a.classList.toggle('active', i === idx); });
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>

@@ -204,6 +204,15 @@ DATASETS: dict[str, Dataset] = {
         write_disposition="replace",
         season_keyed=False,
     ),
+    # 36 rows: 32 current franchises + LA/OAK/SD/STL legacy abbreviations, with
+    # brand colors, logo and wordmark URLs. The legacy rows are what let history
+    # join cleanly across relocations.
+    "teams": Dataset(
+        loader="load_teams",
+        table="nflverse_teams",
+        write_disposition="replace",
+        season_keyed=False,
+    ),
 }
 
 # ---------------------------------------------------------------------------

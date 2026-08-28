@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAME · OVERVIEW — Weekend Warriors wireframe</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<style>
+/* ---- game overview (landing sub-page) css ---- */
+
+/* matchup header: logos beside the abbrs, a whisper of team color under each */
+.matchup .vs { display: flex; align-items: center; gap: 14px; }
+.matchup .side { display: flex; align-items: center; gap: 10px; }
+.matchup .side .abbr { font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; border-bottom: 3px solid var(--team, transparent); padding-bottom: 2px; }
+.matchup .side small { display: block; color: var(--ink-3); }
+.matchup .rec { font-size: var(--fs-s); color: var(--ink-4); }
+
+/* two- and three-up zone grids */
+.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: var(--gap); }
+.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: var(--gap); }
+@media (max-width: 900px) {
+  .cols-2, .cols-3 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* availability rows: player | pos | status badge | practice week */
+.avail-row { display: grid; grid-template-columns: minmax(140px, 1.6fr) 40px minmax(64px, .8fr) minmax(110px, 1.2fr); gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 12.5px; min-width: 380px; }
+.avail-row.head { border-top: 0; padding-top: 0; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-4); }
+.avail-row .pos { color: var(--ink-3); }
+.avail-row .wk { color: var(--ink-3); font-size: var(--fs-s); text-align: right; white-space: nowrap; }
+.avail-tile .tile-body { overflow-x: auto; }
+
+/* defense-allowed compact rows: rank pill | position | two per-game stats */
+.allowed-row.compact { grid-template-columns: 48px minmax(110px, 1.4fr) repeat(2, minmax(70px, .9fr)); min-width: 320px; }
+.rkb { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; padding: 2px 6px; border-radius: 999px; border: 1px solid var(--line); font-size: 10px; font-weight: 700; color: var(--ink-3); }
+.rkb.leak { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 45%, transparent); background: color-mix(in srgb, var(--neg) 8%, transparent); }
+.rkb.sting { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent); background: color-mix(in srgb, var(--pos) 8%, transparent); }
+
+/* edge flags: one line each, the ✦ carries the accent */
+.edges li { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); }
+.edges li:first-child { border-top: 0; }
+.edges .star { color: var(--accent); flex: none; }
+.edges b { color: var(--ink); font-weight: 600; }
+.edges a { color: var(--accent); }
+
+/* teaser tiles deep-linking into the sibling sub-pages */
+a.teaser { display: grid; gap: 8px; align-content: start; }
+a.teaser:hover { border-color: var(--line-2); }
+a.teaser .go { font-size: var(--fs-s); color: var(--accent); font-weight: 600; }
+a.teaser .sum { color: var(--ink-2); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wf-note">wireframe · sample data</div>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="aurora two"><i></i><i></i><i></i></div>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="../../index.html">
+      <span class="mark"></span><span class="word">Weekend Warriors</span><span class="sub">analytics</span>
+    </a>
+    <nav class="sport-switch"><a class="on" href="#">NFL</a><a href="#">NCAAF</a></nav>
+    <div class="context">
+      <span class="ctx-item"><span class="l">Season</span><span class="v">2025 · Week 8</span></span>
+      <span class="ctx-item"><span class="l">Data</span><span class="v">postgres</span></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="crumb-row">
+      <div class="crumbs">
+        <a href="../game-day.html">Game Day</a><span class="sep"></span><span>BUF @ KC</span><span class="sep"></span><span>Overview</span>
+      </div>
+      <a class="back" href="../game-day.html">← Back to the slate</a>
+    </div>
+
+    <!-- zone 1 · full matchup header (this sub-page carries the whole identity) -->
+    <section class="game-head" id="gameHead">
+      <div class="matchup">
+        <span class="kick">SUN 8:20P ET · SNF · GEHA FIELD AT ARROWHEAD</span>
+        <div class="vs">
+          <div class="side">
+            <img class="tlogo lg" id="logoAway" alt="">
+            <div>
+              <h1 class="abbr" style="--team:#00338D">BUF</h1>
+              <small>Bills · 5-2</small>
+            </div>
+          </div>
+          <span class="at">@</span>
+          <div class="side">
+            <img class="tlogo lg" id="logoHome" alt="">
+            <div>
+              <h1 class="abbr" style="--team:#E31837">KC</h1>
+              <small>Chiefs · 6-1</small>
+            </div>
+          </div>
+        </div>
+        <p class="rec" style="margin-top:8px">Roof: open · Turf: grass · Allen 1-3 at Arrowhead</p>
+      </div>
+      <div class="line-strip">
+        <div class="stat"><span class="v">KC -2.5</span><span class="l">Spread · DK</span></div>
+        <div class="stat"><span class="v">52.5</span><span class="l">Total · DK</span></div>
+        <div class="stat"><span class="v">+122</span><span class="l">ML BUF</span></div>
+        <div class="stat"><span class="v">-146</span><span class="l">ML KC</span></div>
+        <div class="stat"><span class="v">41°<small>wind 9</small></span><span class="l">Weather</span></div>
+        <div class="stat"><span class="v">S. Hochuli</span><span class="l">Referee</span></div>
+      </div>
+      <details class="q" style="grid-column:1/-1"><summary>data</summary><pre>mart:  APP.GAME_SLATE  (one row, vendor = DK; vendor-NULL row if no line)
+route: GET /api/nfl/games/{game_key}
+fields: game_key, kickoff_et, slot, away/home abbr·nick·record, venue, roof,
+        spread, total, ml_away, ml_home, temp_f, wind_mph, referee</pre></details>
+    </section>
+
+    <!-- the sub-page family -->
+    <div class="subnav-row">
+      <nav class="subnav">
+        <a class="on" href="overview.html">Overview</a>
+        <a href="props.html">Prop board</a>
+        <a href="situations.html">Situations</a>
+        <a href="lines.html">Lines</a>
+      </nav>
+      <span class="hint">One game, four rooms. This one is the triage.</span>
+    </div>
+
+    <p class="lede">At a glance: who plays, what each defense leaks, and where the edges are.
+      The deep dives live in the tabs above.</p>
+
+    <!-- zone 2 · availability -->
+    <div class="grid cols-2">
+      <section class="tile avail-tile">
+        <div class="tile-head"><h2>BUF availability</h2><span class="meta">official report · Fri</span></div>
+        <div class="tile-body">
+          <div class="avail-row head"><span>Player</span><span>Pos</span><span>Status</span><span class="wk">Practice</span></div>
+          <div class="avail-row"><span><b>Matt Milano</b></span><span class="pos">LB</span><span><span class="badge out">OUT</span></span><span class="wk">DNP · DNP · DNP</span></div>
+          <div class="avail-row"><span><b>Taron Johnson</b></span><span class="pos">CB</span><span><span class="badge q">Q</span></span><span class="wk">DNP · LP · LP</span></div>
+          <div class="avail-row"><span><b>Ed Oliver</b></span><span class="pos">DT</span><span><span class="badge q">Q</span></span><span class="wk">LP · LP · FP</span></div>
+          <div class="avail-row"><span><b>Dalton Kincaid</b></span><span class="pos">TE</span><span><span class="badge ok">ACTIVE</span></span><span class="wk">FP · FP · FP</span></div>
+        </div>
+        <p class="caption">Milano out is the story: the spread moved Thursday when he was ruled out.</p>
+        <details class="q"><summary>data</summary><pre>mart:  APP.PLAYER_STATUS  (planned: injury report × depth chart, both teams)
+route: GET /api/nfl/games/{game_key}  →  availability[]
+fields: team, player_key, player, position, depth_order, game_status,
+        practice_wed, practice_thu, practice_fri, report_note</pre></details>
+      </section>
+
+      <section class="tile avail-tile">
+        <div class="tile-head"><h2>KC availability</h2><span class="meta">official report · Fri</span></div>
+        <div class="tile-body">
+          <div class="avail-row head"><span>Player</span><span>Pos</span><span>Status</span><span class="wk">Practice</span></div>
+          <div class="avail-row"><span><b>Rashee Rice</b></span><span class="pos">WR</span><span><span class="badge q">Q</span></span><span class="wk">DNP · LP · LP</span></div>
+          <div class="avail-row"><span><b>Marquise Brown</b></span><span class="pos">WR</span><span><span class="badge out">OUT</span></span><span class="wk">IR · — · —</span></div>
+          <div class="avail-row"><span><b>Joe Thuney</b></span><span class="pos">G</span><span><span class="badge q">Q</span></span><span class="wk">LP · LP · FP</span></div>
+          <div class="avail-row"><span><b>Travis Kelce</b></span><span class="pos">TE</span><span><span class="badge ok">ACTIVE</span></span><span class="wk">Rest · FP · FP</span></div>
+        </div>
+        <p class="caption">Rice Q with a hamstring: his reception line already moved a full catch.</p>
+        <details class="q"><summary>data</summary><pre>mart:  APP.PLAYER_STATUS  (planned: injury report × depth chart, both teams)
+route: GET /api/nfl/games/{game_key}  →  availability[]
+fields: team, player_key, player, position, depth_order, game_status,
+        practice_wed, practice_thu, practice_fri, report_note</pre></details>
+      </section>
+    </div>
+
+    <!-- zone 3 · defense-allowed, compact: the top leaks and the one wall each -->
+    <div class="grid cols-2">
+      <section class="tile allowed-tile">
+        <div class="tile-head"><h2>What KC's defense allows</h2><span class="meta">top leaks · rank of 32</span></div>
+        <div class="tile-body">
+          <div class="allowed">
+            <div class="allowed-row compact head"><span>Rk</span><span>Position</span><span class="n">Yds/gm</span><span class="n">Fpts/gm</span></div>
+            <div class="allowed-row compact"><span class="rkb leak">28</span><span class="tm"><b>vs WR</b><small>rec yds</small></span><span class="n neg">171.9</span><span class="n neg">34.6</span></div>
+            <div class="allowed-row compact"><span class="rkb leak">26</span><span class="tm"><b>vs QB</b><small>pass yds</small></span><span class="n neg">243.8</span><span class="n neg">19.4</span></div>
+            <div class="allowed-row compact"><span class="rkb sting">8</span><span class="tm"><b>vs TE</b><small>rec yds</small></span><span class="n pos">41.2</span><span class="n pos">9.8</span></div>
+          </div>
+        </div>
+        <p class="caption">Rose = leaky (the opportunity) · sage = stingy. Full grid feeds
+          the <a href="props.html" style="color:var(--accent)">prop board's DvP column →</a></p>
+        <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_ALLOWED  (team = KC, long: position × stat)
+route: GET /api/nfl/games/{game_key}  →  allowed[]
+fields: team, position, stat, allowed_per_game, td_per_game,
+        fpts_allowed_per_game, rank_1_32</pre></details>
+      </section>
+
+      <section class="tile allowed-tile">
+        <div class="tile-head"><h2>What BUF's defense allows</h2><span class="meta">top leaks · rank of 32</span></div>
+        <div class="tile-body">
+          <div class="allowed">
+            <div class="allowed-row compact head"><span>Rk</span><span>Position</span><span class="n">Yds/gm</span><span class="n">Fpts/gm</span></div>
+            <div class="allowed-row compact"><span class="rkb leak">27</span><span class="tm"><b>vs TE</b><small>rec yds</small></span><span class="n neg">61.8</span><span class="n neg">13.7</span></div>
+            <div class="allowed-row compact"><span class="rkb leak">25</span><span class="tm"><b>vs RB</b><small>rush yds</small></span><span class="n neg">132.7</span><span class="n neg">24.8</span></div>
+            <div class="allowed-row compact"><span class="rkb sting">10</span><span class="tm"><b>vs QB</b><small>pass yds</small></span><span class="n pos">221.4</span><span class="n pos">15.9</span></div>
+          </div>
+        </div>
+        <p class="caption">Kelce vs the 27th-ranked TE defense is the matchup the board keeps finding.</p>
+        <details class="q"><summary>data</summary><pre>mart:  APP.TEAM_ALLOWED  (team = BUF, long: position × stat)
+route: GET /api/nfl/games/{game_key}  →  allowed[]
+fields: team, position, stat, allowed_per_game, td_per_game,
+        fpts_allowed_per_game, rank_1_32</pre></details>
+      </section>
+    </div>
+
+    <!-- zone 4 · edge flags -->
+    <section class="tile" style="margin-bottom:var(--gap)">
+      <div class="tile-head"><h2>Edge flags</h2><span class="meta">model + rules · updated hourly</span></div>
+      <ul class="edges">
+        <li><span class="star">✦</span><span><b>Spread vs model.</b> Market KC -2.5, model makes it KC -0.5:
+          two points of lean to <b>BUF +2.5</b>. <a href="lines.html">Why it moved →</a></span></li>
+        <li><span class="star">✦</span><span><b>Wind 9 mph forecast.</b> The total fell 54.5 → 52.5; the market
+          read the forecast too, so the under is no longer free.</span></li>
+        <li><span class="star">✦</span><span><b>Shakir Rec Yds 44.5</b> vs a 58.3 Sleeper projection (Δ +13.8),
+          into KC's 28th-ranked WR defense. <a href="props.html">On the board →</a></span></li>
+        <li><span class="star">✦</span><span><b>KC on 3rd &amp; long</b> is the mismatch: +0.12 EPA/play into a BUF
+          defense allowing -0.13 there. <a href="situations.html">See the splits →</a></span></li>
+        <li><span class="star">✦</span><span><b>Milano OUT, Rice Q.</b> One moved the spread Thursday; the other
+          already cost a reception off his line.</span></li>
+      </ul>
+      <details class="q"><summary>data</summary><pre>mart:  APP.GAME_EDGES  (planned: model-vs-market deltas + rule-based flags)
+route: GET /api/nfl/games/{game_key}  →  edges[]
+fields: flag_kind(model|weather|prop|situation|availability), headline,
+        detail, magnitude, links_to(sub_page)</pre></details>
+    </section>
+
+    <!-- zone 5 · teasers into the sibling sub-pages -->
+    <div class="grid cols-3">
+      <a class="tile teaser" href="props.html">
+        <div class="tile-head"><h2>Prop board</h2><span class="meta">18 props · 3 soft</span></div>
+        <p class="sum">Every prop priced against the Sleeper number, sorted by the gap.
+          Shakir +13.8 leads the page.</p>
+        <span class="go">Open the board →</span>
+      </a>
+      <a class="tile teaser" href="situations.html">
+        <div class="tile-head"><h2>Situations</h2><span class="meta">down · zone · script</span></div>
+        <p class="sum">Where each offense lives and what the other defense allows there,
+          down to red zone and two-minute.</p>
+        <span class="go">Open the splits →</span>
+      </a>
+      <a class="tile teaser" href="lines.html">
+        <div class="tile-head"><h2>Lines</h2><span class="meta">KC -1.5 → -2.5 since Thu</span></div>
+        <svg class="spark" viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M4,10 L36,10 L68,16 L100,24 L132,18 L164,24 L196,24"></path>
+          <circle cx="196" cy="24" r="2.5"></circle>
+        </svg>
+        <p class="sum">The Thursday move, every book's path, and this game's prop-line moves.</p>
+        <span class="go">Open the market view →</span>
+      </a>
+    </div>
+  </main>
+
+  <footer class="foot"><span>Wireframe — zones annotated with the mart + route feeding them.</span><span>NFL_PROD_DB.APP → app.app_copy</span></footer>
+</div>
+
+<nav class="dock">
+  <a href="../pulse.html">Pulse</a>
+  <a href="../game-day.html">Game Day</a>
+  <a href="../players.html">Players</a>
+  <a href="../teams.html">Teams</a>
+  <a href="../markets.html">Markets</a>
+  <a href="../play-log.html">Play Log</a>
+  <a href="../explorer.html">Explorer</a>
+</nav>
+
+<button class="edge-fab" id="edgeFab" title="Edge agent">✦</button>
+<aside class="edge-panel" id="edgePanel">
+  <div class="edge-head">Edge agent<small>page-aware · sees your filters</small></div>
+  <div class="edge-msgs">
+    <div class="edge-msg me">Catch me up on this game.</div>
+    <div class="edge-msg bot">Three things. The spread moved KC -1.5 to -2.5 Thursday after Milano was ruled out.
+      The total fell two with a 9 mph wind forecast. And Shakir's 44.5 rec yds sits 13.8 under the Sleeper
+      projection, into KC's 28th-ranked WR defense. Rice is questionable, check him before lock.</div>
+    <div class="edge-msg me">Where should I dig first?</div>
+    <div class="edge-msg bot">The prop board. Three lines sit well off the projection and two of them hit KC's
+      WR leak. Open the Prop board tab, I carry this context with you across the tabs.</div>
+  </div>
+  <div class="edge-input"><input placeholder="Ask about this page…"></div>
+</aside>
+
+<script src="../../shared/data.js"></script>
+<script>
+  document.getElementById('edgeFab').addEventListener('click', function () {
+    document.getElementById('edgePanel').classList.toggle('open');
+  });
+
+  /* matchup header assets from the shared WW global */
+  document.getElementById('logoAway').src = WW.teams.BUF.logo;
+  document.getElementById('logoHome').src = WW.teams.KC.logo;
+</script>
+</body>
+</html>

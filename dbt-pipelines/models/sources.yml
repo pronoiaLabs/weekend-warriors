@@ -263,58 +263,6 @@ sources:
           - name: prop_type
             tests: [not_null]
 
-      # ---------------------------------------------------------------------
-      # Next Gen Stats -- player x season x week grain, NO game_id.
-      # These conform to dim_player and dim_season_week but NOT to dim_game.
-      # ---------------------------------------------------------------------
-      - name: advanced_passing
-        description: >
-          Next Gen Stats passing, one row per player per season-week per
-          postseason flag. No game_id in this source, so it cannot be joined
-          to a specific game.
-
-          WARNING: week = 0 rows are SEASON TOTALS, not a week. They do not
-          reconcile with the sum of the weekly rows (50,025 attempts vs 47,392),
-          so they are independent authoritative data. Never aggregate across
-          week 0 and weeks 1+ together.
-        tests:
-          - dbt_utils.unique_combination_of_columns:
-              combination_of_columns: [player__id, season, week, postseason]
-        columns:
-          - name: player__id
-            tests:
-              - not_null
-              - relationships: {to: "source('nfl_raw', 'players')", field: id}
-          - name: week
-            description: "0 = season total, 1-18 = regular season week, 1-5 when postseason."
-            tests: [not_null]
-
-      - name: advanced_rushing
-        description: "Next Gen Stats rushing. Same grain as advanced_passing."
-        tests:
-          - dbt_utils.unique_combination_of_columns:
-              combination_of_columns: [player__id, season, week, postseason]
-        columns:
-          - name: player__id
-            tests:
-              - not_null
-              - relationships: {to: "source('nfl_raw', 'players')", field: id}
-          - name: week
-            tests: [not_null]
-
-      - name: advanced_receiving
-        description: "Next Gen Stats receiving. Same grain as advanced_passing."
-        tests:
-          - dbt_utils.unique_combination_of_columns:
-              combination_of_columns: [player__id, season, week, postseason]
-        columns:
-          - name: player__id
-            tests:
-              - not_null
-              - relationships: {to: "source('nfl_raw', 'players')", field: id}
-          - name: week
-            tests: [not_null]
-
       # --- News: the Firecrawl source (dlt news-registry.yml), hourly -------
       - name: news_articles
         description: >
@@ -534,6 +482,16 @@ sources:
           Trade log 2002 onward, one row per asset moved (player by pfr_id, or
           pick by season/round/number), trade_id groups the sides. Replaced
           weekly.
+
+      - name: nflverse_teams
+        description: >
+          Franchise branding: 36 rows (32 current teams plus LA/OAK/SD/STL
+          legacy abbreviations, which is what lets history join cleanly across
+          relocations) with conference/division, brand colors, and logo /
+          wordmark URLs. Replaced weekly.
+        columns:
+          - name: team_abbr
+            tests: [unique, not_null]
 
       # --- Sleeper: live player state and fantasy signal (dlt sleeper-registry.yml)
       #
@@ -807,7 +765,8 @@ sources:
       # unified player population: all five player_season_* tables span the
       # identical 224 players (verified pairwise in prod), because basketball
       # has no positional disciplines. This is why sv_wnba_player_advanced
-      # ships enabled while sv_nfl_player_advanced is disabled.
+      # ships enabled while NFL's equivalent (and its BDL advanced sources)
+      # was retired outright -- nflverse Next Gen covers that ground.
       # ---------------------------------------------------------------------
       - name: player_game_advanced_stats
         description: >

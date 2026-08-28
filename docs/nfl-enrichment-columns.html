@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFL Enrichment Columns</title>
+<meta name="description" content="Table by table: the BDL base columns, then exactly what nflverse and Sleeper bring over to enrich each dim and fact.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧩</text></svg>">
+<style>
+  :root {
+    --bg: #f7f6f3; --panel: #ffffff; --panel-2: #f1efe9;
+    --ink: #1c1b18; --muted: #6b675e; --line: #dedacf;
+    --bdl: #2563eb; --bdl-bg: #eef3fe;
+    --nflverse: #16803c; --nflverse-bg: #ecf6ef;
+    --sleeper: #d9550f; --sleeper-bg: #fdf1e8;
+    --code-bg: #eeece5; --shadow: 0 1px 3px rgba(28,27,24,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16150f; --panel: #201f18; --panel-2: #262419;
+      --ink: #e8e5dc; --muted: #a09b8d; --line: #3a382c;
+      --bdl: #7aa2ff; --bdl-bg: #1d2436;
+      --nflverse: #57c47b; --nflverse-bg: #1b2b20;
+      --sleeper: #f08b4b; --sleeper-bg: #33241a;
+      --code-bg: #2b2a20; --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15.5px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .875em; background: var(--code-bg); padding: .08em .3em; border-radius: 4px; }
+
+  .layout { display: grid; grid-template-columns: 212px minmax(0, 1fr); gap: 28px; max-width: 1480px; margin: 0 auto; padding: 0 20px; }
+  .page { min-width: 0; padding: 0 0 90px; }
+
+  aside.rail { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 40px 0 24px; }
+  .rail .rg { margin-bottom: 16px; }
+  .rail .rg-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 0 10px 4px; }
+  .rail a { display: block; padding: 3px 10px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; border-left: 2px solid var(--line); }
+  .rail a:hover { color: var(--ink); }
+  .rail a.active { color: var(--bdl); border-left-color: currentColor; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    aside.rail { position: static; max-height: none; padding: 20px 0 0; }
+    .rail .rg { display: inline; }
+    .rail .rg-title { display: inline; padding: 0 6px 0 0; }
+    .rail a { display: inline-block; border-left: none; padding: 2px 8px 2px 0; }
+  }
+
+  header { padding: 46px 0 6px; }
+  header .kicker { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
+  header h1 { font-size: clamp(26px, 4vw, 38px); margin: 0 0 10px; letter-spacing: -.01em; }
+  header p.sub { color: var(--muted); font-size: 16.5px; max-width: 780px; margin: 0; }
+
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 4px; }
+  .legend span { font-size: 12.5px; font-weight: 700; padding: 3px 12px; border-radius: 999px; border: 1.5px solid; }
+  .lg-bdl { color: var(--bdl); border-color: var(--bdl); background: var(--bdl-bg); }
+  .lg-nfl { color: var(--nflverse); border-color: var(--nflverse); background: var(--nflverse-bg); }
+  .lg-slp { color: var(--sleeper); border-color: var(--sleeper); background: var(--sleeper-bg); }
+
+  h2.part { font-size: 22px; margin: 52px 0 4px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
+  h2.part small { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 10px; }
+
+  section.model { margin: 26px 0 34px; }
+  .model-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .model-head h3 { font-family: ui-monospace, Menlo, monospace; font-size: 18px; margin: 0; }
+  .model-head .grain { font-size: 13px; color: var(--muted); }
+  .joinpath { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+  .joinpath code { font-size: 12px; }
+
+  .tri { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .col { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+  .col .head { padding: 9px 14px; font-size: 13px; font-weight: 800; letter-spacing: .02em; border-bottom: 1px solid var(--line); }
+  .col.bdl .head { color: var(--bdl); background: var(--bdl-bg); }
+  .col.nfl .head { color: var(--nflverse); background: var(--nflverse-bg); }
+  .col.slp .head { color: var(--sleeper); background: var(--sleeper-bg); }
+  .col.bet .head { color: #7c3aed; background: rgba(124,58,237,.09); }
+  .col.news .head { color: #be185d; background: rgba(190,24,93,.09); }
+  .col.wx .head { color: #0e7490; background: rgba(14,116,144,.09); }
+  .col .head .g { font-weight: 500; opacity: .75; font-size: 11.5px; }
+  .col .body { padding: 10px 14px 14px; }
+  .grp { margin: 12px 0 2px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .grp:first-child { margin-top: 2px; padding-top: 0; border-top: none; }
+  .cols { font-family: ui-monospace, Menlo, monospace; font-size: 12.3px; line-height: 1.9; word-spacing: 2px; }
+  .cols b { font-weight: 700; }
+  .note { font-size: 12.5px; color: var(--muted); font-family: -apple-system, sans-serif; margin-top: 6px; }
+  .none { font-size: 13px; color: var(--muted); font-style: italic; padding: 4px 0; }
+  .flagline { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12.5px; color: var(--muted); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 9px 12px; border-bottom: 2px solid var(--line); background: var(--panel-2); }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+  td.num { text-align: right; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .yes { color: var(--nflverse); font-weight: 700; }
+  .no { color: var(--muted); }
+  details.sql { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); margin: 12px 0; }
+  details.sql > summary { cursor: pointer; padding: 10px 16px; font-size: 13px; font-weight: 700; list-style: none; color: var(--muted); }
+  details.sql > summary::-webkit-details-marker { display: none; }
+  details.sql > summary::before { content: "▸ "; }
+  details.sql[open] > summary::before { content: "▾ "; }
+  details.sql .sqlbody { padding: 0 16px 14px; border-top: 1px solid var(--line); }
+  details.sql .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 12px 0 4px; }
+  details.sql pre { margin: 0; padding: 12px 14px; background: var(--code-bg); border-radius: 8px; overflow-x: auto; font: 11.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink); }
+  .plain { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow); font-size: 14px; }
+  .plain ul { margin: 6px 0 0; padding-left: 20px; }
+  .plain li { margin: 4px 0; }
+  footer { margin-top: 70px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<aside class="rail">
+  <div class="rg">
+    <div class="rg-title">Dims · enriching</div>
+    <a href="#dim_player">player_profile</a>
+    <a href="#dim_team">team_profile</a>
+    <a href="#dim_game">game_schedule</a>
+    <a href="#dim_date">calendar_date</a>
+    <a href="#dim_season_week">season_week</a>
+    <a href="#dim_play_type">play_type</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Dims · as-is</div>
+    <a href="#dim_stadium">stadium_profile</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Dims · new</div>
+    <a href="#dim_game_official">game_official</a>
+    <a href="#dim_player_combine">player_combine</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Facts · enriching</div>
+    <a href="#f_po">player_game_offense</a>
+    <a href="#f_pd">player_game_defense</a>
+    <a href="#f_ps">player_game_special</a>
+    <a href="#f_to">team_game_offense</a>
+    <a href="#f_td">team_game_defense</a>
+    <a href="#f_play">play_log</a>
+    <a href="#f_ts">team_season</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Facts · as-is</div>
+    <a href="#f_odds">game_odds_opening/closing</a>
+    <a href="#f_odds_snap">game_odds_snapshot</a>
+    <a href="#f_props">player_prop_*</a>
+    <a href="#f_injury">injury_report</a>
+    <a href="#f_depth">depth_chart</a>
+    <a href="#f_proj">sleeper_projection_snapshot</a>
+    <a href="#f_trend">sleeper_trending</a>
+    <a href="#f_weather">game_weather</a>
+    <a href="#f_news">player_news_mention</a>
+    <a href="#f_2pt">two_point_conversion</a>
+    <a href="#f_nextgen">nextgen_*</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Facts · new</div>
+    <a href="#f_situation">team_game_situation</a>
+    <a href="#f_trade">trade_asset</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Prep · new</div>
+    <a href="#p_pbp">stg_nfl__nflverse_pbp</a>
+  </div>
+  <div class="rg">
+    <div class="rg-title">Reference</div>
+    <a href="#retired">retired to cold storage</a>
+  </div>
+</aside>
+
+<main class="page">
+
+<header>
+  <p class="kicker">Internal reference · companion to the connection strategy</p>
+  <h1>What each table keeps, and what comes over</h1>
+  <p class="sub">Table by table: the <b>BDL base</b> (what we already use, always the left side of the join), then exactly which columns <b>nflverse</b> and <b>Sleeper</b> bring over to enrich the row.</p>
+  <div class="legend">
+    <span class="lg-bdl">BDL — the base row</span>
+    <span class="lg-nfl">+ nflverse enrichment</span>
+    <span class="lg-slp">+ Sleeper enrichment</span>
+  </div>
+</header>
+
+<div class="plain" style="margin-top:22px">
+  <b>Naming convention for the new schemas.</b> The schema carries the role, so physical tables drop the dim_/fact_ prefix and every name is at least two words: <code>NFL_PROD_DB.DIM.PLAYER_PROFILE</code>, <code>NFL_PROD_DB.FACTS.PLAY_LOG</code>. dbt model names do <b>not</b> change — a <code>generate_alias_name</code> macro strips the prefix by folder, plus a small override map (dim_player → PLAYER_PROFILE, dim_team → TEAM_PROFILE, dim_game → GAME_SCHEDULE, dim_date → CALENDAR_DATE, dim_stadium → STADIUM_PROFILE, fact_play → PLAY_LOG, fact_trade → TRADE_ASSET) — so every ref(), semantic view and APP mart compiles untouched; only the relation names change. Section headers below show the physical name; each grain line names the dbt model. Prep models keep their <code>stg_nfl__*</code> names.
+</div>
+
+<!-- ============================================================ DIMS -->
+<h2 class="part" id="dims">Dimensions</h2>
+
+<!-- ================= dim_player ================= -->
+<section class="model" id="dim_player">
+  <div class="model-head"><h3>PLAYER_PROFILE</h3><span class="grain">dbt model dim_player · one row per player · key <code>player_key</code> · 13,503 rows</span></div>
+  <p class="joinpath">join: <code>player_key → bridge_player_ids (gsis_id) → nflverse players crosswalk / sleeper players</code></p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Identity</div>
+        <div class="cols">player_key<br>player_id<br>full_name<br>first_name<br>last_name<br>jersey_number</div>
+        <div class="grp">Position</div>
+        <div class="cols">position_abbreviation<br>position_name<br>position_group<br>has_known_position</div>
+        <div class="grp">Physical / career</div>
+        <div class="cols">height_inches<br>weight_lbs<br>age<br>seasons_experience<br>is_rookie<br>college</div>
+        <div class="note">Problem being solved: position is 'Unknown' on 8,379 rows; height/weight missing on 9,715; no birth date, no draft info, no headshot.</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse</div>
+      <div class="body">
+        <div class="grp">Bio &amp; draft</div>
+        <div class="cols">birth_date<br>draft_year<br>draft_round<br>draft_pick<br>draft_team<br>college_conference<br>rookie_season<br>last_season<br>years_of_experience<br>headshot_url</div>
+        <div class="grp">Position &amp; status</div>
+        <div class="cols">nflverse_position<br>ngs_position<br>pff_position<br>nflverse_status</div>
+        <div class="grp">Ids (denormalized; bridge stays authoritative)</div>
+        <div class="cols">gsis_id<br>esb_id<br>espn_id<br>pfr_id<br>pff_id<br>otc_id</div>
+        <div class="note">Backfills: position repaired via <code>coalesce(bdl ≠ 'Unknown', nflverse, sleeper)</code> + a provenance column; height/weight filled where BDL is null.</div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="grp">Live status (daily, current state)</div>
+        <div class="cols">injury_status<br>injury_body_part<br>injury_notes<br>practice_participation<br>practice_description<br>news_updated_at</div>
+        <div class="grp">Depth chart &amp; relevance</div>
+        <div class="cols">depth_chart_position<br>depth_chart_order<br>search_rank<br>is_active</div>
+        <div class="grp">Bio &amp; ids</div>
+        <div class="cols">high_school<br>sleeper_player_id<br>sportradar_id<br>yahoo_id<br>rotowire_id<br>kalshi_id<br>oddsjam_id</div>
+        <div class="note">Live-status history isn't lost: the filed reports live on <code>fact_injury_report</code>, chart history on <code>fact_depth_chart</code>.</div>
+      </div>
+    </div>
+  </div>
+  <p class="flagline">Plus flags: <code>has_nflverse_match</code> · <code>has_sleeper_match</code> — so a NULL reads as "no match," never "no data."</p>
+</section>
+
+<!-- ================= dim_team ================= -->
+<section class="model" id="dim_team">
+  <div class="model-head"><h3>TEAM_PROFILE</h3><span class="grain">dbt model dim_team · one row per team · key <code>team_key</code> · 32 rows</span></div>
+  <p class="joinpath">join: <code>team_abbreviation → nfl_team_abbr_nflverse() macro (LAR↔LA, WSH↔WAS)</code></p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="cols">team_key<br>team_id<br>team_abbreviation<br>team_full_name<br>team_location<br>team_nickname<br>conference<br>division<br>conference_division</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse</div>
+      <div class="body">
+        <div class="grp">Join convenience</div>
+        <div class="cols">nflverse_abbr</div>
+        <div class="note">Ends every nflverse join re-deriving the abbreviation per query.</div>
+        <div class="grp">Branding (needs one new small ingestion: nflverse teams dataset)</div>
+        <div class="cols">team_color_primary<br>team_color_secondary<br>logo_url<br>wordmark_url</div>
+        <div class="grp">Home venue</div>
+        <div class="cols">stadium_key</div>
+        <div class="note">FK to dim_stadium — roof / surface / weather relevance one hop away.</div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="none">Nothing — Sleeper adds no team-level attributes worth carrying.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= dim_game ================= -->
+<section class="model" id="dim_game">
+  <div class="model-head"><h3>GAME_SCHEDULE</h3><span class="grain">dbt model dim_game · one row per game (full slate, incl. future) · key <code>game_key</code></span></div>
+  <p class="joinpath">join: <code>game_key → bridge_game_ids → nflverse_game_id</code></p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">When / where</div>
+        <div class="cols">game_datetime<br>game_datetime_et<br>game_date<br>date_key<br>season<br>week<br>season_type<br>season_type_name<br>is_postseason<br>season_week_key<br>venue<br>stadium_key</div>
+        <div class="grp">Participants / state</div>
+        <div class="cols">home_team_key<br>away_team_key<br>game_status<br>is_completed<br>went_to_overtime<br>game_summary</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse</div>
+      <div class="body">
+        <div class="grp">Identity</div>
+        <div class="cols">nflverse_game_id</div>
+        <div class="note">Denormalized from the bridge (2025_01_DAL_PHI shape; NULL for preseason).</div>
+        <div class="grp">Officiating (from nflverse_officials)</div>
+        <div class="cols">referee</div>
+        <div class="note">Head official only; the full crew is the new <code>dim_game_official</code> (game × official).</div>
+        <div class="grp">Derived (BDL data, new column)</div>
+        <div class="cols">is_division_game</div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="none">Nothing — Sleeper has no usable game id; its rows locate games by season + week + team.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= dim_date ================= -->
+<section class="model" id="dim_date">
+  <div class="model-head"><h3>CALENDAR_DATE</h3><span class="grain">dbt model dim_date · one row per date · key <code>date_key</code> · dense calendar spine</span></div>
+  <p class="joinpath">enrichment is pure derivation — no new source, no bridge</p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Calendar</div>
+        <div class="cols">date_key<br>full_date<br>calendar parts (year, month, day, day name)</div>
+        <div class="grp">NFL framing</div>
+        <div class="cols">nfl_season<br>is_sunday<br>is_monday<br>is_thursday<br>is_saturday</div>
+        <div class="note">nfl_season already rolls Jan/Feb games into the prior season.</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ derived</div>
+      <div class="body">
+        <div class="grp">Holiday slates</div>
+        <div class="cols"><b>is_thanksgiving</b><br><b>is_black_friday</b><br><b>is_christmas</b><br>is_new_years</div>
+        <div class="grp">Season framing</div>
+        <div class="cols"><b>season_phase</b></div>
+        <div class="note">offseason / preseason / regular / postseason window. Holiday games are real analytical anchors for the slate page and props — and this is free.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= dim_season_week ================= -->
+<section class="model" id="dim_season_week">
+  <div class="model-head"><h3>SEASON_WEEK</h3><span class="grain">dbt model dim_season_week · one row per season × week × season_type · key <code>season_week_key</code> · 78 rows</span></div>
+  <p class="joinpath">enrichment derived from <code>dim_game</code> gaps + <code>dim_stadium.is_international</code></p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Identity</div>
+        <div class="cols">season_week_key<br>season<br>week<br>season_type<br>season_type_name<br>is_postseason<br>season_week_label</div>
+        <div class="grp">Shape</div>
+        <div class="cols">week_start_date<br>week_end_date<br>games_in_week<br>season_week_sequence</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ derived</div>
+      <div class="body">
+        <div class="grp">Week character</div>
+        <div class="cols"><b>bye_team_count</b><br>international_game_count</div>
+        <div class="note">Pairs with the new <code>bye_week</code> column on <code>fact_team_season</code>: the fact answers "when is this team's bye," the dim answers "how thin is this week's slate."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= dim_stadium ================= -->
+<section class="model" id="dim_stadium">
+  <div class="model-head"><h3>STADIUM_PROFILE</h3><span class="grain">dbt model dim_stadium · one row per physical bowl · key <code>stadium_key</code> · seed-keyed</span></div>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">Seed base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Place</div>
+        <div class="cols">stadium_key<br>display_name<br>lat<br>lon<br>elevation_m<br>timezone<br>is_international</div>
+        <div class="grp">Weather traits</div>
+        <div class="cols">roof<br>surface<br>is_weather_relevant</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse (validation only — no new columns)</div>
+      <div class="body">
+        <div class="none">nflverse pbp observes <code>roof</code> and <code>surface</code> per game, which makes it a free cross-check: a new test asserts the seed agrees with what pbp saw, catching surface swaps and seed drift.</div>
+        <div class="note">Per-game retractable roof state (open/closed) is game-level, so if we ever want it, it lands on <code>fact_game_weather</code> — not here. Loaded nflverse datasets carry no stadium attributes (capacity, opened year) to add.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= dim_play_type ================= -->
+<section class="model" id="dim_play_type">
+  <div class="model-head"><h3>PLAY_TYPE</h3><span class="grain">dbt model dim_play_type · one row per play type · key <code>play_type_key</code> · 39 rows</span></div>
+  <p class="joinpath">the mapping that gives the play-by-play work (§ 6 of the strategy) a shared vocabulary</p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Identity</div>
+        <div class="cols">play_type_key<br>play_type_abbreviation<br>play_type_text</div>
+        <div class="grp">Classification</div>
+        <div class="cols">play_category<br>is_live_ball_play</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse (mapping + behavior flags)</div>
+      <div class="body">
+        <div class="grp">Vocabulary mapping</div>
+        <div class="cols"><b>nflverse_play_type</b><br><b>nflverse_flag_check</b></div>
+        <div class="note">The two vocabularies differ in kind: BDL types encode the <b>outcome</b> (Reception, Incompletion, Sack, Passing TD and Interception Return are five separate types), nflverse encodes the <b>called play</b> (all five are <code>play_type='pass'</code>) with the outcome in flags. So the mapping is the called play <i>plus</i> the flag the matched nflverse row must carry — a semantic check on top of the positional match.</div>
+        <div class="grp">Behavior flags</div>
+        <div class="cols"><b>is_scrimmage_play</b><br><b>is_dropback</b><br>is_designed_run<br>is_special_teams<br><b>is_matchable</b></div>
+        <div class="note"><code>is_scrimmage_play</code> is the EPA denominator (mirrors the pbp filter the team EPA columns already use). <code>is_matchable</code> pre-excludes the ≈27k administrative rows from the play-level match so the audit only counts plays that could match.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>BDL play type (observed)</th><th>Plays</th><th>→ nflverse play_type</th><th>Flag check on match</th><th>Scrimmage</th><th>Matchable</th></tr></thead>
+    <tbody>
+      <tr><td>Rush</td><td class="num">52,308</td><td class="mono">run (or qb_kneel)</td><td class="mono">rush_attempt=1</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Pass Reception</td><td class="num">39,731</td><td class="mono">pass</td><td class="mono">complete_pass=1</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Pass Incompletion</td><td class="num">23,253</td><td class="mono">pass (or qb_spike)</td><td class="mono">incomplete_pass=1</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Official Timeout</td><td class="num">13,904</td><td class="mono">—</td><td class="no">admin, BDL-only granularity</td><td class="no">✗</td><td class="no">✗</td></tr>
+      <tr><td>Kickoff (+ returns, return TD)</td><td class="num">10,029</td><td class="mono">kickoff</td><td class="mono">kickoff_attempt=1</td><td class="no">✗</td><td class="yes">✓</td></tr>
+      <tr><td>Punt (+ blocked, muffed, return TD)</td><td class="num">7,808</td><td class="mono">punt</td><td class="mono">punt_attempt=1</td><td class="no">✗</td><td class="yes">✓</td></tr>
+      <tr><td>Timeout</td><td class="num">7,160</td><td class="mono">no_play</td><td class="mono">timeout=1</td><td class="no">✗</td><td class="no">✗</td></tr>
+      <tr><td>Penalty</td><td class="num">5,858</td><td class="mono">no_play</td><td class="mono">penalty=1</td><td class="no">✗</td><td class="yes">✓</td></tr>
+      <tr><td>Sack (+ Sack Opp Fumble Rec)</td><td class="num">4,721</td><td class="mono">pass</td><td class="mono">sack=1</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Field Goal Good / Missed / Blocked</td><td class="num">3,988</td><td class="mono">field_goal</td><td class="mono">field_goal_result</td><td class="no">✗</td><td class="yes">✓</td></tr>
+      <tr><td>Passing / Rushing Touchdown</td><td class="num">4,620</td><td class="mono">pass / run</td><td class="mono">touchdown=1</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Interception Return (+ TD)</td><td class="num">1,502</td><td class="mono">pass</td><td class="mono">interception=1</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>End Period / Half / Game / Reg · Two-Minute Warning</td><td class="num">6,053</td><td class="mono">—</td><td class="no">admin</td><td class="no">✗</td><td class="no">✗</td></tr>
+      <tr><td>Fumble Recovery (Own / Opponent / Return TD)</td><td class="num">1,428</td><td class="mono">pass / run</td><td class="mono">fumble=1</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Two Point Pass / Rush · Defensive 2pt</td><td class="num">4</td><td class="mono">pass / run</td><td class="mono">two_point_attempt=1</td><td class="no">✗</td><td class="yes">✓</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="plain">
+    <b>Asymmetries the mapping documents (measured, both directions):</b>
+    <ul>
+      <li><b>nflverse-only:</b> extra-point kicks (3,876 <code>XP_KICK</code> plays) have <i>no BDL play type at all</i> — BDL's play stream simply omits PATs. Unmatchable by design; XP stats still arrive via the box-score path on <code>fact_player_game_special</code>.</li>
+      <li><b>nflverse-only vocabulary:</b> kneels (1,343) and spikes (224) are distinct types there, buried inside BDL's Rush and Pass Incompletion — which is why the mapping allows <code>run or qb_kneel</code> / <code>pass or qb_spike</code>.</li>
+      <li><b>BDL-only:</b> ≈27k administrative rows (official timeouts alone are 13,904) mostly don't exist as nflverse plays. <code>is_matchable</code> keeps them out of the match denominator.</li>
+      <li><b>BDL-only coverage:</b> preseason plays — nflverse pbp has no preseason, and <code>bridge_game_ids</code> already carries NULL for those games. Whole preseason games sit outside the match by construction.</li>
+      <li>nflverse carries a second, league-feed vocabulary (<code>play_type_nfl</code>: SACK, INTERCEPTION, PAT2, END_QUARTER…) that is closer to BDL's outcome framing — the flag checks lean on it where the analytics vocabulary is too coarse.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= dim_game_official ================= -->
+<section class="model" id="dim_game_official">
+  <div class="model-head"><h3>GAME_OFFICIAL</h3><span class="grain">dbt model dim_game_official · new dim · one row per game × official · fields verified against NFLVERSE_OFFICIALS</span></div>
+  <div class="tri">
+    <div class="col nfl">
+      <div class="head">dim_game_official <span class="g">game × official</span></div>
+      <div class="body">
+        <div class="cols">official_name<br>position (R, U, HL, LJ, FJ, SJ, BJ)<br>jersey_number<br>official_id</div>
+        <div class="note">Reference data for who worked each game — crew rotation feeds penalty-rate priors. Caution from the RAW check: NFLVERSE_OFFICIALS carries its own numeric <code>game_key</code> column — that is nflverse's key, not ours; bridge on game_id and rename theirs away. Referee (position R) also denormalizes onto dim_game.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= dim_player_combine ================= -->
+<section class="model" id="dim_player_combine">
+  <div class="model-head"><h3>PLAYER_COMBINE</h3><span class="grain">dbt model dim_player_combine · new dim · one row per player · fields verified against NFLVERSE_COMBINE</span></div>
+  <div class="tri">
+    <div class="col nfl">
+      <div class="head">dim_player_combine <span class="g">pfr_id → bridge</span></div>
+      <div class="body">
+        <div class="grp">Identity</div>
+        <div class="cols">pfr_id (→ gsis via crosswalk)<br>player_name / pos / school<br>cfb_id<br>draft_year / draft_team / draft_round / draft_ovr</div>
+        <div class="grp">Athletic testing</div>
+        <div class="cols">ht / wt<br>forty<br>bench<br>vertical<br>broad_jump<br>cone<br>shuttle</div>
+        <div class="note">Pure player attributes, kept as its own dim rather than 15 more dim_player columns — combine data exists only for drafted-era players and would be NULL-heavy on the 13.5k-row roster dim.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FACTS -->
+<h2 class="part" id="facts">Facts <small>wide facts first — BDL anchors, vendors enrich on the same grain; then the facts kept at their own grain, and the new ones</small></h2>
+
+<!-- ================= fact_player_game_offense ================= -->
+<section class="model" id="f_po">
+  <div class="model-head"><h3>PLAYER_GAME_OFFENSE</h3><span class="grain">dbt model fact_player_game_offense · one row per player × game · key <code>player_game_key</code> · ≈22k rows</span></div>
+  <p class="joinpath">join: <code>player_key → bridge → gsis_id</code>, then <code>(gsis_id, season, week) → game</code> (one game per team-week); snaps via <code>pfr_id</code>; Sleeper via <code>sleeper_player_id</code></p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Passing</div>
+        <div class="cols">attempts<br>completions<br>passing_yards<br>yards_per_attempt<br>passing_touchdowns<br>interceptions_thrown<br>times_sacked<br>sack_yards_lost<br>qb_rating<br>qbr</div>
+        <div class="grp">Rushing / receiving</div>
+        <div class="cols">rushing attempts/yards/avg/TD/long<br>targets<br>receptions<br>receiving_yards<br>yards_per_reception<br>receiving_touchdowns<br>long_reception</div>
+        <div class="grp">Ball security</div>
+        <div class="cols">fumbles<br>fumbles_lost</div>
+        <div class="grp">Rollups &amp; fantasy</div>
+        <div class="cols">scrimmage_yards<br>scrimmage_touchdowns<br>touches<br>two_point_conversions<br>two_point_conversions_thrown<br>fanduel_points<br>draftkings_points</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse</div>
+      <div class="body">
+        <div class="grp">Usage (the headline gain)</div>
+        <div class="cols"><b>target_share</b><br><b>air_yards_share</b><br><b>wopr</b><br>racr<br>pacr<br>passing_air_yards<br>receiving_air_yards<br>yards_after_catch</div>
+        <div class="grp">Efficiency</div>
+        <div class="cols"><b>passing_epa</b><br><b>rushing_epa</b><br><b>receiving_epa</b><br><b>passing_cpoe</b></div>
+        <div class="grp">Detail</div>
+        <div class="cols">passing/rushing/receiving_first_downs<br>explosive buckets: passing/receiving 10/16/20/40<br>rushing 10/12/20/40<br>sack_fumbles<br>sack_fumbles_lost<br>fantasy_points<br>fantasy_points_ppr</div>
+        <div class="grp">Snaps (via pfr crosswalk)</div>
+        <div class="cols"><b>offense_snaps</b><br><b>offense_pct</b></div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="grp">Fantasy scoring</div>
+        <div class="cols"><b>pts_std</b><br><b>pts_half_ppr</b><br><b>pts_ppr</b><br>pos_rank_std<br>pos_rank_half_ppr<br>pos_rank_ppr</div>
+        <div class="grp">Snap share (team denominators built in)</div>
+        <div class="cols">off_snp<br>tm_off_snp<br><b>off_snap_share</b></div>
+        <div class="grp">Detail BDL lacks</div>
+        <div class="cols"><b>rec_drop</b><br>rec_air_yd<br>rec_fd<br>rush_fd<br>pass_rtg</div>
+        <div class="note">rec_fd, rush_fd and pass_rtg live in the Sleeper prep view but were never carried onto the current Sleeper fact — the wide fact reads prep directly, so they come along.</div>
+      </div>
+    </div>
+  </div>
+  <p class="flagline"><b>Measured in dev:</b> excluding preseason (nflverse has no preseason data, by construction), <b>99.3%</b> of regular-season and <b>99.2%</b> of postseason BDL player-games find their nflverse row through the bridge (91 + 7 rows lack a bridge entry, 30 lack a stat row); Sleeper lands <b>83.8% / 87.3%</b>. The postseason week mapping (BDL 1,2,3,5 ↔ nflverse 19–22) matched with zero misses. Flags: <code>has_nflverse</code> · <code>has_sleeper</code>. Optional add (decide during build): headline Next Gen metrics per discipline (CPOE-above-expected, rush yards over expected, avg_separation) — full NGS depth stays on <code>fact_nextgen_*</code>.</p>
+</section>
+
+<!-- ================= fact_player_game_defense ================= -->
+<section class="model" id="f_pd">
+  <div class="model-head"><h3>PLAYER_GAME_DEFENSE</h3><span class="grain">dbt model fact_player_game_defense · one row per player × game · key <code>player_game_key</code> · ≈42k rows</span></div>
+  <p class="joinpath">join: same player path as offense; defense snaps via <code>pfr_id</code></p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Tackling</div>
+        <div class="cols">total_tackles<br>solo_tackles<br>assisted_tackles<br>tackles_for_loss</div>
+        <div class="grp">Pass rush / coverage</div>
+        <div class="cols">defensive_sacks<br>qb_hits<br>passes_defended<br>defensive_interceptions<br>interception_yards<br>interception_touchdowns</div>
+        <div class="grp">Takeaways</div>
+        <div class="cols">fumbles_recovered<br>fumbles_touchdowns<br>takeaways<br>defensive_touchdowns</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse</div>
+      <div class="body">
+        <div class="grp">def_* block (week stats)</div>
+        <div class="cols">def_tackles_with_assists<br>def_tackle_assists<br>def_fumbles_forced<br>def_sack_yards<br>def_interception_yards<br>def_pass_defended<br>def_penalties &amp; the rest of the ≈20-column block</div>
+        <div class="grp">Snaps</div>
+        <div class="cols"><b>defense_snaps</b><br><b>defense_pct</b></div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="grp">IDP scoring</div>
+        <div class="cols">idp_tkl<br>idp_sack<br>idp_int<br>idp_ff<br>idp_fum_rec<br>idp_pass_def<br>idp_qb_hit</div>
+        <div class="grp">Snap share</div>
+        <div class="cols">def_snp<br>tm_def_snp</div>
+        <div class="note">The current Sleeper fact carries only idp_tkl / idp_sack / idp_int and def_snp; the other IDP columns and tm_def_snp come from the Sleeper prep view, which the wide fact reads directly.</div>
+      </div>
+    </div>
+  </div>
+  <p class="flagline"><b>Measured in dev:</b> excluding preseason, <b>98.6%</b> of regular-season and <b>99.1%</b> of postseason BDL defense rows find their nflverse row through the bridge (292 + 9 rows lack a bridge entry, 206 + 6 lack a stat row), and every matched row carries the def_* block populated (zeros, not NULLs, where nothing was recorded). Sleeper matches <b>81.2% / 83.9%</b>, with IDP values on roughly 78% of the matched rows. Vendor prefixes stay on overlapping stats (BDL sacks vs nflverse def sacks) — disagreement stays visible, as with the two <code>defensive_touchdowns</code> columns today.</p>
+</section>
+
+<!-- ================= fact_player_game_special ================= -->
+<section class="model" id="f_ps">
+  <div class="model-head"><h3>PLAYER_GAME_SPECIAL</h3><span class="grain">dbt model fact_player_game_special · one row per player × game · key <code>player_game_key</code> · ≈8k rows</span></div>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Kicking</div>
+        <div class="cols">field_goal_attempts<br>field_goals_made<br>field_goal_pct<br>long_field_goal_made<br>extra_points_made<br>kicking_total_points</div>
+        <div class="grp">Punting / returns</div>
+        <div class="cols">punts<br>punt_yards<br>gross_avg_punt_yards<br>touchbacks<br>punts_inside_20<br>long_punt<br>kick + punt returns/yards/avg/long/TD</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse</div>
+      <div class="body">
+        <div class="grp">FG by distance band</div>
+        <div class="cols"><b>fg_made_0_19 … fg_made_60+</b> (made + missed per band)<br>fg_made_list<br>gwfg_att<br>gwfg_made</div>
+        <div class="grp">PAT — fills BDL's made-only gap</div>
+        <div class="cols"><b>pat_att</b><br>pat_made<br>pat_missed<br>pat_blocked<br>pat_pct</div>
+        <div class="note">BDL carries extra_points_made only (and its play stream has no XP plays at all — see dim_play_type). nflverse supplies attempts, misses, blocks and pct.</div>
+        <div class="grp">Punting / return detail</div>
+        <div class="cols">pt_* punting block<br>return detail<br>penalties</div>
+        <div class="grp">Snaps</div>
+        <div class="cols">st_snaps<br>st_pct</div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="grp">Kicking + share</div>
+        <div class="cols">fgm<br>fga<br>xpm<br>xpa<br>st_snp<br>tm_st_snp</div>
+        <div class="note">Kicking values appear only for actual kickers (about a quarter of matched rows — the fact also holds punters and returners). tm_st_snp comes from the Sleeper prep view.</div>
+      </div>
+    </div>
+  </div>
+  <p class="flagline"><b>Measured in dev:</b> excluding preseason, <b>99.7%</b> of regular-season and <b>100%</b> of postseason BDL special-teams rows find their nflverse row through the bridge (19 rows lack a bridge entry, 1 lacks a stat row — the best coverage of the three player facts, since kickers, punters and returners are all named players). Sleeper matches <b>78.3% / 83.0%</b>.</p>
+</section>
+
+<!-- ================= fact_team_game_offense ================= -->
+<section class="model" id="f_to">
+  <div class="model-head"><h3>TEAM_GAME_OFFENSE</h3><span class="grain">dbt model fact_team_game_offense · one row per team × completed game · key <code>team_game_key</code> · ≈2k rows</span></div>
+  <p class="joinpath">join: <code>team_game_key</code> — the EPA columns already live at this exact key (today's <code>fact_team_game_epa</code>, folded in)</p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Result</div>
+        <div class="cols">points_scored<br>points_allowed<br>point_margin<br>is_win/loss/tie (+ additive win/loss/tie_count)<br>is_home<br>went_to_overtime<br>points_q1..q4<br>points_ot</div>
+        <div class="grp">Box score</div>
+        <div class="cols">first_downs (+ passing/rushing/penalty splits)<br>3rd/4th down conversions + attempts<br>red_zone_scores + attempts<br>total_drives<br>total_offensive_plays<br>possession_time_seconds<br>total/passing/rushing yards + attempts + yards-per<br>sacks_allowed<br>sack_yards_lost<br>turnovers<br>fumbles_lost<br>interceptions_thrown<br>penalties + penalty_yards<br>defensive_touchdowns<br>has_box_score</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse (from play-by-play)</div>
+      <div class="body">
+        <div class="grp">Efficiency</div>
+        <div class="cols"><b>off_epa</b><br><b>off_epa_per_play</b><br><b>success_rate</b><br>early_down_success_rate</div>
+        <div class="grp">Splits</div>
+        <div class="cols">dropbacks<br>pass_epa<br>pass_epa_per_dropback<br>carries<br>rush_epa<br>rush_epa_per_carry</div>
+        <div class="grp">Style</div>
+        <div class="cols"><b>explosive_rate</b><br>cpoe<br>pass_rate<br><b>proe</b></div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="none">Nothing at team-game grain (DST fantasy stats stay on the player facts as team-DEF rows).</div>
+      </div>
+    </div>
+  </div>
+  <p class="flagline"><b>Measured in dev:</b> a perfect 1:1. Excluding preseason, <b>100%</b> of the 1,710 regular + postseason team-game rows have their EPA row on the same <code>team_game_key</code>, and zero EPA rows exist without a box-score row — folding <code>fact_team_game_epa</code> into the twins is a lossless column concat, no match logic at all. The EPA fact carries both OFF_* and DEF_* blocks on each team row, so the offense twin takes the OFF_ side and the defense twin the DEF_ side of the same source. Only 4 preseason rows lack a box score.</p>
+</section>
+
+<!-- ================= fact_team_game_defense ================= -->
+<section class="model" id="f_td">
+  <div class="model-head"><h3>TEAM_GAME_DEFENSE</h3><span class="grain">dbt model fact_team_game_defense · one row per team × game · key <code>team_game_key</code> · 1:1 twin of offense</span></div>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Allowed (opponent's box, mirrored)</div>
+        <div class="cols">opp_* mirror of every offensive box column<br>takeaways</div>
+        <div class="grp">Player-defense rollup</div>
+        <div class="cols">total_tackles<br>tackles_for_loss<br>sacks_recorded<br>qb_hits<br>passes_defended<br>interceptions_recorded<br>fumbles_recovered<br>both defensive_touchdowns columns</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse (from play-by-play)</div>
+      <div class="body">
+        <div class="grp">Efficiency allowed</div>
+        <div class="cols"><b>def_epa</b><br><b>def_epa_per_play</b><br><b>success_rate_allowed</b></div>
+        <div class="grp">Splits allowed</div>
+        <div class="cols">def_dropbacks_faced<br>def_pass_epa_per_dropback<br>def_carries_faced<br>def_rush_epa_per_carry<br><b>def_explosive_rate_allowed</b></div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="none">Nothing at this grain.</div>
+      </div>
+    </div>
+  </div>
+  <p class="flagline"><b>Measured in dev:</b> same perfect shape as the offense twin — 2,068 rows, 2,068 distinct <code>team_game_key</code>s, zero rows without their offense twin, and <b>100%</b> of the 1,710 non-preseason rows have their EPA row (the DEF_* side of the same source row the offense twin reads). The opp_* mirror and the player-defense rollup are complete on every non-preseason row; the only gaps are the same 4 preseason games with no box score.</p>
+</section>
+
+<!-- ================= fact_play ================= -->
+<section class="model" id="f_play">
+  <div class="model-head"><h3>PLAY_LOG</h3><span class="grain">dbt model fact_play · one row per play · key <code>play_key</code> · 179k rows</span></div>
+  <p class="joinpath">join: game via <code>bridge_game_ids</code>, then within-game match — the keys line up directly: <code>period = qtr</code> · <code>clock_seconds_remaining = quarter_seconds_remaining</code> · <code>start_down = down</code> · <code>start_distance = ydstogo</code> · <code>start_yards_to_endzone = yardline_100</code></p>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="grp">Situation</div>
+        <div class="cols">period<br>clock_display + clock_seconds_remaining<br>start/end down + distance + yard_line + yards_to_endzone<br>is_home_possession<br>is_third_down<br>is_fourth_down<br>is_red_zone</div>
+        <div class="grp">Outcome</div>
+        <div class="cols">yards_gained<br>is_scoring_play<br>home/away_score_after_play<br>achieved_first_down<br>home_win_probability<br>play_description (+ short)<br>play_wallclock</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ nflverse (where matched)</div>
+      <div class="body">
+        <div class="grp">Core analytics (the default graft)</div>
+        <div class="cols"><b>epa</b><br><b>wpa</b><br><b>success</b><br><b>cpoe</b> + cp<br><b>xpass</b> + pass_oe<br>air_yards<br>yards_after_catch<br>qb_epa</div>
+        <div class="grp">EP / WP decompositions (options)</div>
+        <div class="cols">ep<br>air_epa<br>yac_epa<br>comp_air/yac_epa<br>xyac_epa<br>xyac_mean_yardage<br>xyac_success<br>xyac_fd<br>wp<br>home/away_wp<br>vegas_wp<br>vegas_wpa</div>
+        <div class="grp">Formation &amp; call</div>
+        <div class="cols">shotgun<br>no_huddle<br>qb_dropback<br>qb_scramble<br>qb_kneel<br>qb_spike<br>pass_length<br>pass_location<br>run_location<br>run_gap</div>
+        <div class="grp">Drive / series context</div>
+        <div class="cols">drive<br>fixed_drive_result<br>series<br>series_success<br>series_result<br>drive_play_count<br>drive_time_of_possession<br>goal_to_go<br>half/game_seconds_remaining<br>score_differential<br>posteam/defteam timeouts</div>
+        <div class="grp">Players on every role (gsis ids)</div>
+        <div class="cols">passer<br>rusher<br>receiver<br>up to 4 tacklers + assists<br>sack players (incl. half-sacks)<br>penalty player + penalty_type<br>returners<br>kicker</div>
+        <div class="grp">Game context riding on every row</div>
+        <div class="cols">spread_line<br>total_line<br>div_game<br>roof<br>surface<br>temp<br>wind<br>home/away_coach</div>
+        <div class="note">372 columns total — the core-analytics group is the default graft onto fact_play; everything else stays one join away through the matched nflverse play id, and the situational-splits fact reads the full menu from prep. Unmatched plays keep NULL analytics, never imputed. nflverse also covers the 18 games BDL has no plays for.</div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body">
+        <div class="none">Nothing — Sleeper has no play-level data.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Match tier (measured on 129,350 matchable plays)</th><th>Matched unique</th><th>Ambiguous</th><th>Unmatched</th></tr></thead>
+    <tbody>
+      <tr><td>T1 — exact: qtr + clock + down + distance + yardline</td><td class="num">96,461 (74.6%)</td><td class="num">58</td><td class="num">32,831</td></tr>
+      <tr><td>T2 — clock tolerance ±15s, yardline kept</td><td class="num">110,186 (85.2%)</td><td class="num">335</td><td class="num">18,829</td></tr>
+      <tr><td>T3 — clock ±15s, yardline dropped (resolve ties by nearest clock + play-type flag check)</td><td class="num" colspan="2">129,013 matched any (99.7%)</td><td class="num">337</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="flagline"><b>Measured in dev:</b> of 179k BDL plays, <b>129,350 are matchable</b> (non-administrative, in a bridge-observed game — preseason and the ≈27k admin rows are excluded up front). The deterministic cascade alone reaches <b>99.7%</b>: clock drift between the two feeds is the main friction (hence the ±15s tier) and yardline conventions the second. The residual 337 plays (0.3%) — worst category is Penalty at 1.6% unmatched, Passing and Rushing are at 0.2% — go to the description-similarity tier or stay NULL. Ambiguous candidates resolve by nearest clock plus the <code>nflverse_flag_check</code> from dim_play_type.</p>
+
+  <details class="sql">
+    <summary>The trial-match queries behind these numbers</summary>
+    <div class="sqlbody">
+      <div class="lbl">Tier 1 — strict match on all five keys</div>
+      <pre>WITH bg AS (
+  SELECT game_key, nflverse_game_id FROM BRIDGE_GAME_IDS
+  WHERE nflverse_game_id IS NOT NULL AND is_nflverse_observed
+),
+f AS (
+  SELECT p.play_key, bg.nflverse_game_id, p.period, p.clock_seconds_remaining,
+         p.start_down, p.start_distance, p.start_yards_to_endzone
+  FROM FACT_PLAY p
+  JOIN bg ON bg.game_key = p.game_key
+  JOIN DIM_PLAY_TYPE d ON d.play_type_key = p.play_type_key
+  WHERE d.play_category &lt;&gt; 'Administrative'
+),
+n AS (
+  SELECT game_id, qtr, quarter_seconds_remaining, down, ydstogo, yardline_100
+  FROM NFL_PROD_DB.RAW.NFLVERSE_PBP
+  WHERE play_type_nfl NOT IN ('END_QUARTER','END_GAME','GAME_START','COMMENT','TIMEOUT')
+)
+SELECT COUNT(*)                        AS matchable_rows,
+       SUM(IFF(m.cnt = 1, 1, 0))       AS matched_unique,
+       SUM(IFF(m.cnt &gt; 1, 1, 0))       AS matched_ambiguous,
+       SUM(IFF(m.cnt IS NULL, 1, 0))   AS unmatched
+FROM f
+LEFT JOIN (
+  SELECT f2.play_key, COUNT(*) AS cnt
+  FROM f f2
+  JOIN n ON n.game_id = f2.nflverse_game_id
+        AND n.qtr = f2.period
+        AND n.quarter_seconds_remaining = f2.clock_seconds_remaining
+        AND COALESCE(n.down, 0)         = COALESCE(f2.start_down, 0)
+        AND COALESCE(n.ydstogo, 0)      = COALESCE(f2.start_distance, 0)
+        AND COALESCE(n.yardline_100,-1) = COALESCE(f2.start_yards_to_endzone, -1)
+  GROUP BY 1
+) m ON m.play_key = f.play_key;</pre>
+      <div class="lbl">Tier variants — same CTEs, swap the join predicate</div>
+      <pre>-- T2: clock tolerance, yardline kept
+AND ABS(COALESCE(n.quarter_seconds_remaining,-999)
+      - COALESCE(f2.clock_seconds_remaining,-999)) &lt;= 15
+AND COALESCE(n.down, 0)         = COALESCE(f2.start_down, 0)
+AND COALESCE(n.ydstogo, 0)      = COALESCE(f2.start_distance, 0)
+AND COALESCE(n.yardline_100,-1) = COALESCE(f2.start_yards_to_endzone, -1)
+
+-- T3: clock tolerance, yardline dropped (the 99.7% variant;
+--     ties resolve by nearest clock + nflverse_flag_check)
+AND ABS(COALESCE(n.quarter_seconds_remaining,-999)
+      - COALESCE(f2.clock_seconds_remaining,-999)) &lt;= 15
+AND COALESCE(n.down, 0)    = COALESCE(f2.start_down, 0)
+AND COALESCE(n.ydstogo, 0) = COALESCE(f2.start_distance, 0)</pre>
+      <div class="lbl">Residual profile — unmatched by play category</div>
+      <pre>SELECT f.play_category,
+       COUNT(*)                                            AS rows_,
+       SUM(IFF(m.cnt &gt;= 1, 1, 0))                          AS matched_any,
+       SUM(IFF(m.cnt IS NULL, 1, 0))                       AS unmatched,
+       ROUND(100.0 * SUM(IFF(m.cnt IS NULL,1,0)) / COUNT(*), 1) AS unmatched_pct
+FROM f
+LEFT JOIN ( /* T3 predicate */ ) m ON m.play_key = f.play_key
+GROUP BY 1 ORDER BY unmatched DESC;</pre>
+    </div>
+  </details>
+</section>
+
+<!-- ================= fact_team_season ================= -->
+<section class="model" id="f_ts">
+  <div class="model-head"><h3>TEAM_SEASON</h3><span class="grain">dbt model fact_team_season · one row per team × season · key <code>team_season_key</code></span></div>
+  <div class="tri">
+    <div class="col bdl">
+      <div class="head">BDL base (keep as-is)</div>
+      <div class="body">
+        <div class="cols">wins / losses / ties<br>win_pct<br>games_played<br>points_for / points_against<br>point_differential (+ per-game versions)<br>conference / division / home / road records (each with ties)<br>conference_rank<br>playoff_seed<br>made_playoffs<br>win_streak</div>
+      </div>
+    </div>
+    <div class="col nfl">
+      <div class="head">+ derived</div>
+      <div class="body">
+        <div class="cols"><b>bye_week</b></div>
+        <div class="note">Derived from dim_game gaps — no new source needed.</div>
+      </div>
+    </div>
+    <div class="col slp">
+      <div class="head">+ Sleeper</div>
+      <div class="body"><div class="none">Nothing at this grain.</div></div>
+    </div>
+  </div>
+  <p class="flagline"><b>Measured in dev:</b> the bye derivation is exact — trial-derived from dim_game's regular-season slate, every season yields precisely 32 byes, one per team, weeks 5–14, with zero anomalies and every bye landing on an existing fact_team_season row. Because dim_game holds the full slate including future games, the upcoming season's byes are already derivable before a snap is played — useful for planning views, not just history.</p>
+
+  <details class="sql">
+    <summary>The bye-week derivation query behind these numbers</summary>
+    <div class="sqlbody">
+      <div class="lbl">Derive byes as the missing week per team-season, then validate</div>
+      <pre>WITH tg AS (
+  SELECT season, week, home_team_key AS team_key FROM DIM_GAME WHERE season_type = 2
+  UNION
+  SELECT season, week, away_team_key FROM DIM_GAME WHERE season_type = 2
+),
+allw  AS (SELECT DISTINCT season, week FROM tg),
+teams AS (SELECT DISTINCT season, team_key FROM tg),
+byes AS (
+  SELECT t.season, t.team_key, w.week AS bye_week
+  FROM teams t
+  JOIN allw w ON w.season = t.season
+  LEFT JOIN tg ON tg.season = t.season AND tg.team_key = t.team_key AND tg.week = w.week
+  WHERE tg.team_key IS NULL
+)
+SELECT b.season,
+       COUNT(*)                                AS bye_rows,        -- expect 32
+       COUNT(DISTINCT b.team_key)              AS teams_with_bye,  -- expect 32
+       MIN(b.bye_week)                         AS earliest_bye,
+       MAX(b.bye_week)                         AS latest_bye,
+       SUM(IFF(f.team_season_key IS NULL,1,0)) AS byes_without_fact_row  -- expect 0
+FROM byes b
+LEFT JOIN FACT_TEAM_SEASON f ON f.team_key = b.team_key AND f.season = b.season
+GROUP BY 1 ORDER BY 1;
+
+-- anomaly check: any team-season with more or fewer than one bye (returned zero rows)
+SELECT season, team_key, COUNT(*) FROM byes GROUP BY 1, 2 HAVING COUNT(*) &lt;&gt; 1;</pre>
+    </div>
+  </details>
+</section>
+
+<!-- ============================================================ KEPT FACTS -->
+<p class="joinpath" style="margin-top:34px"><b>The facts below are kept as-is</b> at their own grain and join the wide facts at game_key / player_key. Each carries the standard key block (surrogate PK, game/team/player keys, date_key, season_week_key, season / week / season_type); the cards list the substance. Column lists verified against dev.</p>
+
+<section class="model" id="f_odds">
+  <div class="model-head"><h3>GAME_ODDS_OPENING / _CLOSING</h3><span class="grain">dbt model fact_game_betting_odds_opening / _closing · kept as-is · game × vendor</span></div>
+  <div class="tri">
+  <div class="col bet">
+    <div class="head">betting</div>
+    <div class="body">
+      <div class="grp">Lines</div>
+      <div class="cols">home/away_spread + spread_odds<br>home/away_moneyline_odds<br>total_line<br>over_odds / under_odds</div>
+      <div class="grp">Derived</div>
+      <div class="cols">6 implied probabilities<br>home/away_moneyline_devig_probability<br>implied_home/away_team_total</div>
+      <div class="grp">Settlement</div>
+      <div class="cols">home/away_team_score<br>actual_total<br>home_point_margin<br>home_spread_result<br>total_result</div>
+      <div class="note">Closing also carries the full opening_* snapshot plus 9 *_movement deltas.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_odds_snap">
+  <div class="model-head"><h3>GAME_ODDS_SNAPSHOT</h3><span class="grain">dbt model fact_game_betting_odds_snapshot · kept as-is · game × vendor × snapshot</span></div>
+  <div class="tri">
+  <div class="col bet">
+    <div class="head">betting</div>
+    <div class="body">
+      <div class="grp">Movement bookkeeping</div>
+      <div class="cols">snapshot_number<br>snapshots_before_kickoff<br>is_opening / is_closing<br>snapshot_observed_at (+ prev)<br>minutes_before_kickoff</div>
+      <div class="grp">Lines + deltas</div>
+      <div class="cols">the line fields<br>home_spread_change<br>total_line_change<br>home/away_moneyline_odds_change</div>
+      <div class="note">Consecutive identical observations collapsed — a row means the line moved.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_props">
+  <div class="model-head"><h3>PLAYER_PROP_OPENING / _SNAPSHOT / _CLOSING</h3><span class="grain">dbt model fact_player_prop_opening / _snapshot / _closing · kept as-is · game × player × vendor × prop_type</span></div>
+  <div class="tri">
+  <div class="col bet">
+    <div class="head">betting</div>
+    <div class="body">
+      <div class="grp">Offer</div>
+      <div class="cols">prop_type<br>market_type<br>line_value<br>market_odds<br>over_odds / under_odds</div>
+      <div class="grp">Closing / snapshot extras</div>
+      <div class="cols">opening_* + line/odds movement (closing)<br>snapshot_number, minutes_before_kickoff, *_change (snapshot)</div>
+      <div class="note"><code>is_outcome_evaluation_available</code> is false everywhere — prop settlement is an open TODO, and the wide player facts now make grading props against actuals a single join.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_injury">
+  <div class="model-head"><h3>INJURY_REPORT</h3><span class="grain">dbt model fact_injury_report · kept as-is · week × team × player</span></div>
+  <div class="tri">
+  <div class="col nfl">
+    <div class="head">nflverse</div>
+    <div class="body">
+      <div class="grp">Filed report</div>
+      <div class="cols">report_status<br>report_primary_injury<br>report_secondary_injury</div>
+      <div class="grp">Practice</div>
+      <div class="cols">practice_status<br>practice_primary_injury<br>practice_secondary_injury</div>
+      <div class="grp">Leakage guard</div>
+      <div class="cols">modified_at<br><b>modified_before_kickoff</b></div>
+      <div class="note">The history behind dim_player's current-status columns; anything backtest-shaped reads this, never the dim.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_depth">
+  <div class="model-head"><h3>DEPTH_CHART</h3><span class="grain">dbt model fact_depth_chart · kept as-is · game × team × slot × player</span></div>
+  <div class="tri">
+  <div class="col nfl">
+    <div class="head">nflverse</div>
+    <div class="body">
+      <div class="cols">chart_source (weekly 2023-24 / daily 2025+)<br>formation<br>position<br>depth_slot<br>depth_rank<br>chart_as_of</div>
+      <div class="note">"Who was RB1 going into that game" — the history behind dim_player's current depth-chart columns.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_proj">
+  <div class="model-head"><h3>SLEEPER_PROJECTION_SNAPSHOT</h3><span class="grain">dbt model fact_sleeper_projection_snapshot · kept as-is · player × week × snapshot</span></div>
+  <div class="tri">
+  <div class="col slp">
+    <div class="head">Sleeper</div>
+    <div class="body">
+      <div class="grp">Projected points</div>
+      <div class="cols">pts_ppr / pts_half_ppr / pts_std<br>pts_ppr_change</div>
+      <div class="grp">Projected volume</div>
+      <div class="cols">rec_tgt / rec / rec_yd / rec_td<br>rush_att / rush_yd / rush_td<br>pass_att / pass_yd / pass_td / pass_int<br>fgm / fga</div>
+      <div class="grp">Market prior + bookkeeping</div>
+      <div class="cols">adp_dd_ppr / pos_adp_dd_ppr<br>snapshot_number / snapshots_total<br>is_opening / is_latest<br><b>is_pre_kickoff</b><br>fetched_at (+ prev), last_modified_at</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_trend">
+  <div class="model-head"><h3>SLEEPER_TRENDING</h3><span class="grain">dbt model fact_sleeper_trending · kept as-is · fetched_at × direction × player</span></div>
+  <div class="tri">
+  <div class="col slp">
+    <div class="head">Sleeper</div>
+    <div class="body">
+      <div class="cols">direction (add / drop)<br>move_count<br>board_rank<br>lookback_hours<br>trend_date<br>state_season / state_week / state_season_type</div>
+      <div class="note">The crowd reacting hours ahead of any official designation — appended every 6h.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_weather">
+  <div class="model-head"><h3>GAME_WEATHER</h3><span class="grain">dbt model fact_game_weather · kept as-is · game × product (+ 1:1 forecast view)</span></div>
+  <div class="tri">
+  <div class="col wx">
+    <div class="head">weather (Open-Meteo)</div>
+    <div class="body">
+      <div class="cols">product (archive / forecast / hist_forecast)<br>hour_at<br>kickoff_temp_f<br>wind_mph / gust_mph / wind_dir_deg<br>precip_in<br>weather_code<br>hours_before_kickoff<br>is_weather_relevant<br>is_completed</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_news">
+  <div class="model-head"><h3>PLAYER_NEWS_MENTION</h3><span class="grain">dbt model fact_player_news_mention · kept as-is · article × player mention</span></div>
+  <div class="tri">
+  <div class="col news">
+    <div class="head">news (Firecrawl)</div>
+    <div class="body">
+      <div class="cols">headline<br>context<br>detail<br>player_name_text / team_text<br>feed / url / published_at<br>extract_mode<br>resolution_method<br>candidate_count</div>
+      <div class="note">Resolves names against the BDL roster directly — the one player fact that doesn't use the bridge.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_2pt">
+  <div class="model-head"><h3>TWO_POINT_CONVERSION</h3><span class="grain">dbt model fact_two_point_conversion · kept as-is · play × role × participant</span></div>
+  <div class="tri">
+  <div class="col bdl">
+    <div class="head">BDL</div>
+    <div class="body">
+      <div class="cols">role (rush / receive / pass / unparsed)<br>is_success<br>text_format (gsis / espn)<br>participant_text<br>resolution_method<br>play_description<br><b>player_game_key</b> (links to the phase facts 1:1)</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_nextgen">
+  <div class="model-head"><h3>NEXTGEN_PASSING / _RUSHING / _RECEIVING</h3><span class="grain">dbt model fact_nextgen_passing / _rushing / _receiving · kept as-is · gsis × season × season_type × week</span></div>
+  <div class="tri">
+  <div class="col nfl">
+    <div class="head">nflverse</div>
+    <div class="body">
+      <div class="grp">Passing</div>
+      <div class="cols">avg_time_to_throw<br>avg_completed / intended_air_yards (+ differential)<br>aggressiveness<br>avg_air_yards_to_sticks<br>expected_completion_percentage<br><b>completion_percentage_above_expectation</b><br>avg / max_air_distance, max_completed_air_distance</div>
+      <div class="grp">Rushing</div>
+      <div class="cols">efficiency<br>percent_attempts_gte_eight_defenders<br>avg_time_to_los<br>expected_rush_yards<br><b>rush_yards_over_expected</b> (+ per att, pct)</div>
+      <div class="grp">Receiving</div>
+      <div class="cols">avg_cushion<br><b>avg_separation</b><br>percent_share_of_intended_air_yards<br>catch_percentage<br>avg_yac / avg_expected_yac<br><b>avg_yac_above_expectation</b></div>
+      <div class="note">Qualification-gated (measured: 95% of 15+ attempt games, 90% of 10+ carry games — but ≤ 21% of all rows), so these stay bolt-on facts rather than wide-fact columns. Planned upgrade: add game_key / player_game_key via the week→game resolution and normalize season_type ('REG'/'POST' strings today vs numeric everywhere else).</div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<section class="model" id="f_situation">
+  <div class="model-head"><h3>TEAM_GAME_SITUATION</h3><span class="grain">dbt model fact_team_game_situation · new fact · team × game × situation · from pbp</span></div>
+  <div class="tri">
+  <div class="col nfl">
+    <div class="head">nflverse pbp</div>
+    <div class="body">
+      <div class="grp">Situation dimensions</div>
+      <div class="cols">down bucket (1st / 2nd / 3rd-4th)<br>distance bucket (short / medium / long)<br>field zone (own / midfield / red zone)<br>play family (dropback / designed run)<br>shotgun · no_huddle<br>game script (leading / trailing / neutral, two-minute)</div>
+      <div class="grp">Measures (offense + allowed mirror)</div>
+      <div class="cols">plays<br>epa_per_play<br>success_rate<br>explosive_rate<br>pass_rate / proe<br>yards_per_play<br>first_down_rate</div>
+      <div class="note">The prop-pattern surface: "this defense collapses on third-and-long dropbacks." Rolling windows aggregate downstream in FEATURES / APP.</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<section class="model" id="f_trade">
+  <div class="model-head"><h3>TRADE_ASSET</h3><span class="grain">dbt model fact_trade · new fact · trade × asset · low priority · fields verified against NFLVERSE_TRADES</span></div>
+  <div class="tri">
+  <div class="col nfl">
+    <div class="head">nflverse</div>
+    <div class="body">
+      <div class="cols">trade_id (groups the sides)<br>season / trade_date<br>gave / received (teams)<br>pfr_id + pfr_name (player assets)<br>pick_season / pick_round / pick_number<br>conditional</div>
+    </div>
+  </div>
+
+  </div>
+</section>
+
+<!-- ============================================================ PREP -->
+<h2 class="part" id="prep">Prep <small>one new staging model supports the play-by-play work</small></h2>
+
+<section class="model" id="p_pbp">
+  <div class="model-head"><h3>stg_nfl__nflverse_pbp</h3><span class="grain">new prep model · play grain · curated over the 372-column RAW table</span></div>
+  <div class="tri">
+  <div class="col nfl">
+    <div class="head">nflverse RAW → PREP</div>
+    <div class="body">
+      <div class="cols">the core analytics, EP/WP decomposition,<br>formation &amp; call, drive/series context,<br>role-player ids and game-context groups<br>from the fact_play card</div>
+      <div class="note">Ends the two direct RAW reads (bridge_game_ids, fact_team_game_epa); feeds the play-level graft and fact_team_game_situation.</div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<!-- ============================================================ RETIRED -->
+<h2 class="part" id="retired">Retired to cold storage</h2>
+<div class="plain">
+  Once their columns are absorbed by the wide facts:
+  <ul>
+    <li><code>fact_nflverse_player_week</code>, <code>fact_sleeper_player_week</code>, <code>fact_player_week_snaps</code></li>
+    <li><code>fact_team_game_epa</code> (folded into the team twins)</li>
+    <li>BDL <code>fact_player_week/season_advanced_*</code> (duplicate NGS), <code>fact_player_injury</code></li>
+  </ul>
+</div>
+
+<footer>
+  weekend-warriors · internal reference · companion to <a href="nfl-core-connection-strategy.html">the connection strategy</a>, which holds the schema migration, play-by-play match design, and phasing.
+</footer>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var targets = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function spy() {
+    var pos = window.scrollY + 100, idx = 0, best = -Infinity;
+    targets.forEach(function (t, i) {
+      if (t && t.offsetTop <= pos && t.offsetTop > best) { best = t.offsetTop; idx = i; }
+    });
+    links.forEach(function (a, i) { a.classList.toggle('active', i === idx); });
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>

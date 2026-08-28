@@ -27,6 +27,16 @@
         interceptions and fumble recoveries have no team-level source: the
         player box score is the only place the provider publishes them.
 
+      * EPA ALLOWED (the retired fact_team_game_epa's defense half, folded
+        in). A team's defensive EPA line IS its opponent's offensive one --
+        the retired fact built def_* by re-reading the same scrimmage plays
+        from the defending side, and the mirrors test held them equal -- so
+        the def_* columns here read the opponent row's EPA block, the same
+        self-join as the opp_* block and with the same cannot-disagree
+        property. NULL on preseason rows (nflverse publishes no preseason
+        play-by-play), flagged by has_nflverse; rates come from the offense
+        grain's sums and cannot be re-aggregated.
+
     The self-join is safe because assert_fact_team_game_offense_is_mirrored
     guarantees exactly two rows per game with two distinct teams, so each row
     finds exactly one opponent row and the join cannot fan out.
@@ -190,6 +200,22 @@ select
     d.fumbles_touchdowns,
     d.defenders_with_stats,
     (d.game_key is not null)                                    as has_player_defense,
+
+    -- ---------------------------------------------------------------
+    -- EPA ALLOWED: the opponent row's nflverse EPA block, read from this
+    -- team's side (see header). NULL on preseason rows.
+    -- ---------------------------------------------------------------
+    o.off_plays                                                 as def_plays,
+    o.off_epa                                                   as def_epa,
+    o.off_epa_per_play                                          as def_epa_per_play,
+    o.success_rate                                              as success_rate_allowed,
+    o.dropbacks                                                 as def_dropbacks_faced,
+    o.pass_epa_per_dropback                                     as def_pass_epa_per_dropback,
+    o.carries                                                   as def_carries_faced,
+    o.rush_epa_per_carry                                        as def_rush_epa_per_carry,
+    o.explosive_rate                                            as def_explosive_rate_allowed,
+
+    coalesce(o.has_nflverse, false)                             as has_nflverse,
 
     -- ---------------------------------------------------------------
     -- trap 4: two defensive touchdown readings, deliberately both
