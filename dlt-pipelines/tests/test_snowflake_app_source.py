@@ -196,17 +196,40 @@ def test_normalize_table_validates_shape() -> None:
     }
 
 
-def test_select_sql_bounds_at_cursor_inclusively() -> None:
+def test_select_sql_bounds_at_cursor_exclusively() -> None:
     assert select_sql("DLT_DB.OPS.LOG_LINES") == "SELECT * FROM DLT_DB.OPS.LOG_LINES"
     # No prior state (first run) is a full read even for incremental tables.
     assert select_sql("DLT_DB.OPS.LOG_LINES", "event_ts", None) == (
         "SELECT * FROM DLT_DB.OPS.LOG_LINES"
     )
-    # >= not >: dlt dedupes the boundary; > would drop same-timestamp rows
-    # that landed after the previous read.
+    # STRICT > pairing with range_start="open": the inclusive >= + dedupe
+    # combination fingerprinted nearly every row of the burst-timestamped
+    # telemetry tables and timed out three 60-minute runs (2026-08-28).
+    # Boundary-sharing rows the open range misses are healed by the weekly
+    # resync.
     assert select_sql("DLT_DB.OPS.LOG_LINES", "event_ts", "2026-08-24") == (
-        "SELECT * FROM DLT_DB.OPS.LOG_LINES WHERE EVENT_TS >= %s"
+        "SELECT * FROM DLT_DB.OPS.LOG_LINES WHERE EVENT_TS > %s"
     )
+
+
+def test_incremental_is_open_range_no_dedupe() -> None:
+    # The regression guard for the timeout incident: if someone flips the
+    # incremental back to a closed range, the first full pass over the
+    # telemetry tables grinds past the task timeout again.
+    source = snowflake_app(
+        name="obs_to_postgres",
+        tables=[{"name": "task_runs", "mode": "append", "cursor": "refreshed_at"}],
+        database="DLT_DB",
+        schema="OPS",
+        connect=lambda: _ModalConn([]),
+    )
+    resource = source.resources["task_runs"]
+    # The wrapper only binds the Incremental instance when the resource is
+    # evaluated; iterate first, then inspect the bound instance.
+    list(resource)
+    incremental = resource.incremental.incremental
+    assert incremental is not None
+    assert incremental.range_start == "open"
 
 
 class _ModalCursor:

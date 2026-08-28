@@ -47,13 +47,25 @@ def write_obs_copy_watermark(
     A RESOURCE= subset must not stamp row_count=0 on tables that were not copied.
     Raises on any failure.
     """
-    listed: list[str] = list(spec.config.get("tables") or [])
+    # A table entry is a bare name or, since the incremental copy (2026-08),
+    # a mapping with a `name` key (see snowflake_app_source.normalize_table).
+    # Only the name matters here.
+    listed: list[str] = [
+        t if isinstance(t, str) else t["name"] for t in (spec.config.get("tables") or [])
+    ]
     if not listed:
         raise RuntimeError(f"{spec.name}: config.tables is empty; nothing to watermark")
 
     present = {str(k).lower() for k in row_counts if not str(k).startswith("_dlt")}
     tables = [t for t in listed if t.lower() in present]
     if not tables:
+        if not present:
+            # Incremental copies load nothing on a quiet hour; that is a
+            # clean no-op, not a failure. The watermark keeps its previous
+            # stamps. (Before incremental, replace loaded every table every
+            # run, so an empty row_counts could only mean breakage.)
+            log.info("%s: no rows loaded this run; watermark untouched", spec.name)
+            return
         raise RuntimeError(
             f"{spec.name}: row_counts had no listed OPS tables; refusing to watermark"
         )

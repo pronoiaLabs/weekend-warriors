@@ -156,3 +156,24 @@ export function fetchDbtQueryOperators(
     signal,
   )
 }
+
+export interface RefreshResult {
+  obs_refresh: string
+  dbt_runs_refresh: string
+  obs_copy: string
+}
+
+/** Fire the guarded ops refresh procs (api routers/refresh.py): the sweeps
+    around OBS_REFRESH / DBT_RUNS_REFRESH, then the Postgres copy past its
+    hourly latch. POST, never cached: this changes state in Snowflake. */
+export async function triggerRefresh(): Promise<RefreshResult> {
+  const response = await fetch('/api/refresh', {
+    method: 'POST',
+    headers: { accept: 'application/json' },
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(body?.detail ?? `${response.status} ${response.statusText}`)
+  }
+  return (await response.json()) as RefreshResult
+}

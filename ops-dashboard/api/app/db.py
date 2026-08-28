@@ -93,6 +93,16 @@ def _connect_postgres() -> Any:
     )
 
 
+def snowflake_connection() -> Any:
+    """A fresh Snowflake connection regardless of the read backend.
+
+    The refresh endpoint CALLs ops procs even when reads come from Postgres.
+    Opened per call and closed by the caller; the cached read connection and
+    its lock are never involved, so a slow proc cannot block page queries.
+    """
+    return _connect_snowflake()
+
+
 def query(
     sql: str,
     params: dict[str, Any] | None = None,
