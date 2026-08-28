@@ -29,6 +29,7 @@ with offense as (
         points_scored,
         total_yards,
         turnovers,
+        success_plays,
         has_box_score
     from {{ ref('fact_team_game_offense') }}
 
@@ -43,6 +44,7 @@ defense as (
         points_allowed,
         opp_total_yards,
         opp_turnovers,
+        def_success_plays,
         has_opp_box_score
     from {{ ref('fact_team_game_defense') }}
 
@@ -71,4 +73,5 @@ where d.team_game_key is null                                       -- in offens
    or not equal_null(d.points_allowed, opp.points_scored)           -- result does not mirror
    or not equal_null(d.opp_total_yards, opp.total_yards)            -- allowed block does not mirror
    or not equal_null(d.opp_turnovers, opp.turnovers)
+   or not equal_null(d.def_success_plays, opp.success_plays)         -- epa allowed block does not mirror
    or not equal_null(d.has_opp_box_score, opp.has_box_score)
