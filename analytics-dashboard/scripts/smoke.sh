@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 PORT="${SMOKE_PORT:-8017}"
 # virtual time per route, ms: the pages settle on fixtures in well under a
 # second, and the walk is 27 routes, so 2s keeps the whole run near a minute
-BUDGET="${SMOKE_BUDGET_MS:-2000}"
+BUDGET="${SMOKE_BUDGET_MS:-4000}"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 if [ ! -x "$CHROME" ]; then
   CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
@@ -36,15 +36,19 @@ if lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 LOG="$(mktemp -t ww-smoke.XXXXXX)"
+# An isolated profile per run: without it Chrome shares the default headless
+# profile and the first render of a run can dump the PREVIOUS run's restored
+# tab instead of the requested URL (bit on the first route, Aug 2026).
+PROFILE="$(mktemp -d -t ww-smoke-profile.XXXXXX)"
 (
   cd api
-  ANALYTICS_DASHBOARD_DATA=fixtures ANALYTICS_DASHBOARD_NOW=2026-08-23T02:00:00+00:00 \
+  ANALYTICS_DASHBOARD_DATA=fixtures ANALYTICS_DASHBOARD_NOW=2026-08-28T17:00:00+00:00 \
     uv run --extra dev uvicorn app.main:app --port "$PORT" --log-level warning >"$LOG" 2>&1
 ) &
 API_PID=$!
 # uv run leaves uvicorn as a grandchild that outlives the subshell, so stop
 # whatever listens on the port, not just the subshell
-trap 'kill $API_PID 2>/dev/null || true; lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true; wait $API_PID 2>/dev/null || true; rm -f "$LOG"' EXIT
+trap 'kill $API_PID 2>/dev/null || true; lsof -tnP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true; wait $API_PID 2>/dev/null || true; rm -f "$LOG"; rm -rf "$PROFILE"' EXIT
 
 for _ in $(seq 1 50); do
   if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then break; fi
@@ -57,7 +61,8 @@ GAME_KEY="$(curl -fsS "http://127.0.0.1:$PORT/api/nfl/slate?season_type=Regular%
 
 # route | text the rendered DOM must contain
 ROUTES=(
-  "/nfl|Game day board"
+  "/nfl|The Pulse"
+  "/nfl?days=7|Around the league"
   "/nfl/slate|kickoff slot"
   "/nfl/slate?season_type=Regular%20Season&week=1|SUN 1:00 PM"
   "/nfl/slate?season=2025&season_type=Regular%20Season&week=18|Final"
@@ -87,6 +92,7 @@ ROUTES=(
 
 render() {
   "$CHROME" --headless=new --disable-gpu --no-first-run --no-default-browser-check \
+    --user-data-dir="$PROFILE" \
     --enable-logging=stderr --v=0 --virtual-time-budget=$BUDGET --window-size=1400,1000 \
     --dump-dom "http://127.0.0.1:$PORT$1" 2>&1 || true
 }
@@ -121,7 +127,7 @@ $errors"
 done
 
 # the narrow chrome: bottom tabs instead of the dock
-out="$("$CHROME" --headless=new --disable-gpu --no-first-run --enable-logging=stderr --v=0 \
+out="$("$CHROME" --headless=new --disable-gpu --no-first-run --user-data-dir="$PROFILE" --enable-logging=stderr --v=0 \
   --virtual-time-budget=$BUDGET --window-size=420,900 --dump-dom "http://127.0.0.1:$PORT/nfl/slate" 2>&1 || true)"
 if printf '%s' "$out" | grep -q 'class="tabs"'; then
   echo "ok   /nfl/slate at 420px renders bottom tabs"

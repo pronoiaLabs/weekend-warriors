@@ -117,3 +117,21 @@ models:
       - name: over_pct
         tests:
           - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+
+  - name: app_team_branding
+    description: >
+      The 32 teams' visual identity from dim_team's nflverse branding block:
+      colors, logos, wordmark, plus the labels every page joins on. Fetched
+      once by the app (GET /teams/branding) and joined client-side by
+      team_key, so no other mart carries logo columns.
+    columns:
+      - name: app_team_branding_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: team_label
+        tests: [not_null]
+      - name: logo_url
+        description: "ESPN CDN via nflverse; logo_squared_url is the safe mark on any background."

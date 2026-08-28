@@ -69,6 +69,8 @@ function SportShell({ sport }: { sport: string }) {
           )}
         </header>
 
+        <SportNav sport={sport} caps={caps.data} viewport={viewport} />
+
         <main className="main">
           {caps.error ? (
             <section className="tile">
@@ -83,8 +85,6 @@ function SportShell({ sport }: { sport: string }) {
             <Outlet />
           )}
         </main>
-
-        <SportNav sport={sport} caps={caps.data} viewport={viewport} />
 
         <footer className="foot">
           <span>Pages read the dbt APP layer; the Explorer reads the semantic views.</span>

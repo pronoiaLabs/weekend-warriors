@@ -31,6 +31,8 @@ class MentionRow(BaseModel):
     position: str | None = None
     position_name: str | None = None
     position_group: str | None = None
+    headshot_url: str | None = None
+    sleeper_player_id: str | None = None
     team_key: str | None = None
     team_label: str | None = None
     team_name: str | None = None

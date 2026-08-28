@@ -11,6 +11,16 @@ interface Item {
   also?: string[]
 }
 
+// The marts the Pulse composite reads; a sport with all of them gets the Pulse
+// as its home page and the dock says so (App.tsx's SportIndex uses this too).
+export const PULSE_CAPS: Capability[] = [
+  'schedule',
+  'news',
+  'status_board',
+  'trending_players',
+  'market_movers',
+]
+
 // One list, rendered as the floating dock on wide screens and as bottom tabs on
 // narrow ones. Items appear only when the sport has the capability; the
 // Explorer always does.
@@ -36,10 +46,11 @@ export default function SportNav({
   const { pathname } = useLocation()
   const segment = pathname.split('/')[2] ?? ''
   const items = ITEMS.filter((it) => it.cap === null || caps?.capabilities.includes(it.cap))
+  const hasPulse = PULSE_CAPS.every((c) => caps?.capabilities.includes(c))
   return (
     <nav className={viewport === 'narrow' ? 'tabs' : 'dock'} aria-label="Pages">
       <NavLink to={`/${sport}`} end>
-        <span>Home</span>
+        <span>{hasPulse ? 'Pulse' : 'Home'}</span>
       </NavLink>
       {items.map((it) => {
         // Game day returns to the remembered week and book, not the defaults

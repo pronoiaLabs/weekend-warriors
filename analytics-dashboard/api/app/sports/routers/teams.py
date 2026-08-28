@@ -2,14 +2,16 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app import config
 from app.sports.capabilities import Capability as C
 from app.sports.profile import SportProfile
 from app.sports.registry import require
-from app.sports.tiles import teams
+from app.sports.tiles import branding, teams
 
 router = APIRouter(tags=["teams"])
 
 WithStandings = Annotated[SportProfile, Depends(require(C.TEAM_STANDINGS))]
+WithBranding = Annotated[SportProfile, Depends(require(C.TEAM_BRANDING))]
 WithTeam = Annotated[
     SportProfile,
     Depends(require(C.TEAM_STANDINGS, C.TEAM_WEEKS, C.TEAM_ALLOWED, C.TEAM_ATS)),
@@ -37,6 +39,20 @@ def get_standings(
             detail=_no_games(profile, season, season_type),
         )
     return payload
+
+
+# Declared before /teams/{team} so the literal path wins over the segment.
+@router.get("/teams/branding", response_model=branding.BrandingPayload)
+def get_branding(profile: WithBranding) -> branding.BrandingPayload:
+    """Every team's colors, logos and wordmark. Fetch once, join by team_key."""
+    rows, sql = branding.load(profile)
+    return branding.BrandingPayload(
+        sport=profile.key,
+        season=profile.default_season,
+        as_of=config.now(),
+        rows=rows,
+        query=sql,
+    )
 
 
 @router.get("/teams/{team}", response_model=teams.TeamPayload)

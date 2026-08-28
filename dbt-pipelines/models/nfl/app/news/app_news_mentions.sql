@@ -77,6 +77,8 @@ select
     p.position_abbreviation                             as position,
     p.position_name,
     p.position_group,
+    p.headshot_url,
+    p.sleeper_player_id,
     m.mention_team_key                                  as team_key,
     t.team_abbreviation                                 as team_label,
     t.team_full_name                                    as team_name,

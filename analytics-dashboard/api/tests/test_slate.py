@@ -1,6 +1,6 @@
 """The game day board in fixture mode. The NFL fixture holds 2026 Regular Season
 weeks 1 and 2, 2026 Preseason week 3 (partly played) and 2025 Regular Season
-week 18 (completed, with scores); the clock is pinned to 2026-08-23."""
+week 18 (completed, with scores); the clock is pinned to 2026-08-28."""
 
 from fastapi.testclient import TestClient
 
@@ -9,8 +9,8 @@ def test_default_week_is_the_one_in_progress(client: TestClient) -> None:
     body = client.get("/api/nfl/slate").json()
     assert body["sport"] == "nfl"
     assert body["season"] == 2026
-    # 2026-08-23 falls inside preseason week 3 (first kickoff 08-21), so that is "now"
-    assert (body["season_type_name"], body["week"]) == ("Preseason", 3)
+    # 2026-08-28 sits after preseason week 3's last kickoff, so the opener is next up
+    assert (body["season_type_name"], body["week"]) == ("Regular Season", 1)
     assert body["vendor"] == "draftkings"
     assert body["rows"], "the week has games"
     assert body["query"].count("from app_copy.app_game_slate") == 2
@@ -41,7 +41,7 @@ def test_one_card_per_game_with_the_requested_book(client: TestClient) -> None:
     assert rows == sorted(rows, key=lambda r: r["game_datetime_et"])
     first = rows[0]
     assert first["kickoff_slot_et"] == "Wed 8:20 PM"
-    assert "draftkings" in first["vendors_available"] and len(first["vendors_available"]) == 7
+    assert "draftkings" in first["vendors_available"] and len(first["vendors_available"]) == 8
 
 
 def test_a_book_without_a_line_keeps_the_card_and_blanks_the_line(client: TestClient) -> None:

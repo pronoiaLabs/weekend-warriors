@@ -1,0 +1,166 @@
+{
+  "table": "app_market_movers",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_market_movers_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "kind",
+      "type": "VARCHAR(4)",
+      "nullable": true
+    },
+    {
+      "name": "game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "game_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "game_datetime_et",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "vendor",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "market",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "home_team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "away_team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "player_key",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "player_id",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "player_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "position",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "headshot_url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "stat_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "open_line",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "latest_line",
+      "type": "NUMBER(18,4)",
+      "nullable": true
+    },
+    {
+      "name": "delta",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "abs_delta",
+      "type": "NUMBER(19,4)",
+      "nullable": true
+    },
+    {
+      "name": "open_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "moved_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "snapshots",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "mover_rank",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    }
+  ]
+}
