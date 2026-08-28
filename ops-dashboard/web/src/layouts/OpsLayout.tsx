@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
-import { fetchSports } from '../api/client.ts'
+import { fetchSports, triggerRefresh } from '../api/client.ts'
 import Aurora from '../components/Aurora.tsx'
 import OpsNav from '../components/OpsNav.tsx'
 import { useApi } from '../hooks/useApi.ts'
@@ -35,6 +36,27 @@ function Shell() {
   useTilt()
   useWindowScrollMemory()
 
+  // The scheduled path is hourly; this is the "I need it now" valve. The copy
+  // container takes minutes, so "copy started" is the honest success state --
+  // the Refreshed clock shows when data actually lands.
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshNote, setRefreshNote] = useState<string | null>(null)
+  async function onRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    setRefreshNote(null)
+    try {
+      const result = await triggerRefresh()
+      const failed = Object.values(result).find((m) => m.startsWith('error:'))
+      if (failed) setRefreshNote(failed)
+      else setRefreshNote(result.obs_copy === 'fired' ? 'copy started' : result.obs_copy)
+    } catch (err) {
+      setRefreshNote(err instanceof Error ? err.message : 'refresh failed')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   const list = [ALL_SPORTS, ...(sports.data?.sports.map((s) => s.sport) ?? [])]
 
   return (
@@ -64,10 +86,16 @@ function Shell() {
                 </span>
               </span>
             )}
-            <span className="ctx-item">
-              <span className="l">Updates</span>
-              <span className="v">event-driven</span>
-            </span>
+            <button
+              type="button"
+              className="ctx-item refresh-now"
+              onClick={onRefresh}
+              disabled={refreshing}
+              title={refreshNote ?? 'Run the observability refresh and Postgres copy now'}
+            >
+              <span className="l">Updates hourly</span>
+              <span className="v">{refreshing ? 'refreshing…' : (refreshNote ?? 'refresh now')}</span>
+            </button>
           </div>
           <button type="button" className="theme-toggle" onClick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
             <i className="sw" aria-hidden="true" />

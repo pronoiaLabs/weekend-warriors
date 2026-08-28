@@ -134,6 +134,11 @@ END;
 $$;
 
 GRANT USAGE ON PROCEDURE DLT_DB.OPS.SP_OBS_COPY_FIRE(BOOLEAN) TO ROLE DBT_RUNNER_ROLE;
+-- The ops-dashboard refresh endpoint calls FORCE => TRUE. The grant lives
+-- HERE, not in ops-dashboard/deploy/sql/01_ops_role.sql, because this file
+-- drops and recreates the proc: a grant anywhere else silently vanishes on
+-- every reapply. The role's OPERATE/latch grants are in 01_ops_role.sql.
+GRANT USAGE ON PROCEDURE DLT_DB.OPS.SP_OBS_COPY_FIRE(BOOLEAN) TO ROLE OPS_DASHBOARD_ROLE;
 
 -- Graph 1. Same owner as OBS_REFRESH (DLT_LOADER_ROLE). Root first.
 ALTER TASK IF EXISTS DLT_DB.OPS.OBS_REFRESH SUSPEND;

@@ -165,3 +165,9 @@ small { font-size: var(--fs-s); color: var(--ink-3); }
   [data-tilt] { transition: none; }
   [data-tilt].tilting { transform: none !important; }
 }
+
+/* The manual refresh valve in the topbar: a ctx-item that happens to be a
+   button. Inherits the item typography; only the affordances are its own. */
+button.refresh-now { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+button.refresh-now:disabled { cursor: wait; opacity: .7; }
+button.refresh-now .v { color: var(--accent, inherit); }

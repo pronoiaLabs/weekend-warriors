@@ -10,8 +10,13 @@
 --   container makes runs as the SERVICE OWNER ROLE, not as the viewer. A
 --   service owned by DLT_LOADER_ROLE would hand any person with endpoint
 --   access a role that owns production Tasks and can write NFL_PROD_DB.RAW.
---   So the dashboard's owner role holds SELECT and nothing else: the blast
---   radius of the endpoint is read-only observability data.
+--   So the dashboard's owner role holds SELECT plus exactly one write-shaped
+--   capability: the manual-refresh valve (POST /api/refresh), which CALLs the
+--   guarded ops refresh procs and may fire the obs Postgres copy task. The
+--   blast radius of the endpoint is read-only observability data plus
+--   "refresh the observability data sooner than the hourly schedule would".
+--   EXECUTE TASK ON ACCOUNT below sounds broad but is bounded by OPERATE,
+--   which this role holds on dlt_task_obs_to_postgres and nothing else.
 --
 --   Corollary: 03_service.sql must be run AS OPS_DASHBOARD_ROLE. Creating the
 --   service as SYSADMIN by accident makes SYSADMIN the owner, and undoing
@@ -71,8 +76,35 @@ GRANT USAGE ON DATABASE NCAAF_PROD_DB TO ROLE OPS_DASHBOARD_ROLE;
 GRANT USAGE ON SCHEMA NCAAF_PROD_DB.OPS TO ROLE OPS_DASHBOARD_ROLE;
 GRANT SELECT ON TABLE NCAAF_PROD_DB.OPS.DBT_TRIGGER_LOADS TO ROLE OPS_DASHBOARD_ROLE;
 
--- A public endpoint requires this account-level privilege on the CREATING
--- role. ACCOUNTADMIN is unavoidable here and this is the only statement that
--- needs it.
+-- ---------------------------------------------------------------------------
+-- The manual-refresh valve (api/app/routers/refresh.py). The refresh cadence
+-- is hourly (OBS_REFRESH / DBT_RUNS_REFRESH at a 3600s trigger interval), and
+-- the button is the "I need it now" path: it CALLs the guarded sweep procs
+-- and SP_OBS_COPY_FIRE(TRUE). All three procs are EXECUTE AS CALLER, and the
+-- service session runs USE SECONDARY ROLES NONE, so every privilege below
+-- must be granted DIRECTLY to this role -- no inheritance path applies.
+--
+-- The grant on SP_OBS_COPY_FIRE(BOOLEAN) itself is NOT here: it lives in
+-- dlt-pipelines/sql/ops/11_obs_copy_task.sql beside the proc, because that
+-- file DROPs and recreates the proc and a grant living anywhere else would
+-- silently vanish on every reapply.
+-- ---------------------------------------------------------------------------
+-- SYSADMIN inherits both owners (DLT_LOADER_ROLE owns SP_OBS_SWEEP, the copy
+-- task and the latch; DBT_RUNNER_ROLE owns SP_DBT_RUNS_SWEEP).
+GRANT USAGE ON PROCEDURE DLT_DB.OPS.SP_OBS_SWEEP() TO ROLE OPS_DASHBOARD_ROLE;
+GRANT USAGE ON PROCEDURE DLT_DB.OPS.SP_DBT_RUNS_SWEEP() TO ROLE OPS_DASHBOARD_ROLE;
+-- OPERATE lets the caller's-rights proc EXECUTE TASK it; MONITOR lets the
+-- proc's in-flight guards read TASK_HISTORY for it.
+GRANT MONITOR, OPERATE ON TASK DLT_DB.OPS.dlt_task_obs_to_postgres TO ROLE OPS_DASHBOARD_ROLE;
+-- The proc MERGEs the debounce latch as the caller.
+GRANT SELECT, INSERT, UPDATE ON TABLE DLT_DB.OPS.OBS_COPY_LATCH TO ROLE OPS_DASHBOARD_ROLE;
+
+-- Account-level privileges require ACCOUNTADMIN; these are the only
+-- statements that need it.
 USE ROLE ACCOUNTADMIN;
+-- A public endpoint requires this on the CREATING role.
 GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE OPS_DASHBOARD_ROLE;
+-- EXECUTE TASK is account-level by design in Snowflake; which tasks the role
+-- can actually run stays bounded by OPERATE (granted above on exactly one).
+-- DLT_LOADER_ROLE and DBT_RUNNER_ROLE already hold this same privilege.
+GRANT EXECUTE TASK ON ACCOUNT TO ROLE OPS_DASHBOARD_ROLE;

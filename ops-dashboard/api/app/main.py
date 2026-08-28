@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from app import config, datasource
-from app.routers import dbt, health, pipelines, runs, slate, sports
+from app.routers import dbt, health, pipelines, refresh, runs, slate, sports
 
 
 def create_app() -> FastAPI:
@@ -22,7 +22,7 @@ def create_app() -> FastAPI:
         datasource.begin_trace()
         return await call_next(request)
 
-    for module in (health, sports, slate, pipelines, runs, dbt):
+    for module in (health, sports, slate, pipelines, runs, dbt, refresh):
         app.include_router(module.router)
 
     static_dir = config.static_dir()

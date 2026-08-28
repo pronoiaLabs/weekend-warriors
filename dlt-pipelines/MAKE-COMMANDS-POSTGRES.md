@@ -155,9 +155,17 @@ is the production proof. The laptop run is not.
 
 ## Observability copy (`DLT_DB.OPS` → `app.observability`)
 
-Snowflake stays `DLT_DB.OPS`. The dashboard keeps reading Snowflake. This
-job only replace-loads the materialized OPS tables into the existing
-Postgres instance (same EAI, secret, `app_copy_writer`).
+Snowflake stays `DLT_DB.OPS`. This job copies the materialized OPS tables
+into the existing Postgres instance (same EAI, secret, `app_copy_writer`).
+Since 2026-08 the copy is **incremental per table**: a registry table entry
+may be a mapping (`name` / `mode: append|merge` / `cursor` / `primary_key`)
+instead of a bare name, and the cursor is pushed into the Snowflake `WHERE`
+so neither side re-reads history. Bare names stay full replace. Full
+replaces of the 90-day history tables every fire are what OOMed the shared
+Postgres instance (`psycopg2.errors.OutOfMemory`, 2026-08-24). Incremental
+never deletes, so the scheduled `obs_to_postgres_resync` (Sunday 03:00 UTC,
+spec-level `write_disposition: replace` as the blunt override) re-bounds
+Postgres to Snowflake retention weekly and heals event-timestamp skew.
 
 If `setup-postgres` already ran before observability existed:
 
@@ -201,8 +209,11 @@ Same schema is not enough: Snowflake also requires one owner per graph
 be created as `DLT_LOADER_ROLE`.
 
 The copy job writes SPCS events, which re-fire `OBS_REFRESH`. Both
-wrappers share `DLT_DB.OPS.OBS_COPY_LATCH` and no-op for 10 minutes after
-a fire so that is not an infinite loop. `DBT_RUNS` / query-log tables are
+wrappers share `DLT_DB.OPS.OBS_COPY_LATCH` and no-op for **50 minutes**
+after a fire (raised from 10 on 2026-08-24: with both refresh roots at a
+3600s trigger interval this bounds the copy to about once an hour) so that
+is not an infinite loop. `SP_OBS_COPY_FIRE(TRUE)` -- the dashboard's
+refresh button -- skips the latch but never the two in-flight guards. `DBT_RUNS` / query-log tables are
 owned by `DBT_RUNNER_ROLE`; 11 grants `SELECT` to `DLT_LOADER_ROLE`
 (laptop SYSADMIN hid this). The observability watermark branch lives in
 this repo; the container uses it after the next image roll.
