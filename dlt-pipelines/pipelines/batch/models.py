@@ -72,6 +72,13 @@ SUPPORTED_SOURCES: tuple[str, ...] = (
 # Dispositions dlt accepts as a plain string. `skip` is deliberately absent: a
 # pipeline that loads nothing should not be in the registry.
 _DISPOSITIONS: tuple[str, ...] = ("append", "replace", "merge")
+_LOADER_FILE_FORMATS: tuple[str, ...] = (
+    "csv",
+    "insert_values",
+    "jsonl",
+    "model",
+    "parquet",
+)
 
 # Resolved relative to this file so the loader works from any working directory.
 REGISTRY_PATH: Path = Path(__file__).with_name("registries")
@@ -179,6 +186,34 @@ class PipelineSpec:
         self._validate_schedule_bindings()
         self._validate_write_disposition()
         self._validate_season_rollover()
+        self._validate_execution_options()
+
+    def _validate_execution_options(self) -> None:
+        """Validate runner-owned options carried in the existing config VARIANT.
+
+        These are not source constructor arguments: run.py consumes them before
+        calling pipeline.run(). Keeping them in config avoids adding control-table
+        columns for optional dlt execution knobs while still making YAML and SPCS
+        registry rows mean the same thing.
+        """
+        loader_file_format = self.config.get("loader_file_format")
+        if loader_file_format is not None and loader_file_format not in _LOADER_FILE_FORMATS:
+            raise RegistryError(
+                f"pipeline '{self.name}': config.loader_file_format must be one of "
+                f"{'|'.join(_LOADER_FILE_FORMATS)}, got {loader_file_format!r}"
+            )
+
+        skip_unchanged = self.config.get("skip_unchanged")
+        if skip_unchanged is not None and not isinstance(skip_unchanged, bool):
+            raise RegistryError(
+                f"pipeline '{self.name}': config.skip_unchanged must be a boolean, "
+                f"got {skip_unchanged!r}"
+            )
+        if skip_unchanged and self.source != "snowflake_app":
+            raise RegistryError(
+                f"pipeline '{self.name}': config.skip_unchanged is only supported "
+                "for the snowflake_app source"
+            )
 
     def _validate_season_rollover(self) -> None:
         """A rollover month outside 1-12 silently produces a wrong season, not an error.

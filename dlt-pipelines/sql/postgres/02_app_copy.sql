@@ -57,8 +57,13 @@ CREATE TABLE IF NOT EXISTS app_copy.app_copy_watermark (
   source_build_id  TEXT,
   copied_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   row_count        BIGINT,
+  content_hash     TEXT,
   PRIMARY KEY (sport, table_name)
 );
+
+-- CREATE TABLE IF NOT EXISTS does not add columns to an existing installation.
+ALTER TABLE app_copy.app_copy_watermark
+  ADD COLUMN IF NOT EXISTS content_hash TEXT;
 
 GRANT SELECT, INSERT, UPDATE ON TABLE app_copy.app_copy_watermark TO app_copy_writer;
 GRANT SELECT                 ON TABLE app_copy.app_copy_watermark TO app_api;
