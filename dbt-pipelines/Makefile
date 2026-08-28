@@ -124,7 +124,11 @@ snowpark-test: ## Lint + unit tests for the Snowpark procedures (pure Python, no
 
 deploy-snowpark: ## Build, upload and CREATE OR REPLACE SP_PLAYER_BRIDGE, then re-grant
 	@$(call hdr,deploy $(BRIDGE_PROC))
-	cd $(SNOWPARK_DIR)/player_bridge && $(SNOW) snowpark build && $(SNOW) snowpark deploy $(CONN_ARGS) --replace
+	# build takes CONN_ARGS too: newer snow CLI releases resolve requirements
+	# against the Anaconda channel over a connection, and CI has only the -x
+	# temporary connection (no default) -- without it the build step dies with
+	# "Connection default is not configured" (bit 2026-08-28).
+	cd $(SNOWPARK_DIR)/player_bridge && $(SNOW) snowpark build $(CONN_ARGS) && $(SNOW) snowpark deploy $(CONN_ARGS) --replace
 	$(SNOW) sql $(CONN_ARGS) -q "GRANT USAGE ON PROCEDURE $(BRIDGE_PROC) TO ROLE DBT_RUNNER_ROLE"
 	$(SNOW) sql $(CONN_ARGS) -q "GRANT USAGE ON PROCEDURE $(BRIDGE_PROC) TO ROLE DLT_DEV_ROLE"
 	$(SNOW) sql $(CONN_ARGS) -q "GRANT OWNERSHIP ON PROCEDURE $(BRIDGE_PROC) TO ROLE DBT_RUNNER_ROLE COPY CURRENT GRANTS"
