@@ -321,7 +321,7 @@ BEGIN
   -- ---------------------------------------------------------------------
   v_prompt :=
        'You are the overnight desk editor for "weekend warriors", a sports-data '
-    || 'pipeline platform (NFL, WNBA, NCAAF ingestion + dbt builds on Snowflake). '
+    || 'pipeline platform (NFL and NCAAF ingestion + dbt builds on Snowflake). '
     || 'Below is a JSON digest of today''s operations telemetry. Write the day''s '
     || 'wire: an array of at most 5 headline items.'
     || '\n\nRules, in priority order:'

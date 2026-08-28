@@ -8,8 +8,8 @@
     dim_ncaaf_conference -- one row per conference. Grain: conference,
     25 rows, SCD1.
 
-    College-specific: neither the NFL nor the WNBA has a conference
-    dimension (the NFL's conference is an enum on the team). Here the
+    College-specific: the NFL has no conference dimension (conference is an
+    enum on the team). Here the
     conference is first-class because realignment makes the list itself
     data, standings are published per conference, and the FBS/FCS
     subdivision hangs off it.

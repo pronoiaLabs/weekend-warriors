@@ -61,13 +61,13 @@ def test_failure_card_carries_evidence_and_prev(client: TestClient) -> None:
 
 
 def test_sport_filter_drops_other_leagues(client: TestClient) -> None:
-    body = _get(client, date="2026-08-08", sport="WNBA")
+    body = _get(client, date="2026-08-08", sport="NFL")
     ingestion = [x for x in body["leagues"] if x["kind"] == "ingestion"]
-    assert {x["sport"] for x in ingestion} <= {"WNBA"}
+    assert {x["sport"] for x in ingestion} <= {"NFL"}
     # dbt league, when present under a sport filter, only carries that sport.
     for league in body["leagues"]:
         if league["kind"] == "dbt":
-            assert {c["sport"] for c in league["cards"]} <= {"wnba"}
+            assert {c["sport"] for c in league["cards"]} <= {"nfl"}
 
 
 def test_window_boundary_excludes_prior_day(client: TestClient) -> None:

@@ -2,15 +2,14 @@
 
 from fastapi.testclient import TestClient
 
-# A wnba build with a drained load, per-node queries and one profiled query.
-BUILD = "ec4edb49-8ac2-4de1-8c8d-eec69407e91e"
-NFL_BUILD = "368a08ac-6de0-4922-b2d2-4359fc123f1a"
+# An NFL build with a drained load, per-node queries and one profiled query.
+BUILD = "368a08ac-6de0-4922-b2d2-4359fc123f1a"
 PROFILED_QID = "01c64669-0107-5e2f-000f-cf02000f2d46"
 
 
 def test_builds_ordered_and_filtered(client: TestClient) -> None:
     builds = client.get("/api/dbt/builds").json()["builds"]
-    assert len(builds) == 9
+    assert len(builds) == 4
     starts = [b["started_at"] for b in builds]
     assert starts == sorted(starts, reverse=True)
     assert all(s.endswith("Z") for s in starts)
@@ -30,17 +29,17 @@ def test_builds_unknown_sport_is_404(client: TestClient) -> None:
 def test_build_detail_with_loads(client: TestClient) -> None:
     body = client.get(f"/api/dbt/builds/{BUILD}").json()
     build = body["build"]
-    assert build["sport"] == "wnba"
-    assert build["environment"] == "wnba_prod"
-    assert build["n_queries"] == 1263
+    assert build["sport"] == "nfl"
+    assert build["environment"] == "prod"
+    assert build["n_queries"] == 73
     # One load drained inside the build's window; the sport's other loads sit
     # outside it and must not appear.
-    assert [load["pipeline"] for load in body["loads"]] == ["wnba_games"]
+    assert [load["pipeline"] for load in body["loads"]] == ["nfl_reference"]
     assert body["loads"][0]["drained_at"] > build["started_at"]
 
 
 def test_build_detail_loads_scoped_to_sport(client: TestClient) -> None:
-    body = client.get(f"/api/dbt/builds/{NFL_BUILD}").json()
+    body = client.get(f"/api/dbt/builds/{BUILD}").json()
     assert body["build"]["sport"] == "nfl"
     assert [load["pipeline"] for load in body["loads"]] == ["nfl_reference"]
 

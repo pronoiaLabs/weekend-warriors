@@ -9,7 +9,7 @@ FIXTURE = Path(__file__).parents[1] / "app" / "fixtures" / "registry.json"
 def test_sport_derivation() -> None:
     rows = json.loads(FIXTURE.read_text())
     sports = sorted({r["target_database"] for r in rows if r["schedule"] is not None})
-    assert sports == ["NFL", "WNBA"]
+    assert sports == ["NFL"]
 
 
 def test_sample_pipeline_excluded_by_schedule() -> None:

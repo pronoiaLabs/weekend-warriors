@@ -246,9 +246,8 @@ jobs:
       - name: Assert scheduled Tasks are started
         # CLAUDE.md: "Verify with SHOW TASKS, not with the target's exit code:
         # suspended looks exactly like success." The expected set comes from the
-        # generator itself, so a paused sport (schedules commented out in its
-        # registry, e.g. WNBA since 2026-08-12) is simply absent here and is
-        # never asserted on or accidentally un-paused.
+        # generator itself, so an unscheduled sport is simply absent here and
+        # is never asserted on or accidentally started.
         run: |
           snow sql -x -q "SHOW TASKS IN SCHEMA DLT_DB.OPS;" --format json > show_tasks.json
           python3 - <<'PY'
@@ -316,9 +315,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # WNBA paused 2026-08-12; add
-          #   { sport: wnba, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_WNBA }
-          # here (and to the agents matrix) to revive.
           - { sport: nfl, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL }
           - { sport: ncaaf, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NCAAF }
     env:
@@ -406,7 +402,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # WNBA paused; revive together with the dbt matrix above.
           - { sport: nfl }
           - { sport: ncaaf }
     env:

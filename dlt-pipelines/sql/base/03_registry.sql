@@ -108,12 +108,11 @@ UPDATE DLT_DB.OPS.PIPELINE_REGISTRY
 -- this ALTER is what adds the column, and it is safe to re-run.
 --
 -- WHY THIS COLUMN EXISTS AT ALL. It feeds the `{current_season}` token, and the month a
--- season starts is per sport: 8 for the NFL, 5 for the WNBA. A container in SPCS reads
+-- season starts is per sport rather than a platform constant. A container in SPCS reads
 -- its spec from THIS TABLE, not from the YAML, so a rollover that lives only in
 -- registries/*.yml would be correct on a laptop and silently fall back to the default 8
--- inside every scheduled Task. For the WNBA that means May, June and July resolving to
--- last season while the current one is being played, and the API answers a stale season
--- with data rather than an error.
+-- inside every scheduled Task. A sport with an earlier opening month would then resolve
+-- part of its active season to the prior year without raising an API error.
 --
 -- Existing rows are backfilled to 8, which is the pre-change behaviour. `make
 -- sync-apply` then writes each pipeline's real value from its registry file.
@@ -144,8 +143,8 @@ UPDATE DLT_DB.OPS.PIPELINE_REGISTRY
 -- made it hard to see.
 --
 -- NO BACKFILL, UNLIKE THE TWO MIGRATIONS ABOVE. There is no sensible account-wide
--- default: the values are per source (DLT_DB.OPS.NFL_API_KEY against
--- DLT_DB.OPS.WNBA_API_KEY, and one EAI per upstream host). Rows stay NULL until
+-- default: the values are per source (for example, separate API keys and one EAI per
+-- upstream host). Rows stay NULL until
 -- `make sync-apply` writes each pipeline's real values, so the ALTER and the sync
 -- belong in the same sitting. NULL is also correct and permanent for `sample`, which
 -- has no schedule and needs none of them.

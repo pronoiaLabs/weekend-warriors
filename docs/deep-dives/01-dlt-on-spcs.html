@@ -78,7 +78,7 @@ ENTRYPOINT ["python", "-m", "pipelines.batch.run"]</code></pre>
     <p>Second, the source API key. It is never in the image, never in git, never in the registry YAML. It lives as a Snowflake SECRET object (<code>sql/sources/nfl/03_secrets.sql</code> creates it, an ALTER sets the real value), and the spec's <code>secrets:</code> block mounts it into the container as whatever env var the pipeline's config expects. dlt resolves a <code>secret:sources.nfl.api_key</code> reference from the env var <code>SOURCES__NFL__API_KEY</code>, so the binding is three lines of spec, not a line of code.</p>
     <div class="hard-won">
       <p class="hw-label">Hard-Won Fact</p>
-      <p>Because the secret binds at the spec layer, the container image is credential-free by construction. The same image runs the NFL pipelines, the WNBA pipelines, or any future league's, and the only thing that changes is which SECRET object the spec names. There is nothing to rotate in an image, nothing to scrub from a layer, and a leaked image leaks no keys.</p>
+      <p>Because the secret binds at the spec layer, the container image is credential-free by construction. The same image runs the NFL pipelines, the NCAAF pipelines, or any future league's, and the only thing that changes is which SECRET object the spec names. There is nothing to rotate in an image, nothing to scrub from a layer, and a leaked image leaks no keys.</p>
     </div>
 
     <h2><span class="no">§ 4.</span> Egress is opt-in</h2>

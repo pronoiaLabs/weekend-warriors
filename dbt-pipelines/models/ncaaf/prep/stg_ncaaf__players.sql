@@ -9,7 +9,7 @@
     reference table in the account (FBS + FCS rosters, with churn kept by the
     weekly merge).
 
-    CARRIES A CURRENT TEAM only, like the WNBA dimension: the source has no
+    CARRIES A CURRENT TEAM only: the source has no
     season-team history, and fact_ncaaf_player_game.team_key is the
     season-accurate answer wherever the grain allows.
 

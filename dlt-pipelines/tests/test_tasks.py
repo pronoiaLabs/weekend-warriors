@@ -238,9 +238,8 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
     assert main() == 0  # prints to stdout; exercised for import and runtime errors
 
     # Counted per source rather than as one total. A single number has to be edited
-    # every time any league gains or loses a pipeline, which makes it a chore that gets
-    # updated without being read, and it cannot tell "WNBA arrived" from "an NFL
-    # pipeline silently lost its schedule".
+    # every time any league gains or loses a pipeline and cannot identify which source
+    # silently lost its schedule.
     scheduled = {s.name for s in _scheduled()}
     by_source: dict[str, set[str]] = {}
     for name in scheduled:
@@ -255,11 +254,6 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
         "nfl_nflverse_stats", "nfl_nflverse_depth_charts", "nfl_nflverse_reference",
         "nfl_sleeper_players", "nfl_sleeper_market",
     }
-    # WNBA is PAUSED (2026-08-12): schedules commented out in wnba-registry.yml,
-    # account tasks suspended. The pipelines stay registered and hand-runnable;
-    # they must simply emit no Task. Reviving WNBA means restoring the ten-name
-    # set assertion here.
-    assert "wnba" not in by_source
     assert by_source["ncaaf"] == {
         "ncaaf_reference", "ncaaf_games", "ncaaf_stats",
         "ncaaf_season_stats", "ncaaf_standings", "ncaaf_rankings",

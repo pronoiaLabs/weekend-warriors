@@ -4,8 +4,8 @@
     Record strings arrive as text: "11-2" today, "11-2-1" when there was a
     tie. College football abolished ties in 1996, but the standings and
     rankings sources reach back far enough in principle that the third
-    position is a data condition, not a caller bug -- so this mirrors
-    nfl_parse_record (tie-capable), not the WNBA variant.
+    position is a data condition, not a caller bug -- so this mirrors the
+    tie-capable nfl_parse_record behavior.
 
     Usage:
         {{ ncaaf_parse_record('home_record', 'wins') }}
@@ -54,9 +54,8 @@
 
 {#
     ncaaf_coalesce_variant -- fold a dlt variant-split twin column back into
-    one. Identical mechanics to wnba_coalesce_variant; duplicated per sport
-    deliberately so each sport's macro directory is self-contained and a
-    sport can be lifted out of the project whole.
+    one. Kept in this sport's macro directory so the tree is self-contained
+    and can be lifted out of the project whole.
 
     The canonical twin list (7 columns across 4 tables) lives in
     models/sources.yml on the ncaaf_raw table descriptions.

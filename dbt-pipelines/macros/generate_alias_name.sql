@@ -5,7 +5,7 @@
     dim_/fact_ prefix comes off the physical name. dbt model names do NOT
     change: every ref(), semantic view and APP mart compiles untouched --
     only the rendered relation name differs. Scoped to models under
-    models/nfl/core/ so WNBA/NCAAF and the nfl prep/features/app/semantic
+    models/nfl/core/ so NCAAF and the nfl prep/features/app/semantic
     trees keep dbt's default (alias = model name).
 
     Overrides name the tables whose stripped name would be a single word or

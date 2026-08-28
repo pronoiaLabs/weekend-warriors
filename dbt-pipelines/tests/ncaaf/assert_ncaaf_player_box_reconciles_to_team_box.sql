@@ -1,7 +1,7 @@
 -- Player passing yards summed per team-game should reconcile to the team
 -- box score's passing yards, within tolerance.
 --
--- TOLERANCE, NOT EQUALITY, deliberately (the WNBA lesson): the provider's
+-- TOLERANCE, NOT EQUALITY, deliberately: the provider's
 -- team totals and player lines are compiled separately upstream and small
 -- disagreements are theirs, not ours. The test exists to catch systematic
 -- breakage (a join dropping players, a twin fold zeroing a column), so it

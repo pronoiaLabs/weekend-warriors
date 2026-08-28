@@ -66,11 +66,10 @@ REGISTRY_TABLE = "DLT_DB.OPS.PIPELINE_REGISTRY"
 #
 #     Both halves of that have already bitten:
 #
-#     season_rollover_month  Added to the table and to registry_sync for the WNBA, but
-#                            not here, so every container silently fell back to the NFL
-#                            default of 8. The two rules agree in August and diverge in
-#                            May, so it would have surfaced next spring as a season of
-#                            stale WNBA data loaded with no error at all.
+#     season_rollover_month  Added to the table and to registry_sync, but not here, so
+#                            every container silently fell back to the default of 8.
+#                            A non-default sport would then load stale-season data with
+#                            no error at all.
 #
 #     secret / env_var /     Never columns at all until the migration that added them.
 #     external_access        Declared in registries/*.yml and correctly inlined into the

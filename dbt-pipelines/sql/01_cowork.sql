@@ -2,13 +2,12 @@
 -- sql/01_cowork.sql
 -- =============================================================================
 -- Purpose       : One-time Snowflake CoWork setup: create the account's CoWork
---                 object and register both prod analyst agents in it, so they
+--                 object and register the prod analyst agents in it, so they
 --                 are usable from the CoWork chat surface as well as the
 --                 Agents page.
 -- Run as        : ACCOUNTADMIN (object creation + grants), then SYSADMIN
 --                 holds MODIFY for all future agent add/remove.
--- Prerequisites : The prod agents exist (deploy_nfl_analyst /
---                 deploy_wnba_analyst run against the prod environments).
+-- Prerequisites : The NFL and NCAAF prod agents exist.
 -- Apply         : snow sql -c weekend-warriors -f dbt-pipelines/sql/01_cowork.sql
 --
 -- NAMING DECODER: "Snowflake CoWork" is the product name; the SQL object type
@@ -66,9 +65,6 @@ ALTER SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT
 
 ALTER SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT
   ADD AGENT NFL_PROD_DB.ANALYTICS.NFL_MARKET_ANALYST;
-
-ALTER SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT
-  ADD AGENT WNBA_PROD_DB.ANALYTICS.WNBA_ANALYST;
 
 ALTER SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT
   ADD AGENT NCAAF_PROD_DB.ANALYTICS.NCAAF_ANALYST;

@@ -8,7 +8,7 @@
     dim_ncaaf_player -- player biographical attributes. Grain: player,
     124,089 rows, SCD1: the largest dimension in the account.
 
-    CARRIES A CURRENT TEAM (the WNBA deviation, for the same reason): the
+    CARRIES A CURRENT TEAM: the
     source has no season-team history, so current team and stat-line team
     can disagree across transfers. Prefer fact_ncaaf_player_game.team_key
     and fact_ncaaf_player_season.team_key wherever the grain allows; the

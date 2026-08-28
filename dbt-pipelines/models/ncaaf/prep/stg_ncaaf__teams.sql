@@ -7,7 +7,7 @@
 /*
     stg_ncaaf__teams -- one row per team, 536 rows, FBS through FCS and below.
 
-    CLASSIFIES EVERY ROW, FILTERS NONE (the WNBA is_franchise pattern): only
+    CLASSIFIES EVERY ROW, FILTERS NONE: only
     ~134 rows are FBS programs, and most consumers want that slice, but games
     and stats reference the rest by id so they stay. is_fbs is the filter
     almost every consumer wants.

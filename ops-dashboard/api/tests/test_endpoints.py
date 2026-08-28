@@ -10,13 +10,13 @@ QID = "01c6418f-0107-5e62-000f-cf02000b054e"
 
 def test_sports(client: TestClient) -> None:
     body = client.get("/api/sports").json()
-    assert [s["sport"] for s in body["sports"]] == ["NFL", "WNBA"]
+    assert [s["sport"] for s in body["sports"]] == ["NFL"]
     assert all(s["pipelines"] > 0 for s in body["sports"])
 
 
 def test_pipelines_index(client: TestClient) -> None:
     body = client.get("/api/pipelines").json()
-    assert len(body["pipelines"]) == 17
+    assert len(body["pipelines"]) == 7
     by_name = {p["pipeline"]: p for p in body["pipelines"]}
     ref = by_name["nfl_reference"]
     assert ref["schedule"] == "0 8 * * *"
@@ -29,8 +29,8 @@ def test_pipelines_index(client: TestClient) -> None:
     # A pipeline that never ran still gets a row, with latest None.
     never_ran = [p for p in body["pipelines"] if p["latest"] is None]
     assert all(p["runs_in_window"] == 0 for p in never_ran)
-    wnba = client.get("/api/pipelines?sport=WNBA").json()["pipelines"]
-    assert len(wnba) == 10 and all(p["sport"] == "WNBA" for p in wnba)
+    nfl = client.get("/api/pipelines?sport=NFL").json()["pipelines"]
+    assert len(nfl) == 7 and all(p["sport"] == "NFL" for p in nfl)
 
 
 def test_pipeline_detail(client: TestClient) -> None:

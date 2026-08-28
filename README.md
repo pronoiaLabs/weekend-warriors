@@ -10,8 +10,8 @@ agent on top so you can ask questions like
 
 and get a real answer, computed from a real warehouse, with the SQL shown so you can check its work.
 
-Two sports run today, NFL and WNBA. The whole design assumes you will want a third: adding your
-sport is a scaffold command and a config file, not a rewrite.
+NFL and NCAAF run today. The whole design assumes you may add another sport: doing so is a scaffold
+command and a config file, not a rewrite.
 
 ---
 

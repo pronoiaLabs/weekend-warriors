@@ -105,29 +105,8 @@ def test_real_registry_sends_every_nfl_pipeline_to_the_nfl_databases():
         )
 
 
-def test_real_registry_sends_every_wnba_pipeline_to_the_wnba_databases():
-    """The twin of the NFL check, and the point of the whole database-stem design.
-
-    One sport landing in another's database is not a crash: dlt would create the tables
-    and load them, and the mistake would only surface as an NFL warehouse that somehow
-    contains basketball.
-    """
-    registry = load_registry()
-    wnba = [s for s in registry.pipelines if s.name.startswith("wnba_")]
-    assert wnba, "expected the WNBA pipelines to be present"
-
-    for spec in wnba:
-        assert resolve_database(spec, "DEV") == "WNBA_DEV_DB"
-        assert resolve_database(spec, "PROD") == "WNBA_PROD_DB"
-        assert spec.dataset_name == "RAW"
-        # The rollover is what makes {current_season} right for this sport. Inheriting
-        # the default of 8 would resolve May, June and July to the previous season
-        # while the current one is being played.
-        assert spec.season_rollover_month == 5, f"{spec.name}: WNBA seasons open in May, not August"
-
-
 def test_real_registry_sends_every_ncaaf_pipeline_to_the_ncaaf_databases():
-    """Sport #3, same stem discipline as the first two."""
+    """The second sport follows the same database-stem discipline as the first."""
     registry = load_registry()
     ncaaf = [s for s in registry.pipelines if s.name.startswith("ncaaf_")]
     assert ncaaf, "expected the NCAAF pipelines to be present"
@@ -136,9 +115,7 @@ def test_real_registry_sends_every_ncaaf_pipeline_to_the_ncaaf_databases():
         assert resolve_database(spec, "DEV") == "NCAAF_DEV_DB"
         assert resolve_database(spec, "PROD") == "NCAAF_PROD_DB"
         assert spec.dataset_name == "RAW"
-        # Same rollover as the NFL, but asserted rather than inherited: the WNBA's
-        # month exists precisely because the default is a silent fallback, and this
-        # test is what notices if the explicit declaration is ever dropped.
+        # Assert the declaration rather than inheriting a silent fallback.
         assert spec.season_rollover_month == 8, (
             f"{spec.name}: college football seasons open in August"
         )
@@ -194,43 +171,6 @@ def test_current_season_does_not_roll_over_at_the_super_bowl() -> None:
     # season that has not been played, and the API answers that with an empty list
     # rather than an error, so the run would look fine and load nothing.
     assert current_season(today=date(2027, 3, 1)) == 2026
-
-
-@pytest.mark.parametrize(
-    "day, expected",
-    [
-        (date(2027, 4, 30), 2026),  # offseason: last COMPLETED season
-        (date(2027, 5, 1), 2027),  # rollover, the season opens this month
-        (date(2027, 9, 24), 2027),  # final day of the regular season
-        (date(2027, 12, 25), 2027),  # deep offseason, still the 2027 season
-        (date(2028, 1, 10), 2027),  # new calendar year, season unchanged
-        (date(2028, 4, 30), 2027),  # right up to the next rollover
-    ],
-)
-def test_wnba_season_rolls_over_on_1_may(day, expected) -> None:
-    """The WNBA plays May to September inside ONE calendar year.
-
-    Under the NFL's rollover of 8, every date from May to July resolves to the previous
-    season while the current one is being played. That is not a crash: the API answers
-    a stale season with real data, so the load succeeds and holds the wrong year.
-    """
-    assert current_season(5, today=day) == expected
-
-
-def test_the_two_sports_agree_in_august_which_is_why_this_needed_a_test() -> None:
-    """Why a shared constant would have shipped looking correct.
-
-    This work was done in August 2026, when both rules give 2026. Any smoke test written
-    on the day would have passed with the rollover hardcoded to 8, and the WNBA
-    pipelines would have started loading the wrong season the following May.
-    """
-    august = date(2026, 8, 2)
-    assert current_season(8, today=august) == current_season(5, today=august) == 2026
-
-    # ...and here is where they part company.
-    may = date(2027, 5, 15)
-    assert current_season(8, today=may) == 2026
-    assert current_season(5, today=may) == 2027
 
 
 # ---------------------------------------------------------------------------
@@ -513,15 +453,6 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_game_odds": 2,  # regular/post games parents
         "nfl_player_props": 2,  # regular/post games parents
         "nfl_odds_opening": 2,  # regular/post games parents drive both endpoints
-        # WNBA. Fewer tokens than the NFL for the same coverage, because /plays takes
-        # no season_type and so needs one parent instead of three.
-        "wnba_games": 1,  # once, in resource_defaults
-        "wnba_stats": 1,  # once, in resource_defaults
-        "wnba_season_stats": 1,  # once, in resource_defaults
-        "wnba_advanced_game": 1,  # once, in resource_defaults
-        "wnba_advanced_season": 1,  # once, in resource_defaults, all 8 measure_types
-        "wnba_shot_locations": 1,  # once, in resource_defaults
-        "wnba_plays": 1,  # the single parent driving the fan-out
         # NCAAF. No season_type parameter exists for this sport, so no resource is
         # triplicated and every pipeline needs exactly one token.
         "ncaaf_games": 1,  # the single games resource
@@ -543,9 +474,6 @@ def test_every_season_scoped_resource_carries_the_token() -> None:
         "nfl_reference",
         "nfl_injuries",
         "nfl_news",
-        "wnba_reference",
-        "wnba_injuries",
-        "wnba_standings",
         "ncaaf_reference",
         "sample",
         "nfl_weather_forecast",
@@ -575,19 +503,11 @@ def test_pipelines_with_no_season_have_no_token() -> None:
     # teams, players and injuries are current state, not seasonal. A season filter on
     # them would not narrow anything; it would just be a param the API ignores.
     #
-    # wnba_standings is the interesting one and NOT an oversight. Unlike the NFL's,
-    # this endpoint takes no season at all and returns every season it holds (2008 to
-    # 2026) in one unpaginated request, so a token would throw away 18 seasons that
-    # came free.
-    #
     # nfl_news is dated by its search window (tbs), not by season.
     for name in (
         "nfl_reference",
         "nfl_injuries",
         "nfl_news",
-        "wnba_reference",
-        "wnba_injuries",
-        "wnba_standings",
         "ncaaf_reference",
         "nfl_weather_forecast",
         "nfl_weather_archive",
@@ -1125,7 +1045,7 @@ def test_scheduled_spec_round_trips_through_the_registry_table() -> None:
     assert rebuilt.external_access == spec.external_access
     assert rebuilt.schedule == spec.schedule
     # Not merely non-None: an unselected column silently becomes the dataclass default of
-    # 8, which is the NFL answer and would quietly give the WNBA a stale season each May.
+    # 8, so this non-default value proves the column survived the round trip.
     assert rebuilt.season_rollover_month == 5
     assert rebuilt.config == spec.config
 
