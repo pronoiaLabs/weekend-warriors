@@ -58,8 +58,11 @@
     opponent row so the two can never disagree.
 
     Rates in the EPA block are computed from this grain's own sums and cannot
-    be re-aggregated; anything at another grain should go back to off_plays,
-    dropbacks, carries and the epa sums. proe is pass rate over expected:
+    be re-aggregated; anything at another grain should go back to the additive
+    columns -- off_plays, dropbacks, carries, the epa sums, success_plays,
+    explosive_plays, early_down_plays / early_down_success_plays and
+    pass_over_expected_sum / xpass_plays (the same additive contract
+    fact_team_game_situation carries). proe is pass rate over expected:
     mean(pass - xpass) on scrimmage plays. Play-level detail deliberately
     stays in stg_nfl__nflverse_pbp; this is the modeling surface.
 */
@@ -198,7 +201,16 @@ epa_offense as (
             / count(*)                                  as explosive_rate,
         avg(cpoe)                                       as cpoe,
         count_if(pass = 1) / count(*)                   as pass_rate,
-        avg(pass - xpass)                               as proe
+        avg(pass - xpass)                               as proe,
+        -- additive counts behind the rates above, so other grains can
+        -- re-aggregate sum-over-sum (same contract as fact_team_game_situation)
+        count_if(success = 1)                           as success_plays,
+        count_if((pass = 1 and yards_gained >= 20)
+              or (rush = 1 and yards_gained >= 10))     as explosive_plays,
+        count_if(down in (1, 2))                        as early_down_plays,
+        count_if(down in (1, 2) and success = 1)        as early_down_success_plays,
+        sum(iff(xpass is not null, pass - xpass, null)) as pass_over_expected_sum,
+        count_if(xpass is not null)                     as xpass_plays
     from epa_plays
     group by 1, 2
 
@@ -328,6 +340,12 @@ select
     ep.cpoe,
     ep.pass_rate,
     ep.proe,
+    ep.success_plays,
+    ep.explosive_plays,
+    ep.early_down_plays,
+    ep.early_down_success_plays,
+    ep.pass_over_expected_sum,
+    ep.xpass_plays,
 
     (ep.game_id is not null)                                    as has_nflverse
 

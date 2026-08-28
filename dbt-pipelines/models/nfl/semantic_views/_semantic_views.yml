@@ -23,9 +23,53 @@ models:
   - name: sv_nfl_player_props
     description: >
       NFL player prop offers at game x player x sportsbook vendor x prop_type grain.
-      Exposes opening and strictly pre-kickoff closing lines and movement. Deliberately
-      does not claim over/under outcomes because prop types are not safely mapped to
-      heterogeneous box-score measures.
+      Exposes opening and strictly pre-kickoff closing lines and movement, plus the
+      Sleeper projection standing at kickoff (one row per player x game) for
+      projection-versus-line questions; the prop_type to projected-stat mapping lives
+      in the view's SQL-generation rules. Deliberately does not claim over/under
+      outcomes because prop types are not safely mapped to heterogeneous box-score
+      measures.
+
+  - name: sv_nfl_team_performance
+    description: >
+      Team results and the full box score at team x completed-game grain, both sides:
+      fact_team_game_offense carries the team's own box and the result,
+      fact_team_game_defense is its 1:1 twin re-read as allowed. The nflverse EPA fold
+      rides on both, and every efficiency metric (EPA per play, success rate,
+      explosive rate, PROE and their allowed twins) is a ratio of the additive counts,
+      never an average of per-game rates. Preseason rows carry NULL EPA.
+
+  - name: sv_nfl_player_offense
+    description: >
+      Player production and usage at player x game grain: the BDL box score, nflverse
+      usage and efficiency (target share, WOPR, air yards, EPA, CPOE), Sleeper snaps
+      and league fantasy scoring (pts_ppr family), and the FanDuel/DraftKings UDF pair.
+      Three fantasy scoring systems coexist and the SQL-generation rules keep them
+      apart. Usage columns are NULL on preseason and unmatched rows, never zero.
+
+  - name: sv_nfl_player_defense
+    description: >
+      Individual defensive box score at player x game grain: BDL counting stats,
+      nflverse def_* counting stats, defensive snaps, and Sleeper IDP scoring inputs
+      (idp_tkl, idp_sack, idp_int). The IDP columns and defensive snap share make this
+      the Sleeper-league IDP tool; multiple tackle systems coexist and answers must
+      name the system used.
+
+  - name: sv_nfl_availability
+    description: >
+      Who can play: the filed nflverse injury report (designations and practice
+      participation, season x week x team x player history) and the depth chart
+      (weekly file through 2024, daily snapshots from 2025) beside dim_player's
+      Sleeper current-status block. History and as-of-now are deliberately never
+      blended; the view's SQL-generation rules enforce the split.
+
+  - name: sv_nfl_team_situation
+    description: >
+      Situational tendencies at team x game x situation-cell grain on
+      fact_team_game_situation: down and distance buckets, field zone, play family,
+      shotgun, no-huddle, game script and two-minute, with side = offense or defense
+      so allowed splits are rows, not extra columns. Additive components only; every
+      rate is sum-over-sum. nflverse play-by-play, so no preseason.
 
   - name: sv_nfl_player_news
     description: >

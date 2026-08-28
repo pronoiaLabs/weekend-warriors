@@ -84,7 +84,7 @@ CONTEXT is a tag: injury, lineup, transaction, suspension, other. Filter on it w
 NAME COLLISIONS: if a player name is ambiguous, use position and ask the user to disambiguate.'
 
 ai_question_categorization 'Answer questions about what is being reported or written about an NFL player or team: latest news, injury chatter, practice notes, signings, cuts, suspensions as reported, and which outlets reported them.
-If the question asks for an official injury designation or the official injury report, say this data holds reported news rather than official designations and offer the latest reported mentions instead.
+If the question asks for an official injury designation, the filed injury report, practice participation or depth charts, route it to NFLAvailabilityAnalytics: news covers the reporting, availability covers the report.
 If the question asks for statistics, results or records, route it to the performance tools.
 If the question asks about betting lines or props, route it to NFLGameOddsAnalytics or NFLPlayerPropsAnalytics.'
 

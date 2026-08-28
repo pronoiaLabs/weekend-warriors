@@ -35,7 +35,9 @@
         self-join as the opp_* block and with the same cannot-disagree
         property. NULL on preseason rows (nflverse publishes no preseason
         play-by-play), flagged by has_nflverse; rates come from the offense
-        grain's sums and cannot be re-aggregated.
+        grain's sums and cannot be re-aggregated -- re-aggregate from the
+        additive def_* counts and epa sums instead, the same contract the
+        offense fact and fact_team_game_situation carry.
 
     The self-join is safe because assert_fact_team_game_offense_is_mirrored
     guarantees exactly two rows per game with two distinct teams, so each row
@@ -210,10 +212,18 @@ select
     o.off_epa_per_play                                          as def_epa_per_play,
     o.success_rate                                              as success_rate_allowed,
     o.dropbacks                                                 as def_dropbacks_faced,
+    o.pass_epa                                                  as def_pass_epa,
     o.pass_epa_per_dropback                                     as def_pass_epa_per_dropback,
     o.carries                                                   as def_carries_faced,
+    o.rush_epa                                                  as def_rush_epa,
     o.rush_epa_per_carry                                        as def_rush_epa_per_carry,
     o.explosive_rate                                            as def_explosive_rate_allowed,
+    o.success_plays                                             as def_success_plays,
+    o.explosive_plays                                           as def_explosive_plays,
+    o.early_down_plays                                          as def_early_down_plays,
+    o.early_down_success_plays                                  as def_early_down_success_plays,
+    o.pass_over_expected_sum                                    as def_pass_over_expected_sum,
+    o.xpass_plays                                               as def_xpass_plays,
 
     coalesce(o.has_nflverse, false)                             as has_nflverse,
 

@@ -31,13 +31,16 @@ tables (
 )
 
 relationships (
+    -- closing_odds is the hub and the graph is deliberately a tree:
+    -- opening_odds hangs off it and carries no edges of its own to the dims.
+    -- Duplicate edges would give every dimension two paths from a fact, and
+    -- SEMANTIC_VIEW() rejects multi-path dimension resolution outright
+    -- (measured 2026-08-28). Opening context is not lost: the closing fact
+    -- itself carries the opening_* columns and the movement columns.
     closing_to_opening as closing_odds (game_vendor_odds_key) references opening_odds (game_vendor_odds_key),
     closing_to_game as closing_odds (game_key) references games (game_key),
     closing_to_home_team as closing_odds (home_team_key) references home_teams (team_key),
-    closing_to_away_team as closing_odds (away_team_key) references away_teams (team_key),
-    opening_to_game as opening_odds (game_key) references games (game_key),
-    opening_to_home_team as opening_odds (home_team_key) references home_teams (team_key),
-    opening_to_away_team as opening_odds (away_team_key) references away_teams (team_key)
+    closing_to_away_team as closing_odds (away_team_key) references away_teams (team_key)
 )
 
 facts (
@@ -121,7 +124,23 @@ metrics (
     closing_odds.overs as sum(iff(closing_odds.total_result = 'over', 1, 0))
         comment = 'Completed games that finished over this vendor closing total.',
     closing_odds.avg_home_devig_probability as avg(closing_odds.home_moneyline_devig_probability)
-        comment = 'Average de-vigged closing home win probability.'
+        comment = 'Average de-vigged closing home win probability.',
+    -- Row-grain averages: at game x vendor grain each avg over one row IS the
+    -- row's value. They exist as metrics because a SEMANTIC_VIEW query cannot
+    -- mix FACTS with DIMENSIONS across logical tables; grouped by vendor,
+    -- game and team dimensions they read the lines beside the matchup.
+    closing_odds.avg_home_spread as avg(closing_odds.home_spread)
+        comment = 'Closing home spread; at game and vendor grain this is the line itself.',
+    closing_odds.avg_opening_home_spread as avg(closing_odds.opening_home_spread)
+        comment = 'Opening home spread carried on the closing row.',
+    closing_odds.avg_home_spread_movement as avg(closing_odds.home_spread_movement)
+        comment = 'Closing minus opening home spread.',
+    closing_odds.avg_total_line as avg(closing_odds.total_line)
+        comment = 'Closing total; at game and vendor grain this is the line itself.',
+    closing_odds.avg_opening_total_line as avg(closing_odds.opening_total_line)
+        comment = 'Opening total carried on the closing row.',
+    closing_odds.avg_total_line_movement as avg(closing_odds.total_line_movement)
+        comment = 'Closing minus opening total.'
 )
 
 comment = 'NFL game betting markets by sportsbook vendor, with explicit opening and strictly pre-kickoff closing lines. Supports moneyline, spread, total, implied probabilities, implied team totals, opening-to-closing movement, and completed-game ATS/over-under results. It contains no live or post-kickoff odds.'
@@ -145,14 +164,18 @@ ai_verified_queries (
         verified_at 1786233600
         onboarding_question true
         sql 'SELECT vendor, game_date, home_team_name, away_team_name,
-                    opening_home_spread, home_spread, home_spread_movement,
-                    opening_total_line, total_line, total_line_movement
+                    avg_opening_home_spread, avg_home_spread,
+                    avg_home_spread_movement, avg_opening_total_line,
+                    avg_total_line, avg_total_line_movement
              FROM SEMANTIC_VIEW({{ this }}
+               METRICS closing_odds.avg_opening_home_spread,
+                       closing_odds.avg_home_spread,
+                       closing_odds.avg_home_spread_movement,
+                       closing_odds.avg_opening_total_line,
+                       closing_odds.avg_total_line,
+                       closing_odds.avg_total_line_movement
                DIMENSIONS closing_odds.vendor, games.game_date,
-                          home_teams.home_team_name, away_teams.away_team_name
-               FACTS closing_odds.opening_home_spread, closing_odds.home_spread,
-                     closing_odds.home_spread_movement, closing_odds.opening_total_line,
-                     closing_odds.total_line, closing_odds.total_line_movement)
+                          home_teams.home_team_name, away_teams.away_team_name)
              WHERE home_team_name = ''Kansas City Chiefs''
                 OR away_team_name = ''Kansas City Chiefs''
              ORDER BY game_date DESC, vendor'

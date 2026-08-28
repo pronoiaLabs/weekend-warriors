@@ -128,6 +128,12 @@ dimensions (
         comment = 'True for played games, false for scheduled ones. This flag, not the date and not the status string, is the definition of upcoming.',
     games.went_to_overtime as went_to_overtime
         comment = 'True for completed games that needed overtime. Always false on scheduled rows.',
+    games.referee as referee
+        with synonyms ('head official', 'ref', 'officiating crew lead')
+        comment = 'Head official only, from nflverse officials. NULL on preseason and games without nflverse coverage.',
+    games.is_division_game as is_division_game
+        with synonyms ('divisional matchup', 'division game', 'division rival')
+        comment = 'True when both clubs share a conference and division.',
 
     -- who
     home_teams.home_team_name as team_full_name
@@ -191,6 +197,7 @@ NO RESULTS HERE: this view has no scores, no winners and no records. If a questi
 OUTDOORS: roof in (''open'', ''retractable'') or is_weather_relevant = true. Fixed-roof games are indoor; do not cite wind or temperature as affecting those games even if a forecast row exists.
 FORECAST IS A DAILY SNAPSHOT: hours_before_kickoff says how stale the outlook is. Do not describe it as live radar. TBD kickoffs may have no weather row yet.
 TBD GAMES: 24 late-season 2026 games carry game_status ''TBD'' with placeholder kickoff times, because the league flexes them later. Say the time is not yet set rather than quoting the placeholder.
+REFEREE IS NULL ON PRESEASON ROWS: a NULL referee means no crew data (nflverse does not cover preseason), not unknown officiating for a regular season game.
 SNAPSHOT, NOT LIVE: the schedule loads nightly. A game played earlier today may still read as not completed.'
 
 ai_question_categorization 'Answer questions about the NFL schedule: the upcoming slate, a given week''s matchups, a team''s next game or remaining games, how many games are left, venues, roof type, outdoor vs indoor, international sites, and kickoff-hour forecast conditions.
@@ -239,6 +246,20 @@ ai_verified_queries (
              WHERE season = 2026 AND week = 1
                AND season_type_name = ''Regular Season''
                AND roof IN (''open'', ''retractable'')
+             ORDER BY game_datetime'
+    ),
+    division_games_this_week as (
+        question 'Which games on this week''s slate are division matchups?'
+        verified_at 1787788800
+        sql 'SELECT game_date, game_datetime, home_team_name, away_team_name
+             FROM SEMANTIC_VIEW({{ this }}
+               DIMENSIONS games.game_date, games.game_datetime,
+                          home_teams.home_team_name, away_teams.away_team_name,
+                          games.season, games.week, games.season_type_name,
+                          games.is_division_game)
+             WHERE season = 2026 AND week = 1
+               AND season_type_name = ''Regular Season''
+               AND is_division_game
              ORDER BY game_datetime'
     )
 )

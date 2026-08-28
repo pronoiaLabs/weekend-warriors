@@ -98,13 +98,16 @@ build-sport: ## Prod build on a sport's object, as the connection's role (SPORT=
 # command line without re-quoting, and the space inside the YAML splits the
 # token server-side ("String '{alter:' is not valid YAML"). This target is
 # the single home for that trick and for the sport->env mapping; deploy.yml's
-# agents job calls it rather than spelling the args inline.
-deploy-agent: ## Redeploy a sport's analyst agent in place (SPORT=nfl|wnba|ncaaf)
+# agents job calls it rather than spelling the args inline. The operation is
+# the sport's umbrella macro (agents/deploy_sport_agents.sql), which walks
+# that sport's whole roster and downgrades a not-yet-existing agent from
+# alter to create, so a first deploy of a new agent needs nothing special.
+deploy-agent: ## Redeploy a sport's whole agent roster in place (SPORT=nfl|wnba|ncaaf)
 	@test -n "$(SPORT)" || { echo "usage: make deploy-agent SPORT=nfl|wnba|ncaaf"; exit 1; }
-	@$(call hdr,deploy agent $(SPORT)_analyst via $(call sport_env,$(SPORT)))
+	@$(call hdr,deploy $(SPORT) agent roster via $(call sport_env,$(SPORT)))
 	$(SNOW_DBT) execute $(CONN_ARGS) --env $(call sport_env,$(SPORT)) \
 		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) \
-		run-operation deploy_$(SPORT)_analyst --args "'{alter: true}'"
+		run-operation deploy_$(SPORT)_agents --args "'{alter: true}'"
 
 ##@ Snowflake setup (live; run by a human, never CI)
 
