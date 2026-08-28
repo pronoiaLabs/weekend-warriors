@@ -98,7 +98,7 @@ def _iter_secret_refs(obj: Any) -> Iterator[str]:
         for v in obj:
             yield from _iter_secret_refs(v)
     elif isinstance(obj, str) and obj.startswith(SECRET_PREFIX):
-        yield obj[len(SECRET_PREFIX):]
+        yield obj[len(SECRET_PREFIX) :]
 
 
 def _resolve_secrets(obj: Any) -> Any:
@@ -108,7 +108,7 @@ def _resolve_secrets(obj: Any) -> Any:
     if isinstance(obj, list):
         return [_resolve_secrets(v) for v in obj]
     if isinstance(obj, str) and obj.startswith(SECRET_PREFIX):
-        return dlt.secrets[obj[len(SECRET_PREFIX):]]
+        return dlt.secrets[obj[len(SECRET_PREFIX) :]]
     return obj
 
 
@@ -607,9 +607,13 @@ def run_pipeline(
         info = pipeline.run(source, **run_kwargs)
         info.raise_on_failed_jobs()
 
+        # last_normalize_info is None when a run only loads a pending package
+        # left by a previous failure (nothing was extracted or normalized this
+        # run), so guard both hops or the retry that SUCCEEDED at loading dies
+        # in the bookkeeping (measured 2026-08-28, obs_to_postgres).
         row_counts: dict[str, Any] = (
             dict(pipeline.last_trace.last_normalize_info.row_counts)
-            if pipeline.last_trace
+            if pipeline.last_trace and pipeline.last_trace.last_normalize_info
             else {}
         )
 
@@ -678,9 +682,7 @@ def _registry_mode() -> str:
 
         return "table" if in_spcs() else "yaml"
     if mode not in ("table", "yaml"):
-        raise ValueError(
-            f"DLT_REGISTRY_SOURCE must be auto|table|yaml, got '{mode}'"
-        )
+        raise ValueError(f"DLT_REGISTRY_SOURCE must be auto|table|yaml, got '{mode}'")
     return mode
 
 
@@ -793,8 +795,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.list:
         for p in specs:
             print(
-                f"{p.name:<24} source={p.source:<14} "
-                f"schedule={str(p.schedule):<18} group={p.group}"
+                f"{p.name:<24} source={p.source:<14} schedule={str(p.schedule):<18} group={p.group}"
             )
         return 0
 
