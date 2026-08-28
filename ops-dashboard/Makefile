@@ -129,15 +129,22 @@ fixtures: ## Re-snapshot the row fixtures (CONFIRM=1: the endpoint tests pin the
 
 ##@ Snowflake setup (live; run by a human, never CI)
 
-setup: ## Apply deploy/sql/*.sql: role, pool, service (CONFIRM=1 required)
+# 03_service.sql keeps a <GIT_SHA> placeholder in git; setup renders it with
+# TAG (defaulting to the current short SHA, same default image-push uses) into
+# the gitignored deploy/sql/.generated/ and applies the render. Run image-push
+# and spec-upload first so the tag names an image that exists.
+setup: ## Apply deploy/sql/*: role, pool, service at TAG=<sha> (CONFIRM=1 required)
 	@if [ "$(CONFIRM)" != "1" ]; then \
 		echo "Creates OPS_DASHBOARD_ROLE (grants incl. ACCOUNTADMIN bind), OPS_DASHBOARD_POOL"; \
-		echo "(always-on XS node) and the OPS_DASHBOARD service. 03_service.sql needs its"; \
-		echo "<GIT_SHA> placeholder filled in first."; \
+		echo "(always-on XS node) and the OPS_DASHBOARD service pinned to image tag '$(TAG)'"; \
+		echo "(override with TAG=<sha>; make image-push must have pushed that tag)."; \
 		echo "Re-run with CONFIRM=1"; \
 		exit 2; \
 	fi
-	@for f in deploy/sql/*.sql; do echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
+	@mkdir -p deploy/sql/.generated
+	@sed 's/<GIT_SHA>/$(TAG)/' deploy/sql/03_service.sql > deploy/sql/.generated/03_service.sql
+	@for f in deploy/sql/01_ops_role.sql deploy/sql/02_ops_pool.sql deploy/sql/.generated/03_service.sql; do \
+		echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
 
 ##@ SPCS image and service
 

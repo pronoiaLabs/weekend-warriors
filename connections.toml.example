@@ -1,0 +1,36 @@
+# Snowflake CLI connection for this repo.
+# Copy the [weekend-warriors] block into ~/.snowflake/connections.toml
+# (create the file if it does not exist) and fill in your account + user.
+#
+# KEEP THE CONNECTION NAME `weekend-warriors`. dbt-pipelines/Makefile defaults
+# CONN ?= weekend-warriors, and every `snow sql -c weekend-warriors -f ...`
+# command in the docs and SQL headers assumes it. A different name works, but
+# then you pass CONN= / SNOW_CONN= on every make invocation.
+#
+# NOTE: when ~/.snowflake/connections.toml exists it fully overrides the
+# [connections] section of ~/.snowflake/config.toml -- config.toml then only
+# supplies default_connection_name and [cli.features].
+#
+# Verify with: snow connection test -c weekend-warriors
+
+[weekend-warriors]
+# From Snowsight: Account -> View account details -> Account/Server URL,
+# in <orgname>-<account_name> form.
+account = "<orgname>-<account_name>"
+user = "<your_login_name>"
+# externalbrowser pops SSO/password login in a browser. A programmatic access
+# token (PAT) also works: authenticator = "SNOWFLAKE" plus password = "<PAT>".
+authenticator = "externalbrowser"
+# SYSADMIN is the working default: every setup .sql file elevates itself with
+# USE ROLE (USERADMIN / SECURITYADMIN / ACCOUNTADMIN) where needed, so your
+# user must be able to assume those roles for the setup phases that say so.
+role = "SYSADMIN"
+warehouse = "DEVELOPMENT_WH"
+
+# In ~/.snowflake/config.toml (not this file), set the default and the dbt
+# env-var feature flag the runbooks rely on:
+#
+#   default_connection_name = "weekend-warriors"
+#
+#   [cli.features]
+#   enable_dbt_project_env_vars = true

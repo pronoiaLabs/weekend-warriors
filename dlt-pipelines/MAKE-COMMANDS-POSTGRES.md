@@ -22,16 +22,25 @@ tables.
 ## Once per account
 
 Copy [`.env.postgres.example`](../.env.postgres.example) to the repo-root
-`.env.postgres` and fill `PGHOST` / `PGPASSWORD` (the instance admin). Leave
-`APP_COPY_WRITER_PASSWORD` blank; setup generates it.
+`.env.postgres` and fill `PG_CLIENT_CIDRS` (your public IP/32; the instance
+`PG_*` sizing defaults are fine to keep). Leave `PGHOST` / `PGPASSWORD` /
+`APP_COPY_WRITER_PASSWORD` blank; setup writes all three.
 
 ```bash
 cd dlt-pipelines
 
+# 0. the Snowflake Postgres instance itself: CREATE POSTGRES INSTANCE from the
+#    PG_* vars, poll to READY, write PGHOST + PGPASSWORD back into .env.postgres,
+#    create/extend the instance ingress policy from PG_CLIENT_CIDRS.
+#    Safe when the instance already exists: skips the CREATE (never drops or
+#    recreates), only reconciles the policy.
+make setup-postgres-instance CONFIRM=1
+
 # 1. database app, schemas app_copy + observability, roles, watermarks, writer password
 make setup-postgres CONFIRM=1
 
-# 2. EAI (host:5432 only) + SECRET object (placeholder value)
+# 2. SECRET object (placeholder value) + renders the host EAI and the SPCS
+#    ingress CIDRs from .env.postgres via apply_network.sh
 make setup-source SOURCE=postgres CONFIRM=1
 
 # 3. ALTER SECRET from APP_COPY_WRITER_PASSWORD (gitignored SQL)
@@ -49,11 +58,14 @@ re-apply the rest of the NFL source tree. Step 5 creates the loader Task
 and the harvest wrapper; it does not run `tasks-apply`.
 
 Laptop access is the instance-level `POSTGRES_INGRESS` policy (IPv4 only),
-not the EAI. If `psql` fails with a network-policy error, add your current
-public IP there. SPCS jobs need the Snowflake egress CIDRs from
-`SYSTEM$GET_SNOWFLAKE_EGRESS_IP_RANGES()` — apply
-`sql/sources/postgres/04_ingress_spcs.sql`. Do not open `0.0.0.0/0`. A Task
-that times out on `:5432` is this policy, not a missing EAI.
+not the EAI. If `psql` fails with a network-policy error, add your current IP
+to `PG_CLIENT_CIDRS` and re-run `make setup-postgres-instance CONFIRM=1`.
+SPCS jobs need the Snowflake egress CIDRs from
+`SYSTEM$GET_SNOWFLAKE_EGRESS_IP_RANGES()`, which
+`make setup-postgres-network CONFIRM=1` discovers and applies; those CIDRs
+expire when Snowflake rotates them, and the same target is the re-run. Do not
+open `0.0.0.0/0`. A Task that times out on `:5432` is this policy, not a
+missing EAI.
 
 ---
 

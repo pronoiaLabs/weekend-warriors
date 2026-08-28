@@ -4,9 +4,9 @@
 --           container) and a Gen2 multi-cluster warehouse (runs MERGE/COPY) --
 --           and grant them to DLT_LOADER_ROLE.
 -- Run as  : SYSADMIN. Creating a compute pool needs the account-level CREATE
---           COMPUTE POOL privilege; grant it to SYSADMIN once (see the commented
---           ACCOUNTADMIN line below) if your SYSADMIN does not already have it.
--- Prerequisites : base/01_roles.sql.
+--           COMPUTE POOL privilege, granted to SYSADMIN by
+--           base/00_accountadmin_grants.sql (part of make setup-base).
+-- Prerequisites : base/00_accountadmin_grants.sql, base/01_roles.sql.
 -- Cost note: CPU_X64_S = 0.11 credits/hr per node. SPCS bills in 1-minute
 --            increments with a 5-minute minimum per job run. MAX_NODES caps
 --            concurrent jobs; adjust to your concurrency needs.
@@ -17,10 +17,6 @@
 --   Gen2 (GENERATION = '2') is unavailable in a few regions (AWS af-south-1,
 --   eu-central-2; GCP me-central1; Azure us-gov-virginia) -- use Gen1 there.
 -- =============================================================================
-
--- One-time, only if SYSADMIN lacks the privilege (uncomment and run as ACCOUNTADMIN):
---   USE ROLE ACCOUNTADMIN;
---   GRANT CREATE COMPUTE POOL ON ACCOUNT TO ROLE SYSADMIN;
 
 USE ROLE SYSADMIN;
 

@@ -16,18 +16,13 @@ Before you start, here's what you'll need:
 
 ### External Access Integration Setup
 
-You only need to do this once, and it takes ACCOUNTADMIN. It lets `dbt deps` reach out and download packages:
-
-```sql
-CREATE OR REPLACE NETWORK RULE dbt_network_rule
-  MODE = EGRESS
-  TYPE = HOST_PORT
-  VALUE_LIST = ('hub.getdbt.com', 'codeload.github.com');
-
-CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION dbt_ext_access
-  ALLOWED_NETWORK_RULES = (dbt_network_rule)
-  ENABLED = TRUE;
-```
+You only need to do this once, and it takes ACCOUNTADMIN. It lets `dbt deps`
+reach out and download packages. The DDL is a file, not a snippet to paste:
+[`dlt-pipelines/sql/base/05_dbt_ext_access.sql`](../dlt-pipelines/sql/base/05_dbt_ext_access.sql),
+applied as part of `make -C dlt-pipelines setup-base CONFIRM=1` (or apply that
+one file by hand). It deliberately uses `IF NOT EXISTS` rather than
+`OR REPLACE`: replacing an integration drops its grants, the same trap as the
+dbt project object.
 
 ## Environment variables (env.yml)
 

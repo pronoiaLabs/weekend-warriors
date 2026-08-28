@@ -106,6 +106,22 @@ deploy-agent: ## Redeploy a sport's analyst agent in place (SPORT=nfl|wnba|ncaaf
 		$(DEV_FQN)_$(shell echo $(SPORT) | tr a-z A-Z) \
 		run-operation deploy_$(SPORT)_analyst --args "'{alter: true}'"
 
+##@ Snowflake setup (live; run by a human, never CI)
+
+# One-time CoWork registration. IF NOT EXISTS + MODIFY grant make the object
+# half re-runnable; the ADD AGENT lines assume the prod agents exist (deploy
+# each sport + deploy-agent first) and may error on an agent that is already
+# registered -- comment those lines out on a re-run.
+setup-cowork: ## Apply sql/01_cowork.sql: CoWork object + register the prod analyst agents (CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT (ACCOUNTADMIN) and ADDs the"; \
+		echo "NFL / WNBA / NCAAF prod analyst agents to it. Requires those agents to be"; \
+		echo "deployed first (make deploy-sport + deploy-agent per sport)."; \
+		echo "Re-run with CONFIRM=1"; \
+		exit 2; \
+	fi
+	$(SNOW) sql $(CONN_ARGS) -f sql/01_cowork.sql
+
 ##@ Snowpark procedures (snowpark/)
 
 # Procedures dbt calls from hooks. Each is a snow snowpark project under

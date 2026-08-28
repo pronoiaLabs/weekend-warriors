@@ -74,7 +74,9 @@ That is the whole loop in miniature: an API on one side, queryable tables on the
 
 Deploying to your own Snowflake account is a sequence of reviewed steps you run yourself, on
 purpose: the setup creates roles and permissions, and you should see what it does before it does it.
-The full walkthrough, with a verification query at each step, is
+The ordered end-to-end bootstrap, covering everything from the connection file through the
+Postgres instance, dbt, agents and dashboards, is [SETUP.md](SETUP.md). The ingestion-side
+deep-dive with a verification query at each step is
 [dlt-pipelines/MAKE-COMMANDS-PROD.md](dlt-pipelines/MAKE-COMMANDS-PROD.md).
 
 The short version: a handful of `make setup-*` commands build the foundations, one command pushes

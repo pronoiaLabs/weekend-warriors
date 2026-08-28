@@ -1,5 +1,5 @@
 -- =============================================================================
--- prod/03b_service_user_oidc.sql
+-- prod/optional/03b_service_user_oidc.sql
 -- Purpose : Create a keyless CI/CD service account that authenticates with
 --           GitHub Actions OIDC (workload identity federation), and give it a
 --           user-level network policy so it can actually reach the account.
@@ -13,6 +13,12 @@
 --
 -- Pairs with .github/workflows/deploy.yml at the REPO ROOT
 -- (snowflakedb/snowflake-actions@v3, use-oidc: true).
+--
+-- IN optional/ ON PURPOSE: the setup-prod glob must not apply this file. The
+-- SUBJECT below carries placeholders for YOUR repo's numeric ids, and parts of
+-- section 1b reference objects that exist only after the first dbt/agent
+-- deploys. Fill in the placeholders, review 1b, then apply by hand:
+--   snow sql -c weekend-warriors -f sql/prod/optional/03b_service_user_oidc.sql
 -- =============================================================================
 
 USE ROLE USERADMIN;
@@ -39,6 +45,12 @@ USE ROLE USERADMIN;
 -- recognized" (observed on the first live run, Aug 2026); the failing job's
 -- log echoes the exact subject to copy here. The ids survive renames, which
 -- is strictly better than names alone.
+--
+-- FILL IN YOUR OWN IDS before applying:
+--   gh api orgs/<owner>  --jq .id        (or gh api users/<owner> --jq .id)
+--   gh api repos/<owner>/<repo> --jq .id
+-- or just run the deploy workflow once and copy the exact subject the failing
+-- job echoes.
 CREATE USER IF NOT EXISTS DLT_DEPLOYER
     TYPE              = SERVICE
     DEFAULT_ROLE      = DLT_LOADER_ROLE
@@ -47,7 +59,7 @@ CREATE USER IF NOT EXISTS DLT_DEPLOYER
     WORKLOAD_IDENTITY = (
         TYPE    = OIDC
         ISSUER  = 'https://token.actions.githubusercontent.com'
-        SUBJECT = 'repo:pronoiaLabs@255587542/weekend-warriors@1317793177:environment:deploy'
+        SUBJECT = 'repo:<owner>@<org_id>/<repo>@<repo_id>:environment:deploy'
     )
     COMMENT = 'Keyless CI/CD deployer for dlt + dbt (GitHub Actions OIDC).';
 
@@ -69,6 +81,10 @@ GRANT ROLE DLT_LOADER_ROLE TO USER DLT_DEPLOYER;
 GRANT ROLE DBT_RUNNER_ROLE    TO USER DLT_DEPLOYER;
 GRANT ROLE OPS_DASHBOARD_ROLE TO USER DLT_DEPLOYER;
 
+-- NOTE: every GRANT OWNERSHIP below names an object that exists only after
+-- its first deploy (make -C dbt-pipelines deploy-sport / deploy-agent, and
+-- ops-dashboard make setup for OPS_DASHBOARD_ROLE above). On a fresh account,
+-- apply this file AFTER those, or comment the missing ones out and re-run.
 USE ROLE SYSADMIN;
 GRANT CREATE DBT PROJECT ON SCHEMA DLT_DB.DEPLOY TO ROLE DBT_RUNNER_ROLE;
 GRANT OWNERSHIP ON DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL

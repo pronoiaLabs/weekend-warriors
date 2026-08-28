@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.postgres.example
+!.env.snowflake.example
 **/.dlt/secrets.toml
 *.p8
 *.pem
