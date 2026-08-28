@@ -64,6 +64,7 @@ NO EXECUTION DEPENDENCIES
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from collections.abc import Sequence
@@ -143,6 +144,15 @@ JOBS_SCHEMA = "DLT_DB.DEPLOY"
 # the standing rule is that nothing touches DLT_TASK_% outside this generator.
 COST_CENTER_TAG = "DLT_DB.OPS.COST_CENTER"
 
+# The Postgres spec's {{ pg_host }}: PGHOST from the environment (the Make
+# targets source the repo-root .env.postgres when it exists), falling back to
+# the owner's instance so a render with no env -- owner CI has no .env.postgres
+# -- emits byte-identical SQL. A cloner's CI must export PGHOST (repo Actions
+# variable) or this fallback silently targets the wrong instance; see SETUP.md.
+DEFAULT_PG_HOST = (
+    "3v6glchrerfzlcisoqkcjgkgxm.mcgkxfo-weekend-warriors.us-east-2.aws.postgres.snowflake.app"
+)
+
 
 # ---------------------------------------------------------------------------
 # 2. Emission
@@ -178,6 +188,7 @@ def render_spec(spec: PipelineSpec, database: str, template: str | None = None) 
         "app_database": app_database,
         "secret": spec.secret or "",
         "env_var": spec.env_var or "",
+        "pg_host": os.environ.get("PGHOST") or DEFAULT_PG_HOST,
     }
 
     missing: list[str] = []

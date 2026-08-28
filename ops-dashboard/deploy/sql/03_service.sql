@@ -6,8 +6,9 @@
 -- Prereqs : 01 and 02 applied; the spec template uploaded (`make spec-upload`);
 --           the image pushed (`make image-push`, which tags with the git SHA).
 --
--- This file is a template for the first manual deploy: replace <GIT_SHA> with
--- the short SHA that `make image-push` printed. Day-to-day upgrades go through
+-- This file is a template for the first deploy: `make setup CONFIRM=1` renders
+-- <GIT_SHA> from TAG (default: current short SHA) into deploy/sql/.generated/
+-- and applies the render. Day-to-day upgrades go through
 -- `make deploy TAG=<sha>`, which runs the same statement via ALTER.
 -- =============================================================================
 

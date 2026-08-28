@@ -61,6 +61,9 @@ EXPECTED_VARIABLES: dict[str, set[str]] = {
         "app_database",
         "secret",
         "env_var",
+        # PGHOST from .env.postgres, falling back to the owner's instance so a
+        # render with no env stays byte-identical (generate_tasks.DEFAULT_PG_HOST).
+        "pg_host",
     },
 }
 
@@ -76,6 +79,7 @@ SUBSTITUTIONS = {
     "app_database": "DLT_DB",
     "secret": "DLT_DB.OPS.NFL_API_KEY",
     "env_var": "SOURCES__NFL__API_KEY",
+    "pg_host": "example.postgres.snowflake.app",
 }
 
 

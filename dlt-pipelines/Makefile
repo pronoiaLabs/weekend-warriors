@@ -104,8 +104,14 @@ CONN        ?=                                       # snow connection name (bla
 SF_DATABASE ?=
 
 # Repo-root env for the Snowflake Postgres instance (gitignored). Used by
-# setup-postgres / setup-postgres-secret / run-postgres. See MAKE-COMMANDS-POSTGRES.md.
+# setup-postgres / setup-postgres-secret / run-postgres, and sourced (when
+# present) by the task-rendering targets so {{ pg_host }} resolves to your
+# instance. See MAKE-COMMANDS-POSTGRES.md.
 POSTGRES_ENV ?= ../.env.postgres
+
+# Repo-root env holding secret VALUES (API keys, Slack webhook path) for
+# make setup-secrets. Copy .env.snowflake.example. Gitignored.
+SNOWFLAKE_ENV ?= ../.env.snowflake
 
 # SPCS image build/push. Docker refs must be lowercase, and the tag is the case where
 # a trailing space actually breaks something (see the note at the top of this file).
@@ -185,8 +191,9 @@ endef
         test test-config lint fmt list plan \
         run-local run-snowflake run-prod run-postgres run-spcs \
         sync-sql tasks-sql tasks-suspend-sql tasks-resume-sql emit \
-        setup-base setup-dev setup-prod setup-ops setup-integrations \
+        setup-base setup-dev setup-prod setup-ops setup-integrations setup-secrets \
         setup-source setup-postgres setup-postgres-secret setup-postgres-api-password setup-postgres-observability \
+        setup-postgres-instance setup-postgres-network \
         setup-app-copy-trigger setup-obs-copy-trigger new-source \
         image-build image-login image-push \
         dev-spec-upload dev-pool-status snow-env \
@@ -208,6 +215,7 @@ doctor: ## Check required tooling (uv, docker, snow)
 	@command -v snow   >/dev/null 2>&1 && echo "  snow:   $$(snow --version 2>&1 | head -1)" || echo "  snow:   missing  (only needed for live Snowflake apply)"
 	@command -v psql   >/dev/null 2>&1 && echo "  psql:   $$(psql --version)" || echo "  psql:   missing  (only needed for make setup-postgres; brew install libpq)"
 	@echo "uv provisions Python >=3.11 automatically from pyproject.toml."
+	@echo "snow must be >= 3.21 for the dbt --env flags (see SETUP.md prerequisites)."
 
 install: ## Install deps into .venv via uv (EXTRAS="dev postgres")
 	$(UV) sync $(EXTRA_FLAGS)
@@ -406,8 +414,12 @@ sync-sql: build ## Emit registry sync SQL -> build/sync.sql
 	$(UV_RUN) python -m pipelines.batch.registry_sync --emit-sql --prune > build/sync.sql
 	@echo "Wrote build/sync.sql"
 
+# Sources .env.postgres when present so the Postgres job specs render with
+# YOUR PGHOST; without it {{ pg_host }} falls back to the owner's instance
+# (which is what keeps owner CI byte-identical -- CI has no .env.postgres).
 tasks-sql: build ## Emit per-pipeline Task DDL -> build/tasks.sql
-	$(UV_RUN) python -m deploy.tasks.generate_tasks > build/tasks.sql
+	@if [ -f "$(POSTGRES_ENV)" ]; then set -a; . "$(POSTGRES_ENV)"; set +a; fi; \
+	  $(UV_RUN) python -m deploy.tasks.generate_tasks > build/tasks.sql
 	@echo "Wrote build/tasks.sql"
 
 tasks-suspend-sql: build ## Emit ALTER TASK ... SUSPEND -> build/suspend.sql
@@ -453,10 +465,9 @@ setup-prod: ## Apply production DDL sql/prod/* -- tailor to the customer's needs
 	@if [ "$(CONFIRM)" != "1" ]; then \
 		echo "Production is a separate, customer-specific flow. Review warehouse sizing,"; \
 		echo "multi-cluster, and scheduling in sql/prod/* before applying."; \
-		echo "Creates DLT_PROD_DB, DLT_POOL, DLT_WH, the DLT_LOADER service user (key-pair),"; \
-		echo "and DLT_DEPLOYER (03b: keyless GitHub OIDC for CI, plus its network policy)."; \
-		echo "03b's SUBJECT names a specific repo and GitHub environment -- check it matches"; \
-		echo "yours before applying, or CI authentication will fail."; \
+		echo "Creates DLT_PROD_DB, DLT_POOL, DLT_WH, the DLT_LOADER service user (key-pair)."; \
+		echo "The CI deployer (keyless GitHub OIDC) is sql/prod/optional/03b -- applied by"; \
+		echo "hand after filling in your repo's SUBJECT ids; see SETUP.md."; \
 		echo "Re-run with CONFIRM=1."; \
 		exit 2; \
 	fi
@@ -522,8 +533,9 @@ setup-source: ## Apply one source's DDL sql/sources/$(SOURCE)/* (SOURCE=nfl, gua
 	fi
 	@if [ "$(CONFIRM)" != "1" ]; then \
 		if [ "$(SOURCE)" = "postgres" ]; then \
-			echo "Applies sql/sources/postgres/*.sql: POSTGRES_APP_EAI and"; \
-			echo "DLT_DB.OPS.POSTGRES_APP_COPY (placeholder). No POSTGRES_*_DB is created."; \
+			echo "Applies sql/sources/postgres/*.sql (the POSTGRES_APP_COPY placeholder"; \
+			echo "secret), then renders + applies the host EAI and SPCS ingress rule from"; \
+			echo "$(POSTGRES_ENV) via apply_network.sh. No POSTGRES_*_DB is created."; \
 			echo "Re-run with CONFIRM=1. Then: make setup-postgres-secret CONFIRM=1"; \
 		else \
 			echo "Creates $$(echo $(SOURCE) | tr a-z A-Z)_DEV_DB and $$(echo $(SOURCE) | tr a-z A-Z)_PROD_DB,"; \
@@ -534,6 +546,13 @@ setup-source: ## Apply one source's DDL sql/sources/$(SOURCE)/* (SOURCE=nfl, gua
 	fi
 	@for f in sql/sources/$(SOURCE)/*.sql; do echo "== applying $$f =="; $(SNOW) -f $$f || exit 1; done
 	@if [ "$(SOURCE)" = "postgres" ]; then \
+		if [ -f "$(POSTGRES_ENV)" ]; then \
+			set -a && . "$(POSTGRES_ENV)" && set +a && \
+			  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/sources/postgres/apply_network.sh; \
+		else \
+			echo "No $(POSTGRES_ENV): skipped the EAI/ingress render. Copy"; \
+			echo ".env.postgres.example, then: make setup-postgres-network CONFIRM=1"; \
+		fi; \
 		echo "Source 'postgres' ready. Set the writer password from .env.postgres:"; \
 		echo "  make setup-postgres-secret CONFIRM=1"; \
 	else \
@@ -609,6 +628,61 @@ setup-postgres-observability: ## Create app.observability + watermark (guard: CO
 	  fi; \
 	  ./sql/postgres/apply_observability.sh
 
+# The Snowflake Postgres INSTANCE itself (the thing everything under
+# sql/postgres/ connects to). A render script, not glob-applied SQL: CREATE
+# POSTGRES INSTANCE has no IF NOT EXISTS, so apply_instance.sh guards with
+# SHOW and never drops or recreates. Existing instance => policy reconcile only.
+setup-postgres-instance: ## Create the Snowflake Postgres instance + ingress policy from .env.postgres (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Creates the Snowflake Postgres instance PG_INSTANCE_NAME (billed hourly"; \
+		echo "while running -- ALTER ... SUSPEND when idle), its ingress network policy"; \
+		echo "from PG_CLIENT_CIDRS, and writes PGHOST / PGPASSWORD back into"; \
+		echo "$(POSTGRES_ENV). An existing instance is never touched: the CREATE is"; \
+		echo "skipped and only the policy is reconciled. Requires setup-base first."; \
+		echo "Re-run with CONFIRM=1."; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(POSTGRES_ENV)" ]; then \
+		echo "Missing $(POSTGRES_ENV). Copy .env.postgres.example to the repo root."; \
+		exit 2; \
+	fi
+	@set -a && . "$(POSTGRES_ENV)" && set +a && \
+	  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/sources/postgres/apply_instance.sh
+
+# Re-run target for the account-specific network pieces: the host EAI and the
+# SPCS ingress CIDRs (discovered live; they expire when Snowflake rotates them).
+setup-postgres-network: ## Render + apply POSTGRES_APP_EAI and SPCS ingress from .env.postgres (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Renders the POSTGRES_APP_EGRESS rule + POSTGRES_APP_EAI from PGHOST and"; \
+		echo "the SPCS ingress rule from SYSTEM\$$GET_SNOWFLAKE_EGRESS_IP_RANGES(),"; \
+		echo "then applies both. Re-run when Snowflake rotates its egress CIDRs or"; \
+		echo "PGHOST changes. Re-run with CONFIRM=1."; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(POSTGRES_ENV)" ]; then \
+		echo "Missing $(POSTGRES_ENV). Copy .env.postgres.example to the repo root."; \
+		exit 2; \
+	fi
+	@set -a && . "$(POSTGRES_ENV)" && set +a && \
+	  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/sources/postgres/apply_network.sh
+
+# Secret VALUES, which no committed DDL can carry. Reads .env.snowflake.
+setup-secrets: ## ALTER the API-key + Slack-webhook secrets from .env.snowflake (guard: CONFIRM=1)
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "ALTERs the secrets that setup-source / setup-ops created as placeholders:"; \
+		echo "  NFL_API_KEY  WNBA_API_KEY  NCAAF_API_KEY  FIRECRAWL_API_KEY"; \
+		echo "  SLACK_ALERTS_WEBHOOK"; \
+		echo "from $(SNOWFLAKE_ENV). Empty vars are skipped (never blanks a secret)."; \
+		echo "Re-run with CONFIRM=1."; \
+		exit 2; \
+	fi
+	@if [ ! -f "$(SNOWFLAKE_ENV)" ]; then \
+		echo "Missing $(SNOWFLAKE_ENV). Copy .env.snowflake.example to the repo root."; \
+		exit 2; \
+	fi
+	@set -a && . "$(SNOWFLAKE_ENV)" && set +a && \
+	  SNOW_CONN="$(or $(SNOW_CONN),$(CONN))" ./sql/secrets/apply_secrets.sh
+
 # Standalone copy Task in DLT_DB.OPS (no cron) plus the harvest-graph wrapper
 # in NFL_PROD_DB.OPS. Does NOT run tasks-apply on the whole fleet.
 setup-app-copy-trigger: build ## Create nfl_app_to_postgres Task + APP_COPY_NFL wrapper (CONFIRM=1)
@@ -618,6 +692,7 @@ setup-app-copy-trigger: build ## Create nfl_app_to_postgres Task + APP_COPY_NFL 
 		echo "Re-run with CONFIRM=1. See MAKE-COMMANDS-POSTGRES.md."; \
 		exit 2; \
 	fi
+	@if [ -f "$(POSTGRES_ENV)" ]; then set -a; . "$(POSTGRES_ENV)"; set +a; fi; \
 	$(UV_RUN) python -c "from deploy.tasks.generate_tasks import task_sql; \
 from pipelines.batch.models import load_registry; \
 print(task_sql(load_registry().get('nfl_app_to_postgres')))" > build/app_copy_task.sql
@@ -636,6 +711,7 @@ setup-obs-copy-trigger: build ## Create obs_to_postgres Task + OBS_COPY wrappers
 		exit 2; \
 	fi
 	@$(MAKE) sync-apply
+	@if [ -f "$(POSTGRES_ENV)" ]; then set -a; . "$(POSTGRES_ENV)"; set +a; fi; \
 	$(UV_RUN) python -c "from deploy.tasks.generate_tasks import task_sql; \
 from pipelines.batch.models import load_registry; \
 print(task_sql(load_registry().get('obs_to_postgres')))" > build/obs_copy_task.sql

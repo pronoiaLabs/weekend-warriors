@@ -5,16 +5,12 @@
 --           cost attribution and blast radius. DLT_DEV_* granted to DLT_DEV_ROLE;
 --           ML_DEV_POOL stays SYSADMIN (Snowflake ML batch jobs, not dlt).
 -- Run as  : SYSADMIN. Creating a compute pool needs the account-level CREATE
---           COMPUTE POOL privilege; grant it to SYSADMIN once (see the commented
---           ACCOUNTADMIN line below) if your SYSADMIN does not already have it.
--- Prerequisites : base/01_roles.sql.
+--           COMPUTE POOL privilege, granted to SYSADMIN by
+--           base/00_accountadmin_grants.sql (part of make setup-base).
+-- Prerequisites : base/00_accountadmin_grants.sql, base/01_roles.sql.
 -- Cost note: kept intentionally small (single node / single cluster). Dev jobs
 --            are ad-hoc, so AUTO_SUSPEND is short.
 -- =============================================================================
-
--- One-time, only if SYSADMIN lacks the privilege (uncomment and run as ACCOUNTADMIN):
---   USE ROLE ACCOUNTADMIN;
---   GRANT CREATE COMPUTE POOL ON ACCOUNT TO ROLE SYSADMIN;
 
 USE ROLE SYSADMIN;
 

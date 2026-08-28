@@ -8,8 +8,10 @@
 # Destination password is the only secret, bound to
 # DESTINATION__POSTGRES__CREDENTIALS__PASSWORD — not SOURCES__NFL__API_KEY.
 #
-# Host / user / database are env, not secrets. Change the host here AND in
-# sql/sources/postgres/02_external_access.sql together.
+# Host / user / database are env, not secrets. The host comes from .env.postgres
+# PGHOST (generate_tasks.py fills {{ pg_host }}, falling back to the owner's
+# instance when PGHOST is unset), the same value apply_network.sh renders into
+# the POSTGRES_APP_EAI network rule -- one record, two consumers.
 #
 # LOAD__WORKERS defaults to 20. Concurrent insert_values jobs of that width
 # OOMed Snowflake Postgres (2026-08-24). DATA_WRITER__FILE_MAX_ITEMS keeps
@@ -24,7 +26,7 @@ spec:
         DLT_DESTINATION: postgres
         DLT_DATASET: {{ dataset }}
         SNOWFLAKE_APP_DATABASE: {{ app_database }}
-        DESTINATION__POSTGRES__CREDENTIALS__HOST: 3v6glchrerfzlcisoqkcjgkgxm.mcgkxfo-weekend-warriors.us-east-2.aws.postgres.snowflake.app
+        DESTINATION__POSTGRES__CREDENTIALS__HOST: {{ pg_host }}
         DESTINATION__POSTGRES__CREDENTIALS__PORT: "5432"
         DESTINATION__POSTGRES__CREDENTIALS__DATABASE: app
         DESTINATION__POSTGRES__CREDENTIALS__USERNAME: app_copy_writer

@@ -242,10 +242,12 @@ registry through `dlt.secrets`, which reads that env var. `DLT_DATASET` (default
 `DEV_<snowflake_user>` from your connection) sends the load to your isolated schema. Clean
 up when done: `DROP SCHEMA IF EXISTS NFL_DEV_DB.DEV_<user>;`.
 
-> The `CREATE SECRET` and External Access Integration DDL live in `sql/base/05_secrets.sql`
-> and `sql/base/04_external_access.sql`, applied by `make setup-base`. They are in `base/`
-> because both the dev and prod job roles need them, and the dev path needs them first.
-> `make run-spcs` prints the exact secret/env-var wiring it expects if you get it wrong.
+> The `CREATE SECRET` and External Access Integration DDL live per source in
+> `sql/sources/<name>/03_secrets.sql` and `02_external_access.sql`, applied by
+> `make setup-source SOURCE=<name>` (the real secret values come from
+> `make setup-secrets`). `make run-spcs` prints the exact secret/env-var wiring
+> it expects if you get it wrong. The full account bootstrap order is the
+> repo-root [SETUP.md](../SETUP.md).
 
 
 ---
