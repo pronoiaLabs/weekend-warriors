@@ -31,6 +31,7 @@ def get_plays(
     play_family: BucketQ = None,
     shotgun: Annotated[bool | None, Query()] = None,
     no_huddle: Annotated[bool | None, Query()] = None,
+    two_minute: Annotated[bool | None, Query()] = None,
 ) -> plays.PlaysPayload:
     """The play feed, drive-grouped by the page. Anchored: at least one of
     game_key, player_key or team must bind, which keeps every response one
@@ -54,6 +55,7 @@ def get_plays(
         play_family=play_family,
         shotgun=shotgun,
         no_huddle=no_huddle,
+        two_minute=two_minute,
     )
     if payload is None:
         raise HTTPException(

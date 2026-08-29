@@ -128,6 +128,7 @@ def load(
     play_family: str | None,
     shotgun: bool | None,
     no_huddle: bool | None,
+    two_minute: bool | None = None,
 ) -> PlaysPayload | None:
     """The anchored play feed. The router enforces the anchor rule before
     calling; season defaults to the sport's current one when only a player or
@@ -170,6 +171,8 @@ def load(
         bind("shotgun = %(shotgun)s", "shotgun", shotgun)
     if no_huddle is not None:
         bind("no_huddle = %(no_huddle)s", "no_huddle", no_huddle)
+    if two_minute is not None:
+        bind("is_two_minute = %(two_minute)s", "two_minute", two_minute)
 
     def matches(r: dict[str, Any]) -> bool:
         if game_key is not None and r["game_key"] != game_key:
@@ -198,7 +201,9 @@ def load(
             return False
         if shotgun is not None and r["shotgun"] != shotgun:
             return False
-        return no_huddle is None or r["no_huddle"] == no_huddle
+        if no_huddle is not None and r["no_huddle"] != no_huddle:
+            return False
+        return two_minute is None or r["is_two_minute"] == two_minute
 
     rows, sql = source.select(
         profile,

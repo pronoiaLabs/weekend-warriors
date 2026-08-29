@@ -170,6 +170,7 @@ export type PlaysParams = {
   play_family?: string
   shotgun?: boolean
   no_huddle?: boolean
+  two_minute?: boolean
 }
 
 export function fetchPlays(sport: string, params: PlaysParams, signal?: AbortSignal): Promise<PlaysPayload> {

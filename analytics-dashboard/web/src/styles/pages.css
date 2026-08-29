@@ -129,6 +129,8 @@ a.led-row:hover + a.led-row { border-top-color: transparent; }
 a.stand-row:hover, a.week-row:hover { background: var(--surface); }
 .stand-row .rk, .week-row .rk, .allowed-row .rk { color: var(--ink-4); font-weight: 600; }
 .stand-row .tm, .week-row .tm, .allowed-row .tm, .split-row .tm { display: flex; flex-direction: column; min-width: 0; }
+/* standings team cell: logo inline with the nickname (the wireframe's row) */
+.stand-row .tm { flex-direction: row; align-items: center; gap: 8px; }
 .stand-row .tm b, .week-row .tm b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stand-row .tm small, .week-row .tm small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stand-row .n, .week-row .n, .allowed-row .n, .split-row .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -294,6 +296,7 @@ button.trow.current { background: var(--surface-2); }
 .tlogo { flex: none; width: 22px; height: 22px; object-fit: contain; display: inline-block; vertical-align: middle; }
 .tlogo.sm { width: 16px; height: 16px; }
 .tlogo.lg { width: 44px; height: 44px; }
+.tlogo.xl { width: 52px; height: 52px; }
 .tlogo-fallback { font-size: 10px; font-weight: 700; color: var(--ink-3); }
 
 /* status + direction badges */
@@ -419,9 +422,9 @@ button.trow.current { background: var(--surface-2); }
 /* paired containers: one row, one height. The row's tiles stretch to match,
    the taller list caps and scrolls inside — no side-by-side tiles of uneven
    height anywhere. (The Pulse rails established the pattern.) */
-.cols-game, .cols-divisions, .cols-explore, .cols-markets, .teasers { align-items: stretch; }
-.cols-game > .tile, .cols-divisions > .tile, .cols-explore > .tile { max-height: 520px; display: flex; flex-direction: column; }
-.cols-game > .tile .tile-body, .cols-divisions > .tile .tile-body, .cols-explore > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
+.cols-game, .cols-divisions, .cols-explore, .cols-markets, .cols-team, .teasers { align-items: stretch; }
+.cols-game > .tile, .cols-divisions > .tile, .cols-explore > .tile, .cols-markets > .tile, .cols-team > .tile { max-height: 520px; display: flex; flex-direction: column; }
+.cols-game > .tile .tile-body, .cols-divisions > .tile .tile-body, .cols-explore > .tile .tile-body, .cols-markets > .tile .tile-body, .cols-team > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
 
 /* overview · availability tiles */
 .cols-game + .cols-game { margin-top: var(--gap); }
@@ -566,6 +569,32 @@ a.trow:hover .go { color: var(--accent); }
   .player-head .wordmark { margin-left: 0; }
   .cols-detail { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- team page · identity head + the wireframe pieces ---- */
+.team-page-head { overflow: hidden; }
+.team-page-head .team-bar { position: absolute; left: 24px; top: 0; width: 72px; height: 3px; border-radius: 0 0 3px 3px; background: var(--team, var(--accent)); opacity: .85; }
+.id-row { display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.id-row .rec b { display: block; font-size: 22px; font-weight: 700; line-height: 1.1; }
+.id-row .rec small { color: var(--ink-3); white-space: nowrap; }
+.id-row .last { display: flex; align-items: center; gap: 4px; }
+.id-row .last small { color: var(--ink-4); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+.team-page-head .wordmark { height: 20px; opacity: .8; margin-left: auto; align-self: center; }
+.stack { display: grid; gap: var(--gap); align-content: start; }
+
+/* week-by-week is the page's long list: the tile body caps at the window and
+   the column header pins (the ledger's pattern) */
+.weeks-tile .tile-body { max-height: calc(100vh - 280px); min-height: 340px; overflow: auto; }
+.weeks-tile .week-row.head { position: sticky; top: 0; z-index: 3; background: var(--surface); padding-top: 8px; padding-bottom: 6px; }
+.week-row .opp { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.week-row .opp b { font-weight: 600; white-space: nowrap; }
+.week-row.up { color: var(--ink-3); }
+.week-row.up .tm small { color: var(--ink-4); }
+
+/* allowed grid: every stat cell is a door, value over its rank */
+.allowed-row .n a { display: flex; flex-direction: column; align-items: flex-end; color: inherit; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
+.allowed-row .n a:hover { background: var(--surface-2); }
+.allowed-row .n a small { color: var(--ink-4); font-size: 10px; }
+a.split-row:hover { background: var(--surface); border-radius: 8px; }
 
 /* ---- vertical rhythm, the rule: one even gap between every page-level block
    on every page. Sits last so it wins the tie against each block's own legacy
