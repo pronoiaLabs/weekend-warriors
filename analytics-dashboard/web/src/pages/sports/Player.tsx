@@ -102,7 +102,7 @@ function PlayerPage() {
   const hasUsage = caps?.capabilities.includes('player_situation_usage') ?? false
   const hasProps = caps?.capabilities.includes('game_prop_board') ?? false
   const logHref = (week?: number) =>
-    `/${sport}/explore?sheet=player_games&where=${encodeURIComponent(`player_name:${p.player_name}`)}&where=${encodeURIComponent(`season:${data.season}`)}${week !== undefined ? `&where=${encodeURIComponent(`week:${week}`)}` : ''}`
+    `/${sport}/plays?player_key=${p.player_key}&season=${data.season}${week !== undefined ? `&week=${week}` : ''}`
 
   return (
     <div className="page page-player">
@@ -207,7 +207,7 @@ function PlayerPage() {
       {/* zone 2 · the game log */}
       <TileFrame
         title={`Game log · ${data.season}`}
-        meta={`${data.season_type_name} · rows open his games in the Explorer`}
+        meta={`${data.season_type_name} · rows open the play log`}
         className="table-tile gamelog"
       >
         <GameLog weeks={data.weeks} group={group} logHref={logHref} branding={branding} />
@@ -384,7 +384,7 @@ function GameLog({
           key={w.game_key}
           className="trow"
           to={logHref(w.week)}
-          title={`His week ${w.week} row in the Explorer`}
+          title={`Watch the week ${w.week} plays`}
         >
           <span className="n rk">{w.week}</span>
           <span className="opp">
@@ -413,7 +413,7 @@ function GameLog({
               </span>
             )
           })}
-          <span className="go">rows ›</span>
+          <span className="go">plays ›</span>
         </Link>
       ))}
     </div>
@@ -579,7 +579,7 @@ function UsageZone({
   return (
     <TileFrame
       title="Where the work comes from"
-      meta="Target share by situation · cells open the Explorer"
+      meta="Target share by situation · cells open the play log"
       className="usage-tile"
     >
       {rows.length === 0 ? (
@@ -600,8 +600,8 @@ function UsageZone({
                     <Link
                       key={r.bucket}
                       className={`ucell ${hot.includes(r) ? 'hot' : ''}`}
-                      to={logHref}
-                      title={`${r.bucket_label}: his game rows in the Explorer`}
+                      to={`${logHref}&${r.bucket_type === 'down' ? 'down_bucket' : r.bucket_type === 'field_zone' ? 'field_zone' : 'script'}=${r.bucket}`}
+                      title={`${r.bucket_label}: his plays in the play log`}
                     >
                       <span className="bl">{r.bucket_label}</span>
                       <span className="v">{pct(r.target_share, 0)}</span>

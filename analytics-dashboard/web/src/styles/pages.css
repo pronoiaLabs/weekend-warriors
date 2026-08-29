@@ -468,6 +468,8 @@ button.trow.current { background: var(--surface-2); }
 .sit-row .what { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .sit-row .what small { color: var(--ink-4); font-size: 9.5px; }
 .sit-row.thin .n { color: var(--ink-4); }
+a.sit-row { color: inherit; }
+a.sit-row:hover { background: var(--surface); border-top-color: transparent; border-radius: 8px; }
 .sit-sep { padding: 12px 0 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
 
 @media (max-width: 900px) {
@@ -606,6 +608,52 @@ a.split-row:hover { background: var(--surface); border-radius: 8px; }
 .proplines .trow { min-width: 780px; }
 .prop-flag { margin-left: 6px; }
 .prop-spark { height: 24px; width: 96px; }
+
+/* ---- play log · the pattern room ---- */
+.frail .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.frail .chip .avatar { width: 18px; height: 18px; font-size: 8px; margin-right: 4px; }
+.ustrip { display: flex; align-items: stretch; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.ustrip .whois { display: flex; align-items: center; gap: 10px; padding-right: 12px; border-right: 1px solid var(--line); flex: none; }
+.ustrip .whois .id { display: flex; flex-direction: column; line-height: 1.3; }
+.ustrip .whois .id b { font-weight: 600; white-space: nowrap; }
+.ustrip .whois .id small { color: var(--ink-4); white-space: nowrap; }
+.ustrip .u { flex: 1 0 92px; min-width: 92px; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.ustrip .u label { font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+.ustrip .u b { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+.ustrip .u small { font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+.ustrip .u small.pos { color: var(--pos); }
+.ustrip .u small.neg { color: var(--neg); }
+.ustrip .u.hot { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.ustrip .u.hot b { color: var(--accent); }
+.feed-tile .tile-body { padding: 0; }
+.feed-scroll { max-height: calc(100vh - 420px); min-height: 340px; overflow: auto; }
+.drive-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 10px 20px; background: var(--surface); border-top: 1px solid var(--line); }
+.drive:first-child .drive-head { border-top: 0; }
+.drive-head .team-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--team, var(--line-2)); opacity: .85; }
+.drive-head .dh { display: flex; align-items: baseline; gap: 10px; color: inherit; min-width: 0; }
+.drive-head .dh b { font-weight: 600; white-space: nowrap; }
+.drive-head .dh:hover b { color: var(--accent); }
+.drive-head .dsum { font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drive-head .score { margin-left: auto; font-size: 10.5px; color: var(--ink-4); white-space: nowrap; }
+.play { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto auto; gap: 4px 14px; align-items: center; padding: 7px 20px; border-top: 1px solid var(--line); font-size: 12px; }
+.play .sit b { display: block; color: var(--ink-2); }
+.play .sit small { color: var(--ink-4); white-space: nowrap; }
+.play .ptext { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.play .mx-row { display: flex; gap: 6px; align-items: center; }
+.play .mx { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-3); white-space: nowrap; }
+.play .mx.pos { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent); }
+.play .mx.neg { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 45%, transparent); }
+.play .pwho { display: flex; gap: 4px; }
+.play .pwho .avatar { width: 22px; height: 22px; font-size: 8px; }
+.play .pwho a:hover .avatar { border-color: var(--accent); }
+.play.hit { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.play.hit .sit b { color: var(--accent); }
+.play.dim { opacity: .45; }
+
+@media (max-width: 900px) {
+  .play { grid-template-columns: 110px minmax(0, 1fr); }
+  .play .mx-row, .play .pwho { grid-column: 2; justify-content: flex-start; }
+}
 
 /* ---- vertical rhythm, the rule: one even gap between every page-level block
    on every page. Sits last so it wins the tie against each block's own legacy

@@ -80,24 +80,26 @@ function SituationsPage() {
           <p className="hint">
             No situational play-by-play for this matchup yet
             {data.season_type_name === 'Preseason' ? ' — preseason has no play-by-play feed' : ''}. The{' '}
-            <Link to={`/${sport}/explore`}>Explorer</Link> is the escape hatch.
+            <Link to={`/${sport}/plays`}>play log</Link> covers the regular season and playoffs.
           </p>
         </section>
       ) : (
         <div className="grid cols-game sit-grid">
           <SituationTile
             title={`${data.away_team_label} offense`}
-            meta={`vs ${data.home_team_label} defense allowed`}
+            meta={`vs ${data.home_team_label} defense allowed · rows open the play log`}
             offense={data.away_offense}
             defense={data.home_defense}
             oppLabel={data.home_team_label}
+            playsBase={`/${sport}/plays?game_key=${data.game_key}&team=${data.away_team_label}`}
           />
           <SituationTile
             title={`${data.home_team_label} offense`}
-            meta={`vs ${data.away_team_label} defense allowed`}
+            meta={`vs ${data.away_team_label} defense allowed · rows open the play log`}
             offense={data.home_offense}
             defense={data.away_defense}
             oppLabel={data.away_team_label}
+            playsBase={`/${sport}/plays?game_key=${data.game_key}&team=${data.home_team_label}`}
           />
         </div>
       )}
@@ -114,18 +116,34 @@ function SituationsPage() {
   )
 }
 
+/** The play-log params a situation row lands with. */
+function situationSearch(group: string, key: string): string {
+  if (group === 'down') return `&down_bucket=${key}`
+  if (group === 'down_distance') {
+    const m = key.match(/^(1st|2nd|3rd_4th)_(short|medium|long)$/)
+    return m ? `&down_bucket=${m[1]}&distance_bucket=${m[2]}` : ''
+  }
+  if (group === 'field_zone') return `&field_zone=${key}`
+  if (group === 'script') return `&script=${key}`
+  if (group === 'play_family') return `&play_family=${key}`
+  if (group === 'two_minute') return '&two_minute=true'
+  return ''
+}
+
 function SituationTile({
   title,
   meta,
   offense,
   defense,
   oppLabel,
+  playsBase,
 }: {
   title: string
   meta: string
   offense: SituationRow[]
   defense: SituationRow[]
   oppLabel: string
+  playsBase: string
 }) {
   const allowedByKey = new Map(defense.map((r) => [r.situation_key, r]))
   const groups: { key: string; rows: SituationRow[] }[] = []
@@ -153,7 +171,12 @@ function SituationTile({
               const d = allowedByKey.get(r.situation_key)
               const thin = r.plays < THIN_PLAYS
               return (
-                <div key={r.app_team_situation_key} className={`sit-row${thin ? ' thin' : ''}`} title={`${r.plays} plays`}>
+                <Link
+                  key={r.app_team_situation_key}
+                  className={`sit-row${thin ? ' thin' : ''}`}
+                  title={`${r.plays} plays · open in the play log`}
+                  to={`${playsBase}${situationSearch(r.situation_group, r.situation_key)}`}
+                >
                   <span className="what">
                     {r.situation_label}
                     <small>{fmt(r.plays)} plays</small>
@@ -166,7 +189,7 @@ function SituationTile({
                   </span>
                   <span className="n">{d ? pct(d.success_rate) : '—'}</span>
                   <span className="n">{d ? pct(d.explosive_rate) : '—'}</span>
-                </div>
+                </Link>
               )
             })}
           </div>

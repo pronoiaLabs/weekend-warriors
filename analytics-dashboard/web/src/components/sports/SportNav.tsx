@@ -29,6 +29,7 @@ const ITEMS: Item[] = [
   { to: 'teams', label: 'Teams', cap: 'team_standings' },
   { to: 'players', label: 'Players', cap: 'player_leaders' },
   { to: 'markets', label: 'Markets', cap: 'line_history' },
+  { to: 'plays', label: 'Play Log', cap: 'play_log' },
   { to: 'news', label: 'News', cap: 'news' },
   { to: 'explore', label: 'Explorer', cap: null },
 ]
