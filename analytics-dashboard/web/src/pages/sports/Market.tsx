@@ -9,18 +9,19 @@ import { useApi } from '../../hooks/useApi.ts'
 import { useBack } from '../../hooks/useBack.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
+import GameTabs from '../../components/sports/GameTabs.tsx'
 import { fmt, odds, signed, spreadText, titleCase, tone } from '../../lib/format.ts'
-import { useView, viewSearch } from '../../state/view.tsx'
+import { boardPath, useView, viewSearch } from '../../state/view.tsx'
 
-export default function Market() {
+export default function Market({ family = false }: { family?: boolean }) {
   return (
     <CapabilityGate cap="line_history">
-      <MarketPage />
+      <MarketPage family={family} />
     </CapabilityGate>
   )
 }
 
-function MarketPage() {
+function MarketPage({ family }: { family: boolean }) {
   const sport = useSportParam()
   const caps = useCapabilities()
   const { gameKey = '' } = useParams<{ gameKey: string }>()
@@ -30,7 +31,9 @@ function MarketPage() {
   const metric = search.get('metric') === 'total' ? 'total' : 'spread'
 
   const res = useApi((signal) => fetchGameMarkets(sport, gameKey, vendorParam, signal), [sport, gameKey, vendorParam])
-  const boardHref = `/${sport}/markets${viewSearch(view)}`
+  // as the game family's Lines tab the page belongs to the slate; standalone
+  // (from the Markets board) it keeps its own home
+  const boardHref = family ? boardPath(sport, view) : `/${sport}/markets${viewSearch(view)}`
   const back = useBack(boardHref)
 
   const set = (patch: Record<string, string | undefined>) => {
@@ -46,12 +49,16 @@ function MarketPage() {
   if (!data) {
     return (
       <div className="page page-market">
-        <Crumbs items={[{ label: 'Markets', to: boardHref }, { label: res.error ? 'No lines' : '...' }]} />
+        {family ? (
+          <GameTabs sport={sport} gameKey={gameKey} matchup={res.error ? 'No lines' : '...'} tab="Lines" boardHref={boardHref} back={back} vendorParam={vendorParam} />
+        ) : (
+          <Crumbs items={[{ label: 'Markets', to: boardHref }, { label: res.error ? 'No lines' : '...' }]} />
+        )}
         <div className="page-head">
           <h1>{res.error ? 'No lines for this game' : 'Loading...'}</h1>
           {res.error && (
             <p className="lede">
-              {res.error}. Pick a game from the <Link to={boardHref}>markets board</Link>.
+              {res.error}. Pick a game from the <Link to={boardHref}>{family ? 'slate' : 'markets board'}</Link>.
             </p>
           )}
         </div>
@@ -69,12 +76,24 @@ function MarketPage() {
 
   return (
     <div className="page page-market">
-      <div className="crumb-row">
-        <Crumbs items={[{ label: 'Markets', to: boardHref }, { label: `${g.away_team_label} at ${g.home_team_label}` }]} />
-        <button type="button" className="back" onClick={back}>
-          <span aria-hidden="true">←</span> Back to markets
-        </button>
-      </div>
+      {family ? (
+        <GameTabs
+          sport={sport}
+          gameKey={gameKey}
+          matchup={`${g.away_team_label} @ ${g.home_team_label}`}
+          tab="Lines"
+          boardHref={boardHref}
+          back={back}
+          vendorParam={vendorParam}
+        />
+      ) : (
+        <div className="crumb-row">
+          <Crumbs items={[{ label: 'Markets', to: boardHref }, { label: `${g.away_team_label} at ${g.home_team_label}` }]} />
+          <button type="button" className="back" onClick={back}>
+            <span aria-hidden="true">←</span> Back to markets
+          </button>
+        </div>
+      )}
 
       <div className="game-head" data-tilt="">
         <div className="matchup">

@@ -20,6 +20,7 @@ export type Capability =
   | 'trending_players'
   | 'market_movers'
   | 'team_branding'
+  | 'team_situation'
   | 'explore_player_games'
   | 'explore_defender_games'
   | 'explore_team_games'
@@ -239,6 +240,8 @@ export interface GamePayload {
   vendors: string[]
   away: PropRow[]
   home: PropRow[]
+  availability: StatusRow[]
+  allowed: AllowedRow[]
   query: string | null
 }
 

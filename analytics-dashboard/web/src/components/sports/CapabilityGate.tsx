@@ -22,6 +22,7 @@ const LABELS: Record<Capability, string> = {
   trending_players: 'trending',
   market_movers: 'market movers',
   team_branding: 'team branding',
+  team_situation: 'situational splits',
   explore_player_games: 'player games sheet',
   explore_defender_games: 'defender games sheet',
   explore_team_games: 'team games sheet',
