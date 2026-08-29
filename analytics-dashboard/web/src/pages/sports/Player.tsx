@@ -170,7 +170,7 @@ function StatChart({ series }: { series: PlayerStatRow[] }) {
   const H = 180
   const pad = 10
   const base = H - 22
-  const values = series.flatMap((s) => [s.value, s.prior_season_same_week ?? 0, s.prior_season_avg ?? 0, s.trailing3_avg ?? 0])
+  const values = series.flatMap((s) => [s.value ?? 0, s.prior_season_same_week ?? 0, s.prior_season_avg ?? 0, s.trailing3_avg ?? 0])
   const max = Math.max(1, ...values)
   const scale = (base - pad) / max
   const slot = (W - pad * 2) / series.length
@@ -178,7 +178,7 @@ function StatChart({ series }: { series: PlayerStatRow[] }) {
   const y = (v: number) => base - v * scale
   const prior = series[0]!.prior_season_avg
   const path = series
-    .map((s, i) => `${i === 0 ? 'M' : 'L'} ${(pad + slot * i + slot / 2).toFixed(1)} ${y(s.trailing3_avg ?? s.value).toFixed(1)}`)
+    .map((s, i) => `${i === 0 ? 'M' : 'L'} ${(pad + slot * i + slot / 2).toFixed(1)} ${y(s.trailing3_avg ?? s.value ?? 0).toFixed(1)}`)
     .join(' ')
   return (
     <svg className="stat-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Stat by game">
@@ -189,7 +189,7 @@ function StatChart({ series }: { series: PlayerStatRow[] }) {
         return (
           <g key={s.game_key}>
             <title>{`Week ${s.week}: ${fmt(s.value, 1)} (trailing 3: ${fmt(s.trailing3_avg, 1)}, same week last season: ${s.prior_season_same_week === null ? 'did not play' : fmt(s.prior_season_same_week, 1)})`}</title>
-            <rect x={x} y={y(s.value)} width={bw} height={Math.max(1, base - y(s.value))} className="bar" />
+            <rect x={x} y={y(s.value ?? 0)} width={bw} height={Math.max(1, base - y(s.value ?? 0))} className="bar" />
             {s.prior_season_same_week !== null && <line x1={x - 2} x2={x + bw + 2} y1={y(s.prior_season_same_week)} y2={y(s.prior_season_same_week)} className="tick" />}
             <text x={x + bw / 2} y={H - 4} className="lbl" textAnchor="middle">
               {s.week}
