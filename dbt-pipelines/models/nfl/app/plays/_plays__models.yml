@@ -1,0 +1,43 @@
+version: 2
+
+# APP -- the serving layer for the analytics dashboard: page-shaped marts built
+# from CORE, read by a thin API with bound filters. Long format with the parameters
+# as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
+# Plays: the play feed behind the Play Log page and the Explorer's plays sheet.
+
+models:
+  - name: app_play_log
+    description: >
+      One row per play, fact_play's grain with the nflverse graft: situation,
+      the call, the involved players (bridged to player_key), EPA/WPA/success
+      and the drive context, with drive aggregates on every row so the page
+      rolls nothing up. Unmatched and preseason rows keep NULL analytics,
+      roles and drive columns -- visible, never imputed (has_nflverse says
+      which). The situation buckets mirror fact_team_game_situation, pinned
+      by a reconciliation test.
+    columns:
+      - name: app_play_log_key
+        tests: [unique, not_null]
+      - name: game_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_game')", field: game_key}
+      - name: season
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: down_bucket
+        tests:
+          - accepted_values: {values: ['1st', '2nd', '3rd_4th']}
+      - name: distance_bucket
+        tests:
+          - accepted_values: {values: ['short', 'medium', 'long']}
+      - name: field_zone
+        tests:
+          - accepted_values: {values: ['red_zone', 'mid', 'own']}
+      - name: game_script
+        tests:
+          - accepted_values: {values: ['leading', 'trailing', 'neutral']}
+      - name: play_family
+        tests:
+          - accepted_values: {values: ['dropback', 'designed_run', 'special']}

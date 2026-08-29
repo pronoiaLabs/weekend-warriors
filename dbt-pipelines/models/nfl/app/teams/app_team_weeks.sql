@@ -18,7 +18,9 @@
     the closing line read from the team's side: spread is THIS team's spread, so
     a favourite is negative whether home or away. spread_result and total_result
     are computed here against the final score: the closing fact leaves them
-    NULL until its own evaluation lands.
+    NULL until its own evaluation lands. The EPA block (per-play, per-dropback
+    and per-carry rates from the twins) is game-level and rides every vendor
+    row; NULL with has_nflverse = false where nflverse has no play-by-play.
 */
 
 with offense as (
@@ -206,6 +208,20 @@ select
     d.opp_red_zone_attempts,
     d.opp_turnovers,
     o.has_box_score,
+    -- the EPA block from the twins: game-level, so it rides every vendor row
+    -- of the game; NULL for preseason (has_nflverse = false), never zero.
+    -- Positioned BEFORE the vendor block: the API's LINE_FIELDS slice starts
+    -- at vendor and these columns must stay outside it.
+    o.off_plays,
+    o.off_epa_per_play,
+    o.success_rate,
+    o.pass_epa_per_dropback,
+    o.rush_epa_per_carry,
+    o.explosive_rate,
+    d.def_plays,
+    d.def_epa_per_play,
+    d.success_rate_allowed,
+    o.has_nflverse,
     -- the line, from this team's side
     s.vendor,
     s.spread,

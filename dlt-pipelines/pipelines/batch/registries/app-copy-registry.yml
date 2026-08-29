@@ -58,8 +58,10 @@ pipelines:
         - app_explore_player_props
         - app_explore_news
         - app_explore_line_moves
+        - app_explore_plays
         - app_status_board
         - app_trending_players
         - app_market_movers
         - app_team_branding
         - app_team_situation
+        - app_play_log
