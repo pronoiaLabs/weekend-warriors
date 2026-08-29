@@ -596,6 +596,17 @@ a.trow:hover .go { color: var(--accent); }
 .allowed-row .n a small { color: var(--ink-4); font-size: 10px; }
 a.split-row:hover { background: var(--surface); border-radius: 8px; }
 
+/* ---- markets · the movers board + detail additions ---- */
+.move-card .card-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.move-card .card-title h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.move-card .card-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.move-card .spark-cap { display: block; margin-top: 4px; font-size: 10px; color: var(--ink-4); }
+.chart-summary { font-size: var(--fs-s); color: var(--ink-3); margin-bottom: 8px; }
+.chart-summary b { color: var(--ink-2); font-weight: 600; }
+.proplines .trow { min-width: 780px; }
+.prop-flag { margin-left: 6px; }
+.prop-spark { height: 24px; width: 96px; }
+
 /* ---- vertical rhythm, the rule: one even gap between every page-level block
    on every page. Sits last so it wins the tie against each block's own legacy
    margin-bottom (20/16/10px drift), which is zeroed for direct children. ---- */
