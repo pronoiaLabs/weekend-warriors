@@ -23,7 +23,7 @@ WHAT IT WRITES
     sql/sources/<name>/01_databases.sql          <NAME>_DEV_DB and <NAME>_PROD_DB
     sql/sources/<name>/02_external_access.sql    network rule + EAI for HOST
     sql/sources/<name>/03_secrets.sql            the API-key secret and its grants
-    sql/sources/<name>/05_dbt_trigger.sql        stream -> triggered task -> dbt build
+    sql/sources/<name>/05_dbt_trigger.sql        stream -> triggered task -> dbt run; daily dbt test
     pipelines/batch/registries/<name>-registry.yml  a one-resource starting point
 
     Nothing is applied and nothing existing is overwritten. The generated files are a
@@ -288,13 +288,15 @@ pipelines:
 
 DBT_TRIGGER_SQL = """\
 -- =============================================================================
--- 05_dbt_trigger.sql ({name}) -- event-driven dbt build after ingestion
+-- 05_dbt_trigger.sql ({name}) -- event-driven dbt run after ingestion
 -- =============================================================================
 -- Chain: dlt load succeeds -> one INSERT lands in RAW._DLT_LOADS -> the
 -- append-only stream below has data -> the triggered task fires (no schedule;
 -- idle costs nothing) -> the procedure drains the stream into an audit table
--- and runs EXECUTE DBT PROJECT for this sport. A FAILED load never inserts
--- into _DLT_LOADS, so failures never trigger a rebuild, structurally.
+-- and runs EXECUTE DBT PROJECT ARGS='run' (models only). A FAILED load never
+-- inserts into _DLT_LOADS, so failures never trigger a rebuild, structurally.
+-- Tests are a sibling scheduled task (DBT_TEST_{upper}, 13:00 UTC daily by
+-- default; move the cron after this sport's last ingest cluster).
 --
 -- Conventions this file obeys (verified in WORKFLOW-4.md Phase 0):
 --   * The task name avoids the DLT_TASK_ prefix: DLT_DB.OPS.V_TASK_RUNS turns
@@ -320,6 +322,7 @@ DBT_TRIGGER_SQL = """\
 --     1 run). Evaluations that find no data are SKIPPED at zero cost.
 --
 -- Kill switch:  ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper} SUSPEND;
+-- Daily tests:  ALTER TASK {upper}_PROD_DB.OPS.DBT_TEST_{upper} SUSPEND;
 -- (ingestion untouched; the stream accumulates and is drained on resume;
 -- staleness grace ~14 days, re-create the stream if suspended longer, and
 -- also if dlt ever recreates _DLT_LOADS itself.)
@@ -405,7 +408,7 @@ COMMENT = 'Audit: which loads triggered which dbt build. The INSERT that fills t
 CREATE OR REPLACE PROCEDURE {upper}_PROD_DB.OPS.SP_DBT_BUILD()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Drain DBT_LOADS_STREAM, then dbt build for {upper}. Caller''s rights: EXECUTE DBT PROJECT requires it.'
+COMMENT = 'Drain DBT_LOADS_STREAM, then dbt run (models only) for {upper}. Tests are SP_DBT_TEST / DBT_TEST_{upper}. Caller''s rights: EXECUTE DBT PROJECT requires it.'
 EXECUTE AS CALLER
 AS
 $$
@@ -437,7 +440,7 @@ BEGIN
   -- PROCEDURE time and rejects a Scripting :bind; the build_id is a
   -- self-minted UUID, so inlining it is safe.
   EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}'
-    || ' ARGS = ''build'''
+    || ' ARGS = ''run'''
     || ' ENVIRONMENT = ''{name}_prod'''
     || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';
 
@@ -448,7 +451,7 @@ BEGIN
   INSERT INTO DLT_DB.OPS.DBT_BUILDS
     (BUILD_ID, SPORT, ENVIRONMENT, PROJECT_FQN, ARGS, DRAINED_LOADS, EXEC_QUERY_ID, STARTED_AT, FINISHED_AT)
   VALUES
-    (:build_id, '{name}', '{name}_prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}', 'build',
+    (:build_id, '{name}', '{name}_prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}', 'run',
      :drained, :exec_qid, :started_at, CURRENT_TIMESTAMP());
 
   -- TASK_HISTORY.RETURN_VALUE comes ONLY from SYSTEM$SET_RETURN_VALUE; a
@@ -459,7 +462,7 @@ BEGIN
   -- when the proc runs outside a task (manual smoke tests), hence the
   -- guard.
   BEGIN
-    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''built after ' || drained || ' load(s), build_id ' || build_id || ''')';
+    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''ran after ' || drained || ' load(s), build_id ' || build_id || ''')';
   EXCEPTION
     WHEN OTHER THEN
       NULL;
@@ -486,7 +489,7 @@ BEGIN
       NULL;
   END;
 
-  RETURN 'built after ' || drained || ' load(s), build_id ' || build_id;
+  RETURN 'ran after ' || drained || ' load(s), build_id ' || build_id;
 EXCEPTION
   -- Failure ping, then RAISE so TASK_HISTORY and the auto-suspend counter see
   -- exactly what they saw before this handler existed. Only a transition
@@ -519,8 +522,84 @@ EXCEPTION
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE {upper}_PROD_DB.OPS.SP_DBT_TEST()
+RETURNS VARCHAR
+LANGUAGE SQL
+COMMENT = 'Daily dbt test for {upper}. Does not drain DBT_LOADS_STREAM. Caller''s rights: EXECUTE DBT PROJECT requires it.'
+EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  build_id VARCHAR DEFAULT UUID_STRING();
+  started_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP();
+  exec_qid VARCHAR;
+BEGIN
+  EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}'
+    || ' ARGS = ''test'''
+    || ' ENVIRONMENT = ''{name}_prod'''
+    || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';
+
+  exec_qid := LAST_QUERY_ID();
+  INSERT INTO DLT_DB.OPS.DBT_BUILDS
+    (BUILD_ID, SPORT, ENVIRONMENT, PROJECT_FQN, ARGS, DRAINED_LOADS, EXEC_QUERY_ID, STARTED_AT, FINISHED_AT)
+  VALUES
+    (:build_id, '{name}', '{name}_prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{upper}', 'test',
+     0, :exec_qid, :started_at, CURRENT_TIMESTAMP());
+
+  BEGIN
+    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''tested, build_id ' || build_id || ''')';
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
+  BEGIN
+    LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE WHERE SCOPE = 'dbt_test_{name}');
+    IF (prev = 'failing') THEN
+      CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+        SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+          SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('RECOVERED dbt_test_{name}')),
+        SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+      UPDATE DLT_DB.OPS.ALERT_STATE
+        SET STATUS = 'ok', UPDATED_AT = CURRENT_TIMESTAMP(),
+            LAST_ALERTED_AT = CURRENT_TIMESTAMP(), LAST_ERROR = NULL
+        WHERE SCOPE = 'dbt_test_{name}';
+    END IF;
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
+  RETURN 'tested, build_id ' || build_id;
+EXCEPTION
+  WHEN OTHER THEN
+    LET err VARCHAR := LEFT(COALESCE(SQLERRM, 'unknown error'), 400);
+    BEGIN
+      LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE WHERE SCOPE = 'dbt_test_{name}');
+      IF (prev IS NULL OR prev <> 'failing') THEN
+        CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+          SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+            SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('FAILED dbt_test_{name}: ' || :err)),
+          SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+      END IF;
+      MERGE INTO DLT_DB.OPS.ALERT_STATE t USING (SELECT 'dbt_test_{name}' AS SCOPE) s ON t.SCOPE = s.SCOPE
+        WHEN MATCHED THEN UPDATE SET STATUS = 'failing', UPDATED_AT = CURRENT_TIMESTAMP(),
+          LAST_ALERTED_AT = IFF(t.STATUS <> 'failing', CURRENT_TIMESTAMP(), t.LAST_ALERTED_AT),
+          LAST_ERROR = :err
+        WHEN NOT MATCHED THEN INSERT (SCOPE, STATUS, UPDATED_AT, LAST_ALERTED_AT, LAST_ERROR)
+          VALUES ('dbt_test_{name}', 'failing', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), :err);
+    EXCEPTION
+      WHEN OTHER THEN
+        NULL;
+    END;
+    RAISE;
+END;
+$$;
+
 -- CREATE OR ALTER TASK refuses to touch a started task; suspend first.
--- The whole graph (root AND child) must be suspended to alter either.
+-- The load-triggered graph (root AND child) must be suspended to alter
+-- either. DBT_TEST_{upper} is a separate root (no AFTER).
+ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_TEST_{upper} SUSPEND;
 ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_HARVEST_{upper} SUSPEND;
 ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_BUILD_{upper} SUSPEND;
 
@@ -528,7 +607,7 @@ CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper}
   WAREHOUSE = DBT_WH
   USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 900
   USER_TASK_TIMEOUT_MS = 3600000
-  COMMENT = 'dbt build for {upper} on new RAW loads. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
+  COMMENT = 'dbt run (models only) for {upper} on new RAW loads. Tests are DBT_TEST_{upper}. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
   WHEN SYSTEM$STREAM_HAS_DATA('{upper}_PROD_DB.OPS.DBT_LOADS_STREAM')
 AS
   CALL {upper}_PROD_DB.OPS.SP_DBT_BUILD();
@@ -542,15 +621,30 @@ AS
 CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_HARVEST_{upper}
   WAREHOUSE = DBT_WH
   USER_TASK_TIMEOUT_MS = 1800000
-  COMMENT = 'Query log + operator-stats harvest after each {upper} dbt build. NOT managed by generate_tasks.py.'
+  COMMENT = 'Query log + operator-stats harvest after each {upper} dbt run. NOT managed by generate_tasks.py.'
   AFTER {upper}_PROD_DB.OPS.DBT_BUILD_{upper}
 AS
   CALL DLT_DB.OPS.SP_DBT_HARVEST();
 
+-- Daily test: separate root, not AFTER the run graph. Default cron is
+-- 13:00 UTC; move it after this sport's last ingest cluster (NFL 13:00,
+-- NCAAF 07:00).
+CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_TEST_{upper}
+  WAREHOUSE = DBT_WH
+  SCHEDULE = 'USING CRON 0 13 * * * UTC'
+  USER_TASK_TIMEOUT_MS = 3600000
+  COMMENT = 'Daily dbt test for {upper}. Separate root; does not drain DBT_LOADS_STREAM. NOT managed by generate_tasks.py.'
+AS
+  CALL {upper}_PROD_DB.OPS.SP_DBT_TEST();
+
+ALTER TASK {upper}_PROD_DB.OPS.DBT_TEST_{upper} SET TAG DLT_DB.OPS.COST_CENTER = 'dbt';
+
 -- Not redundant: CREATE OR ALTER TASK leaves tasks suspended. Children
 -- resume BEFORE the root; a resumed root with a suspended child skips it.
+-- DBT_TEST_{upper} is its own root.
 ALTER TASK {upper}_PROD_DB.OPS.DBT_HARVEST_{upper} RESUME;
 ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper} RESUME;
+ALTER TASK {upper}_PROD_DB.OPS.DBT_TEST_{upper} RESUME;
 """
 
 
@@ -642,8 +736,9 @@ dbt, once models exist for the sport (see WORKFLOW-3/4 for the pattern):
        the next step's GRANT ON DBT PROJECT can succeed).
   d. Re-run make setup-source SOURCE={name} CONFIRM=1 to apply
        sql/sources/{name}/05_dbt_trigger.sql: after that, every successful
-       load triggers the sport's dbt build automatically, and the harvest
-       child captures its query log + operator stats.
+       load triggers the sport's dbt run automatically, a daily DBT_TEST_*
+       task runs the test suite, and the harvest child captures the run's
+       query log + operator stats.
   e. env.yml: also add DBT_QUERY_TAG_BASE to both new environments (see the
        existing sports); sql/ops: add a {name} branch to V_DBT_RUNS in
        07_dbt_runs.sql and a DBT_TRIGGER_LOADS DELETE to SP_DBT_OBS_RETENTION

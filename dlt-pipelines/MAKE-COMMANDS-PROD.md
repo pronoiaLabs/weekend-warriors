@@ -85,8 +85,11 @@ the Tasks then keep the current season fresh.
 into fewer triggered dbt builds (the trigger drains everything in the stream per fire), and the pool
 wakes once instead of once per pipeline. The 5-minute stagger, rather than the same minute, keeps
 one API key from being hit concurrently and lets a single warm pool node work through the queue.
-Expect two builds from the window (the first load fires a build almost immediately; the 900s trigger
-interval coalesces the rest), plus the injuries build at 22:xx.
+Expect two dbt runs from the window (the first load fires a run almost immediately; the 900s trigger
+interval coalesces the rest), plus the injuries run at 22:xx. Triggered dbt is `ARGS='run'` (models
+only). Tests run once a day on `DBT_TEST_NFL` at 13:00 UTC (after this cluster, nflverse 11:xx, and
+sleeper players 12:10). `sql/**` is not CI-applied: after merging trigger SQL,
+`make setup-source SOURCE=nfl CONFIRM=1` (and `SOURCE=ncaaf`) is required to flip prod off `build`.
 
 The live betting Tasks use Snowflake's five-field cron step syntax. They run every
 four hours Thursday through Monday (Sunday is 0) and are staggered by ten minutes so
@@ -298,7 +301,8 @@ observability write, so look at layer 3.
 
 Failure pings go to Slack from inside the failing run itself — the runner
 (`pipelines/common/alerts.py`, gated on `DLT_ALERTS=1` which only the prod
-job template sets) and each sport's `SP_DBT_BUILD` exception handler. Both
+job template sets) and each sport's `SP_DBT_BUILD` / `SP_DBT_TEST` exception
+handlers. Both
 send through the account's `SLACK_ALERTS_INT` webhook integration
 (`sql/ops/09_alerting.sql`). Noise policy is transitions + recovery via the
 `DLT_DB.OPS.ALERT_STATE` latch: first failure of a streak pings, the first
@@ -425,11 +429,12 @@ req/min API limit or `DLT_POOL`.
 | `ncaaf_reference` | `10 6 * * 3` | Wednesday | 536 teams + 124k players is ~1,250 requests; college rosters churn on portal windows, not daily waivers |
 
 **One 06:00-06:20 window, same pattern as the NFL's 09:00 cluster.** Loads
-landing together coalesce into fewer triggered dbt builds (Mondays 5 builds
+landing together coalesce into fewer triggered dbt runs (Mondays 5 runs
 become 2, Wednesdays 3 become 2; plain days stay at 2, the two-daily floor)
 and the pool wakes once per morning instead of twice. The cluster stays
 inside the NCAAF band, so the sports still never stack against the shared
-API limit.
+API limit. Triggered dbt is `ARGS='run'`; daily tests are `DBT_TEST_NCAAF`
+at 07:00 UTC. Apply trigger SQL with `make setup-source SOURCE=ncaaf CONFIRM=1`.
 
 **No injuries, no plays, no odds.** The API has no NCAAF injuries endpoint at
 all; play-by-play carries no down/distance/field position (scoring timeline

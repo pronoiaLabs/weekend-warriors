@@ -29,3 +29,7 @@ cortex_agent_lifecycle:
       # default, same fail-fast contract as the variables above.
       query_tag: "{{ env_var('DBT_QUERY_TAG_BASE') }}"
       threads: 4
+      # Collapse the per-node USE ROLE / USE WAREHOUSE / USE DATABASE /
+      # USE SCHEMA burst toward `threads` sessions. If EXECUTE DBT PROJECT
+      # ignores this, the next prod run still shows ~1k USE ROLE.
+      reuse_connections: true
