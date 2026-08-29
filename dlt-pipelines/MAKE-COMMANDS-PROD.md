@@ -63,8 +63,9 @@ reports success while re-fetching a season that ended months ago.
 | `nfl_advanced_stats` | `25 9 * * 2` | Tuesday | same |
 | `nfl_odds_opening` | `30 9 * * *` | daily | immutable game and player-prop openings, both fanned out per game |
 | `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently |
-| `nfl_game_odds` | `0 */2 * * 0,1,4,5,6` | every 2h Thu-Mon | SCD2 snapshots of current game lines |
-| `nfl_player_props` | `10 */2 * * 0,1,4,5,6` | every 2h Thu-Mon | SCD2 snapshots, staggered off game odds |
+| `nfl_news` | `5 */4 * * *` | every 4h | Firecrawl RSS scrape; six runs a day, :05 so it misses the on-the-hour Tasks |
+| `nfl_game_odds` | `0 */4 * * 0,1,4,5,6` | every 4h Thu-Mon | SCD2 snapshots of current game lines |
+| `nfl_player_props` | `10 */4 * * 0,1,4,5,6` | every 4h Thu-Mon | SCD2 snapshots, staggered off game odds |
 | `nfl_nflverse_stats` | `15 11 * * *` | daily | nflverse season files (pbp, player weeks, snaps, Next Gen, injury reports) merged on their keys; a reload is how corrections arrive. 11:xx clears the 09:xx cluster and nflverse's overnight rebuilds |
 | `nfl_nflverse_depth_charts` | `45 11 * * *` | daily | one new depth-chart snapshot a day, cursor on `dt` |
 | `nfl_nflverse_reference` | `50 11 * * 3` | Wednesday | all-history files replaced: players id crosswalk, officials, combine, trades |
@@ -87,10 +88,10 @@ one API key from being hit concurrently and lets a single warm pool node work th
 Expect two builds from the window (the first load fires a build almost immediately; the 900s trigger
 interval coalesces the rest), plus the injuries build at 22:xx.
 
-The live betting Tasks use Snowflake's five-field cron step syntax. They cover Thursday through
-Monday (Sunday is 0) and are staggered by ten minutes so their game fan-outs do not share the API
-key concurrently. Only observations captured while these Tasks run exist: live line movement
-cannot be backfilled.
+The live betting Tasks use Snowflake's five-field cron step syntax. They run every
+four hours Thursday through Monday (Sunday is 0) and are staggered by ten minutes so
+their game fan-outs do not share the API key concurrently. Only observations captured
+while these Tasks run exist: live line movement cannot be backfilled.
 
 **Why 09:00 UTC.** A normal week ends with Monday Night Football at 20:15 ET, final around 23:45 ET.
 That is 03:45 UTC Tuesday under EDT and 04:45 under EST. 09:00 UTC clears both, and the margin is
