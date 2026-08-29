@@ -110,10 +110,16 @@ def test_dbt_trigger_names_agree(scaffold: Path) -> None:
     # doubled quotes; the DBT_BUILDS row carries it plain.
     assert f"ENVIRONMENT = ''{NAME}_prod''" in sql
     assert f"'{NAME}', '{NAME}_prod'" in sql
-    # the harvest child follows the build and calls the shared proc
+    # the harvest child follows the run and calls the shared proc
     assert f"CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_HARVEST_{upper}" in sql
     assert f"AFTER {upper}_PROD_DB.OPS.DBT_BUILD_{upper}" in sql
     assert "CALL DLT_DB.OPS.SP_DBT_HARVEST();" in sql
+    # models-only on the trigger; tests are a separate daily root
+    assert "ARGS = ''run''" in sql
+    assert "ARGS = ''test''" in sql
+    assert f"CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_TEST_{upper}" in sql
+    assert f"AFTER {upper}_PROD_DB.OPS.DBT_TEST_{upper}" not in sql
+    assert "SCHEDULE = 'USING CRON 0 13 * * * UTC'" in sql
     # the audit-table type trap: TZ, never NTZ (failed live, WORKFLOW-4)
     assert "TIMESTAMP_NTZ" not in sql
     # the observability trap: never the generated-task prefix
@@ -130,6 +136,7 @@ def test_dbt_trigger_alerts_and_reraises(scaffold: Path) -> None:
     sql = (scaffold / "sql" / "sources" / NAME / "05_dbt_trigger.sql").read_text()
 
     assert f"'dbt_build_{NAME}'" in sql, "alert scope must carry the sport name"
+    assert f"'dbt_test_{NAME}'" in sql, "daily test alert scope must carry the sport name"
     assert "DLT_DB.OPS.ALERT_STATE" in sql
     assert "SLACK_ALERTS_INT" in sql
     assert "SANITIZE_WEBHOOK_CONTENT" in sql

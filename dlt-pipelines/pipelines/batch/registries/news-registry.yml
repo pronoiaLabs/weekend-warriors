@@ -43,14 +43,15 @@ pipelines:
   # Two RAW tables: news_articles (one row per URL, markdown + feed metadata + the
   # raw extraction JSON) and news_player_mentions (one row per url x player).
   #
-  # HOURLY. The short-post wires below (pft, pfr) expose 15 to 30 items and post
-  # dozens a day, so two runs a day would drop updates; the club and article feeds
-  # hold 20 to 100 items and tolerate either. Five past the hour keeps clear of the
-  # other NFL tasks, which all fire on the hour.
+  # Every 4 hours at :05 UTC (six runs a day). The short-post wires below (pft,
+  # pfr) expose 15 to 30 items and post dozens a day, so two runs a day would
+  # drop updates; six keeps those feeds current without being the loudest dbt
+  # trigger. Club and article feeds hold 20 to 100 items and tolerate either.
+  # Minute 5 stays clear of the other NFL tasks that fire on the hour.
   #
   # Every run that lands rows inserts into RAW._DLT_LOADS and so fires
-  # DBT_BUILD_NFL; the 900s trigger interval coalesces, but this is now the most
-  # frequent trigger of the NFL dbt build. Revisit the cadence if build noise bites.
+  # DBT_BUILD_NFL; the 900s trigger interval coalesces a 4h slot's news / odds /
+  # props loads into one or two builds.
   #
   # Note for the EAI network rule: the container fetches these feeds directly, so
   # every feed host below must be in the rule's VALUE_LIST with its port, not just
@@ -59,7 +60,7 @@ pipelines:
   #   make run-local NAME=nfl_news
   - name: nfl_news
     source: firecrawl
-    schedule: "5 * * * *"
+    schedule: "5 */4 * * *"
     config:
       api_key: "secret:sources.firecrawl.api_key"
 
@@ -123,7 +124,7 @@ pipelines:
         - {name: club_sea, url: https://www.seahawks.com/rss/news, <<: *club_feed}
 
       # Items older than this are ignored. Guards the first run against a club
-      # feed's 100-item backlog; at hourly cadence nothing legitimate is this old.
+      # feed's 100-item backlog; at 4-hour cadence nothing legitimate is this old.
       max_age_hours: 48
 
       # Gate for `extract: gated` feeds, matched as WHOLE WORDS against the item's

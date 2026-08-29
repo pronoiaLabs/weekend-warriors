@@ -47,10 +47,8 @@
 {%- endmacro %}
 
 {% macro snowflake__unset_query_tag(original_query_tag) -%}
-  {% if original_query_tag %}
-    {% do run_query("alter session set query_tag = '" ~ original_query_tag ~ "'") %}
-  {% else %}
-    {% do run_query("alter session unset query_tag") %}
-  {% endif %}
+  {# No-op: keep the signature so dispatch still matches. The next node's
+     set_query_tag still ALTERs because `node` changed. Harvest still sees
+     `node` on the tagged SQL. Cuts one ALTER SESSION per node. #}
   {{ return(none) }}
 {%- endmacro %}

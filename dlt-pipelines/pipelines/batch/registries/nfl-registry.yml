@@ -554,8 +554,8 @@ pipelines:
   # selected:false and never load; only regular season and postseason are requested.
   - name: nfl_game_odds
     source: rest_api
-    # Every two hours Thu-Mon. Minute 0 gives this pipeline the first API-key slot.
-    schedule: "0 */2 * * 0,1,4,5,6"
+    # Every four hours Thu-Mon. Minute 0 gives this pipeline the first API-key slot.
+    schedule: "0 */4 * * 0,1,4,5,6"
     config:
       client: *nfl_client
       resource_defaults:
@@ -625,7 +625,7 @@ pipelines:
   - name: nfl_player_props
     source: rest_api
     # Same window as game odds, staggered to avoid concurrent use of the NFL key.
-    schedule: "10 */2 * * 0,1,4,5,6"
+    schedule: "10 */4 * * 0,1,4,5,6"
     config:
       client: *nfl_client
       resource_defaults:

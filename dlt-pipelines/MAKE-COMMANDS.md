@@ -173,7 +173,7 @@ Six resources into three tables. `season` is **required**; a bare run returns
 
 ### NFL betting: live movement and opening lines
 
-`nfl_game_odds` and `nfl_player_props` run every two hours Thu-Mon at minutes 0 and 10. Both fan
+`nfl_game_odds` and `nfl_player_props` run every four hours Thu-Mon at minutes 0 and 10. Both fan
 out over current-season regular/postseason games and keep SCD2 history. Current lines require
 `WHERE _dlt_valid_to IS NULL`.
 

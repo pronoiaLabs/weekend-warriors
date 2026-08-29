@@ -1,11 +1,14 @@
 -- =============================================================================
--- 05_dbt_trigger.sql (nfl) -- event-driven dbt build after ingestion
+-- 05_dbt_trigger.sql (nfl) -- event-driven dbt run after ingestion
 -- =============================================================================
 -- Chain: dlt load succeeds -> one INSERT lands in RAW._DLT_LOADS -> the
 -- append-only stream below has data -> the triggered task fires (no schedule;
 -- idle costs nothing) -> the procedure drains the stream into an audit table
--- and runs EXECUTE DBT PROJECT for this sport. A FAILED load never inserts
--- into _DLT_LOADS, so failures never trigger a rebuild, structurally.
+-- and runs EXECUTE DBT PROJECT ARGS='run' (models only). A FAILED load never
+-- inserts into _DLT_LOADS, so failures never trigger a rebuild, structurally.
+-- Tests are a sibling scheduled task (DBT_TEST_NFL, 13:00 UTC daily), not on
+-- the hot path: a bad run can copy APP before the next daily test. Slack
+-- still fires if that test fails (SCOPE dbt_test_nfl).
 --
 -- Conventions this file obeys (verified in WORKFLOW-4.md Phase 0):
 --   * The task name avoids the DLT_TASK_ prefix: DLT_DB.OPS.V_TASK_RUNS turns
@@ -35,6 +38,7 @@
 --     1 run). Evaluations that find no data are SKIPPED at zero cost.
 --
 -- Kill switch:  ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND;
+-- Daily tests:  ALTER TASK NFL_PROD_DB.OPS.DBT_TEST_NFL SUSPEND;
 -- (ingestion untouched; the stream accumulates and is drained on resume;
 -- staleness grace ~14 days, re-create the stream if suspended longer, and
 -- also if dlt ever recreates _DLT_LOADS itself.)
@@ -135,7 +139,7 @@ COMMENT = 'Audit: which loads triggered which dbt build. The INSERT that fills t
 CREATE OR REPLACE PROCEDURE NFL_PROD_DB.OPS.SP_DBT_BUILD()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Drain DBT_LOADS_STREAM, then dbt build for NFL. Caller''s rights: EXECUTE DBT PROJECT requires it.'
+COMMENT = 'Drain DBT_LOADS_STREAM, then dbt run (models only) for NFL. Tests are SP_DBT_TEST / DBT_TEST_NFL. Caller''s rights: EXECUTE DBT PROJECT requires it.'
 EXECUTE AS CALLER
 AS
 $$
@@ -167,7 +171,7 @@ BEGIN
   -- PROCEDURE time and rejects a Scripting :bind; the build_id is a
   -- self-minted UUID, so inlining it is safe.
   EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL'
-    || ' ARGS = ''build'''
+    || ' ARGS = ''run'''
     || ' ENVIRONMENT = ''prod'''
     || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';
 
@@ -178,7 +182,7 @@ BEGIN
   INSERT INTO DLT_DB.OPS.DBT_BUILDS
     (BUILD_ID, SPORT, ENVIRONMENT, PROJECT_FQN, ARGS, DRAINED_LOADS, EXEC_QUERY_ID, STARTED_AT, FINISHED_AT)
   VALUES
-    (:build_id, 'nfl', 'prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL', 'build',
+    (:build_id, 'nfl', 'prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL', 'run',
      :drained, :exec_qid, :started_at, CURRENT_TIMESTAMP());
 
   -- TASK_HISTORY.RETURN_VALUE comes ONLY from SYSTEM$SET_RETURN_VALUE; a
@@ -189,7 +193,7 @@ BEGIN
   -- when the proc runs outside a task (manual smoke tests), hence the
   -- guard.
   BEGIN
-    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''built after ' || drained || ' load(s), build_id ' || build_id || ''')';
+    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''ran after ' || drained || ' load(s), build_id ' || build_id || ''')';
   EXCEPTION
     WHEN OTHER THEN
       NULL;
@@ -216,7 +220,7 @@ BEGIN
       NULL;
   END;
 
-  RETURN 'built after ' || drained || ' load(s), build_id ' || build_id;
+  RETURN 'ran after ' || drained || ' load(s), build_id ' || build_id;
 EXCEPTION
   -- Failure ping, then RAISE so TASK_HISTORY and the auto-suspend counter see
   -- exactly what they saw before this handler existed. Only a transition
@@ -260,10 +264,90 @@ EXCEPTION
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE NFL_PROD_DB.OPS.SP_DBT_TEST()
+RETURNS VARCHAR
+LANGUAGE SQL
+COMMENT = 'Daily dbt test for NFL. Does not drain DBT_LOADS_STREAM. Caller''s rights: EXECUTE DBT PROJECT requires it.'
+EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  build_id VARCHAR DEFAULT UUID_STRING();
+  started_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP();
+  exec_qid VARCHAR;
+BEGIN
+  -- No stream drain: this is a scheduled sibling of SP_DBT_BUILD, not a
+  -- consumer of DBT_LOADS_STREAM. DRAINED_LOADS is 0 on the DBT_BUILDS row.
+  EXECUTE IMMEDIATE 'EXECUTE DBT PROJECT DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL'
+    || ' ARGS = ''test'''
+    || ' ENVIRONMENT = ''prod'''
+    || ' ENV_VARS = (''DBT_BUILD_ID'' = ''' || build_id || ''')';
+
+  exec_qid := LAST_QUERY_ID();
+  INSERT INTO DLT_DB.OPS.DBT_BUILDS
+    (BUILD_ID, SPORT, ENVIRONMENT, PROJECT_FQN, ARGS, DRAINED_LOADS, EXEC_QUERY_ID, STARTED_AT, FINISHED_AT)
+  VALUES
+    (:build_id, 'nfl', 'prod', 'DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL', 'test',
+     0, :exec_qid, :started_at, CURRENT_TIMESTAMP());
+
+  BEGIN
+    EXECUTE IMMEDIATE 'SELECT SYSTEM$SET_RETURN_VALUE(''tested, build_id ' || build_id || ''')';
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
+  BEGIN
+    LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE WHERE SCOPE = 'dbt_test_nfl');
+    IF (prev = 'failing') THEN
+      CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+        SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+          SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT('*RECOVERED dbt_test_nfl*')),
+        SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+      UPDATE DLT_DB.OPS.ALERT_STATE
+        SET STATUS = 'ok', UPDATED_AT = CURRENT_TIMESTAMP(),
+            LAST_ALERTED_AT = CURRENT_TIMESTAMP(), LAST_ERROR = NULL
+        WHERE SCOPE = 'dbt_test_nfl';
+    END IF;
+  EXCEPTION
+    WHEN OTHER THEN
+      NULL;
+  END;
+
+  RETURN 'tested, build_id ' || build_id;
+EXCEPTION
+  WHEN OTHER THEN
+    LET err VARCHAR := LEFT(COALESCE(SQLERRM, 'unknown error'), 400);
+    LET alert_msg VARCHAR := '*FAILED dbt_test_nfl*'
+      || '\\ncause: `' || SPLIT_PART(err, '\n', 1) || '`'
+      || '\\nbuild_id: ' || build_id;
+    BEGIN
+      LET prev VARCHAR := (SELECT MAX(STATUS) FROM DLT_DB.OPS.ALERT_STATE WHERE SCOPE = 'dbt_test_nfl');
+      IF (prev IS NULL OR prev <> 'failing') THEN
+        CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
+          SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(
+            SNOWFLAKE.NOTIFICATION.SANITIZE_WEBHOOK_CONTENT(:alert_msg)),
+          SNOWFLAKE.NOTIFICATION.INTEGRATION('SLACK_ALERTS_INT'));
+      END IF;
+      MERGE INTO DLT_DB.OPS.ALERT_STATE t USING (SELECT 'dbt_test_nfl' AS SCOPE) s ON t.SCOPE = s.SCOPE
+        WHEN MATCHED THEN UPDATE SET STATUS = 'failing', UPDATED_AT = CURRENT_TIMESTAMP(),
+          LAST_ALERTED_AT = IFF(t.STATUS <> 'failing', CURRENT_TIMESTAMP(), t.LAST_ALERTED_AT),
+          LAST_ERROR = :err
+        WHEN NOT MATCHED THEN INSERT (SCOPE, STATUS, UPDATED_AT, LAST_ALERTED_AT, LAST_ERROR)
+          VALUES ('dbt_test_nfl', 'failing', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), :err);
+    EXCEPTION
+      WHEN OTHER THEN
+        NULL;
+    END;
+    RAISE;
+END;
+$$;
+
 -- CREATE OR ALTER TASK refuses to touch a started task; suspend first.
--- The whole graph (root, child, and 08 grandchild) must be suspended to
--- alter any node. Root first: suspending a child while the root is started
--- is 091421.
+-- The load-triggered graph (root, child, and 08 grandchild) must be
+-- suspended to alter any node. Root first: suspending a child while the
+-- root is started is 091421. DBT_TEST_NFL is a separate root (no AFTER).
+ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_TEST_NFL SUSPEND;
 ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND;
 ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL SUSPEND;
 ALTER TASK IF EXISTS NFL_PROD_DB.OPS.APP_COPY_NFL SUSPEND;
@@ -272,28 +356,43 @@ CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL
   WAREHOUSE = DBT_WH
   USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 900
   USER_TASK_TIMEOUT_MS = 3600000
-  COMMENT = 'dbt build for NFL on new RAW loads. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
+  COMMENT = 'dbt run (models only) for NFL on new RAW loads. Tests are DBT_TEST_NFL. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
   WHEN SYSTEM$STREAM_HAS_DATA('NFL_PROD_DB.OPS.DBT_LOADS_STREAM')
 AS
   CALL NFL_PROD_DB.OPS.SP_DBT_BUILD();
 
--- Harvest child: runs only after a SUCCESSFUL build (task-graph semantics;
+-- Harvest child: runs only after a SUCCESSFUL run (task-graph semantics;
 -- a child AFTER a triggered root fires normally, verified WORKFLOW-5
--- Phase 0). A harvest failure fails this task's own run, never the build.
--- The proc it calls lives in sql/ops/06_dbt_harvest.sql -- apply that file
--- before this one on a fresh account.
+-- Phase 0). A harvest failure fails this task's own run, never the dbt run.
+-- Daily test queries sit in QUERY_HISTORY until the next run's harvest or
+-- the 4h sweep. The proc it calls lives in sql/ops/06_dbt_harvest.sql --
+-- apply that file before this one on a fresh account.
 CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL
   WAREHOUSE = DBT_WH
   USER_TASK_TIMEOUT_MS = 1800000
-  COMMENT = 'Query log + operator-stats harvest after each NFL dbt build. NOT managed by generate_tasks.py.'
+  COMMENT = 'Query log + operator-stats harvest after each NFL dbt run. NOT managed by generate_tasks.py.'
   AFTER NFL_PROD_DB.OPS.DBT_BUILD_NFL
 AS
   CALL DLT_DB.OPS.SP_DBT_HARVEST();
 
+-- Daily test: separate root, not AFTER the run graph, so a failing test
+-- never blocks APP_COPY. Cron is after the 09:00 cluster, nflverse 11:xx,
+-- and sleeper players 12:10.
+CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_TEST_NFL
+  WAREHOUSE = DBT_WH
+  SCHEDULE = 'USING CRON 0 13 * * * UTC'
+  USER_TASK_TIMEOUT_MS = 3600000
+  COMMENT = 'Daily dbt test for NFL. Separate root; does not drain DBT_LOADS_STREAM. NOT managed by generate_tasks.py.'
+AS
+  CALL NFL_PROD_DB.OPS.SP_DBT_TEST();
+
+ALTER TASK NFL_PROD_DB.OPS.DBT_TEST_NFL SET TAG DLT_DB.OPS.COST_CENTER = 'dbt';
+
 -- Not redundant: CREATE OR ALTER TASK leaves tasks suspended. Children
 -- resume BEFORE the root; a resumed root with a suspended child skips it.
 -- APP_COPY_NFL is created by 08; IF EXISTS so this file still applies
--- on a fresh account before 08 has run.
+-- on a fresh account before 08 has run. DBT_TEST_NFL is its own root.
 ALTER TASK IF EXISTS NFL_PROD_DB.OPS.APP_COPY_NFL RESUME;
 ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL RESUME;
 ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL RESUME;
+ALTER TASK NFL_PROD_DB.OPS.DBT_TEST_NFL RESUME;
