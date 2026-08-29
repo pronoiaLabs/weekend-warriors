@@ -472,6 +472,39 @@ button.trow.current { background: var(--surface-2); }
   .subnav { overflow-x: auto; max-width: 100%; }
 }
 
+/* ---- players · the finder ---- */
+.cols-players { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); gap: var(--gap); align-items: stretch; }
+.cols-players > .tile { display: flex; flex-direction: column; }
+.cols-players > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
+/* the leaderboard lives inside the viewport: the rows scroll, the page doesn't */
+.leaders-tile .tile-body { max-height: calc(100vh - 400px); min-height: 360px; }
+.risers-tile .tile-body { max-height: calc(100vh - 400px); }
+.leaders-tile .trow.head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-top: 8px; padding-bottom: 6px; }
+.pcell { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+.pcell .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.pcell .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcell .who small { color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+a.trow:hover .pcell .who b { color: var(--accent); }
+.posrk { font-size: 10px; font-weight: 700; color: var(--ink-4); }
+.trend { font-size: 11px; color: var(--ink-4); }
+.trend.pos { color: var(--pos); }
+.trend.neg { color: var(--neg); }
+.riser { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); color: inherit; }
+.riser:first-of-type { border-top: 0; padding-top: 0; }
+.riser .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.riser .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riser .who small { color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riser:hover .who b { color: var(--accent); }
+.riser .delta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.riser .delta small { color: var(--ink-4); }
+.risers-tile .tile-body > .hint { padding-top: 10px; }
+.psel-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-s); color: var(--ink-3); }
+.psel { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: var(--fs-s); }
+
+@media (max-width: 900px) {
+  .cols-players { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---- vertical rhythm, the rule: one even gap between every page-level block
    on every page. Sits last so it wins the tie against each block's own legacy
    margin-bottom (20/16/10px drift), which is zeroed for direct children. ---- */
