@@ -77,16 +77,38 @@ function NewsFeed() {
 
       {data && <Kpis data={data} shown={rows.length} />}
 
+      {/* chips for the small sets, selects for the walls: 32 teams and a
+          dozen feeds as pills buried the page (measured five rows deep) */}
       <div className="filters">
         <Chips label="Window" items={WINDOWS.map((d) => ({ id: String(d), label: `${d} days` }))} active={String(data?.days ?? days ?? 7)} onPick={(id) => set({ days: id === '7' ? undefined : id })} />
         {data && data.teams.length > 0 && (
-          <Chips label="Team" items={[{ id: '', label: 'All teams' }, ...data.teams.map((t) => ({ id: t, label: t }))]} active={team ?? ''} onPick={(id) => set({ team: id || undefined })} />
+          <label className="psel-wrap">
+            Team
+            <select className="psel" value={team ?? ''} onChange={(e) => set({ team: e.target.value || undefined })}>
+              <option value="">All teams</option>
+              {data.teams.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
-      </div>
-      <div className="filters">
         {topics.length > 0 && <Chips label="Topic" items={[{ id: '', label: 'Any topic' }, ...topics.map((t) => ({ id: t, label: t }))]} active={topic ?? ''} onPick={(id) => set({ topic: id || undefined })} />}
         {positions.length > 0 && <Chips label="Position" items={[{ id: '', label: 'Any position' }, ...positions.map((p) => ({ id: p, label: p }))]} active={position ?? ''} onPick={(id) => set({ position: id || undefined })} />}
-        {data && data.feeds.length > 1 && <Chips label="Feed" items={[{ id: '', label: 'All feeds' }, ...data.feeds.map((f) => ({ id: f, label: f }))]} active={feed ?? ''} onPick={(id) => set({ feed: id || undefined })} />}
+        {data && data.feeds.length > 1 && (
+          <label className="psel-wrap">
+            Feed
+            <select className="psel" value={feed ?? ''} onChange={(e) => set({ feed: e.target.value || undefined })}>
+              <option value="">All feeds</option>
+              {data.feeds.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button type="button" className={`chip ${resolvedOnly ? 'on' : ''}`} aria-pressed={resolvedOnly} onClick={() => set({ resolved: resolvedOnly ? undefined : '1' })}>
           Resolved players only
         </button>
