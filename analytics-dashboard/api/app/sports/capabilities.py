@@ -23,6 +23,7 @@ class Capability(StrEnum):
     TRENDING_PLAYERS = "trending_players"  # app_trending_players
     MARKET_MOVERS = "market_movers"        # app_market_movers
     TEAM_BRANDING = "team_branding"        # app_team_branding
+    TEAM_SITUATION = "team_situation"      # app_team_situation
     # the Explorer's sheets: flat, one table per grain
     EXPLORE_PLAYER_GAMES = "explore_player_games"      # app_explore_player_games
     EXPLORE_DEFENDER_GAMES = "explore_defender_games"  # app_explore_defender_games

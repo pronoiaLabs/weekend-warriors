@@ -78,6 +78,10 @@ SELECTION: dict[str, dict[C, str]] = {
         C.TRENDING_PLAYERS: "1 = 1",
         C.MARKET_MOVERS: "season = 2026 and week in (1, 2)",
         C.TEAM_BRANDING: "1 = 1",
+        # the game page's situations tab: both seasons the game fixtures span
+        # (the season in progress has no completed regular-season games yet, so
+        # 2025 carries the panel until the pbp lands)
+        C.TEAM_SITUATION: "season in (2025, 2026) and season_type_name = 'Regular Season'",
         # the Explorer's sheets: a slice of each grain the page's filters can
         # cut further (two teams' player seasons, one completed team season,
         # two lined weeks, one book's props, two days of news, two books' moves)

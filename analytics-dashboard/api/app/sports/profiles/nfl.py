@@ -26,6 +26,7 @@ NFL = SportProfile(
         C.TRENDING_PLAYERS: "app_trending_players",
         C.MARKET_MOVERS: "app_market_movers",
         C.TEAM_BRANDING: "app_team_branding",
+        C.TEAM_SITUATION: "app_team_situation",
         C.EXPLORE_PLAYER_GAMES: "app_explore_player_games",
         C.EXPLORE_DEFENDER_GAMES: "app_explore_defender_games",
         C.EXPLORE_TEAM_GAMES: "app_explore_team_games",

@@ -32,9 +32,14 @@ class SlateRow(BaseModel):
     game_date: dt.date
     game_datetime_et: dt.datetime
     kickoff_slot_et: str
+    kickoff_window: str
+    kickoff_window_label: str
+    kickoff_window_order: int
     game_status: str | None = None
     is_completed: bool
     went_to_overtime: bool | None = None
+    is_division_game: bool
+    referee: str | None = None
     home_team_key: str
     home_team_label: str
     home_team_name: str
@@ -45,6 +50,20 @@ class SlateRow(BaseModel):
     away_team_name: str
     away_conference: str | None = None
     away_division: str | None = None
+    # the record entering the game (0-0 at week 1)
+    home_wins: int = 0
+    home_losses: int = 0
+    home_ties: int = 0
+    home_record: str
+    away_wins: int = 0
+    away_losses: int = 0
+    away_ties: int = 0
+    away_record: str
+    # availability: None = no report coverage for the game, 0 = clean report
+    home_players_out: int | None = None
+    home_players_questionable: int | None = None
+    away_players_out: int | None = None
+    away_players_questionable: int | None = None
     venue: str | None = None
     stadium_name: str | None = None
     roof: str | None = None

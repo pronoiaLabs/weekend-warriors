@@ -5,6 +5,7 @@ import type {
   CatalogPayload,
   GameMarketsPayload,
   GamePayload,
+  GameSituationsPayload,
   HealthPayload,
   LeadersPayload,
   MarketsPayload,
@@ -67,6 +68,18 @@ export function fetchGame(
   signal?: AbortSignal,
 ): Promise<GamePayload> {
   return get<GamePayload>(`${sportPath(sport)}/games/${encodeURIComponent(gameKey)}`, { vendor }, signal)
+}
+
+export function fetchGameSituations(
+  sport: string,
+  gameKey: string,
+  signal?: AbortSignal,
+): Promise<GameSituationsPayload> {
+  return get<GameSituationsPayload>(
+    `${sportPath(sport)}/games/${encodeURIComponent(gameKey)}/situations`,
+    {},
+    signal,
+  )
 }
 
 export type StandingsParams = {

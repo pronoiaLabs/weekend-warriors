@@ -67,6 +67,17 @@ class PropRow(BaseModel):
     stat_avg_to_date: float | None = None
     games_over_line_to_date: int | None = None
     hit_rate_over_line: float | None = None
+    # Sleeper's latest pre-kickoff projection for this prop's stat; coverage
+    # follows Sleeper's calendar (its clock serves the league's current week)
+    projection_value: float | None = None
+    projection_vs_line: float | None = None
+    has_projection: bool = False
+    projection_captured_at: dt.datetime | None = None
+    # usage form: trailing three games strictly before kickoff
+    usage_trailing3_games: int = 0
+    target_share_trailing3: float | None = None
+    air_yards_share_trailing3: float | None = None
+    snap_pct_trailing3: float | None = None
     opponent_allowed_stat_key: str | None = None
     opponent_allowed_per_game: float | None = None
     opponent_allowed_rank: int | None = None
