@@ -30,6 +30,8 @@ export type Capability =
   | 'explore_player_props'
   | 'explore_news'
   | 'explore_line_moves'
+  | 'explore_plays'
+  | 'play_log'
 
 export interface CapabilitiesPayload {
   sport: string
@@ -344,6 +346,22 @@ export interface StandingsRow {
   penalty_yards: number | null
   last_game_date: string | null
   last_results: string[] | null
+  /** the EPA block from the team twins: null for preseason (no pbp) */
+  off_plays: number | null
+  off_epa: number | null
+  off_epa_per_play: number | null
+  success_plays: number | null
+  success_rate: number | null
+  def_plays: number | null
+  def_epa: number | null
+  def_epa_per_play: number | null
+  def_success_plays: number | null
+  success_rate_allowed: number | null
+  off_epa_per_play_rank: number | null
+  def_epa_per_play_rank: number | null
+  /** the home/away split rows denormalized onto every row */
+  home_record: string | null
+  away_record: string | null
   rank_overall: number
   rank_conference: number
   rank_division: number
@@ -437,6 +455,17 @@ export interface TeamWeekRow {
   opp_red_zone_attempts: number | null
   opp_turnovers: number | null
   has_box_score: boolean | null
+  /** game-level EPA from the twins; rides every vendor row, null preseason */
+  off_plays: number | null
+  off_epa_per_play: number | null
+  success_rate: number | null
+  pass_epa_per_dropback: number | null
+  rush_epa_per_carry: number | null
+  explosive_rate: number | null
+  def_plays: number | null
+  def_epa_per_play: number | null
+  success_rate_allowed: number | null
+  has_nflverse: boolean | null
   vendor: string | null
   spread: number | null
   spread_odds: number | null
@@ -528,6 +557,9 @@ export interface TeamPayload {
   weeks: TeamWeekRow[]
   allowed: AllowedRow[]
   ats: AtsRow[]
+  /** the situation splits; postseason reads the regular season, preseason is empty */
+  situation_season_type_name: string
+  situations: SituationRow[]
   query: string | null
 }
 
@@ -1118,12 +1150,97 @@ export interface SheetPayload {
   table: string
   columns: SheetColumn[]
   filters: { column: string; value: Cell }[]
+  /** the free-text where bar as sent and as parsed; ANDs with the chip filters */
+  q: string | null
+  clauses: { column: string; op: string; value: Cell }[]
   order: string
   desc: boolean
   limit: number
   offset: number
   has_more: boolean
+  elapsed_ms: number
   rows: Record<string, Cell>[]
+  query: string | null
+}
+
+/** One play from the feed: situation, the call, who was involved, the outcome. */
+export interface PlayRow {
+  app_play_log_key: string
+  play_key: string
+  game_key: string
+  team_key: string | null
+  opponent_team_key: string | null
+  season: number
+  week: number
+  season_type: number
+  season_type_name: string | null
+  is_postseason: boolean | null
+  game_date: string
+  team_label: string | null
+  opponent_label: string | null
+  is_home_possession: boolean | null
+  quarter: number | null
+  clock_display: string | null
+  clock_seconds_remaining: number | null
+  score_differential: number | null
+  game_script: string | null
+  home_score_after_play: number | null
+  away_score_after_play: number | null
+  drive_number: number | null
+  play_in_drive: number | null
+  series_result: string | null
+  drive_play_count: number | null
+  drive_yards: number | null
+  drive_time_of_possession: string | null
+  drive_result: string | null
+  down: number | null
+  distance: number | null
+  yards_to_endzone: number | null
+  down_bucket: string | null
+  distance_bucket: string | null
+  field_zone: string | null
+  is_red_zone: boolean | null
+  is_third_down: boolean | null
+  is_fourth_down: boolean | null
+  is_two_minute: boolean | null
+  shotgun: boolean | null
+  no_huddle: boolean | null
+  play_type: string | null
+  play_category: string | null
+  play_family: string | null
+  pass_length: string | null
+  pass_location: string | null
+  run_location: string | null
+  run_gap: string | null
+  passer_player_key: string | null
+  passer_name: string | null
+  rusher_player_key: string | null
+  rusher_name: string | null
+  receiver_player_key: string | null
+  receiver_name: string | null
+  yards_gained: number | null
+  epa: number | null
+  wpa: number | null
+  success: boolean | null
+  achieved_first_down: boolean | null
+  is_touchdown: boolean | null
+  is_scoring_play: boolean | null
+  air_yards: number | null
+  yards_after_catch: number | null
+  play_description: string | null
+  has_nflverse: boolean | null
+  is_epa_play: boolean | null
+}
+
+export interface PlaysPayload {
+  sport: string
+  season: number
+  as_of: string
+  rows: PlayRow[]
+  has_more: boolean
+  player_key: string | null
+  player_name: string | null
+  usage: PlayerUsageRow[]
   query: string | null
 }
 

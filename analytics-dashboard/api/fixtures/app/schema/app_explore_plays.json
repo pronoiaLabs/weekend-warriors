@@ -1,0 +1,221 @@
+{
+  "table": "app_explore_plays",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "row_id",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "week",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "game_date",
+      "type": "DATE",
+      "nullable": true
+    },
+    {
+      "name": "team",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "opponent",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "quarter",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "clock",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "down",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "distance",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "yards_to_endzone",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "down_bucket",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "distance_bucket",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "field_zone",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "script",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "is_red_zone",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_third_down",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_two_minute",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "shotgun",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "no_huddle",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "play_type",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "play_category",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "play_family",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "pass_length",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "pass_location",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "run_gap",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "passer",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "rusher",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "receiver",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "yards_gained",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "wpa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "success",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "first_down",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_touchdown",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_scoring_play",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "drive_number",
+      "type": "NUMBER(38,0)",
+      "nullable": true
+    },
+    {
+      "name": "play_in_drive",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "drive_result",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "description",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "has_nflverse",
+      "type": "BOOLEAN",
+      "nullable": true
+    }
+  ]
+}

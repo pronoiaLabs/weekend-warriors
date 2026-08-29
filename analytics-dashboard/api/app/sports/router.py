@@ -11,6 +11,7 @@ from app.sports.routers import (
     markets,
     news,
     players,
+    plays,
     pulse,
     slate,
     teams,
@@ -23,6 +24,7 @@ router.include_router(slate.router)
 router.include_router(games.router)
 router.include_router(teams.router)
 router.include_router(players.router)
+router.include_router(plays.router)
 router.include_router(markets.router)
 router.include_router(news.router)
 router.include_router(explore.router)

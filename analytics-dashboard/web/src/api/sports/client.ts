@@ -13,6 +13,7 @@ import type {
   PlayerPayload,
   PlayerPropsPayload,
   PlayerUsagePayload,
+  PlaysPayload,
   PulsePayload,
   SheetPayload,
   SlatePayload,
@@ -156,6 +157,25 @@ export function fetchPlayerProps(
   )
 }
 
+export type PlaysParams = {
+  season?: number
+  week?: number
+  game_key?: string
+  player_key?: string
+  team?: string
+  down_bucket?: string
+  distance_bucket?: string
+  field_zone?: string
+  script?: string
+  play_family?: string
+  shotgun?: boolean
+  no_huddle?: boolean
+}
+
+export function fetchPlays(sport: string, params: PlaysParams, signal?: AbortSignal): Promise<PlaysPayload> {
+  return get<PlaysPayload>(`${sportPath(sport)}/plays`, params, signal)
+}
+
 export function fetchMarkets(sport: string, params: SlateParams, signal?: AbortSignal): Promise<MarketsPayload> {
   return get<MarketsPayload>(`${sportPath(sport)}/markets`, params, signal)
 }
@@ -184,6 +204,7 @@ export function fetchCatalog(sport: string, signal?: AbortSignal): Promise<Catal
 
 export type SheetParams = {
   where: string[]
+  q?: string
   order?: string
   desc?: boolean
   limit?: number

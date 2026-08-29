@@ -21,6 +21,8 @@ from app.sports.capabilities import Capability as C
 from app.sports.payloads import Envelope
 from app.sports.profile import SportProfile
 from app.sports.seasons import pick_season_type, season_types
+from app.sports.tiles.situations import COLUMNS as SITUATION_COLUMNS
+from app.sports.tiles.situations import SituationRow
 
 SPLITS = ("all", "home", "away")
 
@@ -76,6 +78,23 @@ class StandingsRow(BaseModel):
     penalty_yards: int | None = None
     last_game_date: dt.date | None = None
     last_results: list[str] | None = None
+    # the EPA block from the team twins: NULL for preseason (no pbp), ranks
+    # masked there rather than trailing
+    off_plays: int | None = None
+    off_epa: float | None = None
+    off_epa_per_play: float | None = None
+    success_plays: int | None = None
+    success_rate: float | None = None
+    def_plays: int | None = None
+    def_epa: float | None = None
+    def_epa_per_play: float | None = None
+    def_success_plays: int | None = None
+    success_rate_allowed: float | None = None
+    off_epa_per_play_rank: int | None = None
+    def_epa_per_play_rank: int | None = None
+    # the home/away split rows denormalized onto every row of the team-season
+    home_record: str | None = None
+    away_record: str | None = None
     rank_overall: int
     rank_conference: int
     rank_division: int
@@ -166,6 +185,19 @@ class TeamWeekRow(BaseModel):
     opp_red_zone_attempts: int | None = None
     opp_turnovers: int | None = None
     has_box_score: bool | None = None
+    # game-level EPA from the twins: rides every vendor row, NULL preseason.
+    # These MUST sit before `vendor` -- LINE_FIELDS slices from `vendor` to
+    # `total_result` and blanks that span when a book has no line.
+    off_plays: int | None = None
+    off_epa_per_play: float | None = None
+    success_rate: float | None = None
+    pass_epa_per_dropback: float | None = None
+    rush_epa_per_carry: float | None = None
+    explosive_rate: float | None = None
+    def_plays: int | None = None
+    def_epa_per_play: float | None = None
+    success_rate_allowed: float | None = None
+    has_nflverse: bool | None = None
     # the line from this team's side; all None when the requested book has none
     vendor: str | None = None
     spread: float | None = None
@@ -276,6 +308,10 @@ class TeamPayload(BaseModel):
     weeks: list[TeamWeekRow]
     allowed: list[AllowedRow]
     ats: list[AtsRow]
+    # the situation splits: a postseason page reads the REGULAR SEASON rows
+    # (the 12-5 convention); preseason is honestly empty (no play-by-play)
+    situation_season_type_name: str
+    situations: list[SituationRow] = Field(default_factory=list)
     query: str | None = None
 
 
@@ -381,12 +417,23 @@ def team(
         order=("season_type", "vendor"),
         tag="team_ats",
     )
+    si_rows, si_sql = source.select(
+        profile,
+        C.TEAM_SITUATION,
+        SITUATION_COLUMNS,
+        where=where,
+        params=params,
+        matches=matches,
+        order=("season_type", "side", "situation_order"),
+        tag="team_situations",
+    )
 
     splits = sorted(
         (StandingsRow(**r) for r in st_rows if r["season_type_name"] == chosen),
         key=lambda s: SPLITS.index(s.split),
     )
     in_type = [r for r in wk_rows if r["season_type_name"] == chosen]
+    situation_type = "Regular Season" if chosen == "Postseason" else chosen
     return TeamPayload(
         sport=profile.key,
         season=season,
@@ -400,7 +447,11 @@ def team(
         weeks=collapse(in_type, book),
         allowed=[AllowedRow(**r) for r in al_rows if r["season_type_name"] == chosen],
         ats=[AtsRow(**r) for r in ats_rows if r["season_type_name"] == chosen],
-        query=f"{st_sql}\n\n{wk_sql}\n\n{al_sql}\n\n{ats_sql}",
+        situation_season_type_name=situation_type,
+        situations=[
+            SituationRow(**r) for r in si_rows if r["season_type_name"] == situation_type
+        ],
+        query=f"{st_sql}\n\n{wk_sql}\n\n{al_sql}\n\n{ats_sql}\n\n{si_sql}",
     )
 
 
