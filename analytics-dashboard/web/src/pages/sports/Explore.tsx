@@ -139,21 +139,36 @@ function Sheets({ sheets, catalogQuery, sport, label }: { sheets: SheetRef[]; ca
           </button>
         </span>
       </div>
+      {/* one compact select per filterable column: a chip per value buried the
+          page under seven pill rows (18 weeks, 14 positions...) */}
       {filterCols.length > 0 && (
         <div className="filters">
           {filterCols.map((c) => {
             const values = distinct(rows, c.name, c.kind)
             const active = where.find((w) => w.startsWith(`${c.name}:`))?.slice(c.name.length + 1) ?? null
-            // a column with too many values on this page is not a chip row (sort or page instead)
             if ((values.length === 0 || values.length > MAX_CHIPS) && !active) return null
+            const options = active && !values.includes(active) ? [active, ...values] : values
             return (
-              <Chips
-                key={c.name}
-                label={c.name}
-                items={(active && !values.includes(active) ? [active, ...values] : values).map((v) => ({ id: v, label: `${c.name}: ${v}` }))}
-                active={active}
-                onPick={(v) => toggleWhere(c.name, v)}
-              />
+              <label key={c.name} className="psel-wrap">
+                {c.name}
+                <select
+                  className="psel"
+                  value={active ?? ''}
+                  onChange={(e) => {
+                    // picking "any" re-toggles the active value off; with no
+                    // active value there is nothing to clear
+                    const v = e.target.value || active
+                    if (v) toggleWhere(c.name, v)
+                  }}
+                >
+                  <option value="">any</option>
+                  {options.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )
           })}
         </div>
