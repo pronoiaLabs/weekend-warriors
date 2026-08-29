@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { fetchCatalog, fetchSheet } from '../../api/sports/client.ts'
 import type { SheetPayload, SheetRef } from '../../api/sports/types.ts'
@@ -45,17 +45,23 @@ export default function Explore() {
 
 function Sheets({ sheets, catalogQuery, sport, label }: { sheets: SheetRef[]; catalogQuery: string | null; sport: string; label: string }) {
   const [search, setSearch] = useSearchParams()
-  // every choice is in the URL: the sheet, the where pairs, the sort, the page size
+  // every choice is in the URL: the sheet, the where pairs, the free-text
+  // where bar, the sort, the page size
   const sheetId = sheets.some((s) => s.id === search.get('sheet')) ? search.get('sheet')! : sheets[0]!.id
   const sheet = sheets.find((s) => s.id === sheetId)!
   const where = search.getAll('where')
+  const q = search.get('q') ?? undefined
   const order = search.get('order') ?? undefined
   const desc = search.get('desc') === '1'
   const limitParam = Number(search.get('limit'))
   const limit = LIMITS.includes(limitParam) ? limitParam : 500
   const offset = Number(search.get('offset')) || 0
+  // the input is free-typed and committed on Enter or blur, so a half-written
+  // clause never fires a 400 mid-keystroke
+  const [draft, setDraft] = useState(q ?? '')
+  useEffect(() => setDraft(q ?? ''), [q, sheetId])
 
-  const res = useApi((signal) => fetchSheet(sport, sheetId, { where, order, desc, limit, offset }, signal), [sport, sheetId, where.join('|'), order, desc, limit, offset])
+  const res = useApi((signal) => fetchSheet(sport, sheetId, { where, q, order, desc, limit, offset }, signal), [sport, sheetId, where.join('|'), q ?? '', order, desc, limit, offset])
 
   const set = (patch: Record<string, string | string[] | undefined>) => {
     const next = new URLSearchParams(search)
@@ -66,7 +72,17 @@ function Sheets({ sheets, catalogQuery, sport, label }: { sheets: SheetRef[]; ca
     }
     setSearch(next, { replace: true })
   }
-  const pickSheet = (id: string) => set({ sheet: id === sheets[0]!.id ? undefined : id, where: [], order: undefined, desc: undefined, offset: undefined })
+  const pickSheet = (id: string) =>
+    set({
+      sheet: id === sheets[0]!.id ? undefined : id,
+      // the plays sheet is the largest by far: seed the current season as a
+      // removable chip so the first read is bounded, honestly and visibly
+      where: id === 'plays' ? ['season:2026'] : [],
+      q: undefined,
+      order: undefined,
+      desc: undefined,
+      offset: undefined,
+    })
   const toggleWhere = (column: string, value: string) => {
     const key = `${column}:${value}`
     const others = where.filter((w) => !w.startsWith(`${column}:`))
@@ -91,9 +107,37 @@ function Sheets({ sheets, catalogQuery, sport, label }: { sheets: SheetRef[]; ca
         </p>
       </div>
 
-      <div className="filters">
+      <div className="filters catalog-chips">
         <Chips label="Sheet" items={sheets.map((s) => ({ id: s.id, label: s.label }))} active={sheetId} onPick={pickSheet} />
         <Chips label="Rows" items={LIMITS.map((l) => ({ id: String(l), label: String(l) }))} active={String(limit)} onPick={(id) => set({ limit: id === '500' ? undefined : id, offset: undefined })} />
+      </div>
+
+      <div className="qbar">
+        <label className="qwhere">
+          <span>where</span>
+          <input
+            value={draft}
+            spellCheck={false}
+            placeholder="column op value and column op value  ·  ops: = != > < >= <="
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => draft.trim() !== (q ?? '') && set({ q: draft.trim() || undefined, offset: undefined })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') set({ q: draft.trim() || undefined, offset: undefined })
+            }}
+          />
+        </label>
+        <span className="sheet-actions">
+          <a className="chip" href={apiUrl(sport, sheetId, search, true)} download>
+            Export CSV
+          </a>
+          <button
+            type="button"
+            className="chip"
+            onClick={() => navigator.clipboard?.writeText(`${location.origin}${apiUrl(sport, sheetId, search, false)}`)}
+          >
+            Copy API call
+          </button>
+        </span>
       </div>
       {filterCols.length > 0 && (
         <div className="filters">
@@ -216,7 +260,7 @@ function Grid({ data, sheet, sortBy, onPage }: { data: SheetPayload; sheet: Shee
 
       <TileFrame
         title={sheet.label}
-        meta={`${data.rows.length} rows${data.has_more ? ' of more' : ''} · ${cols.length} columns · sorted by ${data.order}${data.desc ? ' desc' : ''}`}
+        meta={`${data.rows.length} rows${data.has_more ? ' of more' : ''} · ${cols.length} columns · sorted by ${data.order}${data.desc ? ' desc' : ''} · ${fmt(data.elapsed_ms, 0)}ms`}
         className="sheet-tile"
         caption={
           <span className="sheet-actions">
@@ -278,6 +322,20 @@ function Grid({ data, sheet, sortBy, onPage }: { data: SheetPayload; sheet: Shee
       </TileFrame>
     </>
   )
+}
+
+/** The API call the current view makes -- shareable, curl-able, exportable. */
+function apiUrl(sport: string, sheetId: string, search: URLSearchParams, csv: boolean): string {
+  const params = new URLSearchParams()
+  for (const w of search.getAll('where')) params.append('where', w)
+  for (const k of ['q', 'order', 'limit', 'offset'] as const) {
+    const v = search.get(k)
+    if (v) params.set(k, v)
+  }
+  if (search.get('desc') === '1') params.set('desc', 'true')
+  if (csv) params.set('format', 'csv')
+  const qs = params.toString()
+  return `/api/${sport}/explore/${sheetId}${qs ? `?${qs}` : ''}`
 }
 
 function Stat({ v, l }: { v: string; l: string }) {

@@ -609,6 +609,14 @@ a.split-row:hover { background: var(--surface); border-radius: 8px; }
 .prop-flag { margin-left: 6px; }
 .prop-spark { height: 24px; width: 96px; }
 
+/* ---- explorer · the query bar ---- */
+.qbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
+.qwhere { flex: 1 1 320px; display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; }
+.qwhere span { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
+.qwhere input { flex: 1; background: none; border: 0; outline: none; color: var(--ink); font-family: var(--mono); font-size: 12px; }
+.qbar .sheet-actions { margin-left: auto; display: inline-flex; gap: 8px; }
+.catalog-chips .chip { font-family: var(--mono); }
+
 /* ---- play log · the pattern room ---- */
 .frail .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
 .frail .chip .avatar { width: 18px; height: 18px; font-size: 8px; margin-right: 4px; }
