@@ -471,3 +471,9 @@ button.trow.current { background: var(--surface-2); }
   .teasers { grid-template-columns: minmax(0, 1fr); }
   .subnav { overflow-x: auto; max-width: 100%; }
 }
+
+/* ---- vertical rhythm, the rule: one even gap between every page-level block
+   on every page. Sits last so it wins the tie against each block's own legacy
+   margin-bottom (20/16/10px drift), which is zeroed for direct children. ---- */
+.page > * + * { margin-top: var(--gap); }
+.page > * { margin-bottom: 0; }
