@@ -11,6 +11,7 @@ import { usePins, type Pin } from '../../hooks/usePins.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
 import { fmt, odds, ordinal, signed, spreadText, titleCase, tone } from '../../lib/format.ts'
+import { PRECIP_FLAG, SPREAD_MOVE_FLAG, WIND_PASSING } from '../../lib/thresholds.ts'
 import { boardPath, useView } from '../../state/view.tsx'
 
 /** Stat families group prop types into one chip row. A family shows only when
@@ -384,13 +385,13 @@ function matchupNotes(g: SlateRow, rows: PropRow[]): string[] {
       notes.push(`${p.opponent_label} is ${ordinal(ranked + 1 - p.opponent_allowed_rank)}-stingiest against ${p.position}s in ${stat} (${per} per game)${season}, a fade for ${team}'s ${p.position}s.`)
     }
   }
-  if (g.is_weather_relevant && (g.wind_mph ?? 0) >= 12) {
+  if (g.is_weather_relevant && (g.wind_mph ?? 0) >= WIND_PASSING) {
     notes.push(`Wind ${fmt(g.wind_mph)} mph at ${g.stadium_name ?? 'the stadium'}: passing volume props are flagged; the market usually shades totals down in this range.`)
   }
-  if (g.is_weather_relevant && (g.precip_in ?? 0) >= 0.2) {
+  if (g.is_weather_relevant && (g.precip_in ?? 0) >= PRECIP_FLAG) {
     notes.push(`Rain forecast (${fmt(g.precip_in, 2)} in): handling and kicking props carry extra variance.`)
   }
-  if (g.home_spread_movement !== null && Math.abs(g.home_spread_movement) >= 1.5) {
+  if (g.home_spread_movement !== null && Math.abs(g.home_spread_movement) >= SPREAD_MOVE_FLAG) {
     const toward = g.home_spread_movement < 0 ? g.home_team_label : g.away_team_label
     notes.push(`The spread moved ${signed(g.home_spread_movement, 1)} toward ${toward} since open; player lines on that side often lag the game line.`)
   }

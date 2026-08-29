@@ -63,8 +63,8 @@ GAME_KEY="$(curl -fsS "http://127.0.0.1:$PORT/api/nfl/slate?season_type=Regular%
 ROUTES=(
   "/nfl|The Pulse"
   "/nfl?days=7|Around the league"
-  "/nfl/slate|kickoff slot"
-  "/nfl/slate?season_type=Regular%20Season&week=1|SUN 1:00 PM"
+  "/nfl/slate|kickoff window"
+  "/nfl/slate?season_type=Regular%20Season&week=1|Sunday Early"
   "/nfl/slate?season=2025&season_type=Regular%20Season&week=18|Final"
   "/nfl/games/$GAME_KEY|Back to board"
   "/nfl/games/$GAME_KEY?vendor=fanduel|fanduel line"

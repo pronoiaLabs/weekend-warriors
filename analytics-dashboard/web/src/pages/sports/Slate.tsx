@@ -1,20 +1,21 @@
 import { useEffect, useRef } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fetchSlate } from '../../api/sports/client.ts'
-import type { SlatePayload, SlateRow, WeekRef } from '../../api/sports/types.ts'
+import type { BrandingRow, SlatePayload, SlateRow, WeekRef } from '../../api/sports/types.ts'
 import CapabilityGate from '../../components/sports/CapabilityGate.tsx'
 import Chips from '../../components/sports/Chips.tsx'
+import TeamLogo from '../../components/sports/TeamLogo.tsx'
 import TileFrame from '../../components/sports/TileFrame.tsx'
 import { useApi } from '../../hooks/useApi.ts'
+import { useBranding, teamAccent } from '../../hooks/useBranding.ts'
 import { useElementScrollMemory } from '../../hooks/useScrollMemory.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
-import { fmt, signed, slotLabel, spreadText, tone } from '../../lib/format.ts'
+import { fmt, odds, signed, spreadText } from '../../lib/format.ts'
+import { PRECIP_FLAG, SPREAD_MOVE_FLAG, WIND_FLAG, WIND_PASSING } from '../../lib/thresholds.ts'
 import { useView, viewFromParams, viewToParams } from '../../state/view.tsx'
 
-const WIND_FLAG = 10
-const WIND_PASSING = 12
-const PRECIP_FLAG = 0.2
+type Branding = Map<string, BrandingRow>
 
 export default function Slate() {
   return (
@@ -73,15 +74,18 @@ function SlateBoard() {
   }
 
   const data = slate.data
-  const label = caps?.label ?? sport.toUpperCase()
+
+  const shown = data ? (outdoor ? data.rows.filter((g) => g.is_weather_relevant) : data.rows) : []
+  const divisionGames = shown.filter((g) => g.is_division_game).length
+  const pendingLines = shown.filter((g) => !g.is_completed && g.vendor === null).length
 
   return (
     <div className="page page-slate">
       <div className="page-head">
-        <h1>Game day board</h1>
+        <h1>Game day</h1>
         <p className="lede">
           {data
-            ? `${data.season_type_name} week ${data.week}, ${label} ${data.season}. One column per kickoff slot; the board scrolls, the slots stay aligned.`
+            ? `The ${data.season_type_name.toLowerCase()} week ${data.week} slate as a ledger — one line per game, grouped by kickoff window. Matchup, line, weather, official, availability: enough to decide which games are worth working before you open one.`
             : slate.error
               ? slate.error
               : 'Loading the week...'}
@@ -108,7 +112,13 @@ function SlateBoard() {
             onPick={(id) => set({ vendor: id === caps.default_vendor ? undefined : id })}
           />
         )}
-        <span className="hint">Click a game for the prop board.</span>
+        {data && (
+          <span className="hint">
+            {shown.length} game{shown.length === 1 ? '' : 's'}
+            {divisionGames > 0 ? ` · ${divisionGames} division` : ''}
+            {pendingLines > 0 ? ` · ${pendingLines} waiting on a line` : ''}
+          </span>
+        )}
       </div>
 
       {slate.error && !data && (
@@ -120,7 +130,7 @@ function SlateBoard() {
         </section>
       )}
 
-      {data && <Board data={data} outdoor={outdoor} sport={sport} vendorParam={vendor} />}
+      {data && <Ledger data={data} games={shown} outdoor={outdoor} sport={sport} vendorParam={vendor} />}
 
       <TileFrame title="How this board is built" className="note-tile" query={data?.query}>
         <p>
@@ -227,25 +237,41 @@ function Kpis({ data, outdoor }: { data: SlatePayload; outdoor: boolean }) {
   )
 }
 
-function Board({
+function Ledger({
   data,
+  games,
   outdoor,
   sport,
   vendorParam,
 }: {
   data: SlatePayload
+  games: SlateRow[]
   outdoor: boolean
   sport: string
   vendorParam: string | undefined
 }) {
-  const games = outdoor ? data.rows.filter((g) => g.is_weather_relevant) : data.rows
-  const slots: string[] = []
-  for (const g of games) if (!slots.includes(g.kickoff_slot_et)) slots.push(g.kickoff_slot_et)
-  // the board scrolls on its own, so the browser cannot restore it; remember
-  // per URL so Back from a game lands on the same slot
-  const boardRef = useRef<HTMLDivElement>(null)
+  const branding = useBranding(sport)
+  // group by named kickoff window, windows in chronological order, games in
+  // kickoff order within each (the rows arrive ordered by kickoff already)
+  const ordered = [...games].sort(
+    (a, b) => a.kickoff_window_order - b.kickoff_window_order || a.game_datetime_et.localeCompare(b.game_datetime_et),
+  )
+  const windows: { key: string; label: string; games: SlateRow[] }[] = []
+  for (const g of ordered) {
+    const last = windows[windows.length - 1]
+    if (last && last.key === g.kickoff_window) last.games.push(g)
+    else windows.push({ key: g.kickoff_window, label: g.kickoff_window_label, games: [g] })
+  }
+  // the marquee: the biggest total on the board, only while the week is live
+  const totals = games.filter((g) => !g.is_completed).map((g) => g.total_line ?? 0)
+  const maxTotal = totals.length ? Math.max(...totals) : null
+
+  // the ledger scrolls on its own, so the browser cannot restore it; remember
+  // per URL so Back from a game lands on the same window
+  const bodyRef = useRef<HTMLDivElement>(null)
   const { pathname, search } = useLocation()
-  useElementScrollMemory(boardRef, `${pathname}${search}`, games.length > 0)
+  useElementScrollMemory(bodyRef, `${pathname}${search}`, games.length > 0)
+
   if (games.length === 0) {
     return (
       <section className="tile">
@@ -254,136 +280,250 @@ function Board({
     )
   }
   return (
-    <div className="board" ref={boardRef}>
-      <div className="slots" style={{ '--n': slots.length } as React.CSSProperties}>
-        {slots.map((slot) => (
-          <div className="slot" key={slot}>
-            <h3 className="slot-head">{slotLabel(slot)} ET</h3>
-            <div className="slot-games">
-              {games
-                .filter((g) => g.kickoff_slot_et === slot)
-                .map((g) => (
-                  <GameCard key={g.game_key} g={g} sport={sport} vendorParam={vendorParam} />
-                ))}
-            </div>
+    <section className="tile ledger">
+      <div className="tile-body" ref={bodyRef}>
+        <div className="led">
+          <div className="led-row head">
+            <span>Matchup</span>
+            <span>Spread</span>
+            <span>Total</span>
+            <span>Moneyline</span>
+            <span>Weather</span>
+            <span>Official</span>
+            <span>Availability</span>
+            <span>Flags</span>
           </div>
-        ))}
+          {windows.map((w) => (
+            <div key={w.key} className="led-window">
+              <div className="led-slot">
+                {w.label}
+                <small>
+                  · {w.games.length} game{w.games.length === 1 ? '' : 's'}
+                </small>
+              </div>
+              {w.games.map((g) => (
+                <LedgerRow
+                  key={g.game_key}
+                  g={g}
+                  sport={sport}
+                  vendorParam={vendorParam}
+                  branding={branding}
+                  marquee={maxTotal !== null && !g.is_completed && g.total_line !== null && g.total_line === maxTotal}
+                  book={data.vendor}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </section>
   )
 }
 
-function GameCard({ g, sport, vendorParam }: { g: SlateRow; sport: string; vendorParam: string | undefined }) {
+const BOOK_SHORT: Record<string, string> = {
+  draftkings: 'DK',
+  fanduel: 'FD',
+  betmgm: 'MGM',
+  caesars: 'CZR',
+  betrivers: 'BR',
+  polymarket: 'POLY',
+  kalshi: 'KAL',
+}
+
+function bookShort(vendor: string | null | undefined): string {
+  if (!vendor) return ''
+  return BOOK_SHORT[vendor] ?? vendor.toUpperCase().slice(0, 4)
+}
+
+function TeamCell({ label, record, row }: { label: string; record: string; row: BrandingRow | undefined }) {
+  const accent = teamAccent(row)
+  return (
+    <span className="mu-t" style={accent ? ({ '--team': accent } as React.CSSProperties) : undefined}>
+      <span className="r1">
+        {row && <TeamLogo teamKey={row.team_key} label={label} branding={new Map([[row.team_key, row]])} />}
+        <b>{label}</b>
+        <small>{record}</small>
+      </span>
+      <span className="cu" />
+    </span>
+  )
+}
+
+function AvailabilityCell({ g }: { g: SlateRow }) {
+  const side = (label: string, q: number | null, out: number | null) => {
+    const bits = []
+    if (out) bits.push(<span key="out" className="badge out">{out} OUT</span>)
+    if (q) bits.push(<span key="q" className="badge q">{q} Q</span>)
+    return bits.length ? (
+      <span key={label} className="side">
+        <span className="tm">{label}</span>
+        {bits}
+      </span>
+    ) : null
+  }
+  if (g.home_players_out === null && g.away_players_out === null) {
+    return (
+      <span className="avc">
+        <span className="clear">no report</span>
+      </span>
+    )
+  }
+  const both = [
+    side(g.away_team_label, g.away_players_questionable, g.away_players_out),
+    side(g.home_team_label, g.home_players_questionable, g.home_players_out),
+  ].filter(Boolean)
+  return <span className="avc">{both.length ? both : <span className="clear">no flags</span>}</span>
+}
+
+function LedgerRow({
+  g,
+  sport,
+  vendorParam,
+  branding,
+  marquee,
+  book,
+}: {
+  g: SlateRow
+  sport: string
+  vendorParam: string | undefined
+  branding: Branding
+  marquee: boolean
+  book: string | null
+}) {
   const href = `/${sport}/games/${g.game_key}${vendorParam ? `?vendor=${encodeURIComponent(vendorParam)}` : ''}`
-  const hasLine = g.vendor !== null && g.home_spread !== null
-  const hasForecast = g.kickoff_temp_f !== null || g.wind_mph !== null || g.precip_in !== null
+  const hasLine = g.vendor !== null && (g.home_spread !== null || g.total_line !== null)
+  const short = bookShort(g.vendor ?? book)
+
+  // sided labels: the favorite carries the number
+  const homeFav = (g.home_spread ?? 0) <= 0
+  const spreadLabel =
+    g.home_spread === null ? null : `${homeFav ? g.home_team_label : g.away_team_label} ${spreadText(homeFav ? g.home_spread : g.away_spread)}`
+  const mlHome = g.home_moneyline_odds
+  const mlAway = g.away_moneyline_odds
+  const mlFavHome = mlHome !== null && mlAway !== null ? mlHome <= mlAway : homeFav
+  const mlFav = mlFavHome ? mlHome : mlAway
+  const mlOther = mlFavHome ? mlAway : mlHome
+
   const flags: { cls: string; text: string }[] = []
-  if (g.props_open > 0) flags.push({ cls: 'props', text: `${g.props_open} props open` })
-  else if (g.props_open_all_books > 0) flags.push({ cls: 'props', text: `${g.props_open_all_books} props at other books` })
-  if (g.news_mentions_7d > 0)
-    flags.push({ cls: 'news', text: `${g.news_mentions_7d} news mention${g.news_mentions_7d === 1 ? '' : 's'}, ${g.players_in_news_7d} player${g.players_in_news_7d === 1 ? '' : 's'}` })
-  if (g.is_weather_relevant && (g.wind_mph ?? 0) >= WIND_PASSING) flags.push({ cls: 'wx', text: `Wind ${fmt(g.wind_mph)} mph, passing props flagged` })
-  if (g.is_weather_relevant && (g.precip_in ?? 0) >= PRECIP_FLAG) flags.push({ cls: 'wx', text: `Rain ${fmt(g.precip_in, 2)} in` })
+  if (g.is_division_game) flags.push({ cls: 'badge', text: 'Division' })
+  if (marquee) flags.push({ cls: 'badge', text: '✦ Marquee' })
+  if (!g.is_completed && Math.abs(g.home_spread_movement ?? 0) >= SPREAD_MOVE_FLAG)
+    flags.push({ cls: 'props', text: `spread moved ${signed(g.home_spread_movement, 1)}` })
+  if (g.is_weather_relevant && (g.wind_mph ?? 0) >= WIND_PASSING && g.total_line !== null)
+    flags.push({ cls: 'wx', text: `✦ wind ${fmt(g.wind_mph)} vs ${fmt(g.total_line, 1)} total` })
+  else if (g.is_weather_relevant && (g.precip_in ?? 0) >= PRECIP_FLAG)
+    flags.push({ cls: 'wx', text: `rain ${fmt(g.precip_in, 2)} in` })
+  if (!g.is_completed && g.props_open > 0) flags.push({ cls: 'props', text: `${g.props_open} props posted` })
+  else if (!g.is_completed && g.props_open_all_books > 0)
+    flags.push({ cls: 'props', text: `${g.props_open_all_books} props at other books` })
+  if (g.news_mentions_7d > 0) flags.push({ cls: 'news', text: `${g.news_mentions_7d} news mentions` })
   if (g.is_international) flags.push({ cls: '', text: 'International' })
 
   return (
-    <Link className="game" to={href} data-tilt="">
-      <div className="game-teams">
-        <div className="team away">
-          <span className="abbr">{g.away_team_label}</span>
-          <span className="name">{g.away_team_name}</span>
-        </div>
-        <div className="at">at</div>
-        <div className="team home">
-          <span className="abbr">{g.home_team_label}</span>
-          <span className="name">{g.home_team_name}</span>
-        </div>
-      </div>
+    <Link className={`led-row${marquee ? ' marquee' : ''}`} to={href}>
+      <span className="mu">
+        <span className="mu-teams">
+          <TeamCell label={g.away_team_label} record={g.away_record} row={branding.get(g.away_team_key)} />
+          <span className="at">at</span>
+          <TeamCell label={g.home_team_label} record={g.home_record} row={branding.get(g.home_team_key)} />
+        </span>
+        <small className="mu-venue">
+          {[g.stadium_name ?? g.venue, g.roof, g.surface].filter(Boolean).join(' · ')}
+        </small>
+      </span>
 
       {g.is_completed ? (
-        <div className="game-line">
-          <div className="ln">
+        <>
+          <span className="n">
             <span className="v">
-              {fmt(g.away_score)} <small>{g.away_team_label}</small>
+              {fmt(g.away_score)}–{fmt(g.home_score)}
             </span>
-            <span className="l">Final{g.went_to_overtime ? ' (OT)' : ''}</span>
-          </div>
-          <div className="ln">
-            <span className="v">
-              {fmt(g.home_score)} <small>{g.home_team_label}</small>
-            </span>
-            <span className="l">&nbsp;</span>
-          </div>
-          <div className="ln">
-            <span className="v">{g.home_spread_result ? `${g.home_team_label} ${g.home_spread_result}` : hasLine ? spreadText(g.home_spread) : ''}</span>
-            <span className="l">{g.total_result ? `Total ${g.total_result}` : hasLine ? 'Closing spread' : 'No line'}</span>
-          </div>
-        </div>
+            <span className="s">Final{g.went_to_overtime ? ' · OT' : ''}</span>
+          </span>
+          <span className="n">
+            <span className="v">{g.home_score !== null && g.away_score !== null ? g.home_score + g.away_score : '—'}</span>
+            <span className="s">{g.total_result ? `${fmt(g.total_line, 1)} ${g.total_result}` : 'points'}</span>
+          </span>
+          <span className="n">
+            <span className="v">{g.home_spread_result ? `${g.home_team_label} ${g.home_spread_result}` : '—'}</span>
+            <span className="s">{g.home_spread_result ? `closed ${spreadText(g.home_spread)}` : 'no line'}</span>
+          </span>
+        </>
       ) : hasLine ? (
-        <div className="game-line">
-          <div className="ln">
-            <span className="v">
-              {g.home_team_label} {spreadText(g.home_spread)}
-            </span>
-            <span className="l">Spread</span>
-          </div>
-          <div className="ln">
+        <>
+          <span className="n">
+            <span className="v">{spreadLabel ?? '—'}</span>
+            <span className="s">{short}</span>
+          </span>
+          <span className="n">
             <span className="v">{fmt(g.total_line, 1)}</span>
-            <span className="l">Total</span>
-          </div>
-          <div className={`ln ${tone(g.home_spread_movement)}`}>
-            <span className="v">{g.home_spread_movement === null ? 'open' : signed(g.home_spread_movement, 1)}</span>
-            <span className="l">Move</span>
-          </div>
-        </div>
+          </span>
+          <span className="n">
+            <span className="v">
+              {mlFav !== null ? `${mlFavHome ? g.home_team_label : g.away_team_label} ${odds(mlFav)}` : '—'}
+            </span>
+            <span className="s">
+              {mlOther !== null ? `${mlFavHome ? g.away_team_label : g.home_team_label} ${odds(mlOther)}` : ''}
+            </span>
+          </span>
+        </>
       ) : (
-        <div className="game-line none">
-          {g.vendors_available.length ? `No line at ${vendorParam ?? 'this book'}; priced at ${g.vendors_available.join(', ')}` : 'No line yet'}
-        </div>
+        <>
+          <span className="n pending">
+            <span className="v">no line yet</span>
+            <span className="s">
+              {g.vendors_available.length ? `at ${g.vendors_available.map(bookShort).join(', ')}` : 'vendor-NULL'}
+            </span>
+          </span>
+          <span className="n pending">
+            <span className="v">—</span>
+          </span>
+          <span className="n pending">
+            <span className="v">—</span>
+          </span>
+        </>
       )}
 
-      {hasForecast ? (
-        <div className="game-wx">
-          <div className="wx">
-            <span className="v">
-              {fmt(g.kickoff_temp_f)}
-              <small>F</small>
-            </span>
-            <span className="l">Kickoff</span>
-          </div>
-          <div className={`wx ${(g.wind_mph ?? 0) >= WIND_FLAG ? 'warn' : ''}`}>
-            <span className="v">
-              {fmt(g.wind_mph)}
-              <small>mph</small>
-            </span>
-            <span className="l">Wind</span>
-          </div>
-          <div className={`wx ${(g.precip_in ?? 0) > 0 ? 'warn' : ''}`}>
-            <span className="v">
-              {fmt(g.precip_in, 2)}
-              <small>in</small>
-            </span>
-            <span className="l">Precip</span>
-          </div>
-        </div>
+      {!g.is_weather_relevant ? (
+        <span className="n wxc">
+          <span className="v indoors">indoors</span>
+          <span className="s">{[g.roof, g.surface].filter(Boolean).join(' · ')}</span>
+        </span>
+      ) : g.kickoff_temp_f !== null || g.wind_mph !== null ? (
+        <span className={`n wxc${(g.wind_mph ?? 0) >= WIND_FLAG ? ' warn' : ''}`}>
+          <span className="v">
+            {fmt(g.kickoff_temp_f)}°F<i>·</i>
+            <em>{fmt(g.wind_mph)} mph</em>
+          </span>
+          <span className="s">{(g.precip_in ?? 0) > 0 ? `${fmt(g.precip_in, 2)} in precip` : 'no precip'}</span>
+        </span>
       ) : (
-        <div className="game-wx none">{g.is_weather_relevant ? 'Forecast arrives inside the week' : 'Indoors'}</div>
+        <span className="n wxc pending">
+          <span className="v">—</span>
+          <span className="s">forecast inside the week</span>
+        </span>
       )}
 
-      <div className="game-venue">
-        <span>{g.stadium_name ?? g.venue ?? ''}</span>
-        <span className="roof">{g.roof ?? ''}</span>
-      </div>
+      <span className="n">
+        <span className="v official">{g.referee ?? '—'}</span>
+        <span className="s">Referee</span>
+      </span>
 
-      {flags.length > 0 && (
-        <div className="ready">
-          {flags.map((f) => (
+      <AvailabilityCell g={g} />
+
+      <span className="flc">
+        {flags.map((f) =>
+          f.cls === 'badge' ? (
+            <span key={f.text} className="badge acc">
+              {f.text}
+            </span>
+          ) : (
             <span key={f.text} className={`flag ${f.cls}`}>
               {f.text}
             </span>
-          ))}
-        </div>
-      )}
+          ),
+        )}
+      </span>
     </Link>
   )
 }
