@@ -3,14 +3,17 @@ version: 2
 # APP -- the serving layer for the analytics dashboard: page-shaped marts built
 # from CORE, read by a thin API with bound filters. Long format with the parameters
 # as columns; sport-agnostic column names. Not Cortex tools. One folder per page.
-# Players: a player's season wide and long, the leaderboard, the defensive twin.
+# Players: a player's season wide and long, the leaderboard with the riser window,
+# the profile header, situational usage, the defensive twin.
 
 models:
   - name: app_player_weeks
     description: >
       A player's season game by game: the offensive box score with identity,
-      team, opponent, the team result, fantasy points at both books and running
-      season counts. One row per player game; completed games only.
+      team, opponent, the team result, fantasy points at both books, running
+      season counts, and the vendor blocks (usage shares, EPA, PPR, snaps).
+      Vendor columns are NULL when the vendor did not match the player-game,
+      never zero. One row per player game; completed games only.
     columns:
       - name: app_player_weeks_key
         tests: [unique, not_null]
@@ -32,12 +35,27 @@ models:
       - name: games_to_date
         tests:
           - dbt_utils.accepted_range: {min_value: 1, max_value: 25}
+      - name: target_share
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+              config: {where: "target_share is not null"}
+      - name: snap_pct
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+              config: {where: "snap_pct is not null"}
 
   - name: app_player_week_stats
     description: >
       app_player_weeks one stat at a time, with the trailing-three average, the
       season average and total through the game, and the player's own prior
       season: the same week's value and the season average one year earlier.
+      Vendor stats (shares, EPA, PPR) keep NULL for unmatched games, so their
+      averages cover matched games only (values_through counts them); share
+      stats publish no season total.
     columns:
       - name: app_player_week_stats_key
         tests: [unique, not_null]
@@ -48,7 +66,12 @@ models:
       - name: stat_key
         tests: [not_null]
       - name: value
-        tests: [not_null]
+        tests:
+          - not_null:
+              config:
+                where: >
+                  stat_key not in ('target_share', 'air_yards_share', 'snap_pct',
+                                   'receiving_epa', 'rushing_epa', 'passing_epa', 'ppr_points')
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [player_game_key, stat_key]
@@ -56,8 +79,12 @@ models:
   - name: app_player_leaders
     description: >
       Season totals and per-game rates per player, season and season type, with
-      a rank within the position for each leaderboard column (1 = most) and the
-      team from the player's most recent game.
+      a rank within the position for each leaderboard column (1 = most), the
+      team from the player's most recent game, honest usage aggregates
+      (target_share and snap_share as ratios of sums, air_yards_share_avg as
+      the marked average-of-shares convention), the riser window (last three
+      games' target share vs the season before it), and the current-state
+      next-game block with the opponent's allowed rank for the position.
     columns:
       - name: app_player_leaders_key
         tests: [unique, not_null]
@@ -69,9 +96,77 @@ models:
       - name: rank_fanduel_points
         tests:
           - dbt_utils.accepted_range: {min_value: 1}
+      - name: rank_ppr_points
+        tests:
+          - dbt_utils.accepted_range: {min_value: 1}
+      - name: target_share
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+              config: {where: "target_share is not null"}
+      - name: snap_share
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+              config: {where: "snap_share is not null"}
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [player_key, season, season_type]
+
+  - name: app_player_profile
+    description: >
+      The player page's identity header, one row per player app_player_weeks
+      can open: bio, draft, headshot, the Sleeper live status block (serving
+      -only current state, as-of news_updated_at), the resolved current team
+      (team_source says which tier answered) and the team's next game.
+    columns:
+      - name: app_player_profile_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_player')", field: player_key}
+      - name: player_name
+        tests: [not_null]
+      - name: team_source
+        tests:
+          - accepted_values: {values: ['box_score', 'roster', 'prior_box_score']}
+
+  - name: app_player_situation_usage
+    description: >
+      Where a player's targets come from: player x season x season type x
+      bucket, three bucket types (down, field zone, game script) whose CASEs
+      mirror fact_team_game_situation. Targets over team targets in the
+      player's own games, with team dropbacks as the routes stand-in and the
+      qualified same-position league share as the baseline. Regular and
+      postseason only -- there is no preseason play-by-play.
+    columns:
+      - name: app_player_situation_usage_key
+        tests: [unique, not_null]
+      - name: player_key
+        tests: [not_null]
+      - name: bucket_type
+        tests:
+          - accepted_values: {values: ['down', 'field_zone', 'script']}
+      - name: bucket
+        tests:
+          - accepted_values:
+              values: ['1st', '2nd', '3rd_4th', 'red_zone', 'mid', 'own',
+                       'leading', 'trailing', 'neutral']
+      - name: targets
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: target_share
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+              config: {where: "target_share is not null"}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [player_key, season, season_type, bucket_type, bucket]
 
   - name: app_player_defense_weeks
     description: >

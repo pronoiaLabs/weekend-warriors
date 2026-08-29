@@ -74,6 +74,10 @@ select
     rush::number                                        as rush,
     shotgun::number                                     as shotgun,
     no_huddle::number                                   as no_huddle,
+    -- who handled the ball (gsis ids; a sack or scramble has no receiver)
+    passer_player_id,
+    rusher_player_id,
+    receiver_player_id,
 
     -- analytics measures (the graft columns)
     epa,
