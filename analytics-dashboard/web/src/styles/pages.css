@@ -416,6 +416,13 @@ button.trow.current { background: var(--surface-2); }
 .edges li a:hover b { color: var(--accent); }
 .edges li small { color: var(--ink-3); }
 
+/* paired containers: one row, one height. The row's tiles stretch to match,
+   the taller list caps and scrolls inside — no side-by-side tiles of uneven
+   height anywhere. (The Pulse rails established the pattern.) */
+.cols-game, .cols-divisions, .cols-explore, .cols-markets, .teasers { align-items: stretch; }
+.cols-game > .tile, .cols-divisions > .tile, .cols-explore > .tile { max-height: 520px; display: flex; flex-direction: column; }
+.cols-game > .tile .tile-body, .cols-divisions > .tile .tile-body, .cols-explore > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
+
 /* overview · availability tiles */
 .cols-game + .cols-game { margin-top: var(--gap); }
 .avail { display: grid; }
