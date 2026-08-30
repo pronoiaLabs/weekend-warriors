@@ -44,14 +44,15 @@ pipelines:
         - state
         - players
 
-  # The moving parts, every six hours: trending adds/drops over the last 24h,
-  # projections for this week and next, stats for this week and last. Trending
-  # and projections are appended as dated snapshots (their history is the
-  # point); stats merge on player x week. :20 keeps clear of the ops sweeps at
-  # :00 and :30 and the odds/props Tasks at :00 and :10.
+  # The moving parts, daily at the tail of the NFL cluster: trending adds/drops
+  # over the last 24h (a 24h window, so daily loses nothing), projections for
+  # this week and next, stats for this week and last. Trending and projections
+  # are appended as dated snapshots (their history is the point, now one
+  # observation a day); stats merge on player x week. 12:15 follows
+  # nfl_sleeper_players at 12:10.
   - name: nfl_sleeper_market
     source: sleeper
-    schedule: "20 */6 * * *"
+    schedule: "15 12 * * *"
     config:
       resources:
         - trending

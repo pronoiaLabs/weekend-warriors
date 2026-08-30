@@ -43,15 +43,17 @@ pipelines:
   # Two RAW tables: news_articles (one row per URL, markdown + feed metadata + the
   # raw extraction JSON) and news_player_mentions (one row per url x player).
   #
-  # Every 4 hours at :05 UTC (six runs a day). The short-post wires below (pft,
-  # pfr) expose 15 to 30 items and post dozens a day, so two runs a day would
-  # drop updates; six keeps those feeds current without being the loudest dbt
-  # trigger. Club and article feeds hold 20 to 100 items and tolerate either.
-  # Minute 5 stays clear of the other NFL tasks that fire on the hour.
+  # Daily at 11:55 UTC, inside the NFL cluster (11:45 belongs to the
+  # nflverse depth charts and 11:50 to Wednesday's nflverse reference).
+  # KNOWN LOSS, accepted 2026-08
+  # for cost: the short-post wires below (pft, pfr) expose only their last 15
+  # to 30 items and post dozens a day, so a daily pull captures a sample of
+  # the day's items, not all of them, and the gap cannot be backfilled. Club
+  # and article feeds hold 20 to 100 items and tolerate daily fine. If the
+  # News page ever needs the full wire again, this cron is the one to raise.
   #
-  # Every run that lands rows inserts into RAW._DLT_LOADS and so fires
-  # DBT_BUILD_NFL; the 900s trigger interval coalesces a 4h slot's news / odds /
-  # props loads into one or two builds.
+  # Every run that lands rows inserts into RAW._DLT_LOADS; the scheduled
+  # 12:30 DBT_BUILD_NFL drains the whole window's loads in one build.
   #
   # Note for the EAI network rule: the container fetches these feeds directly, so
   # every feed host below must be in the rule's VALUE_LIST with its port, not just
@@ -60,7 +62,7 @@ pipelines:
   #   make run-local NAME=nfl_news
   - name: nfl_news
     source: firecrawl
-    schedule: "5 */4 * * *"
+    schedule: "55 11 * * *"
     config:
       api_key: "secret:sources.firecrawl.api_key"
 
