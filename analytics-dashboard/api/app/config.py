@@ -13,7 +13,7 @@ monkeypatch them. Nothing here imports a database driver.
   ANALYTICS_DASHBOARD_ROLE        Snowflake USE ROLE on connect (default
                                   ANALYTICS_DASHBOARD_ROLE). Secondary roles are
                                   always dropped, so the session holds this role alone.
-  ANALYTICS_DASHBOARD_WAREHOUSE   USE WAREHOUSE on connect (default DLT_OPS_WH).
+  ANALYTICS_DASHBOARD_WAREHOUSE   USE WAREHOUSE on connect (default DLT_WH).
   ANALYTICS_DASHBOARD_CACHE_SECONDS  default query cache TTL (default 60).
   <SPORT>_APP_DB / <SPORT>_APP_SCHEMA  where a sport's APP marts live. Postgres
                                   defaults to app / app_copy; Snowflake defaults
@@ -78,7 +78,7 @@ def role() -> str:
 
 
 def warehouse() -> str:
-    return os.environ.get("ANALYTICS_DASHBOARD_WAREHOUSE", "DLT_OPS_WH")
+    return os.environ.get("ANALYTICS_DASHBOARD_WAREHOUSE", "DLT_WH")
 
 
 def cache_seconds() -> float:

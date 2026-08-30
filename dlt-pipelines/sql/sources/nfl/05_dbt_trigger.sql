@@ -2,10 +2,12 @@
 -- 05_dbt_trigger.sql (nfl) -- event-driven dbt run after ingestion
 -- =============================================================================
 -- Chain: dlt load succeeds -> one INSERT lands in RAW._DLT_LOADS -> the
--- append-only stream below has data -> the triggered task fires (no schedule;
--- idle costs nothing) -> the procedure drains the stream into an audit table
--- and runs EXECUTE DBT PROJECT ARGS='run' (models only). A FAILED load never
--- inserts into _DLT_LOADS, so failures never trigger a rebuild, structurally.
+-- append-only stream below has data -> the scheduled task's WHEN clause is
+-- true at its next fixed fire (12:30 and 22:30 UTC, right after the two
+-- daily ingest windows; an empty slot is SKIPPED at zero cost) -> the
+-- procedure drains the stream into an audit table and runs EXECUTE DBT
+-- PROJECT ARGS='run' (models only). A FAILED load never inserts into
+-- _DLT_LOADS, so failures never trigger a rebuild, structurally.
 -- Tests are a sibling scheduled task (DBT_TEST_NFL, 13:00 UTC daily), not on
 -- the hot path: a bad run can copy APP before the next daily test. Slack
 -- still fires if that test fails (SCOPE dbt_test_nfl).
@@ -24,18 +26,19 @@
 --     fail with 091421 on a started child. The wrapper itself is created
 --     in 08, not here.
 --   * The DML drain in the procedure is mandatory, not an audit nicety: a
---     stream that is only read keeps SYSTEM$STREAM_HAS_DATA true and the task
---     re-fires every interval forever, billing DBT_WH (measured: 4 fires in
---     90 seconds). Drain-first also means a load landing mid-build simply
---     re-triggers after this one finishes.
+--     stream that is only read keeps SYSTEM$STREAM_HAS_DATA true and the
+--     WHEN clause would run the build again at every cron slot forever
+--     (measured in the triggered era: 4 fires in 90 seconds). Drain-first
+--     also means a load landing mid-build is simply picked up at the next
+--     scheduled fire.
 --   * ENVIRONMENT is explicit because the project objects default to dev;
 --     omitting it silently builds the wrong environment.
 --   * A partial dbt failure raises a real SQL error (verified), so failures
 --     land in TASK_HISTORY with ERROR_MESSAGE and count toward
 --     SUSPEND_TASK_AFTER_NUM_FAILURES. No result inspection is needed.
---   * The 900s trigger interval coalesces: a burst of loads inside the window
---     produces one build that drains all of them (verified with 3 inserts ->
---     1 run). Evaluations that find no data are SKIPPED at zero cost.
+--   * The fixed 12:30/22:30 fires coalesce: every load of the 11:00-12:20
+--     window drains into the single 12:30 build, and 22:30 covers injuries.
+--     A slot whose stream is empty is SKIPPED at zero cost (WHEN clause).
 --
 -- Kill switch:  ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND;
 -- Daily tests:  ALTER TASK NFL_PROD_DB.OPS.DBT_TEST_NFL SUSPEND;
@@ -352,11 +355,16 @@ ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_BUILD_NFL SUSPEND;
 ALTER TASK IF EXISTS NFL_PROD_DB.OPS.DBT_HARVEST_NFL SUSPEND;
 ALTER TASK IF EXISTS NFL_PROD_DB.OPS.APP_COPY_NFL SUSPEND;
 
+-- Scheduled, not load-triggered (changed 2026-08 with the daily-cadence
+-- consolidation): the whole ingestion day is two windows, 11:00-12:20 and
+-- injuries at 22:00, so two fixed fires drain everything and the WHEN
+-- clause makes an empty slot a zero-cost SKIPPED. The old triggered form
+-- produced one build per staggered load (15/day measured 2026-08-30).
 CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_BUILD_NFL
-  WAREHOUSE = DBT_WH
-  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 900
+  WAREHOUSE = DLT_WH
+  SCHEDULE = 'USING CRON 30 12,22 * * * UTC'
   USER_TASK_TIMEOUT_MS = 3600000
-  COMMENT = 'dbt run (models only) for NFL on new RAW loads. Tests are DBT_TEST_NFL. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
+  COMMENT = 'dbt run (models only) for NFL, 12:30 (after the 11:00 ingest window) and 22:30 (after injuries). Tests are DBT_TEST_NFL. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
   WHEN SYSTEM$STREAM_HAS_DATA('NFL_PROD_DB.OPS.DBT_LOADS_STREAM')
 AS
   CALL NFL_PROD_DB.OPS.SP_DBT_BUILD();
@@ -368,7 +376,7 @@ AS
 -- the 4h sweep. The proc it calls lives in sql/ops/06_dbt_harvest.sql --
 -- apply that file before this one on a fresh account.
 CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_HARVEST_NFL
-  WAREHOUSE = DBT_WH
+  WAREHOUSE = DLT_WH
   USER_TASK_TIMEOUT_MS = 1800000
   COMMENT = 'Query log + operator-stats harvest after each NFL dbt run. NOT managed by generate_tasks.py.'
   AFTER NFL_PROD_DB.OPS.DBT_BUILD_NFL
@@ -376,10 +384,10 @@ AS
   CALL DLT_DB.OPS.SP_DBT_HARVEST();
 
 -- Daily test: separate root, not AFTER the run graph, so a failing test
--- never blocks APP_COPY. Cron is after the 09:00 cluster, nflverse 11:xx,
--- and sleeper players 12:10.
+-- never blocks APP_COPY. Cron is after the 11:00 ingest window and the
+-- 12:30 build, while the warehouse is still warm from them.
 CREATE OR ALTER TASK NFL_PROD_DB.OPS.DBT_TEST_NFL
-  WAREHOUSE = DBT_WH
+  WAREHOUSE = DLT_WH
   SCHEDULE = 'USING CRON 0 13 * * * UTC'
   USER_TASK_TIMEOUT_MS = 3600000
   COMMENT = 'Daily dbt test for NFL. Separate root; does not drain DBT_LOADS_STREAM. NOT managed by generate_tasks.py.'

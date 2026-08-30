@@ -35,19 +35,15 @@ GRANT ROLE DBT_RUNNER_ROLE TO ROLE SYSADMIN;
 
 USE ROLE SYSADMIN;
 
--- Dedicated warehouse: the trigger tasks and every prod EXECUTE DBT PROJECT
--- run here, not on DEVELOPMENT_WH, so scheduled builds never queue behind
--- interactive work and the cost of the trigger machinery reads directly off
--- one warehouse's metering. EXECUTE DBT PROJECT cannot run serverless, so a
--- real warehouse is mandatory.
-CREATE WAREHOUSE IF NOT EXISTS DBT_WH
-  WAREHOUSE_SIZE = XSMALL
-  AUTO_SUSPEND = 60
-  AUTO_RESUME = TRUE
-  INITIALLY_SUSPENDED = TRUE
-  COMMENT = 'dbt builds: trigger tasks and prod EXECUTE DBT PROJECT runs';
-
-GRANT USAGE, OPERATE ON WAREHOUSE DBT_WH TO ROLE DBT_RUNNER_ROLE;
+-- No dedicated warehouse anymore: dbt builds run on DLT_WH, the single job
+-- warehouse (consolidated 2026-08 -- three XS warehouses waking separately
+-- billed mostly 60s resume minimums and auto-suspend tails, measured at ~2/3
+-- of daily spend). The grant lives in sql/prod/02_compute.sql next to the
+-- warehouse's creation, because this file runs before prod/02 on a fresh
+-- account and a grant on a warehouse that does not exist yet fails.
+-- Cost separation now comes from dbt QUERY_TAGs and task-level COST_CENTER
+-- tags, not warehouse metering. EXECUTE DBT PROJECT cannot run serverless,
+-- so a real warehouse is still mandatory.
 
 -- The per-sport dbt project objects live in the control plane's DEPLOY schema
 -- (DLT_DB.DEPLOY.CORTEX_LIFECYCLE_<SPORT>); the role needs the path to them.
@@ -55,8 +51,8 @@ GRANT USAGE, OPERATE ON WAREHOUSE DBT_WH TO ROLE DBT_RUNNER_ROLE;
 GRANT USAGE ON DATABASE DLT_DB TO ROLE DBT_RUNNER_ROLE;
 GRANT USAGE ON SCHEMA DLT_DB.DEPLOY TO ROLE DBT_RUNNER_ROLE;
 
--- (USAGE on DLT_OPS_WH for the ops/07 tasks is granted in ops/07 itself:
--- that warehouse does not exist until ops/01 runs, which is after this file.)
+-- (USAGE, OPERATE on DLT_WH for this role is granted in prod/02 itself:
+-- that warehouse does not exist until prod/02 runs, which is after this file.)
 
 USE ROLE ACCOUNTADMIN;
 

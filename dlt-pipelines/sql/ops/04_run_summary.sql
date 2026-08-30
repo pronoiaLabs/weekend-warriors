@@ -793,11 +793,13 @@ ALTER TASK IF EXISTS DLT_DB.OPS.OBS_REFRESH SUSPEND;
 ALTER TASK IF EXISTS DLT_DB.OPS.OBS_COPY SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.OBS_REFRESH
-  WAREHOUSE = DLT_OPS_WH
+  WAREHOUSE = DLT_WH
   -- Hourly, not 60: at 60s a long-running container (the postgres copies) kept
-  -- this firing continuously and DLT_OPS_WH awake around the clock (~24
-  -- credits/day, measured 2026-08-24). Freshness between fires comes from the
-  -- dashboard's manual refresh (SP_OBS_SWEEP).
+  -- this firing continuously and the ops warehouse awake around the clock (~24
+  -- credits/day, measured 2026-08-24). With daily ingest windows the streams
+  -- only fill around them, so this self-reduces to a few fires a day.
+  -- Freshness between fires comes from the dashboard's manual refresh
+  -- (SP_OBS_SWEEP).
   USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 3600
   USER_TASK_TIMEOUT_MS = 600000
   COMMENT = 'Event-driven observability refresh: drains the ops/02+03 streams and re-merges TASK_RUNS / PIPELINE_RUNS. NOT managed by generate_tasks.py.'
@@ -808,10 +810,14 @@ AS
 
 -- Metrics flush later than logs (the "straddled run" note in ops/01), which the
 -- OR above absorbs; the sweep covers the zero-event cases the OR cannot.
+-- Twice daily, riding the warm periods behind the two NFL builds (12:30 and
+-- 22:30) rather than waking the warehouse on its own six times a day. The
+-- detection bound for a zero-event failure grows to <=12h, proportionate now
+-- that ingestion itself is daily.
 CREATE OR ALTER TASK DLT_DB.OPS.OBS_REFRESH_SWEEP
-  WAREHOUSE = DLT_OPS_WH
-  SCHEDULE  = 'USING CRON 0 */4 * * * UTC'
-  COMMENT   = 'Backstop poke of OBS_REFRESH every 4h: bounds how long a zero-event failure or a stale EXECUTING state can sit unrecorded. NOT managed by generate_tasks.py.'
+  WAREHOUSE = DLT_WH
+  SCHEDULE  = 'USING CRON 15 13,23 * * * UTC'
+  COMMENT   = 'Backstop poke of OBS_REFRESH twice daily: bounds how long a zero-event failure or a stale EXECUTING state can sit unrecorded. NOT managed by generate_tasks.py.'
 AS
   CALL DLT_DB.OPS.SP_OBS_SWEEP();
 

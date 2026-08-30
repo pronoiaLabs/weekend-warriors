@@ -56,10 +56,9 @@
 
 USE ROLE SYSADMIN;
 
--- The refresh and sweep tasks run on the observability warehouse, keeping
--- their cost attributed to ops rather than to dbt builds. Granted here and
--- not in base/04 because DLT_OPS_WH does not exist until ops/01 runs.
-GRANT USAGE ON WAREHOUSE DLT_OPS_WH TO ROLE DBT_RUNNER_ROLE;
+-- The refresh and sweep tasks run on DLT_WH, the single job warehouse;
+-- DBT_RUNNER_ROLE's USAGE + OPERATE on it comes from sql/prod/02_compute.sql,
+-- so no warehouse grant is needed here.
 
 -- A task session runs the owner's PRIMARY role alone, so interactive testing
 -- (which carries secondary roles) cannot prove this privilege exists; the
@@ -437,9 +436,11 @@ ALTER TASK IF EXISTS DLT_DB.OPS.DBT_RUNS_REFRESH SUSPEND;
 ALTER TASK IF EXISTS DLT_DB.OPS.DBT_OBS_COPY SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.DBT_RUNS_REFRESH
-  WAREHOUSE = DLT_OPS_WH
+  WAREHOUSE = DLT_WH
   -- Hourly, matching OBS_REFRESH (same warehouse): either twin at 60s keeps
-  -- DLT_OPS_WH from ever auto-suspending. Manual refresh covers in-between.
+  -- the warehouse from ever auto-suspending. Manual refresh covers in-between.
+  -- At daily ingest cadence the streams fill around the builds, so this
+  -- self-reduces to a few fires a day.
   USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 3600
   USER_TASK_TIMEOUT_MS = 600000
   COMMENT = 'Event-driven refresh of DBT_RUNS: fires when a build lands (DBT_BUILDS) or a harvest lands (DBT_QUERY_LOG, fills rollups). NOT managed by generate_tasks.py.'
@@ -449,11 +450,12 @@ AS
   CALL DLT_DB.OPS.SP_DBT_RUNS_REFRESH();
 
 CREATE OR ALTER TASK DLT_DB.OPS.DBT_RUNS_SWEEP
-  WAREHOUSE = DLT_OPS_WH
-  -- :30 offset, staggered from OBS_REFRESH_SWEEP at :00 so the two backstops
-  -- never share a warehouse-resume minute pointlessly.
-  SCHEDULE  = 'USING CRON 30 */4 * * * UTC'
-  COMMENT   = 'Backstop for FAILED builds (no stream event exists for them), every 4h at :30. NOT managed by generate_tasks.py.'
+  WAREHOUSE = DLT_WH
+  -- Twice daily at :30, a slot behind OBS_REFRESH_SWEEP at :15, both riding
+  -- the warm period after the 12:30/22:30 NFL builds instead of waking the
+  -- warehouse on their own schedule.
+  SCHEDULE  = 'USING CRON 30 13,23 * * * UTC'
+  COMMENT   = 'Backstop for FAILED builds (no stream event exists for them), twice daily at 13:30/23:30. NOT managed by generate_tasks.py.'
 AS
   CALL DLT_DB.OPS.SP_DBT_RUNS_SWEEP();
 

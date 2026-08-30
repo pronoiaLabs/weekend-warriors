@@ -7,7 +7,8 @@
 --                 filled by SP_DBT_HARVEST from the per-sport harvest tasks.
 --                 Plus the retention task for all of it.
 -- Run as        : SYSADMIN for the grant slice, then DBT_RUNNER_ROLE (objects)
--- Prerequisites : sql/base/04_dbt_runner.sql (role + DBT_WH); the per-sport
+-- Prerequisites : sql/base/04_dbt_runner.sql (role) and sql/prod/02_compute.sql
+--                 (DLT_WH + the role's grant on it); the per-sport
 --                 05_dbt_trigger.sql files add the DBT_HARVEST_<SPORT> child
 --                 tasks that call the proc here.
 -- Apply         : make setup-ops CONFIRM=1  (or snow sql -f directly)
@@ -35,9 +36,9 @@
 -- a bind (:var) -- a cursor record field or LATERAL join is a compile error
 -- -- hence the assign-then-bind loop. ~660 ms per profiled query (measured
 -- 10 in 6.6 s), so a typical build's 150-250 warehouse queries cost roughly
--- 1.5-2.5 min of XSMALL DBT_WH per harvest.
+-- 1.5-2.5 min of XSMALL DLT_WH per harvest.
 --
--- Privileges: OPERATE on DBT_WH (already granted in base/04) satisfies both
+-- Privileges: OPERATE on DLT_WH (granted in prod/02) satisfies both
 -- QUERY_HISTORY_BY_WAREHOUSE and GET_QUERY_OPERATOR_STATS. No ACCOUNT_USAGE
 -- grant is needed anywhere in this file.
 -- =============================================================================
@@ -77,10 +78,13 @@ CREATE TABLE IF NOT EXISTS DLT_DB.OPS.DBT_BUILDS (
 )
 COMMENT = 'One row per successful event-driven dbt build. Correlate to queries via BUILD_ID in DBT_QUERY_LOG.';
 
--- One row per query the DBT_WH ran with a dbt query tag. Filled by
+-- One row per query DLT_WH ran with a dbt query tag. Filled by
 -- SP_DBT_HARVEST from INFORMATION_SCHEMA.QUERY_HISTORY_BY_WAREHOUSE
--- (7-day window, RESULT_LIMIT max 10000 applied BEFORE the filters --
--- fine while DBT_WH is dbt-only, which is the standing arrangement).
+-- (7-day window, RESULT_LIMIT max 10000 applied BEFORE the filters).
+-- DLT_WH is shared with loads and ops since the 2026-08 consolidation, so
+-- dbt queries compete for that 10k pre-filter window; at daily cadence the
+-- whole warehouse runs a few hundred queries a day, and the END_TIME
+-- predicate in the proc narrows the scan to the unharvested tail anyway.
 CREATE TABLE IF NOT EXISTS DLT_DB.OPS.DBT_QUERY_LOG (
   QUERY_ID                    VARCHAR,
   BUILD_ID                    VARCHAR,  -- parsed from the tag; 'manual' for hand runs
@@ -106,7 +110,7 @@ CREATE TABLE IF NOT EXISTS DLT_DB.OPS.DBT_QUERY_LOG (
   STATS_CAPTURED              BOOLEAN DEFAULT FALSE,
   HARVESTED_AT                TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP()
 )
-COMMENT = 'One row per dbt-tagged query on DBT_WH, harvested by SP_DBT_HARVEST after each build. STATS_CAPTURED marks the operator-stats pass.';
+COMMENT = 'One row per dbt-tagged query on DLT_WH, harvested by SP_DBT_HARVEST after each build. STATS_CAPTURED marks the operator-stats pass.';
 
 -- The Query Profile, persisted: one row per operator per profiled query.
 -- Shape matches GET_QUERY_OPERATOR_STATS output exactly, plus CAPTURED_AT.
@@ -134,7 +138,7 @@ GRANT SELECT ON TABLE DLT_DB.OPS.DBT_QUERY_OPERATOR_STATS TO ROLE DLT_DEV_ROLE;
 CREATE OR REPLACE PROCEDURE DLT_DB.OPS.SP_DBT_HARVEST()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Enumerate new dbt-tagged DBT_WH queries into DBT_QUERY_LOG, then capture operator stats per warehouse-executing query. Caller''s rights is REQUIRED: owner''s-rights procs cannot run QUERY_HISTORY (verified).'
+COMMENT = 'Enumerate new dbt-tagged DLT_WH queries into DBT_QUERY_LOG, then capture operator stats per warehouse-executing query. Caller''s rights is REQUIRED: owner''s-rights procs cannot run QUERY_HISTORY (verified).'
 EXECUTE AS CALLER
 AS
 $$
@@ -185,8 +189,10 @@ BEGIN
       q.QUEUED_OVERLOAD_TIME, q.BYTES_SCANNED, q.ROWS_PRODUCED,
       q.ROWS_INSERTED, q.CREDITS_USED_CLOUD_SERVICES,
       q.WAREHOUSE_NAME, q.QUERY_TAG
+    -- 'DLT_WH' must track the warehouse the dbt tasks run on: a stale name
+    -- here returns zero rows and dbt observability goes dark with no error.
     FROM TABLE(DLT_DB.INFORMATION_SCHEMA.QUERY_HISTORY_BY_WAREHOUSE(
-           WAREHOUSE_NAME => 'DBT_WH', RESULT_LIMIT => 10000)) q
+           WAREHOUSE_NAME => 'DLT_WH', RESULT_LIMIT => 10000)) q
     WHERE TRY_PARSE_JSON(q.QUERY_TAG):app::VARCHAR = 'dbt'
       AND q.END_TIME IS NOT NULL
       AND q.EXECUTION_STATUS NOT IN ('RUNNING', 'QUEUED', 'BLOCKED')
@@ -322,7 +328,7 @@ $$;
 ALTER TASK IF EXISTS DLT_DB.OPS.DBT_OBS_RETENTION SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.DBT_OBS_RETENTION
-  WAREHOUSE = DBT_WH
+  WAREHOUSE = DLT_WH
   SCHEDULE = 'USING CRON 45 4 * * 0 UTC'
   COMMENT = 'Weekly retention sweep of the dbt observability tables. Hand-written; NOT managed by generate_tasks.py.'
 AS

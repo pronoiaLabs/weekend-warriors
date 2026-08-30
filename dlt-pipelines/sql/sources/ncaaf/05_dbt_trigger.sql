@@ -2,10 +2,11 @@
 -- 05_dbt_trigger.sql (ncaaf) -- event-driven dbt run after ingestion
 -- =============================================================================
 -- Chain: dlt load succeeds -> one INSERT lands in RAW._DLT_LOADS -> the
--- append-only stream below has data -> the triggered task fires (no schedule;
--- idle costs nothing) -> the procedure drains the stream into an audit table
--- and runs EXECUTE DBT PROJECT ARGS='run' (models only). A FAILED load never
--- inserts into _DLT_LOADS, so failures never trigger a rebuild, structurally.
+-- append-only stream below has data -> the scheduled task's WHEN clause is
+-- true at its 06:45 UTC fire (an empty day is SKIPPED at zero cost) -> the
+-- procedure drains the stream into an audit table and runs EXECUTE DBT
+-- PROJECT ARGS='run' (models only). A FAILED load never inserts into
+-- _DLT_LOADS, so failures never trigger a rebuild, structurally.
 -- Tests are a sibling scheduled task (DBT_TEST_NCAAF, 07:00 UTC daily, after
 -- the 06:00 ingest cluster). Slack still fires if that test fails (SCOPE
 -- dbt_test_ncaaf).
@@ -20,18 +21,19 @@
 --     built into this file instead, and the RESUME at the bottom is not
 --     redundant: CREATE OR ALTER TASK leaves a task suspended.
 --   * The DML drain in the procedure is mandatory, not an audit nicety: a
---     stream that is only read keeps SYSTEM$STREAM_HAS_DATA true and the task
---     re-fires every interval forever, billing DBT_WH (measured: 4 fires in
---     90 seconds). Drain-first also means a load landing mid-build simply
---     re-triggers after this one finishes.
+--     stream that is only read keeps SYSTEM$STREAM_HAS_DATA true and the
+--     WHEN clause would run the build again at every cron slot forever
+--     (measured in the triggered era: 4 fires in 90 seconds). Drain-first
+--     also means a load landing mid-build is simply picked up at the next
+--     scheduled fire.
 --   * ENVIRONMENT is explicit because the project objects default to dev;
 --     omitting it silently builds the wrong environment.
 --   * A partial dbt failure raises a real SQL error (verified), so failures
 --     land in TASK_HISTORY with ERROR_MESSAGE and count toward
 --     SUSPEND_TASK_AFTER_NUM_FAILURES. No result inspection is needed.
---   * The 900s trigger interval coalesces: a burst of loads inside the window
---     produces one build that drains all of them (verified with 3 inserts ->
---     1 run). Evaluations that find no data are SKIPPED at zero cost.
+--   * The fixed 06:45 fire coalesces: every load of the 06:00-06:20 cluster
+--     drains into one build. A day whose stream is empty is SKIPPED at zero
+--     cost (WHEN clause).
 --
 -- Kill switch:  ALTER TASK NCAAF_PROD_DB.OPS.DBT_BUILD_NCAAF SUSPEND;
 -- Daily tests:  ALTER TASK NCAAF_PROD_DB.OPS.DBT_TEST_NCAAF SUSPEND;
@@ -334,11 +336,15 @@ ALTER TASK IF EXISTS NCAAF_PROD_DB.OPS.DBT_TEST_NCAAF SUSPEND;
 ALTER TASK IF EXISTS NCAAF_PROD_DB.OPS.DBT_HARVEST_NCAAF SUSPEND;
 ALTER TASK IF EXISTS NCAAF_PROD_DB.OPS.DBT_BUILD_NCAAF SUSPEND;
 
+-- Scheduled, not load-triggered (changed 2026-08 with the daily-cadence
+-- consolidation): the NCAAF ingest cluster is 06:00-06:20, so one fixed
+-- 06:45 fire drains it all, and the WHEN clause makes an empty day (no new
+-- loads) a zero-cost SKIPPED.
 CREATE OR ALTER TASK NCAAF_PROD_DB.OPS.DBT_BUILD_NCAAF
-  WAREHOUSE = DBT_WH
-  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 900
+  WAREHOUSE = DLT_WH
+  SCHEDULE = 'USING CRON 45 6 * * * UTC'
   USER_TASK_TIMEOUT_MS = 3600000
-  COMMENT = 'dbt run (models only) for NCAAF on new RAW loads. Tests are DBT_TEST_NCAAF. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
+  COMMENT = 'dbt run (models only) for NCAAF, 06:45 after the 06:00 ingest cluster. Tests are DBT_TEST_NCAAF. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
   WHEN SYSTEM$STREAM_HAS_DATA('NCAAF_PROD_DB.OPS.DBT_LOADS_STREAM')
 AS
   CALL NCAAF_PROD_DB.OPS.SP_DBT_BUILD();
@@ -351,7 +357,7 @@ AS
 -- apply that file before this one on a fresh account, and add this sport's
 -- DBT_TRIGGER_LOADS DELETE to SP_DBT_OBS_RETENTION there.
 CREATE OR ALTER TASK NCAAF_PROD_DB.OPS.DBT_HARVEST_NCAAF
-  WAREHOUSE = DBT_WH
+  WAREHOUSE = DLT_WH
   USER_TASK_TIMEOUT_MS = 1800000
   COMMENT = 'Query log + operator-stats harvest after each NCAAF dbt run. NOT managed by generate_tasks.py.'
   AFTER NCAAF_PROD_DB.OPS.DBT_BUILD_NCAAF
@@ -361,7 +367,7 @@ AS
 -- Daily test: separate root, not AFTER the run graph. Cron is after the
 -- 06:00 ingest cluster.
 CREATE OR ALTER TASK NCAAF_PROD_DB.OPS.DBT_TEST_NCAAF
-  WAREHOUSE = DBT_WH
+  WAREHOUSE = DLT_WH
   SCHEDULE = 'USING CRON 0 7 * * * UTC'
   USER_TASK_TIMEOUT_MS = 3600000
   COMMENT = 'Daily dbt test for NCAAF. Separate root; does not drain DBT_LOADS_STREAM. NOT managed by generate_tasks.py.'

@@ -21,7 +21,7 @@ CREATE SERVICE IF NOT EXISTS DLT_DB.DEPLOY.OPS_DASHBOARD
     USING (tag => '<GIT_SHA>')
     MIN_INSTANCES = 1
     MAX_INSTANCES = 1
-    QUERY_WAREHOUSE = DLT_OPS_WH
+    QUERY_WAREHOUSE = DLT_WH
     COMMENT = 'Observability dashboard over the DLT_DB.OPS views.';
 
 -- Who may open the page. Ingress sends viewers through Snowflake sign-in and

@@ -87,26 +87,13 @@
 USE ROLE SYSADMIN;
 
 -- ---------------------------------------------------------------------------
--- 1. Observability warehouse
---
--- Deliberately not DLT_WH. That warehouse is a Gen2 multi-cluster sized for MERGE
--- and COPY on the load path; charging dynamic-table refreshes to it would make
--- load cost and observability cost inseparable in METERING_HISTORY, and the whole
--- point of this layer is being able to answer what things cost.
---
--- XSMALL with a 60 second auto-suspend. The refresh workload is a handful of
--- nightly crons, not a stream.
+-- 1. Observability warehouse: none. The layer runs on DLT_WH, the single job
+--    warehouse (consolidated 2026-08). The old separate DLT_OPS_WH bought
+--    per-warehouse cost attribution at the price of its own wake/suspend
+--    overhead (measured 79% of its metered compute); attribution now comes
+--    from task-level COST_CENTER tags instead. DLT_LOADER_ROLE already holds
+--    USAGE + OPERATE on DLT_WH from sql/prod/02_compute.sql.
 -- ---------------------------------------------------------------------------
-CREATE WAREHOUSE IF NOT EXISTS DLT_OPS_WH
-    WAREHOUSE_SIZE      = XSMALL
-    WAREHOUSE_TYPE      = STANDARD
-    AUTO_SUSPEND        = 60
-    AUTO_RESUME         = TRUE
-    INITIALLY_SUSPENDED = TRUE
-    COMMENT             = 'Dynamic-table refresh and retention for the dlt observability layer.';
-
-GRANT USAGE   ON WAREHOUSE DLT_OPS_WH TO ROLE DLT_LOADER_ROLE;
-GRANT OPERATE ON WAREHOUSE DLT_OPS_WH TO ROLE DLT_LOADER_ROLE;
 
 -- ---------------------------------------------------------------------------
 -- 2. The event table

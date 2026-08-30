@@ -46,7 +46,7 @@ USE ROLE DLT_LOADER_ROLE;
 ALTER TASK IF EXISTS DLT_DB.OPS.DLT_EVENTS_RETENTION SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.DLT_EVENTS_RETENTION
-    WAREHOUSE = DLT_OPS_WH
+    WAREHOUSE = DLT_WH
     -- Sunday 04:30 UTC. Every pipeline cron sits between 02:00 and 23:00 UTC, so
     -- this window is as quiet as the calendar gets; ops/06's retention runs at
     -- 04:45 and OBS_RETENTION below at 05:00, deliberately staggered.
@@ -105,7 +105,7 @@ $$;
 ALTER TASK IF EXISTS DLT_DB.OPS.OBS_RETENTION SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.OBS_RETENTION
-    WAREHOUSE = DLT_OPS_WH
+    WAREHOUSE = DLT_WH
     -- Sunday 05:00 UTC: 04:30 (raw events) and 04:45 (dbt observability) are
     -- taken; staggered so the three trims never contend.
     SCHEDULE  = 'USING CRON 0 5 * * 0 UTC'

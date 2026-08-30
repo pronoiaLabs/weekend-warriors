@@ -9,7 +9,7 @@
 --   pool awake (defeating the suspend for the jobs) or gets its node
 --   recycled. A service also competes for nodes with scheduled jobs at cron
 --   time. XS is the smallest family and one node is plenty: the container
---   serves one team and its queries run on DLT_OPS_WH, not on this pool.
+--   serves one team and its queries run on DLT_WH, not on this pool.
 --
 -- COST, STATED SO IT IS A DECISION
 --   CPU_X64_XS at MIN 1 with no auto-suspend runs 24/7. That is the price of

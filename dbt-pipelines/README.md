@@ -100,7 +100,7 @@ Both paths land here. From the command bar:
 Prod models rebuild automatically when ingestion lands: per sport, a stream on
 `RAW._DLT_LOADS` feeds a triggered task that runs `EXECUTE DBT PROJECT` against
 that sport's project object (`DLT_DB.DEPLOY.CORTEX_LIFECYCLE_<SPORT>`), as
-`DBT_RUNNER_ROLE` on warehouse `DBT_WH`. The machinery lives in
+`DBT_RUNNER_ROLE` on warehouse `DLT_WH` (the single job warehouse). The machinery lives in
 `../dlt-pipelines/sql/sources/<sport>/05_dbt_trigger.sql`; the repo root
 CLAUDE.md section "Event-driven dbt builds" has the full contract.
 

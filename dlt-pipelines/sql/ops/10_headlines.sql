@@ -75,7 +75,7 @@
 --   llama3.3-70b       0.432 in / 0.432 out    (cheapest credible fallback)
 -- One call per day, digest capped ~5k input tokens, <= ~600 output tokens:
 -- claude-haiku-4-5 costs about 0.005 AI credits per day, ~1.8 per year.
--- The warehouse second or two DLT_OPS_WH spends on the digest SQL costs
+-- The warehouse second or two DLT_WH spends on the digest SQL costs
 -- more than the model does. Full arithmetic in the read-back section.
 -- =============================================================================
 
@@ -472,16 +472,17 @@ $$;
 -- -----------------------------------------------------------------------------
 -- Section 5: the press run (the task)
 -- -----------------------------------------------------------------------------
--- 12:00 UTC: the 2026 morning slate's last slot is 10:00 UTC, dbt builds
--- trigger within ~15 min of data landing, so by noon the day's story is in.
+-- 13:30 UTC: the daily NFL ingest window ends ~12:20 and its dbt build runs
+-- at 12:30, so by 13:30 the day's story is in (and the warehouse is warm
+-- from the 13:00 test and 13:15/13:30 sweeps).
 -- Name deliberately does NOT start with DLT_TASK_ (that prefix would turn it
 -- into a pipeline row in the ops/04 TASK_RUNS merge). NOT managed by
 -- generate_tasks.py; suspend-before-alter built in, per the ops/04 pattern.
 ALTER TASK IF EXISTS DLT_DB.OPS.HEADLINES_DAILY SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.HEADLINES_DAILY
-  WAREHOUSE = DLT_OPS_WH
-  SCHEDULE = 'USING CRON 0 12 * * * UTC'
+  WAREHOUSE = DLT_WH
+  SCHEDULE = 'USING CRON 30 13 * * * UTC'
   USER_TASK_TIMEOUT_MS = 600000
   COMMENT = 'Daily AI headlines for the ops dashboard (SP_HEADLINES). Best-effort; a failure costs a day''s wire and nothing else. NOT managed by generate_tasks.py.'
 AS
@@ -494,7 +495,7 @@ AS
 --   ALTER TASK DLT_DB.OPS.HEADLINES_DAILY RESUME;
 
 -- Cost attribution, same trailing-ALTER convention as ops/08 (which already
--- grants this role APPLY on the tag). 'ops': it burns DLT_OPS_WH.
+-- grants this role APPLY on the tag). 'ops': observability machinery.
 ALTER TASK DLT_DB.OPS.HEADLINES_DAILY SET TAG DLT_DB.OPS.COST_CENTER = 'ops';
 
 -- -----------------------------------------------------------------------------
@@ -523,7 +524,7 @@ ALTER TASK DLT_DB.OPS.HEADLINES_DAILY SET TAG DLT_DB.OPS.COST_CENTER = 'ops';
 --           ~= 3k typical -> 3,000 * 0.60 / 1,000,000 = 0.0018 credits
 --   output: <= 600 tokens -> 600 * 3.00 / 1,000,000  = 0.0018 credits
 --   => ~0.004 credits/day typical, ~0.008 worst case; ~1.5-3 credits/year.
---   The DLT_OPS_WH seconds running the digest SQL cost more than the model.
+--   The DLT_WH seconds running the digest SQL cost more than the model.
 -- Reconcile actuals: SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AI_FUNCTIONS_USAGE_HISTORY
 -- (function AI_COMPLETE, ~2h lag) against SUM(PROMPT_TOKENS)/SUM(COMPLETION_
 -- TOKENS) per MODEL here.

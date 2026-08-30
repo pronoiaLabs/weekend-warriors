@@ -157,11 +157,11 @@ Postgres live always connects as `app_api`. Snowflake rollback
 (`OPS_DASHBOARD_BACKEND=snowflake`) uses the connection's default role unless
 `OPS_DASHBOARD_ROLE` is set. `deploy/sql/01_ops_role.sql` creates
 `OPS_DASHBOARD_ROLE` with SELECT on exactly the objects the datasource reads and
-USAGE on `DLT_OPS_WH`; to prove those grants before relying on them:
+USAGE on `DLT_WH`; to prove those grants before relying on them:
 
 ```bash
 OPS_DASHBOARD_BACKEND=snowflake OPS_DASHBOARD_ROLE=OPS_DASHBOARD_ROLE \
-  OPS_DASHBOARD_WAREHOUSE=DLT_OPS_WH make test-live
+  OPS_DASHBOARD_WAREHOUSE=DLT_WH make test-live
 ```
 
 The session runs `USE SECONDARY ROLES NONE` after `USE ROLE`, so a grant the role lacks

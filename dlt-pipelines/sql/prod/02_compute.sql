@@ -52,7 +52,14 @@ GRANT USAGE   ON COMPUTE POOL DLT_POOL TO ROLE DLT_LOADER_ROLE;
 GRANT MONITOR ON COMPUTE POOL DLT_POOL TO ROLE DLT_LOADER_ROLE;
 
 -- ---------------------------------------------------------------------------
--- 2. Load warehouse (Gen2 multi-cluster)
+-- 2. Job warehouse (Gen2 multi-cluster)
+--
+-- THE single job warehouse since the 2026-08 consolidation: dlt loads, the
+-- dbt build/test/harvest tasks, and the observability layer all run here.
+-- Three separate XS warehouses spent ~2/3 of their metered compute on 60s
+-- resume minimums and auto-suspend tails from staggered wakes; one warehouse
+-- shares those. Cost attribution moved to task COST_CENTER tags + dbt
+-- QUERY_TAGs (sql/ops/08_cost_tags.sql).
 -- ---------------------------------------------------------------------------
 CREATE WAREHOUSE IF NOT EXISTS DLT_WH
     WAREHOUSE_SIZE        = XSMALL
@@ -70,3 +77,7 @@ CREATE WAREHOUSE IF NOT EXISTS DLT_WH
 
 GRANT USAGE   ON WAREHOUSE DLT_WH TO ROLE DLT_LOADER_ROLE;
 GRANT OPERATE ON WAREHOUSE DLT_WH TO ROLE DLT_LOADER_ROLE;
+
+-- dbt runs here too (base/04 creates the role before this warehouse exists,
+-- so the grant lives here, beside the warehouse).
+GRANT USAGE, OPERATE ON WAREHOUSE DLT_WH TO ROLE DBT_RUNNER_ROLE;
