@@ -482,7 +482,7 @@ setup-prod: ## Apply production DDL sql/prod/* -- tailor to the customer's needs
 # This is the one setup target you run more than once, once per source.
 setup-ops: ## Apply observability DDL sql/ops/* -- event table + binding (guard: CONFIRM=1)
 	@if [ "$(CONFIRM)" != "1" ]; then \
-		echo "Creates DLT_OPS_WH and the DLT_DB.OPS.DLT_EVENTS event table, and binds"; \
+		echo "Creates the DLT_DB.OPS.DLT_EVENTS event table (compute is DLT_WH) and binds"; \
 		echo "it to DLT_DB so every SPCS job writes telemetry there instead of to the"; \
 		echo "shared SNOWFLAKE.TELEMETRY.EVENTS. Rows already in the shared table stay"; \
 		echo "there: history splits at this point."; \

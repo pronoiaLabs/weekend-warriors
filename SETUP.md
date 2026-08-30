@@ -63,11 +63,11 @@ query in the right column, not the exit code.
 
 | # | Command | Roles | Creates | Verify |
 |---|---|---|---|---|
-| 1 | `make setup-base CONFIRM=1` | ACCOUNTADMIN, USERADMIN, SYSADMIN | account grants (compute pool + Postgres instance to SYSADMIN), `DLT_LOADER_ROLE` / `DLT_DEV_ROLE`, `DLT_DB` control plane, registry, `DBT_RUNNER_ROLE` + `DBT_WH`, `DBT_EXT_ACCESS` EAI | `SHOW DATABASES LIKE 'DLT_DB'` |
+| 1 | `make setup-base CONFIRM=1` | ACCOUNTADMIN, USERADMIN, SYSADMIN | account grants (compute pool + Postgres instance to SYSADMIN), `DLT_LOADER_ROLE` / `DLT_DEV_ROLE`, `DLT_DB` control plane, registry, `DBT_RUNNER_ROLE` (its warehouse grant comes with `DLT_WH` in step 7), `DBT_EXT_ACCESS` EAI | `SHOW DATABASES LIKE 'DLT_DB'` |
 | 2 | `make setup-dev CONFIRM=1` | SYSADMIN | `DLT_DEV_DB`, dev pools, `DLT_DEV_WH`, `DEVELOPMENT_WH` | `SHOW WAREHOUSES LIKE 'DEV%'` |
 | 3 | `make setup-source SOURCE=<s> CONFIRM=1` for `nfl`, `ncaaf`, and the extras you want (`firecrawl`, `nflverse`, `openmeteo`, `sleeper`) | SYSADMIN, ACCOUNTADMIN | per-source DEV/PROD databases, EAI, placeholder secret | `SHOW DATABASES LIKE '%_PROD_DB'` |
 | 4 | `make setup-secrets CONFIRM=1` | SYSADMIN | real secret values from `.env.snowflake` (empty vars skipped) | a later `run-spcs` succeeds |
-| 5 | `make setup-ops CONFIRM=1` | SYSADMIN, ACCOUNTADMIN, DLT_LOADER_ROLE, DBT_RUNNER_ROLE | `DLT_OPS_WH`, `DLT_EVENTS` event table + account binding, observability tables/procs, cost tags, Slack alerting integration | `SHOW PARAMETERS LIKE 'EVENT_TABLE' IN ACCOUNT` (level ACCOUNT) |
+| 5 | `make setup-ops CONFIRM=1` | SYSADMIN, ACCOUNTADMIN, DLT_LOADER_ROLE, DBT_RUNNER_ROLE | `DLT_EVENTS` event table + account binding (compute is `DLT_WH`, so run step 7 first), observability tables/procs, cost tags, Slack alerting integration | `SHOW PARAMETERS LIKE 'EVENT_TABLE' IN ACCOUNT` (level ACCOUNT) |
 | 6 | `make setup-integrations CONFIRM=1` | SYSADMIN, ACCOUNTADMIN | GitHub API integration for Snowsight Workspaces. Fork note: the allowed prefix is `github.com/pronoiaLabs`; point it at your org with the `ALTER API INTEGRATION` documented in the file | `SHOW API INTEGRATIONS` |
 | 7 | `make setup-prod CONFIRM=1` | SYSADMIN, USERADMIN | `DLT_PROD_DB`, `DLT_POOL`, `DLT_WH`, `DLT_LOADER` key-pair service user | `SHOW COMPUTE POOLS` |
 | 8 | `make image-push` then `make dev-spec-upload` | (connection role) | dlt container image in `DLT_DB.DEPLOY.IMAGES`, dev job specs staged | `make run-spcs NAME=sample` |

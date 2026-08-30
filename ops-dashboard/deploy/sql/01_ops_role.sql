@@ -59,9 +59,10 @@ GRANT READ ON IMAGE REPOSITORY DLT_DB.DEPLOY.IMAGES TO ROLE OPS_DASHBOARD_ROLE;
 -- The service object itself lives in DLT_DB.DEPLOY beside the job services.
 GRANT CREATE SERVICE ON SCHEMA DLT_DB.DEPLOY TO ROLE OPS_DASHBOARD_ROLE;
 
--- Queries the service runs use the ops warehouse; it is XSMALL with a 60s
--- auto-suspend, created by dlt-pipelines/sql/ops/01_event_table.sql.
-GRANT USAGE ON WAREHOUSE DLT_OPS_WH TO ROLE OPS_DASHBOARD_ROLE;
+-- Queries the service runs use DLT_WH, the single job warehouse (created by
+-- dlt-pipelines/sql/prod/02_compute.sql; the separate ops warehouse was
+-- consolidated away 2026-08).
+GRANT USAGE ON WAREHOUSE DLT_WH TO ROLE OPS_DASHBOARD_ROLE;
 
 -- Per-sport read access, for DBT_TRIGGER_LOADS only; see header.
 GRANT USAGE ON DATABASE NFL_PROD_DB TO ROLE OPS_DASHBOARD_ROLE;

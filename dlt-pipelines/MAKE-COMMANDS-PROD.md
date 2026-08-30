@@ -8,7 +8,7 @@ Scheduled Snowflake Tasks loading `NFL_PROD_DB.RAW`. The third runbook, after
 [MAKE-COMMANDS.md](MAKE-COMMANDS.md) (laptop) and [MAKE-COMMANDS-SPCS.md](MAKE-COMMANDS-SPCS.md)
 (container, by hand).
 
-The difference that matters: **nobody is watching.** A Task fires at 09:00 UTC and reports itself
+The difference that matters: **nobody is watching.** A Task fires at 11:00 UTC and reports itself
 only in `TASK_HISTORY` and `_DLT_RUNS`. Everything below exists because a failure here is silent by
 default.
 
@@ -28,7 +28,7 @@ That single constraint explains most of the design:
 
 So a scheduled pipeline must carry `schedule`, `secret`, `env_var` and `external_access` in its
 registry entry. `make test` fails if one is missing, because the alternative is finding out at
-09:00 UTC.
+11:00 UTC.
 
 ### The season token
 
@@ -53,24 +53,27 @@ reports success while re-fetching a season that ended months ago.
 
 ## The schedules, and the calendar behind them
 
+Everything NFL runs once a day in one 11:00-12:20 UTC window, except injuries (deadline-driven at
+22:00). One window, one warm warehouse and pool, one 12:30 dbt build.
+
 | Pipeline | Cron (UTC) | Cadence | Why |
 |---|---|---|---|
-| `nfl_reference` | `0 9 * * *` | daily | rosters churn on waivers all season; first in the cluster so players land before stats |
-| `nfl_games` | `5 9 * * *` | daily | flex scheduling moves kickoffs; scores same-day |
-| `nfl_stats` | `10 9 * * *` | daily | box scores follow the games |
-| `nfl_plays` | `15 9 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
-| `nfl_standings` | `20 9 * * 2` | Tuesday | only meaningful after a full week |
-| `nfl_advanced_stats` | `25 9 * * 2` | Tuesday | same |
-| `nfl_odds_opening` | `30 9 * * *` | daily | immutable game and player-prop openings, both fanned out per game |
-| `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently |
-| `nfl_news` | `5 */4 * * *` | every 4h | Firecrawl RSS scrape; six runs a day, :05 so it misses the on-the-hour Tasks |
-| `nfl_game_odds` | `0 */4 * * 0,1,4,5,6` | every 4h Thu-Mon | SCD2 snapshots of current game lines |
-| `nfl_player_props` | `10 */4 * * 0,1,4,5,6` | every 4h Thu-Mon | SCD2 snapshots, staggered off game odds |
-| `nfl_nflverse_stats` | `15 11 * * *` | daily | nflverse season files (pbp, player weeks, snaps, Next Gen, injury reports) merged on their keys; a reload is how corrections arrive. 11:xx clears the 09:xx cluster and nflverse's overnight rebuilds |
+| `nfl_reference` | `0 11 * * *` | daily | rosters churn on waivers all season; first in the window so players land before stats |
+| `nfl_games` | `5 11 * * *` | daily | flex scheduling moves kickoffs; scores same-day |
+| `nfl_stats` | `10 11 * * *` | daily | box scores follow the games |
+| `nfl_nflverse_stats` | `15 11 * * *` | daily | nflverse season files (pbp, player weeks, snaps, Next Gen, injury reports) merged on their keys; a reload is how corrections arrive. 11:15 is the window's floor: nflverse rebuilds overnight |
+| `nfl_odds_opening` | `20 11 * * *` | daily | immutable game and player-prop openings, both fanned out per game |
+| `nfl_weather_forecast` | `25 11 * * *` | daily | 16-day outlook for outdoor and retractable sites |
+| `nfl_game_odds` | `30 11 * * *` | daily | SCD2 snapshots of current game lines; one observation a day (movement between pulls is lost, accepted for cost) |
+| `nfl_player_props` | `40 11 * * *` | daily | SCD2 snapshots, staggered ten minutes off game odds for the shared key |
 | `nfl_nflverse_depth_charts` | `45 11 * * *` | daily | one new depth-chart snapshot a day, cursor on `dt` |
 | `nfl_nflverse_reference` | `50 11 * * 3` | Wednesday | all-history files replaced: players id crosswalk, officials, combine, trades |
+| `nfl_news` | `55 11 * * *` | daily | Firecrawl RSS scrape; the short-post wires drop items at this cadence (they only expose their last 15-30), accepted for cost |
+| `nfl_plays` | `0 12 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
+| `nfl_standings` | `5 12 * * 2` | Tuesday | only meaningful after a full week |
 | `nfl_sleeper_players` | `10 12 * * *` | daily | the ~15 MB player dump, replaced; Sleeper asks for at most one pull a day |
-| `nfl_sleeper_market` | `20 */6 * * *` | every 6h | trending adds/drops and this week's projections as dated snapshots; stats for this week and last merged |
+| `nfl_sleeper_market` | `15 12 * * *` | daily | trending adds/drops (a 24h window, so daily loses nothing) and this week's projections as dated snapshots; stats for this week and last merged |
+| `nfl_injuries` | `0 22 * * *` | daily | scd2, so a missed state is gone permanently; late by deadline, see below |
 
 Cron is five fields, **Sunday is 0**, so Tuesday is `2`.
 
@@ -81,24 +84,25 @@ History is the unscheduled backfill entries (2023 onward, the BallDontLie floor)
 `make run-prod NAME=nfl_nflverse_backfill CONFIRM=1` and `make run-prod NAME=nfl_sleeper_backfill CONFIRM=1`;
 the Tasks then keep the current season fresh.
 
-**Why one 09:00-09:25 window instead of hourly staggering.** Loads landing close together coalesce
-into fewer triggered dbt builds (the trigger drains everything in the stream per fire), and the pool
-wakes once instead of once per pipeline. The 5-minute stagger, rather than the same minute, keeps
-one API key from being hit concurrently and lets a single warm pool node work through the queue.
-Expect two dbt runs from the window (the first load fires a run almost immediately; the 900s trigger
-interval coalesces the rest), plus the injuries run at 22:xx. Triggered dbt is `ARGS='run'` (models
-only). Tests run once a day on `DBT_TEST_NFL` at 13:00 UTC (after this cluster, nflverse 11:xx, and
-sleeper players 12:10). `sql/**` is not CI-applied: after merging trigger SQL,
-`make setup-source SOURCE=nfl CONFIRM=1` (and `SOURCE=ncaaf`) is required to flip prod off `build`.
+**Why one 11:00-12:20 window instead of staggering across the day.** Every warehouse resume bills a
+60-second minimum plus a 60-second auto-suspend tail, so spread-out wakes cost more than the queries
+they run (measured 2026-08-30: two thirds of daily spend was wake overhead). One window warms the
+warehouse and pool once; the 5-minute stagger, rather than the same minute, keeps one API key from
+being hit concurrently and lets a single warm pool node work through the queue. dbt is no longer
+load-triggered: `DBT_BUILD_NFL` is a scheduled task at 12:30 and 22:30 UTC whose `WHEN
+SYSTEM$STREAM_HAS_DATA` clause drains the whole window in one `ARGS='run'` (models only) build and
+makes an empty slot a free SKIPPED. Tests run once a day on `DBT_TEST_NFL` at 13:00 UTC.
+`sql/**` is not CI-applied: after merging trigger SQL, `make setup-source SOURCE=nfl CONFIRM=1`
+(and `SOURCE=ncaaf`) is required.
 
-The live betting Tasks use Snowflake's five-field cron step syntax. They run every
-four hours Thursday through Monday (Sunday is 0) and are staggered by ten minutes so
-their game fan-outs do not share the API key concurrently. Only observations captured
-while these Tasks run exist: live line movement cannot be backfilled.
+The betting Tasks are daily now. Only observations captured while they run exist -- line movement
+between the daily pulls is lost and cannot be backfilled. That resolution was traded away
+deliberately for cost; raising them back to `*/4` on game days is a two-line registry change.
 
-**Why 09:00 UTC.** A normal week ends with Monday Night Football at 20:15 ET, final around 23:45 ET.
-That is 03:45 UTC Tuesday under EDT and 04:45 under EST. 09:00 UTC clears both, and the margin is
-deliberate: a fixed UTC cron drifts an hour against ET when the clocks change on 1 November.
+**Why 11:00 UTC.** nflverse rebuilds its files overnight and cannot be pulled before ~11:15, which
+sets the window's floor; everything else joined it there. It also clears Monday Night Football
+(final ~03:45 UTC Tuesday under EDT, 04:45 under EST) by hours, so the DST drift on 1 November
+changes nothing.
 
 **Why `nfl_injuries` is late and daily.** Injury reports are filed Wed/Thu/Fri by 16:00 ET. 22:00 UTC
 is 18:00 EDT and 17:00 EST, after the deadline year-round. This is the one table where cadence is not
@@ -416,8 +420,8 @@ accepts only bracketed `game_ids[]`, which the child resources resolve from thos
 ## NCAAF: schedules and calendar
 
 Deployed 2026-08-09 (WORKFLOW-7). The band is **02:00-07:59 UTC**, below the
-NFL's 08:00-13:00, so the two sports never stack against the shared 600
-req/min API limit or `DLT_POOL`.
+NFL's 11:00-12:20 window, so the two sports never stack against the shared
+600 req/min API limit or `DLT_POOL`.
 
 | Pipeline | Cron (UTC) | Cadence | Why |
 |---|---|---|---|
@@ -428,13 +432,13 @@ req/min API limit or `DLT_POOL`.
 | `ncaaf_rankings` | `20 6 * * 1` | Monday | AP poll releases Sunday ~18:00 UTC; endpoint returns the latest week only, so the weekly run accumulates the season |
 | `ncaaf_reference` | `10 6 * * 3` | Wednesday | 536 teams + 124k players is ~1,250 requests; college rosters churn on portal windows, not daily waivers |
 
-**One 06:00-06:20 window, same pattern as the NFL's 09:00 cluster.** Loads
-landing together coalesce into fewer triggered dbt runs (Mondays 5 runs
-become 2, Wednesdays 3 become 2; plain days stay at 2, the two-daily floor)
-and the pool wakes once per morning instead of twice. The cluster stays
-inside the NCAAF band, so the sports still never stack against the shared
-API limit. Triggered dbt is `ARGS='run'`; daily tests are `DBT_TEST_NCAAF`
-at 07:00 UTC. Apply trigger SQL with `make setup-source SOURCE=ncaaf CONFIRM=1`.
+**One 06:00-06:20 window, same pattern as the NFL's 11:00 window.** The pool
+and warehouse wake once per morning, and `DBT_BUILD_NCAAF` is a scheduled
+task at 06:45 UTC whose `WHEN SYSTEM$STREAM_HAS_DATA` drains the whole
+cluster in one `ARGS='run'` build (an empty day is a free SKIPPED). The
+cluster stays inside the NCAAF band, so the sports still never stack against
+the shared API limit. Daily tests are `DBT_TEST_NCAAF` at 07:00 UTC. Apply
+trigger SQL with `make setup-source SOURCE=ncaaf CONFIRM=1`.
 
 **No injuries, no plays, no odds.** The API has no NCAAF injuries endpoint at
 all; play-by-play carries no down/distance/field position (scoring timeline

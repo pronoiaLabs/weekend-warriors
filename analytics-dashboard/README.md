@@ -38,7 +38,7 @@ Environment, all optional (`api/app/config.py` is the contract):
 | `ANALYTICS_DASHBOARD_NOW` | wall clock | pins the clock (ISO-8601) for fixture-era tests |
 | `ANALYTICS_DASHBOARD_CONNECTION` | weekend-warriors | snow CLI connection name (`BACKEND=snowflake` only) |
 | `ANALYTICS_DASHBOARD_ROLE` | ANALYTICS_DASHBOARD_ROLE | Snowflake `USE ROLE` on connect (`BACKEND=snowflake` only) |
-| `ANALYTICS_DASHBOARD_WAREHOUSE` | DLT_OPS_WH | `USE WAREHOUSE` on connect (`BACKEND=snowflake` only) |
+| `ANALYTICS_DASHBOARD_WAREHOUSE` | DLT_WH | `USE WAREHOUSE` on connect (`BACKEND=snowflake` only) |
 | `ANALYTICS_DASHBOARD_CACHE_SECONDS` | 60 | default query cache TTL; tiles can override per call |
 | `<SPORT>_APP_DB`, `<SPORT>_APP_SCHEMA` | `app`, `app_copy` | mart location. Snowflake defaults are `<SPORT>_PROD_DB`, `APP`; point those at `NFL_DEV_DB` / `DEV_<user>` to capture a dev build |
 | `PGHOST`, `PGPORT`, `APP_API_PASSWORD` | from repo-root `.env.postgres` | Postgres live login. `make serve` / `make dev` source that file. User is always `app_api`; never the writer or instance admin |
@@ -192,7 +192,7 @@ analytics-dashboard/
 
 `ANALYTICS_DASHBOARD_ROLE` holds USAGE on the two databases, `SELECT` on all and future
 tables in each `APP` schema (pages), `SELECT` on all and future semantic views in each
-`ANALYTICS` schema (Explorer), and USAGE on `DLT_OPS_WH`. Nothing on CORE, PREP or RAW.
+`ANALYTICS` schema (Explorer), and USAGE on `DLT_WH`. Nothing on CORE, PREP or RAW.
 `make setup CONFIRM=1` applies the three files in order; `03_app_grants.sql` fails until
 the first prod dbt build has created `APP` and is idempotent after that. Marts are built
 with `+copy_grants` so dbt's `CREATE OR REPLACE` keeps the grant between runs.
@@ -203,11 +203,11 @@ boundary with `USE SECONDARY ROLES NONE` first; `db.py` runs the same statement 
 connection so the app only ever holds the primary role. Verify:
 
 ```bash
-snow sql -c weekend-warriors --role ANALYTICS_DASHBOARD_ROLE --warehouse DLT_OPS_WH --format JSON \
+snow sql -c weekend-warriors --role ANALYTICS_DASHBOARD_ROLE --warehouse DLT_WH --format JSON \
   -q "use secondary roles none; select count(*) from NFL_PROD_DB.CORE.FACT_PLAYER_GAME_OFFENSE"
 # expected: Schema 'NFL_PROD_DB.CORE' does not exist or not authorized.
 
-snow sql -c weekend-warriors --role ANALYTICS_DASHBOARD_ROLE --warehouse DLT_OPS_WH --format JSON \
+snow sql -c weekend-warriors --role ANALYTICS_DASHBOARD_ROLE --warehouse DLT_WH --format JSON \
   -q "use secondary roles none; select count(*) from NFL_PROD_DB.APP.APP_GAME_SLATE"
 ```
 

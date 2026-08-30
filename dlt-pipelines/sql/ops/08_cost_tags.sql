@@ -20,13 +20,14 @@
 -- warehouse hour" at the metering level, where per-query attribution does
 -- not reach (idle time, auto-suspend tails).
 --
--- WHY WAREHOUSES AND NOT SPORTS: DBT_WH serves every sport, so sport-level
--- cost comes from QUERY_TAG rollups over DBT_QUERY_LOG, not from object
--- tags. The object tag dimension is the component: ingestion / dbt / dev /
--- ops. The tag follows the compute an object burns, not its domain: the
--- DBT_RUNS_* refresh tasks are dbt-flavoured but run on DLT_OPS_WH, so they
--- are 'ops' -- otherwise the task-level rollup would disagree with the
--- warehouse-level metering for the same credits.
+-- ONE JOB WAREHOUSE (2026-08): DLT_WH runs ingestion, dbt, and ops, so
+-- warehouse-level metering no longer separates components -- that was the
+-- explicit trade for eliminating per-warehouse wake overhead (three XS
+-- warehouses spent ~2/3 of metered compute on resume minimums and suspend
+-- tails). Component cost now reads off the TASK tags below joined to
+-- TASK_HISTORY / QUERY_ATTRIBUTION_HISTORY, and sport-level dbt cost from
+-- QUERY_TAG rollups over DBT_QUERY_LOG, as before. The tag still follows
+-- the compute an object burns, not its domain.
 --
 -- TAGGED ELSEWHERE: the DLT_TASK_% ingestion tasks carry 'ingestion', set by
 -- deploy/tasks/generate_tasks.py inside build/tasks.sql (standing rule:
@@ -71,13 +72,13 @@
 USE ROLE SYSADMIN;
 
 CREATE TAG IF NOT EXISTS DLT_DB.OPS.COST_CENTER
-  ALLOWED_VALUES 'ingestion', 'dbt', 'dev', 'ops'
+  ALLOWED_VALUES 'ingestion', 'dbt', 'dev', 'ops', 'jobs'
   COMMENT = 'Component-level cost attribution. Joined to WAREHOUSE_METERING_HISTORY and SNOWPARK_CONTAINER_SERVICES_HISTORY via TAG_REFERENCES; sport-level dbt cost comes from QUERY_TAG instead.';
 
-ALTER WAREHOUSE DBT_WH         SET TAG DLT_DB.OPS.COST_CENTER = 'dbt';
+-- ALLOWED_VALUES on an existing tag: ALTER TAG DLT_DB.OPS.COST_CENTER ADD
+-- ALLOWED_VALUES 'jobs'; is the live migration (CREATE IF NOT EXISTS skips).
+ALTER WAREHOUSE DLT_WH         SET TAG DLT_DB.OPS.COST_CENTER = 'jobs';
 ALTER WAREHOUSE DEVELOPMENT_WH SET TAG DLT_DB.OPS.COST_CENTER = 'dev';
-ALTER WAREHOUSE DLT_OPS_WH     SET TAG DLT_DB.OPS.COST_CENTER = 'ops';
-ALTER WAREHOUSE DLT_WH         SET TAG DLT_DB.OPS.COST_CENTER = 'ingestion';
 ALTER WAREHOUSE DLT_DEV_WH     SET TAG DLT_DB.OPS.COST_CENTER = 'dev';
 
 -- The pools are where ingestion cost actually lives; DLT_WH only carries the
@@ -123,6 +124,6 @@ ALTER TASK NCAAF_PROD_DB.OPS.DBT_HARVEST_NCAAF SET TAG DLT_DB.OPS.COST_CENTER = 
 ALTER TASK NCAAF_PROD_DB.OPS.DBT_TEST_NCAAF    SET TAG DLT_DB.OPS.COST_CENTER = 'dbt';
 ALTER TASK DLT_DB.OPS.DBT_OBS_RETENTION      SET TAG DLT_DB.OPS.COST_CENTER = 'dbt';
 
--- 'ops', not 'dbt': these burn DLT_OPS_WH. See WHY WAREHOUSES AND NOT SPORTS.
+-- 'ops', not 'dbt': they are observability machinery. See ONE JOB WAREHOUSE.
 ALTER TASK DLT_DB.OPS.DBT_RUNS_REFRESH SET TAG DLT_DB.OPS.COST_CENTER = 'ops';
 ALTER TASK DLT_DB.OPS.DBT_RUNS_SWEEP   SET TAG DLT_DB.OPS.COST_CENTER = 'ops';

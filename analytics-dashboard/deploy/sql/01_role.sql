@@ -29,10 +29,10 @@ GRANT ROLE ANALYTICS_DASHBOARD_ROLE TO ROLE SYSADMIN;
 
 USE ROLE SYSADMIN;
 
--- Queries run on the ops warehouse for v1: XSMALL, 60s auto-suspend, already
--- tagged COST_CENTER = 'ops' (dlt-pipelines/sql/ops/08_cost_tags.sql). A
--- dedicated warehouse is a one-line change here if the spend ever warrants it.
-GRANT USAGE ON WAREHOUSE DLT_OPS_WH TO ROLE ANALYTICS_DASHBOARD_ROLE;
+-- Queries run on DLT_WH, the single job warehouse (the separate ops
+-- warehouse was consolidated away 2026-08). A dedicated warehouse is a
+-- one-line change here if the spend ever warrants it.
+GRANT USAGE ON WAREHOUSE DLT_WH TO ROLE ANALYTICS_DASHBOARD_ROLE;
 
 -- NFL
 GRANT USAGE ON DATABASE NFL_PROD_DB TO ROLE ANALYTICS_DASHBOARD_ROLE;

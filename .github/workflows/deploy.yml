@@ -318,10 +318,10 @@ jobs:
           - { sport: nfl, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NFL }
           - { sport: ncaaf, object: DLT_DB.DEPLOY.CORTEX_LIFECYCLE_NCAAF }
     env:
-      # DBT_RUNNER_ROLE owns the prod dbt estate; it has USAGE on DBT_WH only,
-      # so the workflow-level DLT_WH must be overridden here.
+      # DBT_RUNNER_ROLE owns the prod dbt estate. It shares DLT_WH (the
+      # workflow-level warehouse) since the 2026-08 consolidation, so only
+      # the role needs overriding here.
       SNOWFLAKE_ROLE: DBT_RUNNER_ROLE
-      SNOWFLAKE_WAREHOUSE: DBT_WH
       # The snow dbt --env / --default-env flags are feature-flagged.
       SNOWFLAKE_CLI_FEATURES_ENABLE_DBT_PROJECT_ENV_VARS: "true"
     steps:
@@ -406,7 +406,6 @@ jobs:
           - { sport: ncaaf }
     env:
       SNOWFLAKE_ROLE: DBT_RUNNER_ROLE
-      SNOWFLAKE_WAREHOUSE: DBT_WH
       SNOWFLAKE_CLI_FEATURES_ENABLE_DBT_PROJECT_ENV_VARS: "true"
     steps:
       - uses: actions/checkout@v4

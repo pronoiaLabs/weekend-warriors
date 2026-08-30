@@ -25,7 +25,7 @@ pipelines:
   # seed; we just do not spend a daily call on them.
   - name: nfl_weather_forecast
     source: openmeteo
-    schedule: "40 9 * * *"
+    schedule: "25 11 * * *"
     config:
       product: forecast
       forecast_days: 16

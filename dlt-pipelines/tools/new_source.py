@@ -308,10 +308,11 @@ DBT_TRIGGER_SQL = """\
 --     built into this file instead, and the RESUME at the bottom is not
 --     redundant: CREATE OR ALTER TASK leaves a task suspended.
 --   * The DML drain in the procedure is mandatory, not an audit nicety: a
---     stream that is only read keeps SYSTEM$STREAM_HAS_DATA true and the task
---     re-fires every interval forever, billing DBT_WH (measured: 4 fires in
---     90 seconds). Drain-first also means a load landing mid-build simply
---     re-triggers after this one finishes.
+--     stream that is only read keeps SYSTEM$STREAM_HAS_DATA true and the
+--     WHEN clause would run the build again at every cron slot forever
+--     (measured in the triggered era: 4 fires in 90 seconds). Drain-first
+--     also means a load landing mid-build is simply picked up at the next
+--     scheduled fire.
 --   * ENVIRONMENT is explicit because the project objects default to dev;
 --     omitting it silently builds the wrong environment.
 --   * A partial dbt failure raises a real SQL error (verified), so failures
@@ -603,11 +604,14 @@ ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_TEST_{upper} SUSPEND;
 ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_HARVEST_{upper} SUSPEND;
 ALTER TASK IF EXISTS {upper}_PROD_DB.OPS.DBT_BUILD_{upper} SUSPEND;
 
+-- Scheduled, not load-triggered: schedule one fire shortly after this
+-- sport's daily ingest cluster ends (NFL runs 12:30 and 22:30, NCAAF 06:45).
+-- The WHEN clause makes an empty slot a zero-cost SKIPPED.
 CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_BUILD_{upper}
-  WAREHOUSE = DBT_WH
-  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 900
+  WAREHOUSE = DLT_WH
+  SCHEDULE = 'USING CRON 45 13 * * * UTC'
   USER_TASK_TIMEOUT_MS = 3600000
-  COMMENT = 'dbt run (models only) for {upper} on new RAW loads. Tests are DBT_TEST_{upper}. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
+  COMMENT = 'dbt run (models only) for {upper} after the daily ingest cluster. Tests are DBT_TEST_{upper}. NOT managed by generate_tasks.py; history in SNOWFLAKE.ACCOUNT_USAGE.DBT_PROJECT_EXECUTION_HISTORY.'
   WHEN SYSTEM$STREAM_HAS_DATA('{upper}_PROD_DB.OPS.DBT_LOADS_STREAM')
 AS
   CALL {upper}_PROD_DB.OPS.SP_DBT_BUILD();
@@ -619,7 +623,7 @@ AS
 -- before this one on a fresh account, and add this sport's DBT_TRIGGER_LOADS
 -- DELETE to SP_DBT_OBS_RETENTION there.
 CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_HARVEST_{upper}
-  WAREHOUSE = DBT_WH
+  WAREHOUSE = DLT_WH
   USER_TASK_TIMEOUT_MS = 1800000
   COMMENT = 'Query log + operator-stats harvest after each {upper} dbt run. NOT managed by generate_tasks.py.'
   AFTER {upper}_PROD_DB.OPS.DBT_BUILD_{upper}
@@ -630,7 +634,7 @@ AS
 -- 13:00 UTC; move it after this sport's last ingest cluster (NFL 13:00,
 -- NCAAF 07:00).
 CREATE OR ALTER TASK {upper}_PROD_DB.OPS.DBT_TEST_{upper}
-  WAREHOUSE = DBT_WH
+  WAREHOUSE = DLT_WH
   SCHEDULE = 'USING CRON 0 13 * * * UTC'
   USER_TASK_TIMEOUT_MS = 3600000
   COMMENT = 'Daily dbt test for {upper}. Separate root; does not drain DBT_LOADS_STREAM. NOT managed by generate_tasks.py.'
@@ -729,7 +733,7 @@ secret, env_var and external_access bindings, which the stub already sets.
 
 dbt, once models exist for the sport (see WORKFLOW-3/4 for the pattern):
   a. dbt-pipelines/env.yml: add {name}_dev / {name}_prod environments
-       (DBT_SPORT: {name}, prod uses DBT_RUNNER_ROLE on DBT_WH).
+       (DBT_SPORT: {name}, prod uses DBT_RUNNER_ROLE on DLT_WH).
   b. dbt-pipelines/dbt_project.yml: add the models/{name} sibling config key.
   c. make -C ../dbt-pipelines deploy-sport SPORT={name}
        (creates DLT_DB.DEPLOY.CORTEX_LIFECYCLE_{name.upper()}; must exist BEFORE
