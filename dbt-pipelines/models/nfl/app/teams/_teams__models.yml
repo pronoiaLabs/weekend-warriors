@@ -9,10 +9,12 @@ models:
   - name: app_team_allowed
     description: >
       What each defense allows, by position and stat. One row per defense,
-      season, season type, position and stat (the pairs props are written on),
-      with the per-game amount, the league average, and a rank where 1 allows
-      the most. The single definition behind the prop board's matchup column and
-      the team page's allowed table.
+      season, season type, position and stat -- the pairs props are written on
+      plus volume, both books' fantasy points and a per-position efficiency
+      key (yards per attempt / carry / target, where allowed_per_game carries
+      the per-unit rate) -- with the per-game amount, the league average, and
+      a rank where 1 allows the most. The single definition behind the prop
+      board's matchup column and the team page's allowed grid.
     columns:
       - name: app_team_allowed_key
         tests: [unique, not_null]
@@ -37,7 +39,9 @@ models:
       A team's season game by game. One row per team game and sportsbook (vendor
       NULL when no closing line exists), with the team's box score, the opponent's,
       the result, running season counts, and the closing line read from this
-      team's side with cover and over calls against the final score. Completed
+      team's side with cover and over calls against the final score. The EPA
+      block from the team twins rides every vendor row, NULL with
+      has_nflverse false where nflverse has no play-by-play. Completed
       games only.
     columns:
       - name: app_team_weeks_key
@@ -73,7 +77,10 @@ models:
       The standings table with home and away splits. One row per team, season,
       season type and split ('all', 'home', 'away'), derived from the team game
       facts so it is live during a season; rates are sum over sum; ranks are
-      within the season, season type and split.
+      within the season, season type and split. Carries the EPA block from the
+      team twins (NULL for preseason, ranks masked there) and the home/away
+      records denormalized onto every row of the team-season; last_results is
+      the five most recent, newest first.
     columns:
       - name: app_team_standings_key
         tests: [unique, not_null]

@@ -99,6 +99,17 @@ SELECTION: dict[str, dict[C, str]] = {
         C.EXPLORE_PLAYER_PROPS: "season = 2026 and week = 1 and vendor = 'draftkings'",
         C.EXPLORE_NEWS: "published_date >= '2026-08-22'",
         C.EXPLORE_LINE_MOVES: "season = 2026 and week = 1 and vendor in ('kalshi', 'draftkings')",
+        # one team's week-18 game: the sheet's shape without the 182k rows
+        C.EXPLORE_PLAYS: (
+            "season = 2025 and season_type = 'Regular Season' and week = 18 and team = 'KC'"
+        ),
+        # one full game (drive grouping) plus a player slice (the role-OR and
+        # the usage-strip branch), the repo's sample entities
+        C.PLAY_LOG: (
+            "(season = 2025 and week = 18 and team_label = 'KC')"
+            " or (season = 2025 and week in (1, 2)"
+            " and (passer_name = 'Patrick Mahomes' or receiver_name = 'Puka Nacua'))"
+        ),
     },
 }
 

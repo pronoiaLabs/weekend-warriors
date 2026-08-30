@@ -14,9 +14,18 @@
     keeps the two in agreement where they overlap).
 
     Rates are sum over sum across the games in the split, never an average of
-    per-game rates. last_results is the split's most recent three results,
+    per-game rates. last_results is the split's most recent five results,
     newest first. Ranks are within (season, season type, split): overall, within
     the conference and within the division, by win pct then point differential.
+
+    The EPA block comes from the team twins (the retired fact_team_game_epa's
+    halves live on fact_team_game_offense / _defense): additive components plus
+    ratio-of-sums rates, NULL for preseason where nflverse publishes no
+    play-by-play. The EPA ranks are masked NULL on those rows so a preseason
+    slice never collects trailing ranks. home_record / away_record denormalize
+    the home and away split rows onto every row of the team-season via windows,
+    NULL until the team has played that venue -- the standings table shows them
+    as columns without a second query.
 */
 
 with team_games as (
@@ -53,7 +62,13 @@ with team_games as (
         d.opp_net_passing_yards,
         d.opp_rushing_yards,
         o.penalties,
-        o.penalty_yards
+        o.penalty_yards,
+        o.off_plays,
+        o.off_epa,
+        o.success_plays,
+        d.def_plays,
+        d.def_epa,
+        d.def_success_plays
     from {{ ref('fact_team_game_offense') }} o
     left join {{ ref('fact_team_game_defense') }} d
         on d.team_game_key = o.team_game_key
@@ -102,9 +117,15 @@ agg as (
         sum(opp_rushing_yards)                          as opp_rushing_yards,
         sum(penalties)                                  as penalties,
         sum(penalty_yards)                              as penalty_yards,
+        sum(off_plays)                                  as off_plays,
+        sum(off_epa)                                    as off_epa,
+        sum(success_plays)                              as success_plays,
+        sum(def_plays)                                  as def_plays,
+        sum(def_epa)                                    as def_epa,
+        sum(def_success_plays)                          as def_success_plays,
         max(game_date)                                  as last_game_date,
         array_slice(
-            array_agg(result) within group (order by game_date desc, game_key desc), 0, 3
+            array_agg(result) within group (order by game_date desc, game_key desc), 0, 5
         )                                               as last_results
     from splits
     group by 1, 2, 3, 4
@@ -137,7 +158,15 @@ with_rates as (
         coalesce(a.takeaways, 0) - coalesce(a.turnovers, 0)
                                                         as turnover_margin,
         round(a.total_yards / a.games, 1)               as yards_per_game,
-        round(a.opp_total_yards / a.games, 1)           as opp_yards_per_game
+        round(a.opp_total_yards / a.games, 1)           as opp_yards_per_game,
+        iff(a.off_plays > 0, round(a.off_epa / a.off_plays, 3), null)
+                                                        as off_epa_per_play,
+        iff(a.off_plays > 0, round(a.success_plays / a.off_plays, 3), null)
+                                                        as success_rate,
+        iff(a.def_plays > 0, round(a.def_epa / a.def_plays, 3), null)
+                                                        as def_epa_per_play,
+        iff(a.def_plays > 0, round(a.def_success_plays / a.def_plays, 3), null)
+                                                        as success_rate_allowed
     from agg a
 
 )
@@ -194,6 +223,36 @@ select
     w.penalty_yards,
     w.last_game_date,
     w.last_results,
+    w.off_plays,
+    w.off_epa,
+    w.off_epa_per_play,
+    w.success_plays,
+    w.success_rate,
+    w.def_plays,
+    w.def_epa,
+    w.def_epa_per_play,
+    w.def_success_plays,
+    w.success_rate_allowed,
+    -- masked so preseason rows (no pbp) never collect trailing ranks;
+    -- nulls last is mandatory, Snowflake sorts NULLs first on desc
+    iff(w.off_plays is null, null, rank() over (
+        partition by w.season, w.season_type, w.split
+        order by w.off_epa / nullif(w.off_plays, 0) desc nulls last
+    ))                                                  as off_epa_per_play_rank,
+    iff(w.def_plays is null, null, rank() over (
+        partition by w.season, w.season_type, w.split
+        order by w.def_epa / nullif(w.def_plays, 0) asc nulls last
+    ))                                                  as def_epa_per_play_rank,
+    -- the home and away split rows, denormalized onto every row of the
+    -- team-season so the standings table shows them as columns
+    max(iff(w.split = 'home',
+        w.wins || '-' || w.losses || iff(w.ties > 0, '-' || w.ties, ''), null))
+        over (partition by w.team_key, w.season, w.season_type)
+                                                        as home_record,
+    max(iff(w.split = 'away',
+        w.wins || '-' || w.losses || iff(w.ties > 0, '-' || w.ties, ''), null))
+        over (partition by w.team_key, w.season, w.season_type)
+                                                        as away_record,
     rank() over (
         partition by w.season, w.season_type, w.split
         order by w.win_pct desc, w.point_diff desc, w.points_for desc

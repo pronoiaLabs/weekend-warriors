@@ -34,3 +34,5 @@ class Capability(StrEnum):
     EXPLORE_PLAYER_PROPS = "explore_player_props"      # app_explore_player_props
     EXPLORE_NEWS = "explore_news"                      # app_explore_news
     EXPLORE_LINE_MOVES = "explore_line_moves"          # app_explore_line_moves
+    EXPLORE_PLAYS = "explore_plays"                    # app_explore_plays
+    PLAY_LOG = "play_log"                              # app_play_log

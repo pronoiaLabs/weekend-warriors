@@ -55,3 +55,12 @@ models:
     columns:
       - name: row_id
         tests: [unique, not_null]
+
+  - name: app_explore_plays
+    description: >
+      One row per play, curated from app_play_log: situation, the call, the
+      involved players by name, EPA and the outcome. The v1 play log and the
+      pattern room's flat twin.
+    columns:
+      - name: row_id
+        tests: [unique, not_null]

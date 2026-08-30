@@ -32,6 +32,8 @@ const LABELS: Record<Capability, string> = {
   explore_player_props: 'player props sheet',
   explore_news: 'news sheet',
   explore_line_moves: 'line moves sheet',
+  explore_plays: 'plays sheet',
+  play_log: 'play log',
 }
 
 /** Renders its page only when the sport has the capability. The nav already

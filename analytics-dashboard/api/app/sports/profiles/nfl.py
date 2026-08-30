@@ -36,6 +36,8 @@ NFL = SportProfile(
         C.EXPLORE_PLAYER_PROPS: "app_explore_player_props",
         C.EXPLORE_NEWS: "app_explore_news",
         C.EXPLORE_LINE_MOVES: "app_explore_line_moves",
+        C.EXPLORE_PLAYS: "app_explore_plays",
+        C.PLAY_LOG: "app_play_log",
     },
     extensions=("fantasy",),
     vendors=("draftkings", "fanduel", "caesars", "betmgm", "betrivers", "polymarket", "kalshi"),

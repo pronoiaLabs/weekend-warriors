@@ -253,6 +253,76 @@
       "nullable": true
     },
     {
+      "name": "off_plays",
+      "type": "NUMBER(30,0)",
+      "nullable": true
+    },
+    {
+      "name": "off_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "off_epa_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "success_plays",
+      "type": "NUMBER(25,0)",
+      "nullable": true
+    },
+    {
+      "name": "success_rate",
+      "type": "NUMBER(32,3)",
+      "nullable": true
+    },
+    {
+      "name": "def_plays",
+      "type": "NUMBER(30,0)",
+      "nullable": true
+    },
+    {
+      "name": "def_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "def_epa_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "def_success_plays",
+      "type": "NUMBER(25,0)",
+      "nullable": true
+    },
+    {
+      "name": "success_rate_allowed",
+      "type": "NUMBER(32,3)",
+      "nullable": true
+    },
+    {
+      "name": "off_epa_per_play_rank",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "def_epa_per_play_rank",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_record",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_record",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
       "name": "rank_overall",
       "type": "NUMBER(18,0)",
       "nullable": true
