@@ -39,6 +39,8 @@ REQUIRED: dict[str, set[str]] = {
     "app_player_leaders": set(players.LEADERS_COLUMNS),
     "app_player_weeks": set(players.WEEK_COLUMNS),
     "app_player_week_stats": set(players.STAT_COLUMNS),
+    "app_player_profile": set(players.PROFILE_COLUMNS),
+    "app_player_situation_usage": set(players.USAGE_COLUMNS),
     "app_line_history": set(markets.LINE_COLUMNS),
     "app_prop_line_history": set(markets.PROP_COLUMNS),
     "app_news_mentions": set(news.COLUMNS),

@@ -61,6 +61,13 @@ SELECTION: dict[str, dict[C, str]] = {
         C.PLAYER_WEEK_STATS: "season in (2025, 2026) and player_name in ('Puka Nacua', 'Patrick Mahomes')",
         # the defender sheet is Explorer-only; a small sample keeps the table shape
         C.PLAYER_DEFENSE_WEEKS: "season = 2025 and season_type_name = 'Regular Season' and team_label = 'KC' and week = 1",
+        # the identity header for the two sample players
+        C.PLAYER_PROFILE: "player_name in ('Puka Nacua', 'Patrick Mahomes')",
+        # their situational usage; there is no preseason pbp, so 2026 rows are
+        # regular season only once it starts
+        C.PLAYER_SITUATION_USAGE: (
+            "season in (2025, 2026) and player_name in ('Puka Nacua', 'Patrick Mahomes')"
+        ),
         # two lined weeks (every book in week 1, fewer in week 2)
         C.LINE_HISTORY: "season = 2026 and week in (1, 2)",
         # DraftKings' week 1 props, and FanDuel's QB props for one game: FanDuel

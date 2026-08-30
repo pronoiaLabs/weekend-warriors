@@ -313,6 +313,86 @@
       "nullable": true
     },
     {
+      "name": "target_share",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "air_yards_share",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "receiving_air_yards",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "team_targets",
+      "type": "NUMBER(31,0)",
+      "nullable": true
+    },
+    {
+      "name": "snap_pct",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "offense_pct",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "off_snaps",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "team_off_snaps",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "passing_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "rushing_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "receiving_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "ppr_points",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "sleeper_ppr_points",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "sleeper_ppr_pos_rank",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "has_nflverse",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "has_sleeper",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
       "name": "fanduel_points",
       "type": "NUMBER(37,2)",
       "nullable": true

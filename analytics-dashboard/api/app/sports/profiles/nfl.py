@@ -19,6 +19,8 @@ NFL = SportProfile(
         C.PLAYER_WEEKS: "app_player_weeks",
         C.PLAYER_WEEK_STATS: "app_player_week_stats",
         C.PLAYER_DEFENSE_WEEKS: "app_player_defense_weeks",
+        C.PLAYER_PROFILE: "app_player_profile",
+        C.PLAYER_SITUATION_USAGE: "app_player_situation_usage",
         C.LINE_HISTORY: "app_line_history",
         C.PROP_LINE_HISTORY: "app_prop_line_history",
         C.NEWS: "app_news_mentions",

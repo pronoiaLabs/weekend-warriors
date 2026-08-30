@@ -46,6 +46,8 @@ pipelines:
         - app_player_weeks
         - app_player_week_stats
         - app_player_defense_weeks
+        - app_player_profile
+        - app_player_situation_usage
         - app_line_history
         - app_prop_line_history
         - app_news_mentions

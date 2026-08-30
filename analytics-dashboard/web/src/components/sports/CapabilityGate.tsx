@@ -15,6 +15,8 @@ const LABELS: Record<Capability, string> = {
   player_weeks: 'player week',
   player_week_stats: 'player stat',
   player_defense_weeks: 'defender week',
+  player_profile: 'player profile',
+  player_situation_usage: 'situational usage',
   line_history: 'line history',
   prop_line_history: 'prop line history',
   news: 'news',

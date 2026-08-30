@@ -253,6 +253,16 @@
       "nullable": true
     },
     {
+      "name": "games_with_nflverse",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "games_with_sleeper",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
       "name": "passing_yards_per_game",
       "type": "NUMBER(38,1)",
       "nullable": true
@@ -295,6 +305,121 @@
     {
       "name": "draftkings_points_per_game",
       "type": "NUMBER(38,2)",
+      "nullable": true
+    },
+    {
+      "name": "headshot_url",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "target_share",
+      "type": "NUMBER(38,3)",
+      "nullable": true
+    },
+    {
+      "name": "air_yards_share_avg",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "snap_share",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "passing_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "rushing_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "receiving_epa",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "ppr_points",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "ppr_points_per_game",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "sleeper_ppr_points",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "target_share_last3",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "last3_share_games",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "target_share_prior",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "prior_share_games",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "target_share_delta",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "next_game_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "next_opponent_team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "next_opponent_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "next_is_home",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "next_game_datetime_et",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "next_opp_allowed_rank",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "next_opp_allowed_teams_ranked",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "next_opp_allowed_season",
+      "type": "NUMBER(20,0)",
       "nullable": true
     },
     {
@@ -359,6 +484,31 @@
     },
     {
       "name": "rank_draftkings_points_per_game",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_target_share",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_snap_share",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_ppr_points",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_ppr_points_per_game",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "rank_receiving_epa",
       "type": "NUMBER(18,0)",
       "nullable": true
     },

@@ -13,6 +13,8 @@ export type Capability =
   | 'player_weeks'
   | 'player_week_stats'
   | 'player_defense_weeks'
+  | 'player_profile'
+  | 'player_situation_usage'
   | 'line_history'
   | 'prop_line_history'
   | 'news'
@@ -590,6 +592,37 @@ export interface LeadersRow {
   touches_per_game: number | null
   fanduel_points_per_game: number | null
   draftkings_points_per_game: number | null
+  games_with_nflverse: number
+  games_with_sleeper: number
+  headshot_url: string | null
+  /** ratio of sums; NULL means no vendor coverage, never zero */
+  target_share: number | null
+  /** average of per-game shares -- the marked display convention */
+  air_yards_share_avg: number | null
+  /** ratio of Sleeper snap sums; NULL when no Sleeper games */
+  snap_share: number | null
+  passing_epa: number | null
+  rushing_epa: number | null
+  receiving_epa: number | null
+  ppr_points: number | null
+  ppr_points_per_game: number | null
+  sleeper_ppr_points: number | null
+  /** the riser window: last three games vs the season before them */
+  target_share_last3: number | null
+  last3_share_games: number | null
+  target_share_prior: number | null
+  prior_share_games: number | null
+  target_share_delta: number | null
+  /** current-state: only when the next game falls in this row's season+type */
+  next_game_key: string | null
+  next_opponent_team_key: string | null
+  next_opponent_label: string | null
+  next_is_home: boolean | null
+  next_game_datetime_et: string | null
+  /** 1 = allows the MOST to the position (soft matchup) */
+  next_opp_allowed_rank: number | null
+  next_opp_allowed_teams_ranked: number | null
+  next_opp_allowed_season: number | null
   rank_passing_yards: number
   rank_passing_touchdowns: number
   rank_rushing_yards: number
@@ -603,12 +636,18 @@ export interface LeadersRow {
   rank_draftkings_points: number
   rank_fanduel_points_per_game: number
   rank_draftkings_points_per_game: number
+  rank_target_share: number
+  rank_snap_share: number
+  rank_ppr_points: number
+  rank_ppr_points_per_game: number
+  rank_receiving_epa: number
   players_at_position: number
 }
 
 export interface LeadersPayload extends Envelope<LeadersRow> {
   season_type_name: string
   season_types: string[]
+  seasons: number[]
   position: string | null
   team: string | null
 }
@@ -677,6 +716,24 @@ export interface PlayerWeekRow {
   has_receiving: boolean | null
   two_point_conversions: number | null
   two_point_conversions_thrown: number | null
+  /** vendor blocks: NULL = no vendor match (see has_nflverse / has_sleeper) */
+  target_share: number | null
+  air_yards_share: number | null
+  receiving_air_yards: number | null
+  team_targets: number | null
+  snap_pct: number | null
+  offense_pct: number | null
+  off_snaps: number | null
+  team_off_snaps: number | null
+  passing_epa: number | null
+  rushing_epa: number | null
+  receiving_epa: number | null
+  ppr_points: number | null
+  sleeper_ppr_points: number | null
+  /** Sleeper's PER-WEEK positional rank, never a season figure */
+  sleeper_ppr_pos_rank: number | null
+  has_nflverse: boolean | null
+  has_sleeper: boolean | null
   fanduel_points: number | null
   draftkings_points: number | null
   fanduel_points_to_date: number | null
@@ -700,8 +757,11 @@ export interface PlayerStatRow {
   season_type_name: string
   game_date: string
   stat_key: string
-  value: number
+  /** NULL on vendor stats when the vendor did not match the game */
+  value: number | null
   games_through: number
+  /** observations behind the averages (vendor stats can trail games_through) */
+  values_through: number
   trailing3_avg: number | null
   season_avg_through: number | null
   season_total_through: number | null
@@ -711,16 +771,143 @@ export interface PlayerStatRow {
   avg_vs_prior_season: number | null
 }
 
+/** The identity header: bio, draft, headshot, the live status block
+    (current state, as-of news_updated_at) and the resolved current team. */
+export interface PlayerProfileRow {
+  app_player_profile_key: string
+  player_key: string
+  player_id: number | null
+  player_name: string
+  first_name: string | null
+  last_name: string | null
+  position: string | null
+  position_name: string | null
+  position_group: string | null
+  jersey_number: string | null
+  headshot_url: string | null
+  age: number | null
+  birth_date: string | null
+  height_inches: number | null
+  weight_lbs: number | null
+  college_display: string | null
+  draft_year: number | null
+  draft_round: number | null
+  draft_pick: number | null
+  draft_team: string | null
+  seasons_experience: number | null
+  is_rookie: boolean | null
+  rookie_season: number | null
+  injury_status: string | null
+  injury_body_part: string | null
+  injury_notes: string | null
+  practice_participation: string | null
+  practice_description: string | null
+  news_updated_at: string | null
+  team_key: string | null
+  team_label: string | null
+  team_name: string | null
+  team_source: string | null
+  next_game_key: string | null
+  next_opponent_team_key: string | null
+  next_opponent_label: string | null
+  next_is_home: boolean | null
+  next_game_datetime_et: string | null
+  next_season: number | null
+  next_week: number | null
+  next_season_type_name: string | null
+}
+
 export interface PlayerPayload {
   sport: string
   season: number
   as_of: string
   player: LeadersRow
+  profile: PlayerProfileRow | null
   seasons: LeadersRow[]
   season_type_name: string
   season_types: string[]
   weeks: PlayerWeekRow[]
   stats: PlayerStatRow[]
+  query: string | null
+}
+
+/** One situational cell: targets over team targets in the player's own games,
+    with team dropbacks as the routes stand-in and the qualified league share. */
+export interface PlayerUsageRow {
+  app_player_situation_usage_key: string
+  player_key: string
+  player_name: string
+  position: string | null
+  season: number
+  season_type: number
+  season_type_name: string
+  bucket_type: 'down' | 'field_zone' | 'script'
+  bucket: string
+  bucket_label: string
+  bucket_order: number
+  targets: number
+  team_targets: number | null
+  team_dropbacks: number | null
+  games: number
+  target_share: number | null
+  league_pos_avg_share: number | null
+  league_qualifying_players: number | null
+  share_vs_league: number | null
+}
+
+export interface PlayerUsagePayload {
+  sport: string
+  season: number
+  as_of: string
+  player_key: string
+  player_name: string
+  position: string | null
+  season_type_name: string
+  rows: PlayerUsageRow[]
+  query: string | null
+}
+
+/** One prop at one book for one game -- the prop board player-scoped. */
+export interface PlayerPropRow {
+  app_game_prop_board_key: string
+  game_key: string
+  season: number
+  week: number
+  season_type_name: string
+  game_datetime_et: string
+  is_completed: boolean
+  player_key: string
+  player_name: string
+  opponent_label: string | null
+  is_home: boolean | null
+  vendor: string
+  prop_type: string
+  market_type: string
+  stat_key: string | null
+  stat_label: string | null
+  line_value: number | null
+  opening_line_value: number | null
+  line_movement: number | null
+  over_odds: number | null
+  under_odds: number | null
+  projection_value: number | null
+  projection_vs_line: number | null
+  has_projection: boolean
+  actual_value: number | null
+  outcome: string | null
+}
+
+export interface PlayerPropsPayload {
+  sport: string
+  season: number
+  as_of: string
+  player_key: string
+  player_name: string
+  position: string | null
+  vendor: string | null
+  stat_key: string | null
+  history: PlayerPropRow[]
+  current: PlayerPropRow[]
   query: string | null
 }
 

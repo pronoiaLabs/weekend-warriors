@@ -11,6 +11,8 @@ import type {
   MarketsPayload,
   NewsPayload,
   PlayerPayload,
+  PlayerPropsPayload,
+  PlayerUsagePayload,
   PulsePayload,
   SheetPayload,
   SlatePayload,
@@ -120,6 +122,38 @@ export type PlayerParams = {
 
 export function fetchPlayer(sport: string, playerKey: string, params: PlayerParams, signal?: AbortSignal): Promise<PlayerPayload> {
   return get<PlayerPayload>(`${sportPath(sport)}/players/${encodeURIComponent(playerKey)}`, params, signal)
+}
+
+export function fetchPlayerUsage(
+  sport: string,
+  playerKey: string,
+  params: PlayerParams,
+  signal?: AbortSignal,
+): Promise<PlayerUsagePayload> {
+  return get<PlayerUsagePayload>(
+    `${sportPath(sport)}/players/${encodeURIComponent(playerKey)}/usage`,
+    params,
+    signal,
+  )
+}
+
+export type PlayerPropsParams = {
+  season?: number
+  vendor?: string
+  stat_key?: string
+}
+
+export function fetchPlayerProps(
+  sport: string,
+  playerKey: string,
+  params: PlayerPropsParams,
+  signal?: AbortSignal,
+): Promise<PlayerPropsPayload> {
+  return get<PlayerPropsPayload>(
+    `${sportPath(sport)}/players/${encodeURIComponent(playerKey)}/props`,
+    params,
+    signal,
+  )
 }
 
 export function fetchMarkets(sport: string, params: SlateParams, signal?: AbortSignal): Promise<MarketsPayload> {
