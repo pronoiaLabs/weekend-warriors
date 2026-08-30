@@ -22,6 +22,7 @@ from app.sports.tiles import (
     movers,
     news,
     players,
+    situations,
     slate,
     status_board,
     teams,
@@ -45,6 +46,7 @@ REQUIRED: dict[str, set[str]] = {
     "app_trending_players": set(trending.COLUMNS),
     "app_market_movers": set(movers.COLUMNS),
     "app_team_branding": set(branding.COLUMNS),
+    "app_team_situation": set(situations.COLUMNS),
     # the Explorer reads whatever columns a sheet has; row_id is the one it relies on
     **{f"app_explore_{s.id}": {"row_id"} for s in explore.SHEETS},
 }

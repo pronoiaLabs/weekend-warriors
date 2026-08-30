@@ -12,7 +12,11 @@ models:
       line keeps one row with vendor NULL, so every dim_game row appears at least
       once. Teams, stadium, kickoff forecast, the closing line and its movement,
       the score once played, and readiness counts (open props, news mentions in
-      the seven days before kickoff).
+      the seven days before kickoff). Ledger columns: the named kickoff window,
+      division flag and referee (dim_game passthroughs), each side's record
+      entering the game, and Out / Questionable counts from the game's injury
+      report (NULL = no nflverse coverage, 0 = clean report). All game-level,
+      so they ride the vendor-NULL row.
     columns:
       - name: app_game_slate_key
         tests: [unique, not_null]
@@ -26,6 +30,41 @@ models:
         tests: [not_null]
       - name: kickoff_slot_et
         tests: [not_null]
+      - name: kickoff_window
+        description: >
+          Named ledger grouping. INTL beats the temporal bucket (a London
+          9:30 AM game is not Sunday Early); hour-0 kickoffs are the feed's
+          date-only TBD form and fall to OTHER.
+        tests:
+          - not_null
+          - accepted_values: {values: ['TNF', 'FRI', 'SAT', 'INTL', 'SUN_EARLY', 'SUN_LATE', 'SNF', 'MNF', 'OTHER']}
+      - name: kickoff_window_order
+        tests: [not_null]
+      - name: is_division_game
+        tests: [not_null]
+      - name: referee
+        description: "Head official from dim_game; NULL means no nflverse coverage, never a placeholder."
+      - name: home_record
+        description: "Record entering the game (0-0 at week 1; regular-season record for playoff games)."
+        tests: [not_null]
+      - name: away_record
+        tests: [not_null]
+      - name: home_players_out
+        description: >
+          Out filings on this game's injury report for the home side. NULL when
+          the game has no nflverse coverage (preseason), 0 when the report is
+          clean. Doubtful and Note rows sit in neither counter.
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: home_players_questionable
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: away_players_out
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
+      - name: away_players_questionable
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0}
       - name: home_team_label
         tests: [not_null]
       - name: away_team_label
@@ -50,7 +89,13 @@ models:
       the stat the prop is about, the opponent's per-game yards allowed to the
       player's position with a rank across teams, and the latest news mention in
       the week before the game. Prop types with no box-score mapping keep their
-      line and odds with NULL form columns.
+      line and odds with NULL form columns. Projection block: Sleeper's latest
+      pre-kickoff projection for the prop's stat and its lean vs the line --
+      coverage follows Sleeper's calendar (its clock serves the league's current
+      week), so rows far from kickoff carry has_projection false honestly.
+      Usage form: trailing-3 target share, air-yards share and snap pct,
+      strictly before kickoff; averages of per-game shares, a display
+      convention.
     columns:
       - name: app_game_prop_board_key
         tests: [unique, not_null]
@@ -83,3 +128,58 @@ models:
       - name: outcome
         tests:
           - accepted_values: {values: ['over', 'under', 'push', 'hit', 'miss']}
+      - name: has_projection
+        tests: [not_null]
+      - name: projection_vs_line
+        description: "Sleeper projection minus the line, in the prop's own unit; NULL when either side is missing."
+      - name: target_share_trailing3
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: snap_pct_trailing3
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+
+  - name: app_team_situation
+    description: >
+      The game page's situations tab. Team x season x season_type x side x
+      situation in long format, aggregated from fact_team_game_situation whose
+      side column already reads both ways (a defense row IS the allowed
+      reading). Rates are recomputed sum-over-sum per cut; league context is a
+      ratio of sums across teams in the same cut. situation_rank is 1 = BEST
+      for that unit (offense ranks EPA descending, defense ascending) -- the
+      opposite convention from app_team_allowed, where 1 allows the most.
+      Season-level surface; preseason is absent (nflverse publishes no
+      preseason play-by-play).
+    columns:
+      - name: app_team_situation_key
+        tests: [unique, not_null]
+      - name: team_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_team')", field: team_key}
+      - name: side
+        tests:
+          - not_null
+          - accepted_values: {values: ['offense', 'defense']}
+      - name: situation_group
+        tests:
+          - not_null
+          - accepted_values: {values: ['overall', 'down', 'down_distance', 'field_zone', 'script', 'play_family', 'two_minute']}
+      - name: situation_key
+        tests: [not_null]
+      - name: situation_order
+        tests: [not_null]
+      - name: plays
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1}
+      - name: success_rate
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: situation_rank
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 1, max_value: 32}
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_key, season, season_type, side, situation_group, situation_key]

@@ -68,6 +68,21 @@
       "nullable": true
     },
     {
+      "name": "kickoff_window",
+      "type": "VARCHAR(9)",
+      "nullable": true
+    },
+    {
+      "name": "kickoff_window_label",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "kickoff_window_order",
+      "type": "NUMBER(1,0)",
+      "nullable": true
+    },
+    {
       "name": "game_status",
       "type": "VARCHAR(16777216)",
       "nullable": true
@@ -80,6 +95,16 @@
     {
       "name": "went_to_overtime",
       "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "is_division_game",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "referee",
+      "type": "VARCHAR(16777216)",
       "nullable": true
     },
     {
@@ -140,6 +165,66 @@
     {
       "name": "away_division",
       "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_wins",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_losses",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_ties",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_record",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "away_wins",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_losses",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_ties",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_record",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "home_players_out",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "home_players_questionable",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_players_out",
+      "type": "NUMBER(13,0)",
+      "nullable": true
+    },
+    {
+      "name": "away_players_questionable",
+      "type": "NUMBER(13,0)",
       "nullable": true
     },
     {

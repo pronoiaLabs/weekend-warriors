@@ -258,6 +258,46 @@
       "nullable": true
     },
     {
+      "name": "projection_value",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "projection_vs_line",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "has_projection",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "projection_captured_at",
+      "type": "TIMESTAMP_TZ(9)",
+      "nullable": true
+    },
+    {
+      "name": "usage_trailing3_games",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "target_share_trailing3",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "air_yards_share_trailing3",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "snap_pct_trailing3",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
       "name": "opponent_allowed_stat_key",
       "type": "VARCHAR(18)",
       "nullable": true

@@ -22,6 +22,7 @@ def test_nfl_capabilities_list_the_page_marts(client: TestClient) -> None:
         "trending_players",
         "market_movers",
         "team_branding",
+        "team_situation",
         "explore_player_games",
         "explore_defender_games",
         "explore_team_games",

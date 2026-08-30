@@ -60,19 +60,19 @@ await send('Runtime.enable')
 
 // 1. pick a week on the board, open a game, Back to board returns to that week
 await goto('/nfl/slate?season_type=Regular%20Season&week=2')
-await waitFor('.game')
-await evaluate(`document.querySelector('.board').scrollTop = 180`)
+await waitFor('a.led-row')
+await evaluate(`document.querySelector('.ledger .tile-body').scrollTop = 180`)
 await sleep(300)
-await click('.game')
+await click('a.led-row')
 check('game page opened', (await url()).startsWith('/nfl/games/'), await url())
 await click('button.back')
 {
   const p = await params()
   check('Back to board returns to week 2', p.path === '/nfl/slate' && p.get('week') === '2' && p.get('season_type') === 'Regular Season', await url())
 }
-await waitFor('.game')
+await waitFor('a.led-row')
 await sleep(400)
-const top = await evaluate(`document.querySelector('.board').scrollTop`)
+const top = await evaluate(`document.querySelector('.ledger .tile-body').scrollTop`)
 check('board scroll restored', top > 100, `scrollTop ${top}`)
 
 // 2. dock "Game day" from Home returns to the remembered week
@@ -81,8 +81,9 @@ check('home', (await url()) === '/nfl', await url())
 await click('.dock a[href^="/nfl/slate"]')
 check('dock Game day remembers week 2', (await url()).includes('week=2'), await url())
 
-// 3. book picked on the game page carries back to the board
-await click('.game')
+// 3. book picked on the game family's Prop board carries back to the board
+await click('a.led-row')
+await click('.subnav a[href*="/props"]')
 await click('.chips[aria-label="Book"] button:nth-child(2)')
 const bookUrl = await url()
 const picked = (await params()).get('vendor')
@@ -94,7 +95,7 @@ await click('.chips[aria-label="Book"] button:nth-child(1)')
 check('default book clears the vendor param', (await params()).get('vendor') === null, await url())
 
 // 4. dock stays on Game day inside a game
-await click('.game')
+await click('a.led-row')
 const active = await evaluate(`document.querySelector('.dock a.active')?.textContent`)
 check('dock highlights Game day on a game page', active === 'Game day', String(active))
 

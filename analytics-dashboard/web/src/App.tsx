@@ -3,6 +3,8 @@ import { PULSE_CAPS } from './components/sports/SportNav.tsx'
 import SportLayout, { useCapabilities } from './layouts/SportLayout.tsx'
 import Explore from './pages/sports/Explore.tsx'
 import Game from './pages/sports/Game.tsx'
+import Overview from './pages/sports/game/Overview.tsx'
+import Situations from './pages/sports/game/Situations.tsx'
 import Market from './pages/sports/Market.tsx'
 import Markets from './pages/sports/Markets.tsx'
 import News from './pages/sports/News.tsx'
@@ -35,7 +37,11 @@ export default function App() {
         <Route path="/:sport" element={<SportLayout />}>
           <Route index element={<SportIndex />} />
           <Route path="slate" element={<Slate />} />
-          <Route path="games/:gameKey" element={<Game />} />
+          {/* the game family: overview lands, the other rooms are tabs */}
+          <Route path="games/:gameKey" element={<Overview />} />
+          <Route path="games/:gameKey/props" element={<Game />} />
+          <Route path="games/:gameKey/situations" element={<Situations />} />
+          <Route path="games/:gameKey/lines" element={<Market family />} />
           <Route path="teams" element={<Teams />} />
           <Route path="teams/:team" element={<Team />} />
           <Route path="players" element={<Players />} />

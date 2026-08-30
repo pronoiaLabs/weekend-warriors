@@ -19,6 +19,22 @@
                           (QB passing, RB rushing, WR and TE receiving), ranked across
                           teams where 1 allows the most, for this season; the prior
                           season stands in until this season has games.
+      the projection      fact_sleeper_projection_latest joined on (player_key,
+                          game_key) -- already bridged and pre-kickoff-selected. The
+                          prop's stat_key picks the projection column in a CASE here
+                          (not the seed: seeds cannot hold the scoring_touchdowns
+                          sum). Unmapped prop types and players without a projection
+                          row carry NULLs and has_projection false. Coverage follows
+                          Sleeper's calendar: projections exist for the league's
+                          CURRENT week, so a board read far ahead of kickoff (or in
+                          preseason, when Sleeper's clock and the props diverge) is
+                          honestly empty until the weeks align.
+      usage form          trailing three games of the same season type strictly
+                          before kickoff, from the same offense rows the form block
+                          reads: target share, air-yards share, snap pct (nflverse
+                          offense_pct, Sleeper snap share standing in when absent).
+                          Averages of per-game shares -- a display convention, not
+                          the additive contract.
 
     The prop type to stat mapping is a seed (seed_nfl_prop_stat_map), because
     prop_type is a lowercased passthrough from the feed with no enumeration in
@@ -100,10 +116,30 @@ offense as (
         o.passing_yards,
         o.passing_touchdowns,
         coalesce(o.rushing_touchdowns, 0) + coalesce(o.receiving_touchdowns, 0)
-                                                        as scoring_touchdowns
+                                                        as scoring_touchdowns,
+        o.target_share,
+        o.air_yards_share,
+        coalesce(o.offense_pct, o.off_snap_share)       as snap_pct
     from {{ ref('fact_player_game_offense') }} o
     inner join games g
         on g.game_key = o.game_key
+
+),
+
+projections as (
+
+    select
+        player_key,
+        game_key,
+        rec,
+        rec_yd,
+        rec_td,
+        rush_yd,
+        rush_td,
+        pass_yd,
+        pass_td,
+        projection_as_of
+    from {{ ref('fact_sleeper_projection_latest') }}
 
 ),
 
@@ -222,6 +258,41 @@ form_trailing as (
         )                                               as stat_last3
     from prior_games
     where recency <= 10
+    group by 1
+
+),
+
+-- usage is per player-game, not per stat: the same three trailing games feed
+-- every prop the player has on this board
+usage_prior as (
+
+    select
+        pb.game_player_vendor_prop_key,
+        o.target_share,
+        o.air_yards_share,
+        o.snap_pct,
+        row_number() over (
+            partition by pb.game_player_vendor_prop_key
+            order by o.game_datetime desc
+        )                                               as recency
+    from prop_base pb
+    inner join offense o
+        on o.player_key = pb.player_key
+       and o.season_type = pb.season_type
+       and o.game_datetime < pb.game_dt
+
+),
+
+usage_form as (
+
+    select
+        game_player_vendor_prop_key,
+        count(*)                                        as usage_trailing3_games,
+        avg(target_share)                               as target_share_trailing3,
+        avg(air_yards_share)                            as air_yards_share_trailing3,
+        avg(snap_pct)                                   as snap_pct_trailing3
+    from usage_prior
+    where recency <= 3
     group by 1
 
 ),
@@ -379,6 +450,27 @@ select
         fd.games_over_line_to_date / fd.games_played_to_date, null)
                                                         as hit_rate_over_line,
 
+    -- the projection: Sleeper's number for this prop's stat, and the lean
+    case s.stat_key
+        when 'receiving_yards'      then pj.rec_yd
+        when 'receptions'           then pj.rec
+        when 'rushing_yards'        then pj.rush_yd
+        when 'passing_yards'        then pj.pass_yd
+        when 'passing_touchdowns'   then pj.pass_td
+        when 'scoring_touchdowns'   then iff(pj.player_key is null, null,
+                                             coalesce(pj.rush_td, 0) + coalesce(pj.rec_td, 0))
+    end                                                 as projection_value,
+    iff(s.line_value is not null, projection_value - s.line_value, null)
+                                                        as projection_vs_line,
+    (projection_value is not null)                      as has_projection,
+    pj.projection_as_of                                 as projection_captured_at,
+
+    -- usage form: trailing three games before this one
+    coalesce(uf.usage_trailing3_games, 0)               as usage_trailing3_games,
+    uf.target_share_trailing3,
+    uf.air_yards_share_trailing3,
+    uf.snap_pct_trailing3,
+
     -- the matchup: what this defense allows to this position
     coalesce(ac.stat_key, ap.stat_key)                  as opponent_allowed_stat_key,
     coalesce(ac.allowed_per_game, ap.allowed_per_game)  as opponent_allowed_per_game,
@@ -416,6 +508,11 @@ left join form_trailing ft
     on ft.game_player_vendor_prop_key = s.game_player_vendor_prop_key
 left join form_to_date fd
     on fd.game_player_vendor_prop_key = s.game_player_vendor_prop_key
+left join projections pj
+    on pj.player_key = s.player_key
+   and pj.game_key = s.game_key
+left join usage_form uf
+    on uf.game_player_vendor_prop_key = s.game_player_vendor_prop_key
 left join actual a
     on a.game_player_vendor_prop_key = s.game_player_vendor_prop_key
 left join allowed_ranked ac

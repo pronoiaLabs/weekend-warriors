@@ -3,14 +3,15 @@ import { fetchGame } from '../../api/sports/client.ts'
 import type { GamePayload, PropRow, SlateRow } from '../../api/sports/types.ts'
 import CapabilityGate from '../../components/sports/CapabilityGate.tsx'
 import Chips from '../../components/sports/Chips.tsx'
-import Crumbs from '../../components/sports/Crumbs.tsx'
+import GameTabs from '../../components/sports/GameTabs.tsx'
 import TileFrame from '../../components/sports/TileFrame.tsx'
 import { useApi } from '../../hooks/useApi.ts'
 import { useBack } from '../../hooks/useBack.ts'
 import { usePins, type Pin } from '../../hooks/usePins.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
-import { fmt, odds, ordinal, signed, spreadText, titleCase, tone } from '../../lib/format.ts'
+import { fmt, odds, ordinal, pct, signed, spreadText, titleCase, tone } from '../../lib/format.ts'
+import { PRECIP_FLAG, SPREAD_MOVE_FLAG, WIND_PASSING } from '../../lib/thresholds.ts'
 import { boardPath, useView } from '../../state/view.tsx'
 
 /** Stat families group prop types into one chip row. A family shows only when
@@ -66,7 +67,7 @@ function GameBoard() {
   if (!data) {
     return (
       <div className="page page-game">
-        <Crumbs items={[{ label: 'Game day', to: board }, { label: res.error ? 'No such game' : '...' }]} />
+        <GameTabs sport={sport} gameKey={gameKey} matchup={res.error ? 'No such game' : '...'} tab="Prop board" boardHref={board} back={back} vendorParam={vendorParam} />
         <div className="page-head">
           <h1>{res.error ? 'No such game' : 'Loading...'}</h1>
           {res.error && (
@@ -97,12 +98,15 @@ function GameBoard() {
 
   return (
     <div className="page page-game">
-      <div className="crumb-row">
-        <Crumbs items={[{ label: 'Game day', to: slateHref }, { label: `${g.away_team_label} at ${g.home_team_label}` }]} />
-        <button type="button" className="back" onClick={back}>
-          <span aria-hidden="true">←</span> Back to board
-        </button>
-      </div>
+      <GameTabs
+        sport={sport}
+        gameKey={gameKey}
+        matchup={`${g.away_team_label} @ ${g.home_team_label}`}
+        tab="Prop board"
+        boardHref={slateHref}
+        back={back}
+        vendorParam={vendorParam}
+      />
 
       <div className="game-head" data-tilt="">
         <div className="matchup">
@@ -162,8 +166,9 @@ function GameBoard() {
           <Chips label="Stat family" items={families} active={family} onPick={(id) => set({ family: id })} />
         )}
         <span className="hint">
-          Avg is the trailing window (up to ten games). Gap is avg minus the line. Rank is the opponent's
-          yards allowed to that position, 1 = allows the most; * marks a prior-season rate.
+          Avg is the trailing window (up to ten games). Proj is Sleeper's number with its lean vs the
+          line; when the board has projections, the leans sort it. Gap is avg minus the line. Rank is
+          the opponent's yards allowed to that position, 1 = allows the most; * marks a prior-season rate.
         </span>
       </div>
 
@@ -265,12 +270,21 @@ function TeamColumn({
   const name = side === 'home' ? g.home_team_name : g.away_team_name
   const label = side === 'home' ? g.home_team_label : g.away_team_label
   const implied = side === 'home' ? g.implied_home_team_total : g.implied_away_team_total
-  const sorted = [...rows].sort(
-    (a, b) =>
+  // with projections on the board the leans lead (over leans first, under
+  // leans last — the wireframe's Δ ordering); without them, position order
+  const anyProjection = rows.some((p) => p.has_projection)
+  const sorted = [...rows].sort((a, b) => {
+    if (anyProjection && (a.projection_vs_line !== null || b.projection_vs_line !== null)) {
+      if (a.projection_vs_line === null) return 1
+      if (b.projection_vs_line === null) return -1
+      if (a.projection_vs_line !== b.projection_vs_line) return b.projection_vs_line - a.projection_vs_line
+    }
+    return (
       positionRank(a) - positionRank(b) ||
       a.player_name.localeCompare(b.player_name) ||
-      a.prop_type.localeCompare(b.prop_type),
-  )
+      a.prop_type.localeCompare(b.prop_type)
+    )
+  })
   return (
     <TileFrame
       title={name}
@@ -318,6 +332,16 @@ function PropLine({ p, pins, sideLabel }: { p: PropRow; pins: ReturnType<typeof 
           {p.market_type === 'milestone' ? ' (yes)' : ''}
           {moved ? ` · ex-${p.team_label}` : ''}
         </small>
+        {p.usage_trailing3_games > 0 && (p.target_share_trailing3 !== null || p.snap_pct_trailing3 !== null) && (
+          <small className="usage" title={`trailing ${p.usage_trailing3_games} games`}>
+            {[
+              p.target_share_trailing3 !== null ? `tgt ${pct(p.target_share_trailing3)}` : null,
+              p.snap_pct_trailing3 !== null ? `snap ${pct(p.snap_pct_trailing3)}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </small>
+        )}
         {p.news_context && <span className="flag news">{p.news_context}</span>}
       </div>
       <div className="pnum" title="Per-game average over the trailing window">
@@ -334,6 +358,13 @@ function PropLine({ p, pins, sideLabel }: { p: PropRow; pins: ReturnType<typeof 
           {price !== null && <small> {odds(price)}</small>}
         </span>
         <span className="l">Line</span>
+      </div>
+      <div className={`pnum ${tone(p.projection_vs_line)}`} title="Sleeper projection, and its lean vs the line">
+        <span className="v">
+          {p.projection_value === null ? '–' : fmt(p.projection_value, 1)}
+          {p.projection_vs_line !== null && <small> {signed(p.projection_vs_line, 1)}</small>}
+        </span>
+        <span className="l">{p.projection_vs_line === null ? 'Proj' : (p.projection_vs_line ?? 0) >= 0 ? 'over lean' : 'under lean'}</span>
       </div>
       <div className={`pnum ${tone(p.gap_to_line)}`} title="Trailing average minus the line">
         <span className="v">{p.gap_to_line === null ? '–' : signed(p.gap_to_line, 1)}</span>
@@ -384,13 +415,13 @@ function matchupNotes(g: SlateRow, rows: PropRow[]): string[] {
       notes.push(`${p.opponent_label} is ${ordinal(ranked + 1 - p.opponent_allowed_rank)}-stingiest against ${p.position}s in ${stat} (${per} per game)${season}, a fade for ${team}'s ${p.position}s.`)
     }
   }
-  if (g.is_weather_relevant && (g.wind_mph ?? 0) >= 12) {
+  if (g.is_weather_relevant && (g.wind_mph ?? 0) >= WIND_PASSING) {
     notes.push(`Wind ${fmt(g.wind_mph)} mph at ${g.stadium_name ?? 'the stadium'}: passing volume props are flagged; the market usually shades totals down in this range.`)
   }
-  if (g.is_weather_relevant && (g.precip_in ?? 0) >= 0.2) {
+  if (g.is_weather_relevant && (g.precip_in ?? 0) >= PRECIP_FLAG) {
     notes.push(`Rain forecast (${fmt(g.precip_in, 2)} in): handling and kicking props carry extra variance.`)
   }
-  if (g.home_spread_movement !== null && Math.abs(g.home_spread_movement) >= 1.5) {
+  if (g.home_spread_movement !== null && Math.abs(g.home_spread_movement) >= SPREAD_MOVE_FLAG) {
     const toward = g.home_spread_movement < 0 ? g.home_team_label : g.away_team_label
     notes.push(`The spread moved ${signed(g.home_spread_movement, 1)} toward ${toward} since open; player lines on that side often lag the game line.`)
   }

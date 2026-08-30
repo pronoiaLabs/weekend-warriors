@@ -340,12 +340,14 @@ def test_nfl_app_to_postgres_is_an_after_task_with_every_app_mart() -> None:
     assert spec.config["loader_file_format"] == "csv"
     assert spec.config["skip_unchanged"] is True
     # every table in analytics-dashboard/api/app/sports/profiles/nfl.py
-    assert len(spec.config["tables"]) == 24
+    assert len(spec.config["tables"]) == 25
     assert "app_game_slate" in spec.config["tables"]
     assert "app_explore_line_moves" in spec.config["tables"]
     # the Pulse marts ride the same copy (the Postgres gate)
     for table in ("app_status_board", "app_trending_players", "app_market_movers", "app_team_branding"):
         assert table in spec.config["tables"]
+    # the game family's situations tab
+    assert "app_team_situation" in spec.config["tables"]
 
 
 def test_obs_to_postgres_reads_dlt_db_ops() -> None:

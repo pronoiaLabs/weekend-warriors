@@ -20,6 +20,7 @@ export type Capability =
   | 'trending_players'
   | 'market_movers'
   | 'team_branding'
+  | 'team_situation'
   | 'explore_player_games'
   | 'explore_defender_games'
   | 'explore_team_games'
@@ -82,9 +83,14 @@ export interface SlateRow {
   game_date: string
   game_datetime_et: string
   kickoff_slot_et: string
+  kickoff_window: string
+  kickoff_window_label: string
+  kickoff_window_order: number
   game_status: string | null
   is_completed: boolean
   went_to_overtime: boolean | null
+  is_division_game: boolean
+  referee: string | null
   home_team_key: string
   home_team_label: string
   home_team_name: string
@@ -95,6 +101,18 @@ export interface SlateRow {
   away_team_name: string
   away_conference: string | null
   away_division: string | null
+  home_wins: number
+  home_losses: number
+  home_ties: number
+  home_record: string
+  away_wins: number
+  away_losses: number
+  away_ties: number
+  away_record: string
+  home_players_out: number | null
+  home_players_questionable: number | null
+  away_players_out: number | null
+  away_players_questionable: number | null
   venue: string | null
   stadium_name: string | null
   roof: string | null
@@ -193,6 +211,14 @@ export interface PropRow {
   stat_avg_to_date: number | null
   games_over_line_to_date: number | null
   hit_rate_over_line: number | null
+  projection_value: number | null
+  projection_vs_line: number | null
+  has_projection: boolean
+  projection_captured_at: string | null
+  usage_trailing3_games: number
+  target_share_trailing3: number | null
+  air_yards_share_trailing3: number | null
+  snap_pct_trailing3: number | null
   opponent_allowed_stat_key: string | null
   opponent_allowed_per_game: number | null
   opponent_allowed_rank: number | null
@@ -214,6 +240,51 @@ export interface GamePayload {
   vendors: string[]
   away: PropRow[]
   home: PropRow[]
+  availability: StatusRow[]
+  allowed: AllowedRow[]
+  query: string | null
+}
+
+export interface SituationRow {
+  app_team_situation_key: string
+  team_key: string
+  team_label: string
+  team_name: string | null
+  season: number
+  season_type: number
+  season_type_name: string
+  side: string
+  situation_group: string
+  situation_key: string
+  situation_label: string
+  situation_order: number
+  plays: number
+  epa_per_play: number | null
+  success_rate: number | null
+  explosive_rate: number | null
+  league_epa_per_play: number | null
+  epa_vs_league: number | null
+  league_success_rate: number | null
+  success_rate_vs_league: number | null
+  situation_rank: number | null
+  teams_ranked: number | null
+}
+
+export interface GameSituationsPayload {
+  sport: string
+  season: number
+  as_of: string
+  game_key: string
+  season_type_name: string
+  situation_season_type_name: string
+  home_team_key: string
+  home_team_label: string
+  away_team_key: string
+  away_team_label: string
+  home_offense: SituationRow[]
+  home_defense: SituationRow[]
+  away_offense: SituationRow[]
+  away_defense: SituationRow[]
   query: string | null
 }
 

@@ -1,0 +1,136 @@
+{
+  "table": "app_team_situation",
+  "captured_from": "NFL_DEV_DB.DEV_<user> dev build",
+  "columns": [
+    {
+      "name": "app_team_situation_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_key",
+      "type": "VARCHAR(32)",
+      "nullable": true
+    },
+    {
+      "name": "team_id",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "team_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "team_name",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "conference",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "division",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "season",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type",
+      "type": "NUMBER(19,0)",
+      "nullable": true
+    },
+    {
+      "name": "season_type_name",
+      "type": "VARCHAR(14)",
+      "nullable": true
+    },
+    {
+      "name": "is_postseason",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
+      "name": "side",
+      "type": "VARCHAR(7)",
+      "nullable": true
+    },
+    {
+      "name": "situation_group",
+      "type": "VARCHAR(13)",
+      "nullable": true
+    },
+    {
+      "name": "situation_key",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "situation_label",
+      "type": "VARCHAR(16777216)",
+      "nullable": true
+    },
+    {
+      "name": "situation_order",
+      "type": "NUMBER(2,0)",
+      "nullable": true
+    },
+    {
+      "name": "plays",
+      "type": "NUMBER(30,0)",
+      "nullable": true
+    },
+    {
+      "name": "epa_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "success_rate",
+      "type": "NUMBER(31,6)",
+      "nullable": true
+    },
+    {
+      "name": "explosive_rate",
+      "type": "NUMBER(31,6)",
+      "nullable": true
+    },
+    {
+      "name": "league_epa_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "epa_vs_league",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "league_success_rate",
+      "type": "NUMBER(38,6)",
+      "nullable": true
+    },
+    {
+      "name": "success_rate_vs_league",
+      "type": "NUMBER(38,6)",
+      "nullable": true
+    },
+    {
+      "name": "situation_rank",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "teams_ranked",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    }
+  ]
+}

@@ -20,9 +20,27 @@
       readiness              props_open counts fact_player_prop_closing rows for the same
                              game and vendor; news_mentions_7d counts resolved mentions whose
                              team is either side, published in the seven days before the game
+      records                fact_team_game_offense rows strictly before this game's date,
+                             same season and season type -- the record ENTERING the game,
+                             which for an unplayed game is the season to date. Postseason
+                             games show the regular-season record (the conventional "12-5").
+      availability           fact_injury_report is already anchored to this game_key, so the
+                             counters are a straight count of Out / Questionable filings per
+                             side. NULL means no nflverse coverage for the game (preseason),
+                             0 means a clean report; the feed's 'Doubtful' and 'Note' rows
+                             sit in neither counter.
+      referee, division      dim_game passthroughs -- the head official (NULL = no nflverse
+                             coverage, never a placeholder) and its is_division_game.
 
     Kickoff slot is a display string ('Sun 1:00 PM') derived once here so every
     page groups the same way. Eastern time, the feed's game_datetime_et.
+    kickoff_window is the named ledger grouping (TNF / SUN_EARLY / ... ) with a
+    label and a chronological sort order; INTL wins over the temporal bucket so a
+    London 9:30 AM game does not read as Sunday Early, and rows whose kickoff is
+    date-only (hour 0, the feed's TBD form) fall to OTHER rather than lying.
+
+    Every column added for the ledger is game-level, so it rides the vendor-NULL
+    row by construction.
 */
 
 with games as (
@@ -89,6 +107,43 @@ props_all_books as (
 
 ),
 
+-- the record entering the game: completed rows strictly before this game's date.
+-- A playoff game shows the regular-season record; week 1 is honestly 0-0.
+records as (
+
+    select
+        g.game_key,
+        tg.team_key,
+        sum(tg.win_count)                               as wins,
+        sum(tg.loss_count)                              as losses,
+        sum(tg.tie_count)                               as ties
+    from games g
+    inner join {{ ref('fact_team_game_offense') }} tg
+        on tg.season = g.season
+       and tg.team_key in (g.home_team_key, g.away_team_key)
+       and iff(g.is_postseason,
+               tg.season_type = 2,
+               tg.season_type = g.season_type and tg.game_date < g.game_date)
+    group by 1, 2
+
+),
+
+-- Out / Questionable filings for this game, per side. The fact carries the
+-- game_key already; all filed rows count, bridged or not.
+injuries as (
+
+    select
+        game_key,
+        team_key,
+        count_if(report_status = 'Out')                 as players_out,
+        count_if(report_status = 'Questionable')        as players_questionable
+    from {{ ref('fact_injury_report') }}
+    where game_key is not null
+      and team_key is not null
+    group by 1, 2
+
+),
+
 news as (
 
     select
@@ -135,9 +190,33 @@ select
     g.game_datetime_et,
     regexp_replace(to_char(g.game_datetime_et, 'DY HH12:MI AM'), ' 0', ' ')
                                                         as kickoff_slot_et,
+    case
+        when hour(g.game_datetime_et) = 0                                   then 'OTHER'
+        when coalesce(s.is_international, false)                            then 'INTL'
+        when dayname(g.game_datetime_et) = 'Thu'                            then 'TNF'
+        when dayname(g.game_datetime_et) = 'Fri'                            then 'FRI'
+        when dayname(g.game_datetime_et) = 'Sat'                            then 'SAT'
+        when dayname(g.game_datetime_et) = 'Sun'
+         and hour(g.game_datetime_et) < 15                                  then 'SUN_EARLY'
+        when dayname(g.game_datetime_et) = 'Sun'
+         and hour(g.game_datetime_et) < 19                                  then 'SUN_LATE'
+        when dayname(g.game_datetime_et) = 'Sun'                            then 'SNF'
+        when dayname(g.game_datetime_et) = 'Mon'                            then 'MNF'
+        else 'OTHER'
+    end                                                 as kickoff_window,
+    decode(kickoff_window,
+        'TNF', 'Thursday Night', 'FRI', 'Friday', 'SAT', 'Saturday',
+        'INTL', 'International', 'SUN_EARLY', 'Sunday Early', 'SUN_LATE', 'Sunday Late',
+        'SNF', 'Sunday Night', 'MNF', 'Monday Night', 'Other')
+                                                        as kickoff_window_label,
+    decode(kickoff_window,
+        'TNF', 1, 'FRI', 2, 'SAT', 3, 'INTL', 4, 'SUN_EARLY', 5,
+        'SUN_LATE', 6, 'SNF', 7, 'MNF', 8, 9)           as kickoff_window_order,
     g.game_status,
     g.is_completed,
     g.went_to_overtime,
+    g.is_division_game,
+    g.referee,
 
     -- who
     g.home_team_key,
@@ -152,6 +231,30 @@ select
     a.team_full_name                                    as away_team_name,
     a.conference                                        as away_conference,
     a.division                                          as away_division,
+
+    -- the record entering the game (0-0 at week 1)
+    coalesce(rh.wins, 0)                                as home_wins,
+    coalesce(rh.losses, 0)                              as home_losses,
+    coalesce(rh.ties, 0)                                as home_ties,
+    coalesce(rh.wins, 0) || '-' || coalesce(rh.losses, 0)
+        || iff(coalesce(rh.ties, 0) > 0, '-' || rh.ties, '')
+                                                        as home_record,
+    coalesce(ra.wins, 0)                                as away_wins,
+    coalesce(ra.losses, 0)                              as away_losses,
+    coalesce(ra.ties, 0)                                as away_ties,
+    coalesce(ra.wins, 0) || '-' || coalesce(ra.losses, 0)
+        || iff(coalesce(ra.ties, 0) > 0, '-' || ra.ties, '')
+                                                        as away_record,
+
+    -- availability: NULL = no nflverse report coverage (preseason), 0 = clean report
+    iff(g.nflverse_game_id is null, null, coalesce(inj_h.players_out, 0))
+                                                        as home_players_out,
+    iff(g.nflverse_game_id is null, null, coalesce(inj_h.players_questionable, 0))
+                                                        as home_players_questionable,
+    iff(g.nflverse_game_id is null, null, coalesce(inj_a.players_out, 0))
+                                                        as away_players_out,
+    iff(g.nflverse_game_id is null, null, coalesce(inj_a.players_questionable, 0))
+                                                        as away_players_questionable,
 
     -- where
     g.venue,
@@ -229,3 +332,15 @@ left join props_all_books pa
     on pa.game_key = g.game_key
 left join news n
     on n.game_key = g.game_key
+left join records rh
+    on rh.game_key = g.game_key
+   and rh.team_key = g.home_team_key
+left join records ra
+    on ra.game_key = g.game_key
+   and ra.team_key = g.away_team_key
+left join injuries inj_h
+    on inj_h.game_key = g.game_key
+   and inj_h.team_key = g.home_team_key
+left join injuries inj_a
+    on inj_a.game_key = g.game_key
+   and inj_a.team_key = g.away_team_key

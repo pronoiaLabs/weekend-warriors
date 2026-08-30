@@ -60,3 +60,4 @@ pipelines:
         - app_trending_players
         - app_market_movers
         - app_team_branding
+        - app_team_situation
