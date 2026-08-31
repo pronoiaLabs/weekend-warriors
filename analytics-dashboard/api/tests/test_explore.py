@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def test_catalog_lists_every_sheet_with_typed_columns(client: TestClient) -> None:
     body = client.get("/api/nfl/explore").json()
     ids = [s["id"] for s in body["sheets"]]
-    assert ids == ["player_games", "defender_games", "team_games", "game_lines", "player_props", "news", "line_moves"]
+    assert ids == ["player_games", "defender_games", "team_games", "game_lines", "player_props", "news", "line_moves", "plays"]
     team_games = next(s for s in body["sheets"] if s["id"] == "team_games")
     assert team_games["table"] == "app_explore_team_games"
     kinds = {c["name"]: c["kind"] for c in team_games["columns"]}
@@ -18,8 +18,8 @@ def test_catalog_lists_every_sheet_with_typed_columns(client: TestClient) -> Non
     assert kinds["is_home"] == "boolean"
     assert kinds["game_date"] == "date"
     assert all(s["columns"][0]["name"] == "row_id" for s in body["sheets"])
-    assert body["query"].count("information_schema.columns") == 7
-    assert body["query"].count("table_name = 'app_explore_") == 7
+    assert body["query"].count("information_schema.columns") == 8
+    assert body["query"].count("table_name = 'app_explore_") == 8
 
 
 def test_sheet_pages_with_has_more(client: TestClient) -> None:
@@ -74,3 +74,57 @@ def test_sport_without_sheets_has_an_empty_catalog(client: TestClient) -> None:
     body = client.get("/api/ncaaf/explore").json()
     assert body["sheets"] == [] and body["query"] is None
     assert client.get("/api/ncaaf/explore/team_games").status_code == 404
+
+
+def test_query_bar_binds_ops_and_rides_beside_chips(client: TestClient) -> None:
+    body = client.get(
+        "/api/nfl/explore/team_games",
+        params={"where": "team:KC", "q": "point_margin >= 10 and week <= 10"},
+    ).json()
+    assert body["q"] == "point_margin >= 10 and week <= 10"
+    assert [c["op"] for c in body["clauses"]] == [">=", "<="]
+    assert body["filters"] == [{"column": "team", "value": "KC"}]
+    rows = body["rows"]
+    assert rows
+    assert all(r["team"] == "KC" and r["point_margin"] >= 10 and r["week"] <= 10 for r in rows)
+    assert "point_margin >= %(q0)s" in body["query"] or "point_margin >= " in body["query"]
+
+
+def test_query_bar_quotes_strings_and_chains(client: TestClient) -> None:
+    body = client.get(
+        "/api/nfl/explore/team_games",
+        params={"q": "team = 'KC' and result != \"L\""},
+    ).json()
+    rows = body["rows"]
+    assert rows and all(r["team"] == "KC" and r["result"] != "L" for r in rows)
+
+
+def test_query_bar_400s_name_the_grammar_and_the_columns(client: TestClient) -> None:
+    res = client.get("/api/nfl/explore/team_games", params={"q": "nope = 1"})
+    assert res.status_code == 400
+    detail = res.json()["detail"]
+    assert "no column 'nope'" in detail and "columns:" in detail
+    res = client.get("/api/nfl/explore/team_games", params={"q": "team > 'KC'"})
+    assert res.status_code == 400 and "takes = or !=" in res.json()["detail"]
+    res = client.get("/api/nfl/explore/team_games", params={"q": "week = 1 team = 'KC'"})
+    assert res.status_code == 400 and "expected 'and'" in res.json()["detail"]
+    res = client.get("/api/nfl/explore/team_games", params={"q": "  "})
+    assert res.status_code == 400 and "empty" in res.json()["detail"]
+
+
+def test_elapsed_rides_the_payload(client: TestClient) -> None:
+    body = client.get("/api/nfl/explore/team_games").json()
+    assert body["elapsed_ms"] >= 0
+
+
+def test_csv_export_replays_the_same_page(client: TestClient) -> None:
+    res = client.get(
+        "/api/nfl/explore/team_games",
+        params={"where": "team:KC", "format": "csv", "limit": 5},
+    )
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/csv")
+    assert "attachment" in res.headers["content-disposition"]
+    lines = res.text.strip().splitlines()
+    assert lines[0].startswith("row_id,")
+    assert len(lines) == 6, "header plus the five requested rows"

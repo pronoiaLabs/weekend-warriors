@@ -398,6 +398,56 @@
       "nullable": true
     },
     {
+      "name": "off_plays",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "off_epa_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "success_rate",
+      "type": "NUMBER(38,6)",
+      "nullable": true
+    },
+    {
+      "name": "pass_epa_per_dropback",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "rush_epa_per_carry",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "explosive_rate",
+      "type": "NUMBER(19,6)",
+      "nullable": true
+    },
+    {
+      "name": "def_plays",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
+      "name": "def_epa_per_play",
+      "type": "FLOAT",
+      "nullable": true
+    },
+    {
+      "name": "success_rate_allowed",
+      "type": "NUMBER(38,6)",
+      "nullable": true
+    },
+    {
+      "name": "has_nflverse",
+      "type": "BOOLEAN",
+      "nullable": true
+    },
+    {
       "name": "vendor",
       "type": "VARCHAR(16777216)",
       "nullable": true

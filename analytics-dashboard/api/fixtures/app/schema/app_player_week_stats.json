@@ -74,7 +74,7 @@
     },
     {
       "name": "value",
-      "type": "NUMBER(37,2)",
+      "type": "FLOAT",
       "nullable": true
     },
     {
@@ -83,28 +83,33 @@
       "nullable": true
     },
     {
+      "name": "values_through",
+      "type": "NUMBER(18,0)",
+      "nullable": true
+    },
+    {
       "name": "trailing3_avg",
-      "type": "NUMBER(38,2)",
+      "type": "FLOAT",
       "nullable": true
     },
     {
       "name": "season_avg_through",
-      "type": "NUMBER(38,2)",
+      "type": "FLOAT",
       "nullable": true
     },
     {
       "name": "season_total_through",
-      "type": "NUMBER(38,2)",
+      "type": "FLOAT",
       "nullable": true
     },
     {
       "name": "prior_season_same_week",
-      "type": "NUMBER(37,2)",
+      "type": "FLOAT",
       "nullable": true
     },
     {
       "name": "prior_season_avg",
-      "type": "NUMBER(38,2)",
+      "type": "FLOAT",
       "nullable": true
     },
     {
@@ -114,7 +119,7 @@
     },
     {
       "name": "avg_vs_prior_season",
-      "type": "NUMBER(38,2)",
+      "type": "FLOAT",
       "nullable": true
     }
   ]

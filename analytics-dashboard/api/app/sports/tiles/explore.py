@@ -13,6 +13,7 @@ totals the rows it was given.
 
 import datetime as dt
 import re
+import time
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -79,6 +80,12 @@ SHEETS: tuple[Sheet, ...] = (
         label="Line moves",
         description="One row per pregame line change at a book: the snapshot, the change, the move since open.",
     ),
+    Sheet(
+        id="plays",
+        cap=C.EXPLORE_PLAYS,
+        label="Plays",
+        description="One row per play: situation, the call, the involved players, EPA and the outcome; drive context on matched plays.",
+    ),
 )
 
 BY_ID: dict[str, Sheet] = {s.id: s for s in SHEETS}
@@ -111,6 +118,14 @@ class Filter(BaseModel):
     value: Any
 
 
+class Clause(BaseModel):
+    """One parsed piece of the free-text where bar: column op value."""
+
+    column: str
+    op: str
+    value: Any
+
+
 class SheetPayload(BaseModel):
     sport: str
     season: int
@@ -119,11 +134,16 @@ class SheetPayload(BaseModel):
     table: str
     columns: list[Column]
     filters: list[Filter]
+    # the free-text where bar as sent and as parsed; rides beside the chip
+    # filters, both sets AND together
+    q: str | None = None
+    clauses: list[Clause] = []
     order: str
     desc: bool
     limit: int
     offset: int
     has_more: bool
+    elapsed_ms: float = 0
     rows: list[dict[str, Any]]
     query: str | None = None
 
@@ -236,18 +256,85 @@ def _same(row_value: Any, wanted: Any, col: Column) -> bool:
     return row_value == wanted
 
 
+def _cmp(row_value: Any, op: str, wanted: Any, col: Column) -> bool:
+    """Fixture-side comparison for a parsed where clause."""
+    if row_value is None:
+        return False
+    if op == "=":
+        return _same(row_value, wanted, col)
+    if op == "!=":
+        return not _same(row_value, wanted, col)
+    if col.kind in ("date", "datetime"):
+        a, b = str(row_value), str(wanted)
+    else:
+        a, b = float(row_value), float(wanted)
+    return {">": a > b, "<": a < b, ">=": a >= b, "<=": a <= b}[op]
+
+
+# the where bar's grammar: `column op value` chains joined by `and`. Range ops
+# apply to numeric and date kinds only; text and boolean take = and != alone.
+# No or, no parens, no in -- the minimal grammar a page (or later, an agent)
+# can write safely; everything binds, nothing interpolates.
+_CLAUSE_RE = re.compile(
+    r"([A-Za-z_][A-Za-z0-9_]*)\s*(>=|<=|!=|=|>|<)\s*(\"[^\"]*\"|'[^']*'|\S+)"
+)
+_AND_RE = re.compile(r"\s*and\s+", re.IGNORECASE)
+_RANGE_KINDS = ("integer", "number", "date", "datetime")
+
+
+def parse_q(q: str, by_name: dict[str, Column], sheet_id: str) -> list[tuple[Column, str, Any]]:
+    """The free-text where bar into (column, op, value) triples. Raises
+    BadRequest naming the valid columns on an unknown name, the grammar on a
+    token that does not parse, and the kind on an op a column cannot take."""
+    parsed: list[tuple[Column, str, Any]] = []
+    text = q.strip()
+    pos = 0
+    while pos < len(text):
+        if parsed:
+            joiner = _AND_RE.match(text, pos)
+            if joiner is None:
+                raise BadRequest(
+                    f"expected 'and' before {text[pos:pos + 20]!r};"
+                    " the where bar takes `column op value` joined by and"
+                )
+            pos = joiner.end()
+        m = _CLAUSE_RE.match(text, pos)
+        if m is None:
+            raise BadRequest(
+                f"could not parse {text[pos:pos + 30]!r};"
+                " the where bar takes `column op value` (ops = != > < >= <=)"
+            )
+        name, op, raw = m.group(1), m.group(2), m.group(3)
+        pos = m.end()
+        col = by_name.get(name.lower())
+        if col is None:
+            raise BadRequest(
+                f"{sheet_id} has no column {name!r}; columns: {', '.join(sorted(by_name))}"
+            )
+        if op not in ("=", "!=") and col.kind not in _RANGE_KINDS:
+            raise BadRequest(f"{col.name} is {col.kind} and takes = or !=, not {op}")
+        if raw and raw[0] in "\"'" and raw[0] == raw[-1] and len(raw) >= 2:
+            raw = raw[1:-1]
+        parsed.append((col, op, coerce(raw, col)))
+    if not parsed:
+        raise BadRequest("the where bar is empty; write `column op value`")
+    return parsed
+
+
 def rows(
     profile: SportProfile,
     sheet: Sheet,
     *,
     where: list[tuple[str, str]],
+    q: str | None = None,
     order: str | None,
     desc: bool,
     limit: int,
     offset: int,
 ) -> SheetPayload:
-    """One page of the sheet with equality filters. Raises BadRequest on a column
-    the sheet lacks or a value that does not parse."""
+    """One page of the sheet: the chip equality filters AND the free-text
+    where bar, both bound. Raises BadRequest on a column the sheet lacks, a
+    value that does not parse, or a where bar outside the grammar."""
     cols, describe_sql = columns(profile, sheet)
     by_name = {c.name: c for c in cols}
     filters: list[tuple[Column, Any]] = []
@@ -256,21 +343,28 @@ def rows(
         if col is None:
             raise BadRequest(f"{sheet.id} has no column {name!r}")
         filters.append((col, coerce(raw, col)))
+    parsed = parse_q(q, by_name, sheet.id) if q else []
     order_col = (order or "row_id").lower()
     if order_col not in by_name:
         raise BadRequest(f"{sheet.id} has no column {order_col!r} to order by")
 
     params: dict[str, Any] = {f"w{i}": value for i, (_, value) in enumerate(filters)}
     clauses = [f"{col.name} = %(w{i})s" for i, (col, _) in enumerate(filters)]
+    for i, (col, op, value) in enumerate(parsed):
+        params[f"q{i}"] = value
+        clauses.append(f"{col.name} {op} %(q{i})s")
     where_sql = " and ".join(clauses) or "1 = 1"
     order_items = [f"{order_col} desc" if desc else order_col]
     if order_col != "row_id":
         order_items.append("row_id")
 
     def matches(r: dict[str, Any]) -> bool:
-        return all(_same(r.get(col.name), value, col) for col, value in filters)
+        return all(_same(r.get(col.name), value, col) for col, value in filters) and all(
+            _cmp(r.get(col.name), op, value, col) for col, op, value in parsed
+        )
 
     # one past the page tells the client whether another page exists
+    started = time.perf_counter()
     page, sql = source.select(
         profile,
         sheet.cap,
@@ -283,6 +377,7 @@ def rows(
         limit=limit + 1,
         offset=offset,
     )
+    elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
     return SheetPayload(
         sport=profile.key,
         season=profile.default_season,
@@ -291,11 +386,14 @@ def rows(
         table=profile.tables[sheet.cap],
         columns=cols,
         filters=[Filter(column=col.name, value=value) for col, value in filters],
+        q=q,
+        clauses=[Clause(column=col.name, op=op, value=value) for col, op, value in parsed],
         order=order_col,
         desc=desc,
         limit=limit,
         offset=offset,
         has_more=len(page) > limit,
+        elapsed_ms=elapsed_ms,
         rows=page[:limit],
         query=f"{describe_sql}\n\n{sql}",
     )

@@ -74,6 +74,16 @@ select
     rush::number                                        as rush,
     shotgun::number                                     as shotgun,
     no_huddle::number                                   as no_huddle,
+    -- who handled the ball (gsis ids; a sack or scramble has no receiver)
+    passer_player_id,
+    rusher_player_id,
+    receiver_player_id,
+    -- the call's detail and what the play settled
+    pass_length,
+    pass_location,
+    run_location,
+    run_gap,
+    touchdown::number                                   as touchdown,
 
     -- analytics measures (the graft columns)
     epa,
@@ -90,7 +100,11 @@ select
     -- drive bookkeeping
     drive::number                                       as drive,
     series::number                                      as series,
+    series_result,
     fixed_drive::number                                 as fixed_drive,
+    fixed_drive_result,
+    drive_play_count::number                            as drive_play_count,
+    drive_time_of_possession,
 
     to_timestamp_tz(_dlt_load_id::float::number)        as loaded_at
 from source

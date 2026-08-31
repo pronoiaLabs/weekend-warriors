@@ -15,6 +15,8 @@ const LABELS: Record<Capability, string> = {
   player_weeks: 'player week',
   player_week_stats: 'player stat',
   player_defense_weeks: 'defender week',
+  player_profile: 'player profile',
+  player_situation_usage: 'situational usage',
   line_history: 'line history',
   prop_line_history: 'prop line history',
   news: 'news',
@@ -30,6 +32,8 @@ const LABELS: Record<Capability, string> = {
   explore_player_props: 'player props sheet',
   explore_news: 'news sheet',
   explore_line_moves: 'line moves sheet',
+  explore_plays: 'plays sheet',
+  play_log: 'play log',
 }
 
 /** Renders its page only when the sport has the capability. The nav already

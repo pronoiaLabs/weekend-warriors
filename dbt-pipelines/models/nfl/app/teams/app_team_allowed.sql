@@ -17,7 +17,13 @@
     attributed to the defense they faced, so it is a player-position rollup, not
     the team box score: the RB row is rushing yards by RBs, not all rushing yards.
     Positions are the player's position from dim_player. The pairs below are the
-    ones props are written on; adding a pair is one line in position_stats.
+    ones props are written on plus the team page's grid (volume, both books'
+    fantasy points, and a per-position efficiency key); adding a pair is one
+    line in position_stats. Fantasy uses the book UDF scorings because they
+    cover every row including preseason -- a vendor-gapped scoring would
+    silently undercount what a defense allowed. The three *_per_* efficiency
+    keys carry the per-unit rate (yards per attempt/carry/target) in
+    allowed_per_game, not a per-game figure.
 
     Season types are kept apart (preseason defenses are not regular-season
     defenses); the rank partitions on season, season type, position and stat.
@@ -39,7 +45,12 @@ with offense as (
         o.receiving_yards,
         o.receptions,
         coalesce(o.rushing_touchdowns, 0) + coalesce(o.receiving_touchdowns, 0)
-                                                        as scoring_touchdowns
+                                                        as scoring_touchdowns,
+        o.passing_attempts,
+        o.rushing_attempts,
+        o.receiving_targets,
+        o.fanduel_points,
+        o.draftkings_points
     from {{ ref('fact_player_game_offense') }} o
     inner join {{ ref('dim_game') }} g
         on g.game_key = o.game_key
@@ -61,22 +72,35 @@ position_stats as (
 
     select 'QB' as position, 'passing_yards'      as stat_key union all
     select 'QB',             'passing_touchdowns'           union all
+    select 'QB',             'passing_attempts'             union all
+    select 'QB',             'fanduel_points'               union all
+    select 'QB',             'draftkings_points'            union all
     select 'RB',             'rushing_yards'                union all
     select 'RB',             'receiving_yards'              union all
     select 'RB',             'scoring_touchdowns'           union all
+    select 'RB',             'rushing_attempts'             union all
+    select 'RB',             'fanduel_points'               union all
+    select 'RB',             'draftkings_points'            union all
     select 'WR',             'receiving_yards'              union all
     select 'WR',             'receptions'                   union all
     select 'WR',             'scoring_touchdowns'           union all
+    select 'WR',             'receiving_targets'            union all
+    select 'WR',             'fanduel_points'               union all
+    select 'WR',             'draftkings_points'            union all
     select 'TE',             'receiving_yards'              union all
     select 'TE',             'receptions'                   union all
-    select 'TE',             'scoring_touchdowns'
+    select 'TE',             'scoring_touchdowns'           union all
+    select 'TE',             'receiving_targets'            union all
+    select 'TE',             'fanduel_points'               union all
+    select 'TE',             'draftkings_points'
 
 ),
 
 -- one row per player-game-stat
 offense_long as (
 
-    {% set stats = ['passing_yards', 'passing_touchdowns', 'rushing_yards', 'receiving_yards', 'receptions', 'scoring_touchdowns'] %}
+    {% set stats = ['passing_yards', 'passing_touchdowns', 'rushing_yards', 'receiving_yards', 'receptions', 'scoring_touchdowns',
+                    'passing_attempts', 'rushing_attempts', 'receiving_targets', 'fanduel_points', 'draftkings_points'] %}
     {% for stat in stats %}
     select
         game_key, player_key, defense_team_key, season, season_type,
@@ -110,6 +134,52 @@ allowed as (
 
 ),
 
+-- per-position efficiency: yards over volume, a true ratio of sums (both
+-- sides of the join cover the identical game set, so defense_games agree).
+-- For these keys allowed_per_game holds the per-unit rate, not a per-game
+-- figure -- the _per_ in the key says so.
+efficiency as (
+
+    select
+        y.defense_team_key,
+        y.season,
+        y.season_type,
+        y.position,
+        case y.position
+            when 'QB' then 'passing_yards_per_attempt'
+            when 'RB' then 'rushing_yards_per_carry'
+            else           'receiving_yards_per_target'
+        end                                             as stat_key,
+        y.allowed_total,
+        y.defense_games,
+        y.allowed_total / nullif(v.allowed_total, 0)    as allowed_per_game
+    from allowed y
+    inner join allowed v
+        on v.defense_team_key = y.defense_team_key
+       and v.season = y.season
+       and v.season_type = y.season_type
+       and v.position = y.position
+       and v.stat_key = case y.position
+                            when 'QB' then 'passing_attempts'
+                            when 'RB' then 'rushing_attempts'
+                            else           'receiving_targets'
+                        end
+    where y.stat_key = case y.position
+                           when 'QB' then 'passing_yards'
+                           when 'RB' then 'rushing_yards'
+                           else           'receiving_yards'
+                       end
+
+),
+
+measured as (
+
+    select * from allowed
+    union all
+    select * from efficiency
+
+),
+
 ranked as (
 
     select
@@ -122,7 +192,7 @@ ranked as (
                                                         as teams_ranked,
         avg(allowed_per_game) over (partition by season, season_type, position, stat_key)
                                                         as league_avg_per_game
-    from allowed
+    from measured
 
 ),
 

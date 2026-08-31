@@ -14,7 +14,7 @@ WithStandings = Annotated[SportProfile, Depends(require(C.TEAM_STANDINGS))]
 WithBranding = Annotated[SportProfile, Depends(require(C.TEAM_BRANDING))]
 WithTeam = Annotated[
     SportProfile,
-    Depends(require(C.TEAM_STANDINGS, C.TEAM_WEEKS, C.TEAM_ALLOWED, C.TEAM_ATS)),
+    Depends(require(C.TEAM_STANDINGS, C.TEAM_WEEKS, C.TEAM_ALLOWED, C.TEAM_ATS, C.TEAM_SITUATION)),
 ]
 
 SeasonQ = Annotated[int | None, Query(description="defaults to the sport's current season")]

@@ -17,6 +17,17 @@
     The long companion,
     app_player_week_stats, is the same rows one stat at a time with trailing
     and prior-season comparisons for charts and the year-over-year columns.
+
+    The vendor blocks ride through un-coalesced: NULL on target_share, the
+    EPA columns or ppr_points means the vendor did not match that player-game
+    (has_nflverse / has_sleeper say which), never zero. Canonical PPR is
+    nflverse fantasy_points_ppr (99% of player-games); Sleeper's pts_ppr and
+    its PER-WEEK pos_rank_ppr ride under sleeper_* names and must never be
+    read as season figures. snap_pct prefers nflverse offense_pct with
+    Sleeper's off_snap_share standing in (the prop board's convention);
+    off_snaps / team_off_snaps are the Sleeper ratio-of-sums components a
+    multi-game snap share must divide, and team_targets is the BDL-derived
+    denominator that lets a season target share be a ratio of sums.
 */
 
 with offense as (
@@ -146,6 +157,25 @@ select
     o.has_receiving,
     o.two_point_conversions,
     o.two_point_conversions_thrown,
+    o.target_share,
+    o.air_yards_share,
+    o.receiving_air_yards,
+    sum(o.receiving_targets) over (partition by o.game_key, o.team_key)
+                                                        as team_targets,
+    -- clamped at 1: Sleeper's team snap total can undercount by a snap and
+    -- put an every-down player a hair over (62 of 61, measured)
+    least(coalesce(o.offense_pct, o.off_snap_share), 1) as snap_pct,
+    o.offense_pct,
+    o.off_snp                                           as off_snaps,
+    o.tm_off_snp                                        as team_off_snaps,
+    o.passing_epa,
+    o.rushing_epa,
+    o.receiving_epa,
+    o.fantasy_points_ppr                                as ppr_points,
+    o.pts_ppr                                           as sleeper_ppr_points,
+    o.pos_rank_ppr                                      as sleeper_ppr_pos_rank,
+    o.has_nflverse,
+    o.has_sleeper,
     o.fanduel_points,
     o.draftkings_points,
     r.fanduel_points_to_date,

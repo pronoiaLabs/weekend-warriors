@@ -81,7 +81,7 @@ export function tsv(rows: Row[], columns: SheetColumn[]): string {
 }
 
 /** Columns worth a filter chip row: low-cardinality keys the sheets share. */
-export const FILTERABLE = ['season', 'season_type', 'week', 'team', 'position', 'position_group', 'vendor', 'feed', 'market_type', 'is_home', 'result', 'team_result'] as const
+export const FILTERABLE = ['season', 'season_type', 'week', 'team', 'position', 'position_group', 'vendor', 'feed', 'market_type', 'is_home', 'result', 'team_result', 'down_bucket', 'field_zone', 'script', 'play_family'] as const
 
 /** Columns that are identity or calendar, never the number to total. */
 export const NOT_A_MEASURE = ['season', 'week', 'game_id', 'player_id', 'team_id', 'snapshot_number', 'snapshots_before_kickoff'] as const

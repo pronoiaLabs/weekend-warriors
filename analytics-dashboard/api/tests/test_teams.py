@@ -53,7 +53,13 @@ def test_team_page_carries_the_whole_season(client: TestClient) -> None:
     body = client.get("/api/nfl/teams/kc", params={"season": 2025, "season_type": "Regular Season"}).json()
     team = body["team"]
     assert (team["team_label"], team["split"], team["wins"], team["losses"]) == ("KC", "all", 6, 11)
-    assert team["last_results"] == ["L", "L", "L"]
+    assert len(team["last_results"]) == 5, "the five most recent, newest first"
+    assert team["last_results"][:3] == ["L", "L", "L"]
+    # the denorm puts the split records on every row; KC 2025 went 4-4 at home
+    assert team["home_record"] and team["away_record"]
+    # the EPA block is real for a pbp-covered season
+    assert team["off_epa_per_play"] is not None
+    assert 1 <= team["off_epa_per_play_rank"] <= 32
     assert [s["split"] for s in body["splits"]] == ["all", "home", "away"]
     assert body["season_types"] == ["Preseason", "Regular Season"], "KC missed the 2025 postseason"
     weeks = body["weeks"]
@@ -64,10 +70,16 @@ def test_team_page_carries_the_whole_season(client: TestClient) -> None:
     assert all(w["vendor"] is None and w["spread"] is None for w in weeks), "no 2025 lines"
     assert body["vendor"] == "draftkings" and body["vendors"] == []
     allowed = body["allowed"]
-    assert len(allowed) == 11
+    assert len(allowed) == 27, "props pairs + volume + fantasy + efficiency"
+    assert {a["stat_key"] for a in allowed} >= {"passing_yards_per_attempt", "draftkings_points"}
     assert all(1 <= a["allowed_rank"] <= a["teams_ranked"] == 32 for a in allowed)
     assert body["ats"] == [], "no book priced a 2025 game"
-    assert body["query"].count("from app_copy.") == 4
+    situations = body["situations"]
+    assert body["situation_season_type_name"] == "Regular Season"
+    assert situations and {r["side"] for r in situations} == {"offense", "defense"}
+    assert all(r["team_label"] == "KC" for r in situations)
+    # standings + weeks + allowed + ats + situations
+    assert body["query"].count("from app_copy.") == 5
 
 
 def test_team_defaults_to_the_season_type_in_progress(client: TestClient) -> None:
@@ -103,4 +115,5 @@ def test_collapse_keeps_the_game_and_blanks_a_missing_book(client: TestClient) -
     assert len(none) == 1, "the game keeps its row"
     assert none[0].vendor is None and none[0].spread is None and none[0].spread_result is None
     assert none[0].points_for == base["points_for"], "the box score is not a line field"
+    assert none[0].off_epa_per_play == base["off_epa_per_play"], "EPA sits outside LINE_FIELDS"
     assert none[0].vendors_available == ["draftkings", "fanduel"]

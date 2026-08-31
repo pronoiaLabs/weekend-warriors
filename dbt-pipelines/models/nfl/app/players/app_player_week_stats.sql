@@ -25,8 +25,18 @@
     team he was on. Stats with no value in a game (a WR's passing yards) are 0,
     not NULL, because the box score reports them as 0; a player-game row exists
     only when he appeared, so averages divide by games played.
+
+    Vendor stats are the exception to the zero-fill rule: NULL means the
+    vendor did not match that player-game, never zero, so their rows keep the
+    NULL and every window average is an average over matched games only
+    (values_through counts the observations behind it; games_through counts
+    rows). For the share stats those averages are the display convention --
+    an average of per-game shares, not a ratio of sums; the sanctioned
+    ratio-of-sums aggregates live on app_player_leaders. A "season total" of
+    a share is nonsense, so season_total_through is NULL on share rows.
 */
 
+{# box-score stats: reported as 0 when a position does not accumulate them #}
 {% set stats = [
     'passing_attempts', 'passing_completions', 'passing_yards', 'passing_touchdowns',
     'passing_interceptions', 'rushing_attempts', 'rushing_yards', 'rushing_touchdowns',
@@ -34,6 +44,12 @@
     'scrimmage_yards', 'scrimmage_touchdowns', 'scoring_touchdowns', 'touches',
     'fumbles_lost', 'fanduel_points', 'draftkings_points',
 ] %}
+
+{# vendor stats: NULL = no vendor match, kept NULL; additive, totals are real #}
+{% set vendor_stats = ['receiving_epa', 'rushing_epa', 'passing_epa', 'ppr_points'] %}
+
+{# share stats: NULL = no vendor match, kept NULL; NOT additive, no totals #}
+{% set share_stats = ['target_share', 'air_yards_share', 'snap_pct'] %}
 
 with weeks as (
 
@@ -49,6 +65,15 @@ long as (
         season, week, season_type, season_type_name, game_date,
         '{{ stat }}'                                    as stat_key,
         coalesce({{ stat }}, 0)                         as value
+    from weeks
+    union all
+    {% endfor %}
+    {% for stat in vendor_stats + share_stats %}
+    select
+        player_game_key, game_key, player_key, player_name, position, team_key, team_label,
+        season, week, season_type, season_type_name, game_date,
+        '{{ stat }}'                                    as stat_key,
+        {{ stat }}                                      as value
     from weeks
     {% if not loop.last %}union all{% endif %}
     {% endfor %}
@@ -78,7 +103,12 @@ windows as (
             partition by player_key, season, season_type, stat_key
             order by game_date, game_key
             rows between unbounded preceding and current row
-        )                                               as games_through
+        )                                               as games_through,
+        count(value) over (
+            partition by player_key, season, season_type, stat_key
+            order by game_date, game_key
+            rows between unbounded preceding and current row
+        )                                               as values_through
     from long
 
 ),
@@ -91,7 +121,7 @@ prior_season as (
         season_type,
         stat_key,
         avg(value)                                      as prior_season_avg,
-        count(*)                                        as prior_season_games
+        count(value)                                    as prior_season_games
     from long
     group by 1, 2, 3, 4
 
@@ -129,14 +159,22 @@ select
     w.stat_key,
     w.value,
     w.games_through,
-    round(w.trailing3_avg, 2)                           as trailing3_avg,
-    round(w.season_avg_through, 2)                      as season_avg_through,
-    w.season_total_through,
+    w.values_through,
+    {% set share_keys %}{% for stat in share_stats %}'{{ stat }}'{% if not loop.last %}, {% endif %}{% endfor %}{% endset %}
+    -- shares live on 0-1 and need the third decimal (28.7%, not 29%)
+    round(w.trailing3_avg, iff(w.stat_key in ({{ share_keys }}), 3, 2))
+                                                        as trailing3_avg,
+    round(w.season_avg_through, iff(w.stat_key in ({{ share_keys }}), 3, 2))
+                                                        as season_avg_through,
+    iff(w.stat_key in ({{ share_keys }}), null, w.season_total_through)
+                                                        as season_total_through,
     psw.prior_season_same_week,
-    round(ps.prior_season_avg, 2)                       as prior_season_avg,
+    round(ps.prior_season_avg, iff(w.stat_key in ({{ share_keys }}), 3, 2))
+                                                        as prior_season_avg,
     ps.prior_season_games,
-    iff(ps.prior_season_avg is not null, round(w.season_avg_through - ps.prior_season_avg, 2), null)
-                                                        as avg_vs_prior_season
+    iff(ps.prior_season_avg is not null,
+        round(w.season_avg_through - ps.prior_season_avg, iff(w.stat_key in ({{ share_keys }}), 3, 2)),
+        null)                                           as avg_vs_prior_season
 from windows w
 left join prior_season ps
     on ps.player_key = w.player_key

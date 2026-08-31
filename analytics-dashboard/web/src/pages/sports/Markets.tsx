@@ -3,8 +3,10 @@ import { fetchMarkets } from '../../api/sports/client.ts'
 import type { LineRow, MarketsPayload } from '../../api/sports/types.ts'
 import CapabilityGate from '../../components/sports/CapabilityGate.tsx'
 import Chips from '../../components/sports/Chips.tsx'
+import TeamLogo from '../../components/sports/TeamLogo.tsx'
 import TileFrame from '../../components/sports/TileFrame.tsx'
 import { useApi } from '../../hooks/useApi.ts'
+import { useBranding } from '../../hooks/useBranding.ts'
 import { useSportParam } from '../../hooks/useSportParam.ts'
 import { useCapabilities } from '../../layouts/SportLayout.tsx'
 import { fmt, odds, signed, spreadText, tone } from '../../lib/format.ts'
@@ -40,9 +42,21 @@ export function groupByGame(rows: LineRow[]): GamePath[] {
   })
 }
 
+/** SUN 8:20P from the kickoff datetime -- the card's slot text. */
+export function slotText(iso: string): string {
+  const d = new Date(iso)
+  const day = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' }).toUpperCase()
+  const time = d
+    .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
+    .replace(' AM', 'A')
+    .replace(' PM', 'P')
+  return `${day} ${time}`
+}
+
 function MarketsBoard() {
   const sport = useSportParam()
   const caps = useCapabilities()
+  const branding = useBranding(sport)
   const [search, setSearch] = useSearchParams()
   const { view, setView } = useView()
 
@@ -122,7 +136,14 @@ function MarketsBoard() {
       {data && paths.length > 0 && (
         <div className="grid cols-markets">
           {paths.map((p) => (
-            <MoveCard key={p.game_key} path={p} sport={sport} vendor={vendor} />
+            <MoveCard
+              key={p.game_key}
+              path={p}
+              sport={sport}
+              vendor={vendor}
+              branding={branding}
+              badge={biggestMove(paths)?.game_key === p.game_key ? biggestMove(paths)?.text ?? null : null}
+            />
           ))}
         </div>
       )}
@@ -174,47 +195,88 @@ function Kpis({ data, paths }: { data: MarketsPayload; paths: GamePath[] }) {
   )
 }
 
-function MoveCard({ path, sport, vendor }: { path: GamePath; sport: string; vendor: string | undefined }) {
+/** The week's largest spread-or-total move, for the accent badge. */
+function biggestMove(paths: GamePath[]): { game_key: string; text: string } | null {
+  let best: { game_key: string; text: string; size: number } | null = null
+  for (const p of paths) {
+    const s = Math.abs(p.close.home_spread_since_open ?? 0)
+    const t = Math.abs(p.close.total_line_since_open ?? 0)
+    const size = Math.max(s, t)
+    if (size > 0 && (best === null || size > best.size)) {
+      best = {
+        game_key: p.game_key,
+        size,
+        text:
+          t >= s
+            ? `biggest move · total ${signed(p.close.total_line_since_open, 1)}`
+            : `biggest move · spread ${signed(p.close.home_spread_since_open, 1)}`,
+      }
+    }
+  }
+  return best
+}
+
+function MoveCard({
+  path,
+  sport,
+  vendor,
+  branding,
+  badge,
+}: {
+  path: GamePath
+  sport: string
+  vendor: string | undefined
+  branding: ReturnType<typeof useBranding>
+  badge: string | null
+}) {
   const o = path.open
   const c = path.close
   const href = `/${sport}/markets/${path.game_key}${vendor ? `?vendor=${encodeURIComponent(vendor)}` : ''}`
   return (
     <Link className="tile move-card" to={href} data-tilt="">
       <header className="tile-head">
-        <h2>
-          {o.away_team_label} at {o.home_team_label}
-        </h2>
-        <span className="meta">
-          {path.rows.length} snapshot{path.rows.length === 1 ? '' : 's'}
-          {c.is_closing ? ' · closed' : ''}
+        <span className="card-title">
+          <TeamLogo teamKey={o.away_team_key} label={null} branding={branding} size="sm" />
+          <h2>
+            {o.away_team_label} @ {o.home_team_label}
+          </h2>
+          <TeamLogo teamKey={o.home_team_key} label={null} branding={branding} size="sm" />
+        </span>
+        <span className="card-meta">
+          <span className="meta">{slotText(o.game_datetime_et)}</span>
+          {badge && <span className="badge acc">{badge}</span>}
         </span>
       </header>
       <div className="move-grid">
         <div className="move">
-          <span className="l">Spread ({o.home_team_label})</span>
+          <span className="l">Spread</span>
           <span className="v">
-            {spreadText(o.home_spread)} <i>→</i> {spreadText(c.home_spread)}
+            {o.home_team_label} {spreadText(o.home_spread)} <i>→</i> {spreadText(c.home_spread)}
           </span>
-          <span className={`d ${tone(c.home_spread_since_open)}`}>{c.home_spread_since_open ? signed(c.home_spread_since_open, 1) : 'unchanged'}</span>
+          <span className={`d ${tone(c.home_spread_since_open)}`}>{c.home_spread_since_open ? signed(c.home_spread_since_open, 1) : 'no move'}</span>
         </div>
         <div className="move">
           <span className="l">Total</span>
           <span className="v">
             {fmt(o.total_line, 1)} <i>→</i> {fmt(c.total_line, 1)}
           </span>
-          <span className={`d ${tone(c.total_line_since_open)}`}>{c.total_line_since_open ? signed(c.total_line_since_open, 1) : 'unchanged'}</span>
+          <span className={`d ${tone(c.total_line_since_open)}`}>{c.total_line_since_open ? signed(c.total_line_since_open, 1) : 'no move'}</span>
         </div>
         <div className="move">
-          <span className="l">Moneyline</span>
+          <span className="l">Home ML</span>
           <span className="v">
-            {odds(c.away_moneyline_odds)} / {odds(c.home_moneyline_odds)}
+            {odds(o.home_moneyline_odds)} <i>→</i> {odds(c.home_moneyline_odds)}
           </span>
           <span className="d">
-            {c.home_moneyline_odds_change ? `home ${signed(c.home_moneyline_odds_change, 0)} last move` : 'away / home'}
+            {c.home_moneyline_odds_change ? `${signed(c.home_moneyline_odds_change, 0)} last move` : 'no move'}
           </span>
         </div>
       </div>
       <Sparkline rows={path.rows} />
+      <span className="spark-cap">
+        spread path · {path.rows.length} snapshot{path.rows.length === 1 ? '' : 's'}
+        {c.is_closing ? ' · closed' : ''}
+      </span>
     </Link>
   )
 }

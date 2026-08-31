@@ -22,6 +22,7 @@ from app.sports.tiles import (
     movers,
     news,
     players,
+    plays,
     situations,
     slate,
     status_board,
@@ -39,6 +40,8 @@ REQUIRED: dict[str, set[str]] = {
     "app_player_leaders": set(players.LEADERS_COLUMNS),
     "app_player_weeks": set(players.WEEK_COLUMNS),
     "app_player_week_stats": set(players.STAT_COLUMNS),
+    "app_player_profile": set(players.PROFILE_COLUMNS),
+    "app_player_situation_usage": set(players.USAGE_COLUMNS),
     "app_line_history": set(markets.LINE_COLUMNS),
     "app_prop_line_history": set(markets.PROP_COLUMNS),
     "app_news_mentions": set(news.COLUMNS),
@@ -47,6 +50,7 @@ REQUIRED: dict[str, set[str]] = {
     "app_market_movers": set(movers.COLUMNS),
     "app_team_branding": set(branding.COLUMNS),
     "app_team_situation": set(situations.COLUMNS),
+    "app_play_log": set(plays.COLUMNS),
     # the Explorer reads whatever columns a sheet has; row_id is the one it relies on
     **{f"app_explore_{s.id}": {"row_id"} for s in explore.SHEETS},
 }

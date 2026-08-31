@@ -64,7 +64,7 @@
     },
     {
       "name": "stat_key",
-      "type": "VARCHAR(18)",
+      "type": "VARCHAR(26)",
       "nullable": true
     },
     {
@@ -74,7 +74,7 @@
     },
     {
       "name": "allowed_total",
-      "type": "NUMBER(32,0)",
+      "type": "NUMBER(38,2)",
       "nullable": true
     },
     {

@@ -106,13 +106,18 @@ models:
     description: >
       Curated slice of nflverse play-by-play (the RAW table is 372 columns):
       play-match keys, EPA/WPA/success analytics, call and formation flags,
-      drive bookkeeping. Grain: nflverse_game_id x play_id. Every downstream
-      nflverse pbp read comes through here.
+      the ball-handler gsis ids, drive bookkeeping. Grain: nflverse_game_id x
+      play_id. Every downstream nflverse pbp read comes through here.
     columns:
       - name: nflverse_game_id
         tests: [not_null]
       - name: play_id
         tests: [not_null]
+      - name: receiver_player_id
+        description: >
+          gsis id of the targeted receiver; NULL on sacks, scrambles and every
+          non-pass play. passer_player_id / rusher_player_id likewise carry the
+          gsis id of the player who handled the ball on that play type.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [nflverse_game_id, play_id]

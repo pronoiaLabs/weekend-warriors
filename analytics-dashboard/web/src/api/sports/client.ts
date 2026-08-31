@@ -11,6 +11,9 @@ import type {
   MarketsPayload,
   NewsPayload,
   PlayerPayload,
+  PlayerPropsPayload,
+  PlayerUsagePayload,
+  PlaysPayload,
   PulsePayload,
   SheetPayload,
   SlatePayload,
@@ -122,6 +125,58 @@ export function fetchPlayer(sport: string, playerKey: string, params: PlayerPara
   return get<PlayerPayload>(`${sportPath(sport)}/players/${encodeURIComponent(playerKey)}`, params, signal)
 }
 
+export function fetchPlayerUsage(
+  sport: string,
+  playerKey: string,
+  params: PlayerParams,
+  signal?: AbortSignal,
+): Promise<PlayerUsagePayload> {
+  return get<PlayerUsagePayload>(
+    `${sportPath(sport)}/players/${encodeURIComponent(playerKey)}/usage`,
+    params,
+    signal,
+  )
+}
+
+export type PlayerPropsParams = {
+  season?: number
+  vendor?: string
+  stat_key?: string
+}
+
+export function fetchPlayerProps(
+  sport: string,
+  playerKey: string,
+  params: PlayerPropsParams,
+  signal?: AbortSignal,
+): Promise<PlayerPropsPayload> {
+  return get<PlayerPropsPayload>(
+    `${sportPath(sport)}/players/${encodeURIComponent(playerKey)}/props`,
+    params,
+    signal,
+  )
+}
+
+export type PlaysParams = {
+  season?: number
+  week?: number
+  game_key?: string
+  player_key?: string
+  team?: string
+  down_bucket?: string
+  distance_bucket?: string
+  field_zone?: string
+  script?: string
+  play_family?: string
+  shotgun?: boolean
+  no_huddle?: boolean
+  two_minute?: boolean
+}
+
+export function fetchPlays(sport: string, params: PlaysParams, signal?: AbortSignal): Promise<PlaysPayload> {
+  return get<PlaysPayload>(`${sportPath(sport)}/plays`, params, signal)
+}
+
 export function fetchMarkets(sport: string, params: SlateParams, signal?: AbortSignal): Promise<MarketsPayload> {
   return get<MarketsPayload>(`${sportPath(sport)}/markets`, params, signal)
 }
@@ -150,6 +205,7 @@ export function fetchCatalog(sport: string, signal?: AbortSignal): Promise<Catal
 
 export type SheetParams = {
   where: string[]
+  q?: string
   order?: string
   desc?: boolean
   limit?: number

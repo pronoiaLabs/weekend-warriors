@@ -16,6 +16,8 @@ class Capability(StrEnum):
     PLAYER_WEEKS = "player_weeks"          # app_player_weeks
     PLAYER_WEEK_STATS = "player_week_stats"  # app_player_week_stats
     PLAYER_DEFENSE_WEEKS = "player_defense_weeks"  # app_player_defense_weeks
+    PLAYER_PROFILE = "player_profile"      # app_player_profile
+    PLAYER_SITUATION_USAGE = "player_situation_usage"  # app_player_situation_usage
     LINE_HISTORY = "line_history"          # app_line_history
     PROP_LINE_HISTORY = "prop_line_history"  # app_prop_line_history
     NEWS = "news"                          # app_news_mentions
@@ -32,3 +34,5 @@ class Capability(StrEnum):
     EXPLORE_PLAYER_PROPS = "explore_player_props"      # app_explore_player_props
     EXPLORE_NEWS = "explore_news"                      # app_explore_news
     EXPLORE_LINE_MOVES = "explore_line_moves"          # app_explore_line_moves
+    EXPLORE_PLAYS = "explore_plays"                    # app_explore_plays
+    PLAY_LOG = "play_log"                              # app_play_log

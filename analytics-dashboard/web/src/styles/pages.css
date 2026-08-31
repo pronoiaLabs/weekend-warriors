@@ -129,6 +129,8 @@ a.led-row:hover + a.led-row { border-top-color: transparent; }
 a.stand-row:hover, a.week-row:hover { background: var(--surface); }
 .stand-row .rk, .week-row .rk, .allowed-row .rk { color: var(--ink-4); font-weight: 600; }
 .stand-row .tm, .week-row .tm, .allowed-row .tm, .split-row .tm { display: flex; flex-direction: column; min-width: 0; }
+/* standings team cell: logo inline with the nickname (the wireframe's row) */
+.stand-row .tm { flex-direction: row; align-items: center; gap: 8px; }
 .stand-row .tm b, .week-row .tm b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stand-row .tm small, .week-row .tm small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stand-row .n, .week-row .n, .allowed-row .n, .split-row .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -294,6 +296,7 @@ button.trow.current { background: var(--surface-2); }
 .tlogo { flex: none; width: 22px; height: 22px; object-fit: contain; display: inline-block; vertical-align: middle; }
 .tlogo.sm { width: 16px; height: 16px; }
 .tlogo.lg { width: 44px; height: 44px; }
+.tlogo.xl { width: 52px; height: 52px; }
 .tlogo-fallback { font-size: 10px; font-weight: 700; color: var(--ink-3); }
 
 /* status + direction badges */
@@ -419,9 +422,9 @@ button.trow.current { background: var(--surface-2); }
 /* paired containers: one row, one height. The row's tiles stretch to match,
    the taller list caps and scrolls inside — no side-by-side tiles of uneven
    height anywhere. (The Pulse rails established the pattern.) */
-.cols-game, .cols-divisions, .cols-explore, .cols-markets, .teasers { align-items: stretch; }
-.cols-game > .tile, .cols-divisions > .tile, .cols-explore > .tile { max-height: 520px; display: flex; flex-direction: column; }
-.cols-game > .tile .tile-body, .cols-divisions > .tile .tile-body, .cols-explore > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
+.cols-game, .cols-divisions, .cols-explore, .cols-markets, .cols-team, .teasers { align-items: stretch; }
+.cols-game > .tile, .cols-divisions > .tile, .cols-explore > .tile, .cols-markets > .tile, .cols-team > .tile { max-height: 520px; display: flex; flex-direction: column; }
+.cols-game > .tile .tile-body, .cols-divisions > .tile .tile-body, .cols-explore > .tile .tile-body, .cols-markets > .tile .tile-body, .cols-team > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
 
 /* overview · availability tiles */
 .cols-game + .cols-game { margin-top: var(--gap); }
@@ -465,11 +468,199 @@ button.trow.current { background: var(--surface-2); }
 .sit-row .what { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .sit-row .what small { color: var(--ink-4); font-size: 9.5px; }
 .sit-row.thin .n { color: var(--ink-4); }
+a.sit-row { color: inherit; }
+a.sit-row:hover { background: var(--surface); border-top-color: transparent; border-radius: 8px; }
 .sit-sep { padding: 12px 0 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
 
 @media (max-width: 900px) {
   .teasers { grid-template-columns: minmax(0, 1fr); }
   .subnav { overflow-x: auto; max-width: 100%; }
+}
+
+/* ---- players · the finder ---- */
+.cols-players { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); gap: var(--gap); align-items: stretch; }
+.cols-players > .tile { display: flex; flex-direction: column; }
+.cols-players > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
+/* the leaderboard lives inside the viewport: the rows scroll, the page doesn't */
+.leaders-tile .tile-body { max-height: calc(100vh - 400px); min-height: 360px; }
+.risers-tile .tile-body { max-height: calc(100vh - 400px); }
+.leaders-tile .trow.head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-top: 8px; padding-bottom: 6px; }
+.pcell { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+.pcell .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.pcell .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcell .who small { color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+a.trow:hover .pcell .who b { color: var(--accent); }
+.posrk { font-size: 10px; font-weight: 700; color: var(--ink-4); }
+.trend { font-size: 11px; color: var(--ink-4); }
+.trend.pos { color: var(--pos); }
+.trend.neg { color: var(--neg); }
+.riser { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); color: inherit; }
+.riser:first-of-type { border-top: 0; padding-top: 0; }
+.riser .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.riser .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riser .who small { color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riser:hover .who b { color: var(--accent); }
+.riser .delta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.riser .delta small { color: var(--ink-4); }
+.risers-tile .tile-body > .hint { padding-top: 10px; }
+.psel-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-s); color: var(--ink-3); }
+.psel { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: var(--fs-s); }
+
+@media (max-width: 900px) {
+  .cols-players { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- player detail · identity header: team-head chassis + player pieces.
+   Team color is a whisper: the 3px bar, never a background flood. ---- */
+.player-head { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr); align-items: start; overflow: hidden; }
+.player-head .team-bar { position: absolute; left: 0; top: 20px; bottom: 20px; width: 3px; border-radius: 2px; background: var(--team, var(--line)); opacity: .85; }
+.player-head .who-row { display: flex; gap: 16px; align-items: flex-start; }
+.player-head .kick { display: inline-flex; align-items: center; gap: 6px; }
+.player-head h1 .jersey { font-size: 16px; font-weight: 500; color: var(--ink-4); margin-left: 8px; letter-spacing: 0; }
+.avatar.xl { width: 64px; height: 64px; font-size: 18px; flex: none; }
+.bio-strip { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: var(--fs-s); color: var(--ink-3); }
+.bio-strip b { color: var(--ink-2); font-weight: 600; }
+.head-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+.next-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
+.next-chip:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.player-head .season-side { display: flex; flex-direction: column; gap: 12px; align-items: flex-end; }
+.player-head .wordmark { height: 22px; opacity: .8; margin-left: auto; }
+.player-head .line-strip.three { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+
+/* game log */
+.gamelog .trow { min-width: 820px; }
+.gamelog .opp { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.gamelog .opp b { font-weight: 600; white-space: nowrap; }
+.gamelog .opp small { color: var(--ink-4); white-space: nowrap; }
+.gamelog .go { font-size: 10px; color: var(--ink-4); text-align: right; }
+a.trow:hover .go { color: var(--accent); }
+
+/* the form band: chart beside the usage grid, one height, scroll inside */
+.cols-detail { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--gap); align-items: stretch; }
+.cols-detail > .tile { display: flex; flex-direction: column; }
+.cols-detail > .tile .tile-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
+
+/* chart additions: value labels above the bars, the anchored prior label */
+.stat-chart .val { fill: var(--ink-2); font-size: 9.5px; font-weight: 600; }
+.stat-chart .prior-lbl { fill: var(--ink-3); font-size: 9px; }
+
+/* zone 4 · situational usage cells */
+.usage { display: grid; gap: 16px; }
+.ugroup .gl { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); margin-bottom: 6px; }
+.ucells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ucell { display: flex; flex-direction: column; gap: 2px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; min-width: 0; }
+.ucell .bl { font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+.ucell .v { font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.ucell .d { font-size: 10px; color: var(--ink-4); }
+.ucell:hover .bl { color: var(--accent); }
+.ucell.hot { border-color: color-mix(in srgb, var(--pos) 45%, transparent); background: color-mix(in srgb, var(--pos) 7%, transparent); }
+.ucell.hot .v { color: var(--pos); }
+.pattern { font-size: var(--fs-s); color: var(--ink-3); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+
+/* zone 5 · the market on this player */
+.market-now { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.proplog .trow { min-width: 420px; }
+.hit { display: inline-flex; justify-content: center; min-width: 40px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; border: 1px solid var(--line); color: var(--ink-3); }
+.hit.O { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent); }
+.hit.U { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 45%, transparent); }
+.market-player-tile .tile-body > .hint { margin-top: 10px; }
+
+@media (max-width: 900px) {
+  .player-head { grid-template-columns: minmax(0, 1fr); }
+  .player-head .season-side { align-items: flex-start; }
+  .player-head .wordmark { margin-left: 0; }
+  .cols-detail { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- team page · identity head + the wireframe pieces ---- */
+.team-page-head { overflow: hidden; }
+.team-page-head .team-bar { position: absolute; left: 24px; top: 0; width: 72px; height: 3px; border-radius: 0 0 3px 3px; background: var(--team, var(--accent)); opacity: .85; }
+.id-row { display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.id-row .rec b { display: block; font-size: 22px; font-weight: 700; line-height: 1.1; }
+.id-row .rec small { color: var(--ink-3); white-space: nowrap; }
+.id-row .last { display: flex; align-items: center; gap: 4px; }
+.id-row .last small { color: var(--ink-4); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+.team-page-head .wordmark { height: 20px; opacity: .8; margin-left: auto; align-self: center; }
+.stack { display: grid; gap: var(--gap); align-content: start; }
+
+/* week-by-week is the page's long list: the tile body caps at the window and
+   the column header pins (the ledger's pattern) */
+.weeks-tile .tile-body { max-height: calc(100vh - 280px); min-height: 340px; overflow: auto; }
+.weeks-tile .week-row.head { position: sticky; top: 0; z-index: 3; background: var(--surface); padding-top: 8px; padding-bottom: 6px; }
+.week-row .opp { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.week-row .opp b { font-weight: 600; white-space: nowrap; }
+.week-row.up { color: var(--ink-3); }
+.week-row.up .tm small { color: var(--ink-4); }
+
+/* allowed grid: every stat cell is a door, value over its rank */
+.allowed-row .n a { display: flex; flex-direction: column; align-items: flex-end; color: inherit; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
+.allowed-row .n a:hover { background: var(--surface-2); }
+.allowed-row .n a small { color: var(--ink-4); font-size: 10px; }
+a.split-row:hover { background: var(--surface); border-radius: 8px; }
+
+/* ---- markets · the movers board + detail additions ---- */
+.move-card .card-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.move-card .card-title h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.move-card .card-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.move-card .spark-cap { display: block; margin-top: 4px; font-size: 10px; color: var(--ink-4); }
+.chart-summary { font-size: var(--fs-s); color: var(--ink-3); margin-bottom: 8px; }
+.chart-summary b { color: var(--ink-2); font-weight: 600; }
+.proplines .trow { min-width: 780px; }
+.prop-flag { margin-left: 6px; }
+.prop-spark { height: 24px; width: 96px; }
+
+/* ---- explorer · the query bar ---- */
+.qbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
+.qwhere { flex: 1 1 320px; display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; }
+.qwhere span { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-4); }
+.qwhere input { flex: 1; background: none; border: 0; outline: none; color: var(--ink); font-family: var(--mono); font-size: 12px; }
+.qbar .sheet-actions { margin-left: auto; display: inline-flex; gap: 8px; }
+.catalog-chips .chip { font-family: var(--mono); }
+
+/* ---- play log · the pattern room ---- */
+.frail .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.frail .chip .avatar { width: 18px; height: 18px; font-size: 8px; margin-right: 4px; }
+.ustrip { display: flex; align-items: stretch; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.ustrip .whois { display: flex; align-items: center; gap: 10px; padding-right: 12px; border-right: 1px solid var(--line); flex: none; }
+.ustrip .whois .id { display: flex; flex-direction: column; line-height: 1.3; }
+.ustrip .whois .id b { font-weight: 600; white-space: nowrap; }
+.ustrip .whois .id small { color: var(--ink-4); white-space: nowrap; }
+.ustrip .u { flex: 1 0 92px; min-width: 92px; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.ustrip .u label { font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+.ustrip .u b { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+.ustrip .u small { font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+.ustrip .u small.pos { color: var(--pos); }
+.ustrip .u small.neg { color: var(--neg); }
+.ustrip .u.hot { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.ustrip .u.hot b { color: var(--accent); }
+.feed-tile .tile-body { padding: 0; }
+.feed-scroll { max-height: calc(100vh - 420px); min-height: 340px; overflow: auto; }
+.drive-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 10px 20px; background: var(--surface); border-top: 1px solid var(--line); }
+.drive:first-child .drive-head { border-top: 0; }
+.drive-head .team-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--team, var(--line-2)); opacity: .85; }
+.drive-head .dh { display: flex; align-items: baseline; gap: 10px; color: inherit; min-width: 0; }
+.drive-head .dh b { font-weight: 600; white-space: nowrap; }
+.drive-head .dh:hover b { color: var(--accent); }
+.drive-head .dsum { font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drive-head .score { margin-left: auto; font-size: 10.5px; color: var(--ink-4); white-space: nowrap; }
+.play { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto auto; gap: 4px 14px; align-items: center; padding: 7px 20px; border-top: 1px solid var(--line); font-size: 12px; }
+.play .sit b { display: block; color: var(--ink-2); }
+.play .sit small { color: var(--ink-4); white-space: nowrap; }
+.play .ptext { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.play .mx-row { display: flex; gap: 6px; align-items: center; }
+.play .mx { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-3); white-space: nowrap; }
+.play .mx.pos { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent); }
+.play .mx.neg { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 45%, transparent); }
+.play .pwho { display: flex; gap: 4px; }
+.play .pwho .avatar { width: 22px; height: 22px; font-size: 8px; }
+.play .pwho a:hover .avatar { border-color: var(--accent); }
+.play.hit { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.play.hit .sit b { color: var(--accent); }
+.play.dim { opacity: .45; }
+
+@media (max-width: 900px) {
+  .play { grid-template-columns: 110px minmax(0, 1fr); }
+  .play .mx-row, .play .pwho { grid-column: 2; justify-content: flex-start; }
 }
 
 /* ---- vertical rhythm, the rule: one even gap between every page-level block

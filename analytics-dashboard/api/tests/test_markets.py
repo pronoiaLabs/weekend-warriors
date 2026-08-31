@@ -22,7 +22,7 @@ def test_default_week_is_the_first_with_a_line_ahead_of_the_clock(client: TestCl
 def test_week_at_a_book_lists_every_snapshot_in_order(client: TestClient) -> None:
     body = client.get("/api/nfl/markets", params={"week": 1, "vendor": "kalshi"}).json()
     rows = body["rows"]
-    assert len(rows) == 374
+    assert len(rows) == 449
     assert all(r["vendor"] == "kalshi" for r in rows)
     assert len({r["game_key"] for r in rows}) == 16
     assert rows == sorted(rows, key=lambda r: (r["game_datetime_et"], r["game_key"], r["snapshot_number"]))
@@ -49,10 +49,10 @@ def test_game_markets_carry_every_book_and_the_chosen_books_props(client: TestCl
     assert body["game"]["game_key"] == NE_SEA
     assert (body["game"]["away_team_label"], body["game"]["home_team_label"]) == ("NE", "SEA")
     assert len(body["vendors"]) == 8
-    assert len(body["lines"]) == 51
+    assert len(body["lines"]) == 58
     assert body["vendor"] == "draftkings"
     props = body["props"]
-    assert len(props) == 4676 and all(p["vendor"] == "draftkings" for p in props)
+    assert len(props) == 6195 and all(p["vendor"] == "draftkings" for p in props)
     assert props == sorted(props, key=lambda p: (p["player_name"], p["prop_type"], p["snapshot_number"]))
     assert body["query"].count("from app_copy.") == 2
 
@@ -61,7 +61,7 @@ def test_props_are_bound_to_one_book(client: TestClient) -> None:
     dk = client.get(f"/api/nfl/markets/{SF_LAR}").json()
     fd = client.get(f"/api/nfl/markets/{SF_LAR}", params={"vendor": "fanduel"}).json()
     assert len({p["game_player_vendor_prop_key"] for p in dk["props"]}) == 64
-    assert len(fd["props"]) == 1374, "FanDuel re-snapshots every tick"
+    assert len(fd["props"]) == 1631, "FanDuel re-snapshots every tick"
     assert all(p["position"] == "QB" for p in fd["props"])
     assert dk["lines"] == fd["lines"], "the line paths are served for every book regardless"
 
