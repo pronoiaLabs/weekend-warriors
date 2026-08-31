@@ -24,9 +24,9 @@
 --           otherwise re-fire it immediately).
 --
 --           The windows are 50 minutes: with OBS_REFRESH and DBT_RUNS_REFRESH
---           both at a 3600s trigger interval, 50 minutes means the copy runs
---           at most about once an hour even when both graphs fire in the same
---           hour (agreed 2026-08-24). FORCE => TRUE (the dashboard's refresh
+--           on three fixed daily slots (since 2026-08-31; hourly-triggered
+--           before), 50 minutes still means at most one copy per slot even
+--           when both graphs fire in it. FORCE => TRUE (the dashboard's refresh
 --           button) skips the latch and the recency guard but never the two
 --           in-flight guards: manual refresh may jump the queue, not stack.
 -- Run as  : DLT_LOADER_ROLE (OPERATE + proc + OBS_COPY), then

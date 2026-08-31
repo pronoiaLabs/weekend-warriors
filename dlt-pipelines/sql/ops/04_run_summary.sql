@@ -794,15 +794,18 @@ ALTER TASK IF EXISTS DLT_DB.OPS.OBS_COPY SUSPEND;
 
 CREATE OR ALTER TASK DLT_DB.OPS.OBS_REFRESH
   WAREHOUSE = DLT_WH
-  -- Hourly, not 60: at 60s a long-running container (the postgres copies) kept
-  -- this firing continuously and the ops warehouse awake around the clock (~24
-  -- credits/day, measured 2026-08-24). With daily ingest windows the streams
-  -- only fill around them, so this self-reduces to a few fires a day.
-  -- Freshness between fires comes from the dashboard's manual refresh
-  -- (SP_OBS_SWEEP).
-  USER_TASK_MINIMUM_TRIGGER_INTERVAL_IN_SECONDS = 3600
+  -- Scheduled, not triggered (changed 2026-08-31). Triggered-hourly was a
+  -- self-perpetuating loop: this fires OBS_COPY, whose postgres-copy SPCS
+  -- container writes its own logs into DLT_EVENTS, re-arming the streams for
+  -- the next hourly fire (measured: 14 copies/day, ~1.4 credits/day, with
+  -- daily ingestion). Three fixed slots ride the warm periods behind the
+  -- ingest windows (NCAAF 06:45 build, NFL 12:30 and 22:30 builds); each
+  -- drains its own events, so the loop cannot sustain between slots, and the
+  -- WHEN clause makes an empty slot a free SKIPPED. Freshness between fires
+  -- comes from the dashboard's manual refresh (SP_OBS_SWEEP).
+  SCHEDULE = 'USING CRON 10 7,13,23 * * * UTC'
   USER_TASK_TIMEOUT_MS = 600000
-  COMMENT = 'Event-driven observability refresh: drains the ops/02+03 streams and re-merges TASK_RUNS / PIPELINE_RUNS. NOT managed by generate_tasks.py.'
+  COMMENT = 'Scheduled observability refresh (07:10/13:10/23:10 UTC): drains the ops/02+03 streams and re-merges TASK_RUNS / PIPELINE_RUNS. NOT managed by generate_tasks.py.'
   WHEN SYSTEM$STREAM_HAS_DATA('DLT_DB.OPS.STREAM_OBS_LOGS')
     OR SYSTEM$STREAM_HAS_DATA('DLT_DB.OPS.STREAM_OBS_METRICS')
 AS
