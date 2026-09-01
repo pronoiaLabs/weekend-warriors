@@ -254,10 +254,11 @@ def test_generator_covers_every_scheduled_pipeline() -> None:
         "nfl_nflverse_stats", "nfl_nflverse_depth_charts", "nfl_nflverse_reference",
         "nfl_sleeper_players", "nfl_sleeper_market",
     }
-    assert by_source["ncaaf"] == {
-        "ncaaf_reference", "ncaaf_games", "ncaaf_stats",
-        "ncaaf_season_stats", "ncaaf_standings", "ncaaf_rankings",
-    }
+    # NCAAF is PAUSED (2026-09, BDL subscription lapsed): every schedule in its
+    # registry is commented out, so the sport must be absent here entirely. On
+    # renewal, restore the old assertion: reference, games, stats,
+    # season_stats, standings, rankings.
+    assert "ncaaf" not in by_source
 
     # `sample` is the guard on the whole mechanism: it exists precisely to be the
     # pipeline that is runnable by hand and never becomes a Task.

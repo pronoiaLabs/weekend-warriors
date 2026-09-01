@@ -556,11 +556,15 @@ pipelines:
   # selected:false and never load; only regular season and postseason are requested.
   - name: nfl_game_odds
     source: rest_api
-    # Daily in the 11:00 window. Once a day is a deliberate cost trade: only
-    # observations captured while this runs exist, so line-history resolution
-    # drops to one snapshot per day (movement between pulls is lost, not
-    # backfillable). Accepted 2026-08 to keep the warehouse warm once a day.
-    schedule: "30 11 * * *"
+    # Every 4h on game days (restored 2026-09-01 once the scheduled-build
+    # design made an extra cycle cheap: ~0.15 credits, no build behind it).
+    # Only observations captured while this runs exist -- line movement
+    # cannot be backfilled -- so cadence IS the line-history resolution.
+    # Hours 2,6,10,14,18,22 keep clear of the 11:00-12:20 daily window and
+    # 22:00 injuries (the 22:15 cycle rides that warm period); loads drain
+    # at the next scheduled build (12:30 or 22:30), so the pages lag but the
+    # snapshots do not.
+    schedule: "15 2,6,10,14,18,22 * * 0,1,4,5,6"
     config:
       client: *nfl_client
       resource_defaults:
@@ -629,9 +633,9 @@ pipelines:
 
   - name: nfl_player_props
     source: rest_api
-    # Same window as game odds, staggered 10 minutes to avoid concurrent use
-    # of the NFL key. Same one-snapshot-a-day trade as nfl_game_odds.
-    schedule: "40 11 * * *"
+    # Same cycles as game odds, staggered 10 minutes to avoid concurrent use
+    # of the NFL key (nfl_news at :20 sits between them on its own key).
+    schedule: "25 2,6,10,14,18,22 * * 0,1,4,5,6"
     config:
       client: *nfl_client
       resource_defaults:
