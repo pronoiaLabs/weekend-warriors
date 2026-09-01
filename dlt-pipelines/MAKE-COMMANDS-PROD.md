@@ -64,11 +64,11 @@ Everything NFL runs once a day in one 11:00-12:20 UTC window, except injuries (d
 | `nfl_nflverse_stats` | `15 11 * * *` | daily | nflverse season files (pbp, player weeks, snaps, Next Gen, injury reports) merged on their keys; a reload is how corrections arrive. 11:15 is the window's floor: nflverse rebuilds overnight |
 | `nfl_odds_opening` | `20 11 * * *` | daily | immutable game and player-prop openings, both fanned out per game |
 | `nfl_weather_forecast` | `25 11 * * *` | daily | 16-day outlook for outdoor and retractable sites |
-| `nfl_game_odds` | `30 11 * * *` | daily | SCD2 snapshots of current game lines; one observation a day (movement between pulls is lost, accepted for cost) |
-| `nfl_player_props` | `40 11 * * *` | daily | SCD2 snapshots, staggered ten minutes off game odds for the shared key |
+| `nfl_game_odds` | `15 2,6,10,14,18,22 * * 0,1,4,5,6` | every 4h Thu-Mon | SCD2 snapshots of current game lines; cadence IS the line-history resolution |
+| `nfl_player_props` | `25 2,6,10,14,18,22 * * 0,1,4,5,6` | every 4h Thu-Mon | SCD2 snapshots, staggered ten minutes off game odds for the shared key |
 | `nfl_nflverse_depth_charts` | `45 11 * * *` | daily | one new depth-chart snapshot a day, cursor on `dt` |
 | `nfl_nflverse_reference` | `50 11 * * 3` | Wednesday | all-history files replaced: players id crosswalk, officials, combine, trades |
-| `nfl_news` | `55 11 * * *` | daily | Firecrawl RSS scrape; the short-post wires drop items at this cadence (they only expose their last 15-30), accepted for cost |
+| `nfl_news` | `20 2,6,10,14,18,22 * * *` | every 4h | Firecrawl RSS scrape in the odds/props cycle's middle slot; six runs keep the short-post wires whole |
 | `nfl_plays` | `0 12 * * 2` | Tuesday | ~334 requests; plays are final once a game ends |
 | `nfl_standings` | `5 12 * * 2` | Tuesday | only meaningful after a full week |
 | `nfl_sleeper_players` | `10 12 * * *` | daily | the ~15 MB player dump, replaced; Sleeper asks for at most one pull a day |
@@ -95,9 +95,12 @@ makes an empty slot a free SKIPPED. Tests run once a day on `DBT_TEST_NFL` at 13
 `sql/**` is not CI-applied: after merging trigger SQL, `make setup-source SOURCE=nfl CONFIRM=1`
 (and `SOURCE=ncaaf`) is required.
 
-The betting Tasks are daily now. Only observations captured while they run exist -- line movement
-between the daily pulls is lost and cannot be backfilled. That resolution was traded away
-deliberately for cost; raising them back to `*/4` on game days is a two-line registry change.
+The betting and news Tasks are the one intraday exception (restored 2026-09-01 after a single
+daily-cadence day proved an extra cycle costs ~0.15 credits under the scheduled-build design):
+a tight :15/:20/:25 cluster at hours 2/6/10/14/18/22, odds and props on game days, news every
+day. Only observations captured while they run exist -- line movement between pulls cannot be
+backfilled. No build fires behind them; their loads drain at the next 12:30/22:30 build, so the
+pages lag up to half a day while the snapshots keep full resolution.
 
 **Why 11:00 UTC.** nflverse rebuilds its files overnight and cannot be pulled before ~11:15, which
 sets the window's floor; everything else joined it there. It also clears Monday Night Football
@@ -418,6 +421,12 @@ accepts only bracketed `game_ids[]`, which the child resources resolve from thos
 ---
 
 ## NCAAF: schedules and calendar
+
+**THE SPORT IS PAUSED (2026-09):** the BDL subscription's NCAAF access lapsed
+(every endpoint 401s), so the registry schedules are commented out, the
+generator no longer manages the Tasks, and the live NCAAF Tasks plus its dbt
+build/test roots are suspended by hand. The resume recipe is in
+ncaaf-registry.yml's header. The table below describes the paused design.
 
 Deployed 2026-08-09 (WORKFLOW-7). The band is **02:00-07:59 UTC**, below the
 NFL's 11:00-12:20 window, so the two sports never stack against the shared
